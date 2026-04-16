@@ -88,6 +88,8 @@ impl HistoryScreen {
             Line::from(vec![
                 Span::styled(" [j/k]", Style::default().fg(PURPLE)),
                 Span::styled(" Navigate  ", Style::default().fg(Color::DarkGray)),
+                Span::styled("[Enter]", Style::default().fg(PURPLE)),
+                Span::styled(" Edit  ", Style::default().fg(Color::DarkGray)),
                 Span::styled("[d]", Style::default().fg(PURPLE)),
                 Span::styled(" Delete  ", Style::default().fg(Color::DarkGray)),
                 Span::styled("[Esc]", Style::default().fg(PURPLE)),
@@ -209,6 +211,12 @@ impl HistoryScreen {
             KeyCode::Char('d') => {
                 if !self.entries.is_empty() {
                     self.mode = Mode::ConfirmDelete;
+                }
+                Action::None
+            }
+            KeyCode::Enter => {
+                if !self.entries.is_empty() {
+                    return Action::Navigate(Screen::LogEntry);
                 }
                 Action::None
             }

@@ -8,7 +8,7 @@ use ratatui::{
 };
 
 use crate::db::Database;
-use crate::model::{Practice, PracticeType, SetData};
+use crate::model::{LogEntry, Practice, PracticeType, SetData};
 use super::{Action, Screen};
 
 const PURPLE: Color = Color::Rgb(124, 124, 245);
@@ -34,6 +34,7 @@ pub struct LogEntryScreen {
     field2: String,
     active_field: usize,
     note: String,
+    editing_log_id: Option<i64>,
 }
 
 impl LogEntryScreen {
@@ -53,6 +54,34 @@ impl LogEntryScreen {
             field2: String::new(),
             active_field: 0,
             note: String::new(),
+            editing_log_id: None,
+        })
+    }
+
+    pub fn from_existing(db: &Database, log_entry: &LogEntry) -> anyhow::Result<Self> {
+        let practices = db.list_practices()?;
+        let filtered_indices = (0..practices.len()).collect();
+        let practice = practices
+            .iter()
+            .find(|p| p.id == log_entry.log.practice_id)
+            .cloned();
+        let sets: Vec<SetData> = log_entry.sets.iter().map(|s| s.data.clone()).collect();
+        let note = log_entry.log.note.clone().unwrap_or_default();
+
+        Ok(Self {
+            practices,
+            filtered_indices,
+            filter_text: String::new(),
+            filtering: false,
+            selected: 0,
+            phase: Phase::EnterSets,
+            chosen_practice: practice,
+            sets,
+            field1: String::new(),
+            field2: String::new(),
+            active_field: 0,
+            note,
+            editing_log_id: Some(log_entry.log.id),
         })
     }
 
@@ -559,7 +588,11 @@ impl LogEntryScreen {
                 } else {
                     Some(self.note.as_str())
                 };
-                let _ = db.create_log(practice.id, &self.sets, note);
+                if let Some(log_id) = self.editing_log_id {
+                    let _ = db.update_log(log_id, &self.sets, note);
+                } else {
+                    let _ = db.create_log(practice.id, &self.sets, note);
+                }
                 Action::Navigate(Screen::Dashboard)
             }
             KeyCode::Backspace => {

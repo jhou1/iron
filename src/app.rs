@@ -70,7 +70,17 @@ fn run_app(
                 Action::Navigate(screen) => {
                     match &screen {
                         Screen::Dashboard => dashboard.refresh(db)?,
-                        Screen::LogEntry => log_entry = LogEntryScreen::new(db)?,
+                        Screen::LogEntry => {
+                            if current_screen == Screen::History {
+                                if let Some(entry) = history.selected_entry() {
+                                    log_entry = LogEntryScreen::from_existing(db, entry)?;
+                                } else {
+                                    log_entry = LogEntryScreen::new(db)?;
+                                }
+                            } else {
+                                log_entry = LogEntryScreen::new(db)?;
+                            }
+                        }
                         Screen::History => history = HistoryScreen::new(db)?,
                         Screen::Trends => trends = TrendsScreen::new(db)?,
                         Screen::Practices => practices = PracticesScreen::new(db)?,
