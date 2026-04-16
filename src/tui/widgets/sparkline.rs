@@ -5,6 +5,8 @@ use ratatui::{
     widgets::Widget,
 };
 
+const ACCENT: Color = Color::Cyan;
+
 /// A vertical bar chart widget.
 ///
 /// Takes `Vec<(String, f64)>` where String is a label (e.g. date) and f64 is the value.
@@ -35,15 +37,15 @@ impl Sparkline {
 impl Widget for Sparkline {
     fn render(self, area: Rect, buf: &mut Buffer) {
         // Minimum area: height >= 3, width >= 4, data not empty
-        if area.height < 3 || area.width < 4 || self.data.is_empty() {
+        if area.height < 4 || area.width < 4 || self.data.is_empty() {
             return;
         }
 
-        // Reserve 1 row for x-axis labels at the bottom, and 1 column gap on the right
-        // for y-axis labels.
+        // Reserve 2 rows for x-axis labels (day + month) at the bottom,
+        // and columns on the right for y-axis labels.
         let y_label_width: u16 = 6; // right-side y-axis labels (e.g. "1234.5")
         let chart_width = area.width.saturating_sub(y_label_width + 1); // +1 gap
-        let chart_height = area.height.saturating_sub(1); // 1 row for x-axis labels
+        let chart_height = area.height.saturating_sub(2); // 2 rows for x-axis labels
 
         if chart_width < 3 || chart_height < 2 {
             return;
@@ -89,11 +91,19 @@ impl Widget for Sparkline {
                 }
             }
 
-            // Draw x-axis label (first 2 chars of label) below the chart
-            let label_y = area.y + chart_height;
-            if label_y < area.y + area.height {
-                let short: String = label.chars().take(2).collect();
-                buf.set_string(x, label_y, &short, Style::default().fg(Color::DarkGray));
+            // Draw x-axis labels below the chart.
+            // Labels can contain "day\nmonth" (e.g., "21\nJan") for month boundaries,
+            // or just "day" (e.g., "26") for regular entries.
+            let day_row = area.y + chart_height;
+            let month_row = day_row + 1;
+            let parts: Vec<&str> = label.splitn(2, '\n').collect();
+            if day_row < area.y + area.height {
+                let day_label: String = parts[0].chars().take(2).collect();
+                buf.set_string(x, day_row, &day_label, Style::default().fg(Color::DarkGray));
+            }
+            if parts.len() > 1 && month_row < area.y + area.height {
+                let month_label: String = parts[1].chars().take(3).collect();
+                buf.set_string(x, month_row, &month_label, Style::default().fg(ACCENT));
             }
         }
 

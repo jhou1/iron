@@ -90,6 +90,7 @@ Integration tests use file-based SQLite databases via `TestDb` helper (creates t
 - Color constants defined per-screen as `const ACCENT`, `const GREEN`, etc. using ANSI colors.
 - Database errors in TUI handlers are currently swallowed with `let _ =` (known limitation).
 - `PracticeType::label()` returns the UI-facing name (weightxreps/reps/distance/duration). `Display` impl returns the storage name (weighted/bodyweight/distance/endurance).
+- Everytime a feature is added or modified, update the README.md to provide proper user instruction.
 
 ## Spec & Plan
 

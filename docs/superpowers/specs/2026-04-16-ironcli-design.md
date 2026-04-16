@@ -145,7 +145,7 @@ When editing an existing log from History, the date is pre-populated from the or
 
 ### Trend View
 
-Sparkline bar chart showing the derived metric (volume, total reps, total distance, or total duration) per log over time for a selected practice. Summary stats below: average, peak, and trend percentage. Navigate time window with h/l.
+Sparkline bar chart showing the derived metric (volume, total reps, total distance, or total duration) per log over time for a selected practice. The x-axis uses two rows: the top row shows day-of-month (e.g., "05", "18") for every bar, and the bottom row shows the month abbreviation (e.g., "Jan", "Feb") in cyan only at month boundaries. Summary stats below: average, peak, and trend percentage. Navigate time window with h/l.
 
 ## CRUD Operations
 

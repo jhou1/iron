@@ -1,3 +1,4 @@
+use chrono::Datelike;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     layout::{Constraint, Direction, Layout},
@@ -293,8 +294,19 @@ impl TrendsScreen {
             let chart_data: Vec<(String, f64)> = self
                 .entries
                 .iter()
-                .map(|e| {
-                    let label = e.log.logged_at.format("%m/%d").to_string();
+                .enumerate()
+                .map(|(i, e)| {
+                    let day = e.log.logged_at.format("%d").to_string();
+                    let label = if i == 0
+                        || e.log.logged_at.month()
+                            != self.entries[i - 1].log.logged_at.month()
+                    {
+                        // First entry or month boundary — day on row 1, month on row 2
+                        let month = e.log.logged_at.format("%b").to_string();
+                        format!("{}\n{}", day, month)
+                    } else {
+                        day
+                    };
                     (label, e.total_metric())
                 })
                 .collect();
