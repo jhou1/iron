@@ -1,3 +1,4 @@
+use chrono::{Local, NaiveDate, NaiveDateTime, NaiveTime};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Direction, Layout},
@@ -35,12 +36,16 @@ pub struct LogEntryScreen {
     active_field: usize,
     note: String,
     editing_log_id: Option<i64>,
+    log_date: String,      // YYYY-MM-DD, defaults to today
+    editing_date: bool,     // true when in date-edit mode
+    date_input: String,     // buffer for typing a new date
 }
 
 impl LogEntryScreen {
     pub fn new(db: &Database) -> anyhow::Result<Self> {
         let practices = db.list_practices()?;
         let filtered_indices = (0..practices.len()).collect();
+        let today = Local::now().format("%Y-%m-%d").to_string();
         Ok(Self {
             practices,
             filtered_indices,
@@ -55,6 +60,9 @@ impl LogEntryScreen {
             active_field: 0,
             note: String::new(),
             editing_log_id: None,
+            log_date: today,
+            editing_date: false,
+            date_input: String::new(),
         })
     }
 
@@ -68,6 +76,7 @@ impl LogEntryScreen {
         let sets: Vec<SetData> = log_entry.sets.iter().map(|s| s.data.clone()).collect();
         let note = log_entry.log.note.clone().unwrap_or_default();
 
+        let log_date = log_entry.log.logged_at.format("%Y-%m-%d").to_string();
         Ok(Self {
             practices,
             filtered_indices,
@@ -82,6 +91,9 @@ impl LogEntryScreen {
             active_field: 0,
             note,
             editing_log_id: Some(log_entry.log.id),
+            log_date,
+            editing_date: false,
+            date_input: String::new(),
         })
     }
 
@@ -257,7 +269,7 @@ impl LogEntryScreen {
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(1), // title
-                Constraint::Length(1), // spacer
+                Constraint::Length(1), // date line
                 Constraint::Min(1),   // committed sets + input
                 Constraint::Length(1), // running total
                 Constraint::Length(2), // footer
@@ -276,6 +288,28 @@ impl LogEntryScreen {
             ),
         ]);
         frame.render_widget(Paragraph::new(title), chunks[0]);
+
+        // Date line
+        let date_line = if self.editing_date {
+            Line::from(vec![
+                Span::styled("  Date: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!("{}\u{2588}", self.date_input),
+                    Style::default().fg(ACCENT),
+                ),
+                Span::styled(
+                    "  (YYYY-MM-DD, Enter to confirm)",
+                    Style::default().fg(Color::DarkGray),
+                ),
+            ])
+        } else {
+            Line::from(vec![
+                Span::styled("  Date: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(&self.log_date, Style::default().fg(Color::White)),
+                Span::styled("  [D] to change", Style::default().fg(Color::DarkGray)),
+            ])
+        };
+        frame.render_widget(Paragraph::new(date_line), chunks[1]);
 
         // Committed sets + current input
         let mut lines: Vec<Line> = Vec::new();
@@ -373,8 +407,10 @@ impl LogEntryScreen {
             Span::styled(" Add set  ", Style::default().fg(Color::DarkGray)),
             Span::styled("[Ctrl+S]", Style::default().fg(ACCENT)),
             Span::styled(" Save  ", Style::default().fg(Color::DarkGray)),
+            Span::styled("[D]", Style::default().fg(ACCENT)),
+            Span::styled(" Date  ", Style::default().fg(Color::DarkGray)),
             Span::styled("[d]", Style::default().fg(ACCENT)),
-            Span::styled(" Delete last  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" Del last  ", Style::default().fg(Color::DarkGray)),
             Span::styled("[Esc]", Style::default().fg(ACCENT)),
             Span::styled(" Cancel", Style::default().fg(Color::DarkGray)),
         ]);
@@ -382,6 +418,11 @@ impl LogEntryScreen {
     }
 
     fn handle_enter_sets(&mut self, key: KeyEvent) -> Action {
+        // Date editing sub-mode
+        if self.editing_date {
+            return self.handle_date_edit(key);
+        }
+
         let practice = self.chosen_practice.as_ref().unwrap().clone();
         let is_weighted = practice.practice_type == PracticeType::Weighted;
         let has_two_fields = is_weighted;
@@ -396,6 +437,11 @@ impl LogEntryScreen {
 
         match key.code {
             KeyCode::Esc => Action::Navigate(Screen::Dashboard),
+            KeyCode::Char('D') => {
+                self.editing_date = true;
+                self.date_input = self.log_date.clone();
+                Action::None
+            }
             KeyCode::Tab => {
                 if has_two_fields {
                     self.active_field = if self.active_field == 0 { 1 } else { 0 };
@@ -404,10 +450,8 @@ impl LogEntryScreen {
             }
             KeyCode::Enter => {
                 if has_two_fields && self.active_field == 0 {
-                    // Switch to the second field
                     self.active_field = 1;
                 } else {
-                    // Commit the set
                     self.commit_set();
                 }
                 Action::None
@@ -421,16 +465,10 @@ impl LogEntryScreen {
                 Action::None
             }
             KeyCode::Char('d') => {
-                // Only delete last set when all input fields are empty
                 let fields_empty = self.field1.is_empty()
                     && (self.field2.is_empty() || !has_two_fields);
                 if fields_empty && !self.sets.is_empty() {
                     self.sets.pop();
-                } else if self.active_field == 0 {
-                    // Otherwise treat 'd' as digit input? No, 'd' is not a digit.
-                    // 'd' is not a digit or '.', so ignore it as input.
-                } else {
-                    // active_field == 1, also not a valid input char
                 }
                 Action::None
             }
@@ -444,6 +482,29 @@ impl LogEntryScreen {
             }
             _ => Action::None,
         }
+    }
+
+    fn handle_date_edit(&mut self, key: KeyEvent) -> Action {
+        match key.code {
+            KeyCode::Enter => {
+                // Validate the date
+                if NaiveDate::parse_from_str(&self.date_input, "%Y-%m-%d").is_ok() {
+                    self.log_date = self.date_input.clone();
+                }
+                self.editing_date = false;
+            }
+            KeyCode::Esc => {
+                self.editing_date = false;
+            }
+            KeyCode::Backspace => {
+                self.date_input.pop();
+            }
+            KeyCode::Char(c) if c.is_ascii_digit() || c == '-' => {
+                self.date_input.push(c);
+            }
+            _ => {}
+        }
+        Action::None
     }
 
     fn commit_set(&mut self) {
@@ -541,6 +602,10 @@ impl LogEntryScreen {
             .map(|s| s.metric_label())
             .unwrap_or("units");
         let summary_lines = vec![
+            Line::from(vec![
+                Span::styled("  Date: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(&self.log_date, Style::default().fg(Color::White)),
+            ]),
             Line::from(Span::styled(
                 format!("  {} sets logged", self.sets.len()),
                 Style::default().fg(GREEN),
@@ -588,10 +653,13 @@ impl LogEntryScreen {
                 } else {
                     Some(self.note.as_str())
                 };
+                let date = NaiveDate::parse_from_str(&self.log_date, "%Y-%m-%d")
+                    .unwrap_or_else(|_| Local::now().date_naive());
+                let datetime = date.and_time(NaiveTime::from_hms_opt(12, 0, 0).unwrap());
                 if let Some(log_id) = self.editing_log_id {
-                    let _ = db.update_log(log_id, &self.sets, note);
+                    let _ = db.update_log(log_id, &self.sets, note, Some(&datetime));
                 } else {
-                    let _ = db.create_log(practice.id, &self.sets, note);
+                    let _ = db.create_log_at(practice.id, &datetime, &self.sets, note);
                 }
                 Action::Navigate(Screen::Dashboard)
             }

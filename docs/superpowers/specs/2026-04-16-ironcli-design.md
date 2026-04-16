@@ -131,7 +131,7 @@ The home screen uses a full-width layout with split panes:
 ### Log Entry Flow
 
 1. Select a practice from the inventory using a filterable list (j/k, / to search).
-2. Enter sets one at a time. Each set prompts for the fields relevant to the practice type:
+2. Enter sets one at a time. The log date is shown at the top, defaulting to today. Press `D` (shift+d) to edit the date in YYYY-MM-DD format. Each set prompts for the fields relevant to the practice type:
    - Weighted: weight (kg), reps
    - Bodyweight: reps
    - Distance: distance (km)
@@ -140,6 +140,8 @@ The home screen uses a full-width layout with split panes:
 4. A running total is displayed live (sets count + derived metric).
 5. Press Ctrl+S to finish adding sets. A note prompt appears — type a free-text note (e.g., "I feel great in this session") or press Enter to skip.
 6. Press Enter to save. Press Esc to cancel.
+
+When editing an existing log from History, the date is pre-populated from the original log and can be changed with `D`.
 
 ### Trend View
 

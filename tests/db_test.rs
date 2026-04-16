@@ -93,7 +93,7 @@ fn update_log_sets_and_note() {
         SetData::Weighted { weight: 80.0, reps: 8 },
         SetData::Weighted { weight: 100.0, reps: 5 },
     ];
-    db.update_log(log_id, &new_sets, Some("Updated")).unwrap();
+    db.update_log(log_id, &new_sets, Some("Updated"), None).unwrap();
 
     let entries = db.list_logs_recent(1).unwrap();
     assert_eq!(entries[0].sets.len(), 2);

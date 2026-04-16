@@ -177,9 +177,22 @@ impl Database {
         Ok(log_id)
     }
 
-    pub fn update_log(&self, log_id: i64, sets: &[SetData], note: Option<&str>) -> Result<()> {
-        self.conn
-            .execute("UPDATE logs SET note = ?1 WHERE id = ?2", params![note, log_id])?;
+    pub fn update_log(
+        &self,
+        log_id: i64,
+        sets: &[SetData],
+        note: Option<&str>,
+        logged_at: Option<&NaiveDateTime>,
+    ) -> Result<()> {
+        if let Some(dt) = logged_at {
+            self.conn.execute(
+                "UPDATE logs SET note = ?1, logged_at = ?2 WHERE id = ?3",
+                params![note, dt.to_string(), log_id],
+            )?;
+        } else {
+            self.conn
+                .execute("UPDATE logs SET note = ?1 WHERE id = ?2", params![note, log_id])?;
+        }
         // Delete old sets and insert new ones
         self.conn
             .execute("DELETE FROM sets WHERE log_id = ?1", params![log_id])?;
