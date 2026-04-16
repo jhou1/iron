@@ -179,7 +179,7 @@ pub fn import_from_json(db: &Database, path: &Path) -> Result<usize> {
         let sets: Vec<SetData> = log
             .sets
             .iter()
-            .map(|s| reconstruct_set_data(s))
+            .map(reconstruct_set_data)
             .collect();
 
         db.create_log_at(
