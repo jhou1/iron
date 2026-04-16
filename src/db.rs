@@ -151,6 +151,23 @@ impl Database {
         Ok(log_id)
     }
 
+    /// Creates a log with a specific timestamp (used by import).
+    pub fn create_log_at(
+        &self,
+        practice_id: i64,
+        logged_at: &NaiveDateTime,
+        sets: &[SetData],
+        note: Option<&str>,
+    ) -> Result<i64> {
+        self.conn.execute(
+            "INSERT INTO logs (practice_id, logged_at, note) VALUES (?1, ?2, ?3)",
+            params![practice_id, logged_at.to_string(), note],
+        )?;
+        let log_id = self.conn.last_insert_rowid();
+        self.insert_sets(log_id, sets)?;
+        Ok(log_id)
+    }
+
     pub fn update_log(&self, log_id: i64, sets: &[SetData], note: Option<&str>) -> Result<()> {
         self.conn
             .execute("UPDATE logs SET note = ?1 WHERE id = ?2", params![note, log_id])?;
