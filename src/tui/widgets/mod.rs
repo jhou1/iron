@@ -1,1 +1,2 @@
-// Custom widgets — implemented in Tasks 6, 9
+pub mod heatmap;
+pub mod sparkline;
