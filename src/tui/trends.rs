@@ -12,9 +12,9 @@ use crate::model::{LogEntry, Practice};
 use super::widgets::sparkline::Sparkline;
 use super::{Action, Screen};
 
-const PURPLE: Color = Color::Rgb(124, 124, 245);
-const GREEN: Color = Color::Rgb(78, 202, 78);
-const RED: Color = Color::Rgb(220, 80, 80);
+const ACCENT: Color = Color::Cyan;
+const GREEN: Color = Color::Green;
+const RED: Color = Color::Red;
 
 #[derive(Debug, Clone, PartialEq)]
 enum Phase {
@@ -106,7 +106,7 @@ impl TrendsScreen {
         // Title
         let title = Line::from(Span::styled(
             " Trends \u{2014} Select Practice",
-            Style::default().fg(PURPLE).bold(),
+            Style::default().fg(ACCENT).bold(),
         ));
         frame.render_widget(Paragraph::new(title), chunks[0]);
 
@@ -119,7 +119,7 @@ impl TrendsScreen {
             String::from(" Press / to filter")
         };
         let filter_style = if self.filtering {
-            Style::default().fg(PURPLE)
+            Style::default().fg(ACCENT)
         } else {
             Style::default().fg(Color::DarkGray)
         };
@@ -151,13 +151,13 @@ impl TrendsScreen {
 
         // Footer
         let footer = Line::from(vec![
-            Span::styled(" [j/k]", Style::default().fg(PURPLE)),
+            Span::styled(" [j/k]", Style::default().fg(ACCENT)),
             Span::styled(" Navigate  ", Style::default().fg(Color::DarkGray)),
-            Span::styled("[/]", Style::default().fg(PURPLE)),
+            Span::styled("[/]", Style::default().fg(ACCENT)),
             Span::styled(" Filter  ", Style::default().fg(Color::DarkGray)),
-            Span::styled("[Enter]", Style::default().fg(PURPLE)),
+            Span::styled("[Enter]", Style::default().fg(ACCENT)),
             Span::styled(" Select  ", Style::default().fg(Color::DarkGray)),
-            Span::styled("[Esc]", Style::default().fg(PURPLE)),
+            Span::styled("[Esc]", Style::default().fg(ACCENT)),
             Span::styled(" Back", Style::default().fg(Color::DarkGray)),
         ]);
         frame.render_widget(Paragraph::new(footer), chunks[3]);
@@ -262,7 +262,7 @@ impl TrendsScreen {
         let title = Line::from(vec![
             Span::styled(
                 format!(" {} ", practice.name),
-                Style::default().fg(PURPLE).bold(),
+                Style::default().fg(ACCENT).bold(),
             ),
             Span::styled(
                 format!("({}) ", metric_label),
@@ -329,11 +329,11 @@ impl TrendsScreen {
 
         // Footer
         let footer = Line::from(vec![
-            Span::styled(" [h/l]", Style::default().fg(PURPLE)),
+            Span::styled(" [h/l]", Style::default().fg(ACCENT)),
             Span::styled(" Window  ", Style::default().fg(Color::DarkGray)),
-            Span::styled("[/]", Style::default().fg(PURPLE)),
+            Span::styled("[/]", Style::default().fg(ACCENT)),
             Span::styled(" Pick practice  ", Style::default().fg(Color::DarkGray)),
-            Span::styled("[Esc]", Style::default().fg(PURPLE)),
+            Span::styled("[Esc]", Style::default().fg(ACCENT)),
             Span::styled(" Dashboard", Style::default().fg(Color::DarkGray)),
         ]);
         frame.render_widget(Paragraph::new(footer), chunks[6]);

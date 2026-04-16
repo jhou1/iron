@@ -19,12 +19,12 @@ impl<'a> Heatmap<'a> {
         Self { data, weeks }
     }
 
-    fn color_for_count(count: i64) -> Color {
+    fn cell_for_count(count: i64) -> (&'static str, Color) {
         match count {
-            0 => Color::Rgb(30, 30, 58),
-            1 => Color::Rgb(45, 90, 45),
-            2 => Color::Rgb(61, 139, 61),
-            _ => Color::Rgb(78, 202, 78),
+            0 => ("\u{00B7}", Color::DarkGray),    // · middle dot
+            1 => ("\u{2588}", Color::DarkGray),     // █
+            2 => ("\u{2588}", Color::Green),        // █
+            _ => ("\u{2588}", Color::LightGreen),   // █
         }
     }
 }
@@ -72,12 +72,12 @@ impl<'a> Widget for Heatmap<'a> {
                 }
                 let date_str = date.format("%Y-%m-%d").to_string();
                 let count = counts.get(&date_str).copied().unwrap_or(0);
-                let color = Heatmap::color_for_count(count);
+                let (ch, color) = Heatmap::cell_for_count(count);
 
                 let x = area.x + label_width + week * 2;
                 let y = area.y + day;
                 if y < area.y + area.height && x + 1 < area.x + area.width {
-                    buf.set_string(x, y, "\u{2588}", Style::default().fg(color));
+                    buf.set_string(x, y, ch, Style::default().fg(color));
                 }
             }
         }
@@ -87,13 +87,13 @@ impl<'a> Widget for Heatmap<'a> {
         if legend_y < area.y + area.height {
             let legend = Line::from(vec![
                 Span::styled("Less ", Style::default().fg(Color::DarkGray)),
-                Span::styled("\u{2588}", Style::default().fg(Color::Rgb(30, 30, 58))),
+                Span::styled("\u{00B7}", Style::default().fg(Color::DarkGray)),
                 Span::raw(" "),
-                Span::styled("\u{2588}", Style::default().fg(Color::Rgb(45, 90, 45))),
+                Span::styled("\u{2588}", Style::default().fg(Color::DarkGray)),
                 Span::raw(" "),
-                Span::styled("\u{2588}", Style::default().fg(Color::Rgb(61, 139, 61))),
+                Span::styled("\u{2588}", Style::default().fg(Color::Green)),
                 Span::raw(" "),
-                Span::styled("\u{2588}", Style::default().fg(Color::Rgb(78, 202, 78))),
+                Span::styled("\u{2588}", Style::default().fg(Color::LightGreen)),
                 Span::styled(" More", Style::default().fg(Color::DarkGray)),
             ]);
             buf.set_line(area.x + label_width, legend_y, &legend, area.width.saturating_sub(label_width));

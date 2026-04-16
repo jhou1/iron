@@ -19,14 +19,16 @@ impl Sparkline {
         Self { data }
     }
 
-    /// Returns a green shade whose intensity is proportional to `ratio` (0.0..=1.0).
+    /// Returns a green shade based on the ratio (0.0..=1.0).
+    /// Uses ANSI colors for terminal theme compatibility.
     fn green_for_ratio(ratio: f64) -> Color {
-        let r = ratio.clamp(0.0, 1.0);
-        // Interpolate from dim green (30, 60, 30) to bright green (78, 202, 78)
-        let red = 30.0 + r * 48.0;
-        let green = 60.0 + r * 142.0;
-        let blue = 30.0 + r * 48.0;
-        Color::Rgb(red as u8, green as u8, blue as u8)
+        if ratio < 0.33 {
+            Color::DarkGray
+        } else if ratio < 0.66 {
+            Color::Green
+        } else {
+            Color::LightGreen
+        }
     }
 }
 

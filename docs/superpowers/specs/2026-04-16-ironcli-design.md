@@ -92,6 +92,29 @@ Practices
   [Esc] → back
 ```
 
+### Color Scheme
+
+Use ANSI terminal colors instead of hardcoded RGB values so the app adapts to any terminal theme (dark, light, custom backgrounds).
+
+| Role | Color |
+|---|---|
+| Accent (titles, shortcuts, headers) | Cyan |
+| Active/selected items, logged entries | Green |
+| Bright highlight (3+ sessions) | LightGreen |
+| Primary text | White |
+| Labels, dimmed text, borders | DarkGray |
+| Error, delete prompts | Red |
+| Notes | Yellow |
+
+**Heatmap cells:**
+
+| Sessions | Character | Color |
+|---|---|---|
+| 0 (empty) | `·` (middle dot) | DarkGray |
+| 1 | `█` | DarkGray |
+| 2 | `█` | Green |
+| 3+ | `█` | LightGreen |
+
 ### Navigation
 
 Vim-style throughout: `j/k` for up/down, `h/l` for left/right or back/forward, `/` for filtering, `Esc` to go back, `Enter` to confirm.
@@ -100,7 +123,7 @@ Vim-style throughout: `j/k` for up/down, `h/l` for left/right or back/forward, `
 
 The home screen uses a full-width layout with split panes:
 
-- **Top:** GitHub-style training activity heatmap spanning the year. Rows = days of the week (Mon–Sun). Cells colored by number of entries logged that day (0 = empty, 1 = light, 2 = medium, 3+ = bright green). Legend at bottom.
+- **Top:** GitHub-style training activity heatmap spanning the year. Rows = days of the week (Mon–Sun). Empty days show `·` in DarkGray; training days show `█` in DarkGray/Green/LightGreen by session count. Legend at bottom.
 - **Bottom-left pane:** Today's training — lists all entries logged today with practice name, key metrics, and derived totals.
 - **Bottom-right pane:** Last 14 days — aggregated stats: total sessions, total volume, total reps, total distance.
 - **Footer:** Keyboard shortcut hints.

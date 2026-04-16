@@ -13,8 +13,8 @@ use crate::model::LogEntry;
 use super::widgets::heatmap::Heatmap;
 use super::{Action, Screen};
 
-const PURPLE: Color = Color::Rgb(124, 124, 245);
-const GREEN: Color = Color::Rgb(78, 202, 78);
+const ACCENT: Color = Color::Cyan;
+const GREEN: Color = Color::Green;
 
 pub struct DashboardScreen {
     heatmap_data: Vec<(String, i64)>,
@@ -68,7 +68,7 @@ impl DashboardScreen {
 
         // ── Title bar ──
         let title = Line::from(vec![
-            Span::styled(" iron", Style::default().fg(PURPLE).bold()),
+            Span::styled(" iron", Style::default().fg(ACCENT).bold()),
             Span::styled(" v0.1.0", Style::default().fg(Color::DarkGray)),
         ]);
         frame.render_widget(Paragraph::new(title), chunks[0]);
@@ -100,15 +100,15 @@ impl DashboardScreen {
 
         // ── Footer ──
         let footer = Line::from(vec![
-            Span::styled(" [l]", Style::default().fg(PURPLE)),
+            Span::styled(" [l]", Style::default().fg(ACCENT)),
             Span::styled(" Log  ", Style::default().fg(Color::DarkGray)),
-            Span::styled("[h]", Style::default().fg(PURPLE)),
+            Span::styled("[h]", Style::default().fg(ACCENT)),
             Span::styled(" History  ", Style::default().fg(Color::DarkGray)),
-            Span::styled("[t]", Style::default().fg(PURPLE)),
+            Span::styled("[t]", Style::default().fg(ACCENT)),
             Span::styled(" Trends  ", Style::default().fg(Color::DarkGray)),
-            Span::styled("[e]", Style::default().fg(PURPLE)),
+            Span::styled("[e]", Style::default().fg(ACCENT)),
             Span::styled(" Practices  ", Style::default().fg(Color::DarkGray)),
-            Span::styled("[q]", Style::default().fg(PURPLE)),
+            Span::styled("[q]", Style::default().fg(ACCENT)),
             Span::styled(" Quit", Style::default().fg(Color::DarkGray)),
         ]);
         frame.render_widget(Paragraph::new(footer), chunks[4]);

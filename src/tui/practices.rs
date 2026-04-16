@@ -11,9 +11,9 @@ use crate::db::Database;
 use crate::model::{Practice, PracticeType};
 use super::{Action, Screen};
 
-const PURPLE: Color = Color::Rgb(124, 124, 245);
-const GREEN: Color = Color::Rgb(78, 202, 78);
-const RED: Color = Color::Rgb(232, 84, 84);
+const ACCENT: Color = Color::Cyan;
+const GREEN: Color = Color::Green;
+const RED: Color = Color::Red;
 
 #[derive(Debug, Clone, PartialEq)]
 enum Mode {
@@ -71,7 +71,7 @@ impl PracticesScreen {
 
         // ── Title ──
         let title = Line::from(vec![
-            Span::styled(" Practices", Style::default().fg(PURPLE).add_modifier(Modifier::BOLD)),
+            Span::styled(" Practices", Style::default().fg(ACCENT).add_modifier(Modifier::BOLD)),
         ]);
         frame.render_widget(Paragraph::new(vec![title, Line::from("")]), chunks[0]);
 
@@ -188,35 +188,35 @@ impl PracticesScreen {
         // ── Shortcuts ──
         let shortcuts = match &self.mode {
             Mode::Browse => Line::from(vec![
-                Span::styled(" [j/k]", Style::default().fg(PURPLE)),
+                Span::styled(" [j/k]", Style::default().fg(ACCENT)),
                 Span::styled(" Navigate  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("[a]", Style::default().fg(PURPLE)),
+                Span::styled("[a]", Style::default().fg(ACCENT)),
                 Span::styled(" Add  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("[Enter]", Style::default().fg(PURPLE)),
+                Span::styled("[Enter]", Style::default().fg(ACCENT)),
                 Span::styled(" Edit  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("[d]", Style::default().fg(PURPLE)),
+                Span::styled("[d]", Style::default().fg(ACCENT)),
                 Span::styled(" Delete  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("[Esc]", Style::default().fg(PURPLE)),
+                Span::styled("[Esc]", Style::default().fg(ACCENT)),
                 Span::styled(" Back", Style::default().fg(Color::DarkGray)),
             ]),
             Mode::AddName | Mode::EditName => Line::from(vec![
-                Span::styled(" [Enter]", Style::default().fg(PURPLE)),
+                Span::styled(" [Enter]", Style::default().fg(ACCENT)),
                 Span::styled(" Confirm  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("[Esc]", Style::default().fg(PURPLE)),
+                Span::styled("[Esc]", Style::default().fg(ACCENT)),
                 Span::styled(" Cancel", Style::default().fg(Color::DarkGray)),
             ]),
             Mode::AddType => Line::from(vec![
-                Span::styled(" [j/k]", Style::default().fg(PURPLE)),
+                Span::styled(" [j/k]", Style::default().fg(ACCENT)),
                 Span::styled(" Select  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("[Enter]", Style::default().fg(PURPLE)),
+                Span::styled("[Enter]", Style::default().fg(ACCENT)),
                 Span::styled(" Confirm  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("[Esc]", Style::default().fg(PURPLE)),
+                Span::styled("[Esc]", Style::default().fg(ACCENT)),
                 Span::styled(" Cancel", Style::default().fg(Color::DarkGray)),
             ]),
             Mode::ConfirmDelete => Line::from(vec![
-                Span::styled(" [y]", Style::default().fg(PURPLE)),
+                Span::styled(" [y]", Style::default().fg(ACCENT)),
                 Span::styled(" Yes  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("[n]", Style::default().fg(PURPLE)),
+                Span::styled("[n]", Style::default().fg(ACCENT)),
                 Span::styled(" No", Style::default().fg(Color::DarkGray)),
             ]),
         };

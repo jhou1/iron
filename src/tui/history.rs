@@ -11,9 +11,9 @@ use crate::db::Database;
 use crate::model::{LogEntry, SetData};
 use super::{Action, Screen};
 
-const GREEN: Color = Color::Rgb(78, 202, 78);
-const PURPLE: Color = Color::Rgb(124, 124, 245);
-const NOTE_COLOR: Color = Color::Rgb(200, 200, 100);
+const GREEN: Color = Color::Green;
+const ACCENT: Color = Color::Cyan;
+const NOTE_COLOR: Color = Color::Yellow;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Mode {
@@ -79,20 +79,20 @@ impl HistoryScreen {
         let shortcuts = if self.mode == Mode::ConfirmDelete {
             Line::from(vec![
                 Span::styled(" Delete this entry? ", Style::default().fg(Color::Red)),
-                Span::styled("[y]", Style::default().fg(PURPLE)),
+                Span::styled("[y]", Style::default().fg(ACCENT)),
                 Span::styled(" Yes  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("[any]", Style::default().fg(PURPLE)),
+                Span::styled("[any]", Style::default().fg(ACCENT)),
                 Span::styled(" Cancel", Style::default().fg(Color::DarkGray)),
             ])
         } else {
             Line::from(vec![
-                Span::styled(" [j/k]", Style::default().fg(PURPLE)),
+                Span::styled(" [j/k]", Style::default().fg(ACCENT)),
                 Span::styled(" Navigate  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("[Enter]", Style::default().fg(PURPLE)),
+                Span::styled("[Enter]", Style::default().fg(ACCENT)),
                 Span::styled(" Edit  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("[d]", Style::default().fg(PURPLE)),
+                Span::styled("[d]", Style::default().fg(ACCENT)),
                 Span::styled(" Delete  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("[Esc]", Style::default().fg(PURPLE)),
+                Span::styled("[Esc]", Style::default().fg(ACCENT)),
                 Span::styled(" Back", Style::default().fg(Color::DarkGray)),
             ])
         };

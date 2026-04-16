@@ -11,8 +11,8 @@ use crate::db::Database;
 use crate::model::{LogEntry, Practice, PracticeType, SetData};
 use super::{Action, Screen};
 
-const PURPLE: Color = Color::Rgb(124, 124, 245);
-const GREEN: Color = Color::Rgb(78, 202, 78);
+const ACCENT: Color = Color::Cyan;
+const GREEN: Color = Color::Green;
 
 #[derive(Debug, Clone, PartialEq)]
 enum Phase {
@@ -119,7 +119,7 @@ impl LogEntryScreen {
         // Title
         let title = Line::from(Span::styled(
             " Select Practice",
-            Style::default().fg(PURPLE).bold(),
+            Style::default().fg(ACCENT).bold(),
         ));
         frame.render_widget(Paragraph::new(title), chunks[0]);
 
@@ -132,7 +132,7 @@ impl LogEntryScreen {
             String::from(" Press / to filter")
         };
         let filter_style = if self.filtering {
-            Style::default().fg(PURPLE)
+            Style::default().fg(ACCENT)
         } else {
             Style::default().fg(Color::DarkGray)
         };
@@ -164,13 +164,13 @@ impl LogEntryScreen {
 
         // Footer
         let footer = Line::from(vec![
-            Span::styled(" [j/k]", Style::default().fg(PURPLE)),
+            Span::styled(" [j/k]", Style::default().fg(ACCENT)),
             Span::styled(" Navigate  ", Style::default().fg(Color::DarkGray)),
-            Span::styled("[/]", Style::default().fg(PURPLE)),
+            Span::styled("[/]", Style::default().fg(ACCENT)),
             Span::styled(" Filter  ", Style::default().fg(Color::DarkGray)),
-            Span::styled("[Enter]", Style::default().fg(PURPLE)),
+            Span::styled("[Enter]", Style::default().fg(ACCENT)),
             Span::styled(" Select  ", Style::default().fg(Color::DarkGray)),
-            Span::styled("[Esc]", Style::default().fg(PURPLE)),
+            Span::styled("[Esc]", Style::default().fg(ACCENT)),
             Span::styled(" Back", Style::default().fg(Color::DarkGray)),
         ]);
         frame.render_widget(Paragraph::new(footer), chunks[3]);
@@ -268,7 +268,7 @@ impl LogEntryScreen {
         let title = Line::from(vec![
             Span::styled(
                 format!(" {} ", practice.name),
-                Style::default().fg(PURPLE).bold(),
+                Style::default().fg(ACCENT).bold(),
             ),
             Span::styled(
                 format!("({})", practice.practice_type.label()),
@@ -300,12 +300,12 @@ impl LogEntryScreen {
                     Span::styled("Weight (kg): ", Style::default().fg(Color::DarkGray)),
                     Span::styled(
                         format!("{}{}", self.field1, weight_cursor),
-                        Style::default().fg(if self.active_field == 0 { PURPLE } else { Color::White }),
+                        Style::default().fg(if self.active_field == 0 { ACCENT } else { Color::White }),
                     ),
                     Span::styled("  Reps: ", Style::default().fg(Color::DarkGray)),
                     Span::styled(
                         format!("{}{}", self.field2, reps_cursor),
-                        Style::default().fg(if self.active_field == 1 { PURPLE } else { Color::White }),
+                        Style::default().fg(if self.active_field == 1 { ACCENT } else { Color::White }),
                     ),
                 ]));
             }
@@ -319,7 +319,7 @@ impl LogEntryScreen {
                     Span::styled("Reps: ", Style::default().fg(Color::DarkGray)),
                     Span::styled(
                         format!("{}{}", self.field1, cursor),
-                        Style::default().fg(PURPLE),
+                        Style::default().fg(ACCENT),
                     ),
                 ]));
             }
@@ -333,7 +333,7 @@ impl LogEntryScreen {
                     Span::styled("Distance (km): ", Style::default().fg(Color::DarkGray)),
                     Span::styled(
                         format!("{}{}", self.field1, cursor),
-                        Style::default().fg(PURPLE),
+                        Style::default().fg(ACCENT),
                     ),
                 ]));
             }
@@ -347,7 +347,7 @@ impl LogEntryScreen {
                     Span::styled("Duration (min): ", Style::default().fg(Color::DarkGray)),
                     Span::styled(
                         format!("{}{}", self.field1, cursor),
-                        Style::default().fg(PURPLE),
+                        Style::default().fg(ACCENT),
                     ),
                 ]));
             }
@@ -369,13 +369,13 @@ impl LogEntryScreen {
 
         // Footer
         let footer = Line::from(vec![
-            Span::styled(" [Enter]", Style::default().fg(PURPLE)),
+            Span::styled(" [Enter]", Style::default().fg(ACCENT)),
             Span::styled(" Add set  ", Style::default().fg(Color::DarkGray)),
-            Span::styled("[Ctrl+S]", Style::default().fg(PURPLE)),
+            Span::styled("[Ctrl+S]", Style::default().fg(ACCENT)),
             Span::styled(" Save  ", Style::default().fg(Color::DarkGray)),
-            Span::styled("[d]", Style::default().fg(PURPLE)),
+            Span::styled("[d]", Style::default().fg(ACCENT)),
             Span::styled(" Delete last  ", Style::default().fg(Color::DarkGray)),
-            Span::styled("[Esc]", Style::default().fg(PURPLE)),
+            Span::styled("[Esc]", Style::default().fg(ACCENT)),
             Span::styled(" Cancel", Style::default().fg(Color::DarkGray)),
         ]);
         frame.render_widget(Paragraph::new(footer), chunks[4]);
@@ -529,7 +529,7 @@ impl LogEntryScreen {
         // Title
         let title = Line::from(Span::styled(
             format!(" Log {} \u{2014} Add Note", practice.name),
-            Style::default().fg(PURPLE).bold(),
+            Style::default().fg(ACCENT).bold(),
         ));
         frame.render_widget(Paragraph::new(title), chunks[0]);
 
@@ -570,9 +570,9 @@ impl LogEntryScreen {
 
         // Footer
         let footer = Line::from(vec![
-            Span::styled(" [Enter]", Style::default().fg(PURPLE)),
+            Span::styled(" [Enter]", Style::default().fg(ACCENT)),
             Span::styled(" Save  ", Style::default().fg(Color::DarkGray)),
-            Span::styled("[Esc]", Style::default().fg(PURPLE)),
+            Span::styled("[Esc]", Style::default().fg(ACCENT)),
             Span::styled(" Cancel", Style::default().fg(Color::DarkGray)),
         ]);
         frame.render_widget(Paragraph::new(footer), chunks[6]);
