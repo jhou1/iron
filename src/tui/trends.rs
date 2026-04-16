@@ -122,7 +122,7 @@ impl TrendsScreen {
         let filter_style = if self.filtering {
             Style::default().fg(ACCENT)
         } else {
-            Style::default().fg(Color::DarkGray)
+            Style::default().fg(Color::Gray)
         };
         let filter_line = Line::from(Span::styled(filter_display, filter_style));
         frame.render_widget(Paragraph::new(filter_line), chunks[1]);
@@ -153,13 +153,13 @@ impl TrendsScreen {
         // Footer
         let footer = Line::from(vec![
             Span::styled(" [j/k]", Style::default().fg(ACCENT)),
-            Span::styled(" Navigate  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" Navigate  ", Style::default().fg(Color::Gray)),
             Span::styled("[/]", Style::default().fg(ACCENT)),
-            Span::styled(" Filter  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" Filter  ", Style::default().fg(Color::Gray)),
             Span::styled("[Enter]", Style::default().fg(ACCENT)),
-            Span::styled(" Select  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" Select  ", Style::default().fg(Color::Gray)),
             Span::styled("[Esc]", Style::default().fg(ACCENT)),
-            Span::styled(" Back", Style::default().fg(Color::DarkGray)),
+            Span::styled(" Back", Style::default().fg(Color::Gray)),
         ]);
         frame.render_widget(Paragraph::new(footer), chunks[3]);
     }
@@ -271,7 +271,7 @@ impl TrendsScreen {
             ),
             Span::styled(
                 format!("[{}]", practice.practice_type.label()),
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(Color::Gray),
             ),
         ]);
         frame.render_widget(Paragraph::new(title), chunks[0]);
@@ -279,7 +279,7 @@ impl TrendsScreen {
         // Subtitle
         let subtitle = Line::from(Span::styled(
             format!(" Last {} days", self.days_window),
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(Color::Gray),
         ));
         frame.render_widget(Paragraph::new(subtitle), chunks[1]);
 
@@ -287,7 +287,7 @@ impl TrendsScreen {
         if self.entries.is_empty() {
             let msg = Line::from(Span::styled(
                 "  No data for this period.",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(Color::Gray),
             ));
             frame.render_widget(Paragraph::new(msg), chunks[3]);
         } else {
@@ -325,12 +325,12 @@ impl TrendsScreen {
                     format!("  Avg: {:.1}", avg),
                     Style::default().fg(Color::White),
                 ),
-                Span::styled("  |  ", Style::default().fg(Color::DarkGray)),
+                Span::styled("  |  ", Style::default().fg(Color::Gray)),
                 Span::styled(
                     format!("Peak: {:.1}", peak),
                     Style::default().fg(Color::White),
                 ),
-                Span::styled("  |  ", Style::default().fg(Color::DarkGray)),
+                Span::styled("  |  ", Style::default().fg(Color::Gray)),
                 Span::styled(
                     format!("Trend: {}{:.1}%", trend_sign, trend_pct),
                     Style::default().fg(trend_color),
@@ -342,11 +342,11 @@ impl TrendsScreen {
         // Footer
         let footer = Line::from(vec![
             Span::styled(" [h/l]", Style::default().fg(ACCENT)),
-            Span::styled(" Window  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" Window  ", Style::default().fg(Color::Gray)),
             Span::styled("[/]", Style::default().fg(ACCENT)),
-            Span::styled(" Pick practice  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" Pick practice  ", Style::default().fg(Color::Gray)),
             Span::styled("[Esc]", Style::default().fg(ACCENT)),
-            Span::styled(" Dashboard", Style::default().fg(Color::DarkGray)),
+            Span::styled(" Dashboard", Style::default().fg(Color::Gray)),
         ]);
         frame.render_widget(Paragraph::new(footer), chunks[6]);
     }

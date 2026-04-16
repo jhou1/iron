@@ -99,7 +99,7 @@ impl Widget for Sparkline {
             let parts: Vec<&str> = label.splitn(2, '\n').collect();
             if day_row < area.y + area.height {
                 let day_label: String = parts[0].chars().take(2).collect();
-                buf.set_string(x, day_row, &day_label, Style::default().fg(Color::DarkGray));
+                buf.set_string(x, day_row, &day_label, Style::default().fg(Color::Gray));
             }
             if parts.len() > 1 && month_row < area.y + area.height {
                 let month_label: String = parts[1].chars().take(3).collect();
@@ -112,10 +112,10 @@ impl Widget for Sparkline {
         if y_label_x + y_label_width <= area.x + area.width {
             // Max value at the top
             let max_str = format_compact(max_val);
-            buf.set_string(y_label_x, chart_top, &max_str, Style::default().fg(Color::DarkGray));
+            buf.set_string(y_label_x, chart_top, &max_str, Style::default().fg(Color::Gray));
 
             // "0" at the bottom
-            buf.set_string(y_label_x, chart_bottom, "0", Style::default().fg(Color::DarkGray));
+            buf.set_string(y_label_x, chart_bottom, "0", Style::default().fg(Color::Gray));
         }
     }
 }

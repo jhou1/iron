@@ -112,6 +112,7 @@ impl SetData {
 pub struct LogEntry {
     pub log: Log,
     pub practice_name: String,
+    #[allow(dead_code)]
     pub practice_type: PracticeType,
     pub sets: Vec<Set>,
 }

@@ -1,4 +1,4 @@
-use chrono::{Local, NaiveDate, NaiveDateTime, NaiveTime};
+use chrono::{Local, NaiveDate, NaiveTime};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Direction, Layout},
@@ -35,8 +35,10 @@ pub struct LogEntryScreen {
     field2: String,
     active_field: usize,
     note: String,
+    note_cursor: usize,    // byte offset into note string
     editing_log_id: Option<i64>,
     log_date: String,      // YYYY-MM-DD, defaults to today
+    date_confirmed: bool,   // false = cursor on date line, true = entering sets
     editing_date: bool,     // true when in date-edit mode
     date_input: String,     // buffer for typing a new date
 }
@@ -59,8 +61,10 @@ impl LogEntryScreen {
             field2: String::new(),
             active_field: 0,
             note: String::new(),
+            note_cursor: 0,
             editing_log_id: None,
             log_date: today,
+            date_confirmed: false,
             editing_date: false,
             date_input: String::new(),
         })
@@ -89,9 +93,11 @@ impl LogEntryScreen {
             field1: String::new(),
             field2: String::new(),
             active_field: 0,
+            note_cursor: note.len(),
             note,
             editing_log_id: Some(log_entry.log.id),
             log_date,
+            date_confirmed: true,
             editing_date: false,
             date_input: String::new(),
         })
@@ -146,7 +152,7 @@ impl LogEntryScreen {
         let filter_style = if self.filtering {
             Style::default().fg(ACCENT)
         } else {
-            Style::default().fg(Color::DarkGray)
+            Style::default().fg(Color::Gray)
         };
         let filter_line = Line::from(Span::styled(filter_display, filter_style));
         frame.render_widget(Paragraph::new(filter_line), chunks[1]);
@@ -177,13 +183,13 @@ impl LogEntryScreen {
         // Footer
         let footer = Line::from(vec![
             Span::styled(" [j/k]", Style::default().fg(ACCENT)),
-            Span::styled(" Navigate  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" Navigate  ", Style::default().fg(Color::Gray)),
             Span::styled("[/]", Style::default().fg(ACCENT)),
-            Span::styled(" Filter  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" Filter  ", Style::default().fg(Color::Gray)),
             Span::styled("[Enter]", Style::default().fg(ACCENT)),
-            Span::styled(" Select  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" Select  ", Style::default().fg(Color::Gray)),
             Span::styled("[Esc]", Style::default().fg(ACCENT)),
-            Span::styled(" Back", Style::default().fg(Color::DarkGray)),
+            Span::styled(" Back", Style::default().fg(Color::Gray)),
         ]);
         frame.render_widget(Paragraph::new(footer), chunks[3]);
     }
@@ -240,6 +246,7 @@ impl LogEntryScreen {
                     self.field1.clear();
                     self.field2.clear();
                     self.active_field = 0;
+                    self.date_confirmed = false;
                 }
                 Action::None
             }
@@ -284,7 +291,7 @@ impl LogEntryScreen {
             ),
             Span::styled(
                 format!("({})", practice.practice_type.label()),
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(Color::Gray),
             ),
         ]);
         frame.render_widget(Paragraph::new(title), chunks[0]);
@@ -292,21 +299,27 @@ impl LogEntryScreen {
         // Date line
         let date_line = if self.editing_date {
             Line::from(vec![
-                Span::styled("  Date: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("  Date: ", Style::default().fg(Color::Gray)),
                 Span::styled(
                     format!("{}\u{2588}", self.date_input),
                     Style::default().fg(ACCENT),
                 ),
                 Span::styled(
                     "  (YYYY-MM-DD, Enter to confirm)",
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(Color::Gray),
                 ),
+            ])
+        } else if !self.date_confirmed {
+            Line::from(vec![
+                Span::styled("> Date: ", Style::default().fg(GREEN).bold()),
+                Span::styled(&self.log_date, Style::default().fg(GREEN).bold()),
+                Span::styled("  [Enter] confirm  [D] edit", Style::default().fg(Color::Gray)),
             ])
         } else {
             Line::from(vec![
-                Span::styled("  Date: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("  Date: ", Style::default().fg(Color::Gray)),
                 Span::styled(&self.log_date, Style::default().fg(Color::White)),
-                Span::styled("  [D] to change", Style::default().fg(Color::DarkGray)),
+                Span::styled("  [D] to change", Style::default().fg(Color::Gray)),
             ])
         };
         frame.render_widget(Paragraph::new(date_line), chunks[1]);
@@ -331,12 +344,12 @@ impl LogEntryScreen {
                         format!("  Set {}: ", set_num),
                         Style::default().fg(Color::White),
                     ),
-                    Span::styled("Weight (kg): ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("Weight (kg): ", Style::default().fg(Color::Gray)),
                     Span::styled(
                         format!("{}{}", self.field1, weight_cursor),
                         Style::default().fg(if self.active_field == 0 { ACCENT } else { Color::White }),
                     ),
-                    Span::styled("  Reps: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("  Reps: ", Style::default().fg(Color::Gray)),
                     Span::styled(
                         format!("{}{}", self.field2, reps_cursor),
                         Style::default().fg(if self.active_field == 1 { ACCENT } else { Color::White }),
@@ -350,7 +363,7 @@ impl LogEntryScreen {
                         format!("  Set {}: ", set_num),
                         Style::default().fg(Color::White),
                     ),
-                    Span::styled("Reps: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("Reps: ", Style::default().fg(Color::Gray)),
                     Span::styled(
                         format!("{}{}", self.field1, cursor),
                         Style::default().fg(ACCENT),
@@ -364,7 +377,7 @@ impl LogEntryScreen {
                         format!("  Set {}: ", set_num),
                         Style::default().fg(Color::White),
                     ),
-                    Span::styled("Distance (km): ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("Distance (km): ", Style::default().fg(Color::Gray)),
                     Span::styled(
                         format!("{}{}", self.field1, cursor),
                         Style::default().fg(ACCENT),
@@ -378,7 +391,7 @@ impl LogEntryScreen {
                         format!("  Set {}: ", set_num),
                         Style::default().fg(Color::White),
                     ),
-                    Span::styled("Duration (min): ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("Duration (min): ", Style::default().fg(Color::Gray)),
                     Span::styled(
                         format!("{}{}", self.field1, cursor),
                         Style::default().fg(ACCENT),
@@ -404,15 +417,15 @@ impl LogEntryScreen {
         // Footer
         let footer = Line::from(vec![
             Span::styled(" [Enter]", Style::default().fg(ACCENT)),
-            Span::styled(" Add set  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" Add set  ", Style::default().fg(Color::Gray)),
             Span::styled("[Ctrl+S]", Style::default().fg(ACCENT)),
-            Span::styled(" Save  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" Save  ", Style::default().fg(Color::Gray)),
             Span::styled("[D]", Style::default().fg(ACCENT)),
-            Span::styled(" Date  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" Date  ", Style::default().fg(Color::Gray)),
             Span::styled("[d]", Style::default().fg(ACCENT)),
-            Span::styled(" Del last  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" Del last  ", Style::default().fg(Color::Gray)),
             Span::styled("[Esc]", Style::default().fg(ACCENT)),
-            Span::styled(" Cancel", Style::default().fg(Color::DarkGray)),
+            Span::styled(" Cancel", Style::default().fg(Color::Gray)),
         ]);
         frame.render_widget(Paragraph::new(footer), chunks[4]);
     }
@@ -423,6 +436,23 @@ impl LogEntryScreen {
             return self.handle_date_edit(key);
         }
 
+        // Date confirmation step — cursor is on the date line
+        if !self.date_confirmed {
+            return match key.code {
+                KeyCode::Enter => {
+                    self.date_confirmed = true;
+                    Action::None
+                }
+                KeyCode::Char('D') | KeyCode::Char('d') => {
+                    self.editing_date = true;
+                    self.date_input = self.log_date.clone();
+                    Action::None
+                }
+                KeyCode::Esc => Action::Navigate(Screen::Dashboard),
+                _ => Action::None,
+            };
+        }
+
         let practice = self.chosen_practice.as_ref().unwrap().clone();
         let is_weighted = practice.practice_type == PracticeType::Weighted;
         let has_two_fields = is_weighted;
@@ -431,6 +461,7 @@ impl LogEntryScreen {
         if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('s') {
             if !self.sets.is_empty() {
                 self.phase = Phase::EnterNote;
+                self.note_cursor = self.note.len();
             }
             return Action::None;
         }
@@ -490,6 +521,7 @@ impl LogEntryScreen {
                 // Validate the date
                 if NaiveDate::parse_from_str(&self.date_input, "%Y-%m-%d").is_ok() {
                     self.log_date = self.date_input.clone();
+                    self.date_confirmed = true;
                 }
                 self.editing_date = false;
             }
@@ -603,7 +635,7 @@ impl LogEntryScreen {
             .unwrap_or("units");
         let summary_lines = vec![
             Line::from(vec![
-                Span::styled("  Date: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("  Date: ", Style::default().fg(Color::Gray)),
                 Span::styled(&self.log_date, Style::default().fg(Color::White)),
             ]),
             Line::from(Span::styled(
@@ -621,29 +653,74 @@ impl LogEntryScreen {
         let note_block = Block::default()
             .title(Span::styled(
                 "Note (optional)",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(Color::Gray),
             ))
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::DarkGray));
-        let note_text = format!("{}\u{2588}", self.note);
-        let note_paragraph = Paragraph::new(Line::from(Span::styled(
-            note_text,
-            Style::default().fg(Color::White),
-        )))
+        let (before, after) = self.note.split_at(self.note_cursor);
+        let note_line = Line::from(vec![
+            Span::styled(before.to_string(), Style::default().fg(Color::White)),
+            Span::styled("\u{2588}", Style::default().fg(ACCENT)),
+            Span::styled(after.to_string(), Style::default().fg(Color::White)),
+        ]);
+        let note_paragraph = Paragraph::new(note_line)
         .block(note_block);
         frame.render_widget(note_paragraph, chunks[4]);
 
         // Footer
         let footer = Line::from(vec![
             Span::styled(" [Enter]", Style::default().fg(ACCENT)),
-            Span::styled(" Save  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" Save  ", Style::default().fg(Color::Gray)),
             Span::styled("[Esc]", Style::default().fg(ACCENT)),
-            Span::styled(" Cancel", Style::default().fg(Color::DarkGray)),
+            Span::styled(" Cancel", Style::default().fg(Color::Gray)),
         ]);
         frame.render_widget(Paragraph::new(footer), chunks[6]);
     }
 
     fn handle_enter_note(&mut self, key: KeyEvent, db: &Database) -> Action {
+        // Ctrl+B / Left: move cursor back
+        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('b')
+            || key.code == KeyCode::Left
+        {
+            if self.note_cursor > 0 {
+                // Move back one char (find previous char boundary)
+                self.note_cursor = self.note[..self.note_cursor]
+                    .char_indices()
+                    .next_back()
+                    .map(|(i, _)| i)
+                    .unwrap_or(0);
+            }
+            return Action::None;
+        }
+        // Ctrl+F / Right: move cursor forward
+        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('f')
+            || key.code == KeyCode::Right
+        {
+            if self.note_cursor < self.note.len() {
+                // Move forward one char
+                self.note_cursor = self.note[self.note_cursor..]
+                    .char_indices()
+                    .nth(1)
+                    .map(|(i, _)| self.note_cursor + i)
+                    .unwrap_or(self.note.len());
+            }
+            return Action::None;
+        }
+        // Ctrl+A / Home: move to start
+        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('a')
+            || key.code == KeyCode::Home
+        {
+            self.note_cursor = 0;
+            return Action::None;
+        }
+        // Ctrl+E / End: move to end
+        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('e')
+            || key.code == KeyCode::End
+        {
+            self.note_cursor = self.note.len();
+            return Action::None;
+        }
+
         match key.code {
             KeyCode::Esc => Action::Navigate(Screen::Dashboard),
             KeyCode::Enter => {
@@ -664,11 +741,20 @@ impl LogEntryScreen {
                 Action::Navigate(Screen::Dashboard)
             }
             KeyCode::Backspace => {
-                self.note.pop();
+                if self.note_cursor > 0 {
+                    let prev = self.note[..self.note_cursor]
+                        .char_indices()
+                        .next_back()
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
+                    self.note.remove(prev);
+                    self.note_cursor = prev;
+                }
                 Action::None
             }
             KeyCode::Char(c) => {
-                self.note.push(c);
+                self.note.insert(self.note_cursor, c);
+                self.note_cursor += c.len_utf8();
                 Action::None
             }
             _ => Action::None,

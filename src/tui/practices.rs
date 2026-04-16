@@ -79,7 +79,7 @@ impl PracticesScreen {
         let list_lines: Vec<Line> = if self.practices.is_empty() {
             vec![Line::from(Span::styled(
                 "  No practices yet. Press 'a' to add one.",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(Color::Gray),
             ))]
         } else {
             self.practices
@@ -97,7 +97,7 @@ impl PracticesScreen {
                         Span::styled(&p.name, name_style),
                         Span::styled(
                             format!(" ({})", p.practice_type.label()),
-                            Style::default().fg(Color::DarkGray),
+                            Style::default().fg(Color::Gray),
                         ),
                     ])
                 })
@@ -139,7 +139,7 @@ impl PracticesScreen {
                     let style = if i == self.type_selected {
                         Style::default().fg(GREEN).add_modifier(Modifier::BOLD)
                     } else {
-                        Style::default().fg(Color::DarkGray)
+                        Style::default().fg(Color::Gray)
                     };
                     lines.push(Line::from(Span::styled(
                         format!(" {}{}", marker, pt.label()),
@@ -189,35 +189,35 @@ impl PracticesScreen {
         let shortcuts = match &self.mode {
             Mode::Browse => Line::from(vec![
                 Span::styled(" [j/k]", Style::default().fg(ACCENT)),
-                Span::styled(" Navigate  ", Style::default().fg(Color::DarkGray)),
+                Span::styled(" Navigate  ", Style::default().fg(Color::Gray)),
                 Span::styled("[a]", Style::default().fg(ACCENT)),
-                Span::styled(" Add  ", Style::default().fg(Color::DarkGray)),
+                Span::styled(" Add  ", Style::default().fg(Color::Gray)),
                 Span::styled("[Enter]", Style::default().fg(ACCENT)),
-                Span::styled(" Edit  ", Style::default().fg(Color::DarkGray)),
+                Span::styled(" Edit  ", Style::default().fg(Color::Gray)),
                 Span::styled("[d]", Style::default().fg(ACCENT)),
-                Span::styled(" Delete  ", Style::default().fg(Color::DarkGray)),
+                Span::styled(" Delete  ", Style::default().fg(Color::Gray)),
                 Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(" Back", Style::default().fg(Color::DarkGray)),
+                Span::styled(" Back", Style::default().fg(Color::Gray)),
             ]),
             Mode::AddName | Mode::EditName => Line::from(vec![
                 Span::styled(" [Enter]", Style::default().fg(ACCENT)),
-                Span::styled(" Confirm  ", Style::default().fg(Color::DarkGray)),
+                Span::styled(" Confirm  ", Style::default().fg(Color::Gray)),
                 Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(" Cancel", Style::default().fg(Color::DarkGray)),
+                Span::styled(" Cancel", Style::default().fg(Color::Gray)),
             ]),
             Mode::AddType => Line::from(vec![
                 Span::styled(" [j/k]", Style::default().fg(ACCENT)),
-                Span::styled(" Select  ", Style::default().fg(Color::DarkGray)),
+                Span::styled(" Select  ", Style::default().fg(Color::Gray)),
                 Span::styled("[Enter]", Style::default().fg(ACCENT)),
-                Span::styled(" Confirm  ", Style::default().fg(Color::DarkGray)),
+                Span::styled(" Confirm  ", Style::default().fg(Color::Gray)),
                 Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(" Cancel", Style::default().fg(Color::DarkGray)),
+                Span::styled(" Cancel", Style::default().fg(Color::Gray)),
             ]),
             Mode::ConfirmDelete => Line::from(vec![
                 Span::styled(" [y]", Style::default().fg(ACCENT)),
-                Span::styled(" Yes  ", Style::default().fg(Color::DarkGray)),
+                Span::styled(" Yes  ", Style::default().fg(Color::Gray)),
                 Span::styled("[n]", Style::default().fg(ACCENT)),
-                Span::styled(" No", Style::default().fg(Color::DarkGray)),
+                Span::styled(" No", Style::default().fg(Color::Gray)),
             ]),
         };
         frame.render_widget(Paragraph::new(vec![shortcuts]), chunks[3]);

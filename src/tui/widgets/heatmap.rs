@@ -21,17 +21,17 @@ impl<'a> Heatmap<'a> {
 
     fn cell_for_count(count: i64) -> (&'static str, Color) {
         match count {
-            0 => ("\u{00B7}", Color::DarkGray),    // · middle dot
-            1 => ("\u{2588}", Color::DarkGray),     // █
-            2 => ("\u{2588}", Color::Green),        // █
-            _ => ("\u{2588}", Color::LightGreen),   // █
+            0 => ("\u{25AA}", Color::DarkGray),                  // ▪ small square
+            1 => ("\u{25A0}", Color::Indexed(65)),               // ■ muted teal
+            2 => ("\u{25A0}", Color::Indexed(71)),               // ■ medium green
+            _ => ("\u{25A0}", Color::Indexed(118)),              // ■ bright lime
         }
     }
 }
 
 impl<'a> Widget for Heatmap<'a> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        if area.height < 8 || area.width < 10 {
+        if area.height < 9 || area.width < 10 {
             return;
         }
 
@@ -47,26 +47,52 @@ impl<'a> Widget for Heatmap<'a> {
         let current_week_monday = today - Duration::days(today_weekday as i64);
         let start_monday = current_week_monday - Duration::weeks((self.weeks as i64) - 1);
 
-        // Day labels on the left (3 chars wide)
+        // Day labels on the left (3 chars wide), shifted down 1 row for month labels
         let day_labels = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
         let label_width: u16 = 3; // "Mo " etc.
+        let month_row_y = area.y;
+        let grid_y = area.y + 1; // grid starts 1 row below for month labels
 
         // Render day labels
         for (row, label) in day_labels.iter().enumerate() {
-            let y = area.y + row as u16;
+            let y = grid_y + row as u16;
             if y >= area.y + area.height {
                 break;
             }
-            buf.set_string(area.x, y, label, Style::default().fg(Color::DarkGray));
+            buf.set_string(area.x, y, label, Style::default().fg(Color::Gray));
         }
 
         // Render the heatmap cells
         let cols_available = area.width.saturating_sub(label_width);
-        let num_weeks = (cols_available / 2).min(self.weeks); // each cell is 2 chars wide ("█ ")
+        let cell_width: u16 = 2; // "■ " — square + 1 space
+        let num_weeks = (cols_available / cell_width).min(self.weeks);
+
+        let month_names = [
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+        ];
+
+        // Track which months to label: place label at the first week column of each month
+        let mut last_labeled_month: Option<u32> = None;
 
         for week in 0..num_weeks {
+            // Determine the month for this week's Monday
+            let week_monday = start_monday + Duration::weeks(week as i64);
+            let month = week_monday.month();
+
+            // Place month label at the first week column of each new month
+            if last_labeled_month != Some(month) {
+                let x = area.x + label_width + week * cell_width;
+                let label = month_names[(month - 1) as usize];
+                // Only render if there's room for the 3-char label
+                if x + 3 <= area.x + area.width {
+                    buf.set_string(x, month_row_y, label, Style::default().fg(Color::Gray));
+                }
+                last_labeled_month = Some(month);
+            }
+
             for day in 0..7u16 {
-                let date = start_monday + Duration::weeks(week as i64) + Duration::days(day as i64);
+                let date = week_monday + Duration::days(day as i64);
                 if date > today {
                     continue;
                 }
@@ -74,8 +100,8 @@ impl<'a> Widget for Heatmap<'a> {
                 let count = counts.get(&date_str).copied().unwrap_or(0);
                 let (ch, color) = Heatmap::cell_for_count(count);
 
-                let x = area.x + label_width + week * 2;
-                let y = area.y + day;
+                let x = area.x + label_width + week * cell_width;
+                let y = grid_y + day;
                 if y < area.y + area.height && x + 1 < area.x + area.width {
                     buf.set_string(x, y, ch, Style::default().fg(color));
                 }
@@ -83,18 +109,18 @@ impl<'a> Widget for Heatmap<'a> {
         }
 
         // Render legend row below the 7 day rows
-        let legend_y = area.y + 7;
+        let legend_y = grid_y + 7;
         if legend_y < area.y + area.height {
             let legend = Line::from(vec![
-                Span::styled("Less ", Style::default().fg(Color::DarkGray)),
-                Span::styled("\u{00B7}", Style::default().fg(Color::DarkGray)),
+                Span::styled("Less ", Style::default().fg(Color::Gray)),
+                Span::styled("\u{25AA}", Style::default().fg(Color::DarkGray)),
                 Span::raw(" "),
-                Span::styled("\u{2588}", Style::default().fg(Color::DarkGray)),
+                Span::styled("\u{25A0}", Style::default().fg(Color::Indexed(65))),
                 Span::raw(" "),
-                Span::styled("\u{2588}", Style::default().fg(Color::Green)),
+                Span::styled("\u{25A0}", Style::default().fg(Color::Indexed(71))),
                 Span::raw(" "),
-                Span::styled("\u{2588}", Style::default().fg(Color::LightGreen)),
-                Span::styled(" More", Style::default().fg(Color::DarkGray)),
+                Span::styled("\u{25A0}", Style::default().fg(Color::Indexed(118))),
+                Span::styled(" More", Style::default().fg(Color::Gray)),
             ]);
             buf.set_line(area.x + label_width, legend_y, &legend, area.width.saturating_sub(label_width));
         }

@@ -31,7 +31,7 @@ pub struct HistoryScreen {
 
 impl HistoryScreen {
     pub fn new(db: &Database) -> anyhow::Result<Self> {
-        let entries = db.list_logs_recent(14)?;
+        let entries = db.list_logs_all()?;
         Ok(Self {
             entries,
             selected: 0,
@@ -61,7 +61,7 @@ impl HistoryScreen {
         // ── Title ──
         let title = Line::from(vec![
             Span::styled(
-                " History \u{2014} Last 14 Days",
+                " History",
                 Style::default().fg(Color::White).bold(),
             ),
         ]);
@@ -80,20 +80,20 @@ impl HistoryScreen {
             Line::from(vec![
                 Span::styled(" Delete this entry? ", Style::default().fg(Color::Red)),
                 Span::styled("[y]", Style::default().fg(ACCENT)),
-                Span::styled(" Yes  ", Style::default().fg(Color::DarkGray)),
+                Span::styled(" Yes  ", Style::default().fg(Color::Gray)),
                 Span::styled("[any]", Style::default().fg(ACCENT)),
-                Span::styled(" Cancel", Style::default().fg(Color::DarkGray)),
+                Span::styled(" Cancel", Style::default().fg(Color::Gray)),
             ])
         } else {
             Line::from(vec![
                 Span::styled(" [j/k]", Style::default().fg(ACCENT)),
-                Span::styled(" Navigate  ", Style::default().fg(Color::DarkGray)),
+                Span::styled(" Navigate  ", Style::default().fg(Color::Gray)),
                 Span::styled("[Enter]", Style::default().fg(ACCENT)),
-                Span::styled(" Edit  ", Style::default().fg(Color::DarkGray)),
+                Span::styled(" Edit  ", Style::default().fg(Color::Gray)),
                 Span::styled("[d]", Style::default().fg(ACCENT)),
-                Span::styled(" Delete  ", Style::default().fg(Color::DarkGray)),
+                Span::styled(" Delete  ", Style::default().fg(Color::Gray)),
                 Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(" Back", Style::default().fg(Color::DarkGray)),
+                Span::styled(" Back", Style::default().fg(Color::Gray)),
             ])
         };
         frame.render_widget(Paragraph::new(shortcuts), chunks[3]);
@@ -115,8 +115,8 @@ impl HistoryScreen {
     fn render_list(&self, frame: &mut Frame, area: ratatui::layout::Rect, visible: usize) {
         if self.entries.is_empty() {
             let empty = Paragraph::new(Line::from(Span::styled(
-                "  No entries in the last 14 days",
-                Style::default().fg(Color::DarkGray),
+                "  No entries yet",
+                Style::default().fg(Color::Gray),
             )));
             frame.render_widget(empty, area);
             return;
@@ -173,7 +173,7 @@ impl HistoryScreen {
             };
             lines.push(Line::from(Span::styled(
                 detail,
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(Color::Gray),
             )));
         }
 
@@ -231,7 +231,7 @@ impl HistoryScreen {
                 let log_id = entry.log.id;
                 let _ = db.delete_log(log_id);
                 // Re-fetch entries after deletion
-                if let Ok(entries) = db.list_logs_recent(14) {
+                if let Ok(entries) = db.list_logs_all() {
                     self.entries = entries;
                 }
                 // Adjust selected index

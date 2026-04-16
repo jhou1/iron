@@ -38,6 +38,7 @@ impl Database {
     }
 
     /// Opens an in-memory database (for tests).
+    #[allow(dead_code)]
     pub fn open_in_memory() -> Result<Self> {
         let conn = Connection::open_in_memory()?;
         let db = Database { conn };
@@ -144,6 +145,7 @@ impl Database {
 
     // ── Log CRUD ───────────────────────────────────────────────────────
 
+    #[allow(dead_code)]
     pub fn create_log(
         &self,
         practice_id: i64,
@@ -234,6 +236,48 @@ impl Database {
     }
 
     // ── Query helpers ──────────────────────────────────────────────────
+
+    pub fn list_logs_all(&self) -> Result<Vec<LogEntry>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT l.id, l.practice_id, l.logged_at, l.note, p.name, p.practice_type
+             FROM logs l
+             JOIN practices p ON l.practice_id = p.id
+             ORDER BY l.logged_at DESC",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, i64>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, Option<String>>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, String>(5)?,
+            ))
+        })?;
+
+        let mut entries = Vec::new();
+        for row in rows {
+            let (log_id, practice_id, logged_at_str, note, practice_name, pt_str) = row?;
+            let logged_at =
+                NaiveDateTime::parse_from_str(&logged_at_str, "%Y-%m-%d %H:%M:%S%.f")
+                    .context("failed to parse logged_at")?;
+            let practice_type: PracticeType =
+                pt_str.parse().map_err(|e: String| anyhow::anyhow!(e))?;
+            let sets = self.load_sets(log_id, &practice_type)?;
+            entries.push(LogEntry {
+                log: Log {
+                    id: log_id,
+                    practice_id,
+                    logged_at,
+                    note,
+                },
+                practice_name,
+                practice_type,
+                sets,
+            });
+        }
+        Ok(entries)
+    }
 
     pub fn list_logs_recent(&self, days: i64) -> Result<Vec<LogEntry>> {
         let cutoff = Local::now().naive_local() - chrono::Duration::days(days);

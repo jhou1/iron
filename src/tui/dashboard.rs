@@ -1,4 +1,3 @@
-use chrono::Local;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
@@ -18,37 +17,27 @@ const GREEN: Color = Color::Green;
 
 pub struct DashboardScreen {
     heatmap_data: Vec<(String, i64)>,
-    today_entries: Vec<LogEntry>,
+    recent_entries: Vec<LogEntry>,
     stats: AggregateStats,
 }
 
 impl DashboardScreen {
     pub fn new(db: &Database) -> anyhow::Result<Self> {
         let heatmap_data = db.heatmap_counts(365)?;
-        let today_entries = Self::load_today_entries(db)?;
+        let recent_entries = db.list_logs_recent(14)?;
         let stats = db.aggregate_stats(14)?;
         Ok(Self {
             heatmap_data,
-            today_entries,
+            recent_entries,
             stats,
         })
     }
 
     pub fn refresh(&mut self, db: &Database) -> anyhow::Result<()> {
         self.heatmap_data = db.heatmap_counts(365)?;
-        self.today_entries = Self::load_today_entries(db)?;
+        self.recent_entries = db.list_logs_recent(14)?;
         self.stats = db.aggregate_stats(14)?;
         Ok(())
-    }
-
-    fn load_today_entries(db: &Database) -> anyhow::Result<Vec<LogEntry>> {
-        let today_str = Local::now().format("%Y-%m-%d").to_string();
-        let recent = db.list_logs_recent(1)?;
-        let filtered: Vec<LogEntry> = recent
-            .into_iter()
-            .filter(|e| e.log.logged_at.format("%Y-%m-%d").to_string() == today_str)
-            .collect();
-        Ok(filtered)
     }
 
     pub fn render(&self, frame: &mut Frame) {
@@ -60,7 +49,7 @@ impl DashboardScreen {
             .constraints([
                 Constraint::Length(1), // title
                 Constraint::Length(1), // heatmap header
-                Constraint::Length(9), // heatmap (7 day rows + 1 legend + 1 padding)
+                Constraint::Length(10), // heatmap (1 month labels + 7 day rows + 1 legend + 1 padding)
                 Constraint::Min(4),   // split panes
                 Constraint::Length(2), // footer
             ])
@@ -69,7 +58,7 @@ impl DashboardScreen {
         // ── Title bar ──
         let title = Line::from(vec![
             Span::styled(" iron", Style::default().fg(ACCENT).bold()),
-            Span::styled(" v0.1.0", Style::default().fg(Color::DarkGray)),
+            Span::styled(" v0.1.0", Style::default().fg(Color::Gray)),
         ]);
         frame.render_widget(Paragraph::new(title), chunks[0]);
 
@@ -95,54 +84,55 @@ impl DashboardScreen {
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(chunks[3]);
 
-        self.render_today_pane(frame, panes[0]);
+        self.render_recent_pane(frame, panes[0]);
         self.render_stats_pane(frame, panes[1]);
 
         // ── Footer ──
         let footer = Line::from(vec![
             Span::styled(" [l]", Style::default().fg(ACCENT)),
-            Span::styled(" Log  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" Log  ", Style::default().fg(Color::Gray)),
             Span::styled("[h]", Style::default().fg(ACCENT)),
-            Span::styled(" History  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" History  ", Style::default().fg(Color::Gray)),
             Span::styled("[t]", Style::default().fg(ACCENT)),
-            Span::styled(" Trends  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" Trends  ", Style::default().fg(Color::Gray)),
             Span::styled("[e]", Style::default().fg(ACCENT)),
-            Span::styled(" Practices  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" Practices  ", Style::default().fg(Color::Gray)),
             Span::styled("[q]", Style::default().fg(ACCENT)),
-            Span::styled(" Quit", Style::default().fg(Color::DarkGray)),
+            Span::styled(" Quit", Style::default().fg(Color::Gray)),
         ]);
         frame.render_widget(Paragraph::new(footer), chunks[4]);
     }
 
-    fn render_today_pane(&self, frame: &mut Frame, area: Rect) {
-        let today_label = Local::now().format("Today \u{2014} %a %b %d, %Y").to_string();
+    fn render_recent_pane(&self, frame: &mut Frame, area: Rect) {
         let block = Block::default()
-            .title(Span::styled(today_label, Style::default().fg(Color::White).bold()))
+            .title(Span::styled("Last 14 Days", Style::default().fg(Color::White).bold()))
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::DarkGray));
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
 
-        if self.today_entries.is_empty() {
+        if self.recent_entries.is_empty() {
             let empty = Paragraph::new(Line::from(Span::styled(
-                "No entries yet today",
-                Style::default().fg(Color::DarkGray),
+                "No entries in the last 14 days",
+                Style::default().fg(Color::Gray),
             )));
             frame.render_widget(empty, inner);
         } else {
             let lines: Vec<Line> = self
-                .today_entries
+                .recent_entries
                 .iter()
                 .map(|entry| {
+                    let date = entry.log.logged_at.format("%b %d").to_string();
                     let sets_count = entry.sets.len();
                     let total = entry.total_metric();
                     let label = entry.metric_label();
                     Line::from(vec![
+                        Span::styled(format!("{} ", date), Style::default().fg(Color::Gray)),
                         Span::styled(&entry.practice_name, Style::default().fg(GREEN)),
                         Span::styled(
                             format!("  {} sets, {:.0} {}", sets_count, total, label),
-                            Style::default().fg(Color::DarkGray),
+                            Style::default().fg(Color::Gray),
                         ),
                     ])
                 })
@@ -153,7 +143,7 @@ impl DashboardScreen {
 
     fn render_stats_pane(&self, frame: &mut Frame, area: Rect) {
         let block = Block::default()
-            .title(Span::styled("Last 14 Days", Style::default().fg(Color::White).bold()))
+            .title(Span::styled("Statistics", Style::default().fg(Color::White).bold()))
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::DarkGray));
 
@@ -189,7 +179,7 @@ impl DashboardScreen {
 
 fn stat_line<'a>(label: &'a str, value: &'a str) -> Line<'a> {
     Line::from(vec![
-        Span::styled(format!("{:<12}", label), Style::default().fg(Color::DarkGray)),
+        Span::styled(format!("{:<12}", label), Style::default().fg(Color::Gray)),
         Span::styled(value.to_string(), Style::default().fg(GREEN)),
     ])
 }
