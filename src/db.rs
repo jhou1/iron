@@ -128,8 +128,17 @@ impl Database {
     }
 
     pub fn delete_practice(&self, id: i64) -> Result<()> {
-        self.conn
-            .execute("DELETE FROM practices WHERE id = ?1", params![id])?;
+        // Cascade: delete associated sets and logs first
+        let mut stmt = self.conn.prepare("SELECT id FROM logs WHERE practice_id = ?1")?;
+        let log_ids: Vec<i64> = stmt
+            .query_map(params![id], |row| row.get(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        drop(stmt);
+        for log_id in log_ids {
+            self.conn.execute("DELETE FROM sets WHERE log_id = ?1", params![log_id])?;
+        }
+        self.conn.execute("DELETE FROM logs WHERE practice_id = ?1", params![id])?;
+        self.conn.execute("DELETE FROM practices WHERE id = ?1", params![id])?;
         Ok(())
     }
 

@@ -64,7 +64,7 @@ impl PracticesScreen {
             .constraints([
                 Constraint::Length(2), // title
                 Constraint::Min(4),   // practice list
-                Constraint::Length(4), // input/action area
+                Constraint::Length(6), // input/action area
                 Constraint::Length(2), // shortcuts
             ])
             .split(area);
@@ -146,9 +146,7 @@ impl PracticesScreen {
                         style,
                     )));
                 }
-                // Pad to 4 lines if needed (we have 1 header + 4 types = 5, but area is 4 lines)
-                // We'll let it overflow slightly or truncate; the layout handles it.
-                lines.truncate(4);
+                // 1 header + 4 types = 5 lines, fits in the 6-line action area
                 lines
             }
             Mode::EditName => {
