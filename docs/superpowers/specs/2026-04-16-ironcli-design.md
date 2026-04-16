@@ -10,12 +10,12 @@ IronCLI (`iron`) is an interactive TUI app that lets you log training practices,
 
 Four built-in types. When adding a new practice to the inventory, the user selects one of these:
 
-| Type | Fields per set | Derived metric |
-|---|---|---|
-| **Weighted** | weight (kg), reps | volume = sum of (weight x reps) per set |
-| **Bodyweight** | reps | total_reps = sum of reps per set |
-| **Distance** | distance (km) | total_distance = sum of distance per set |
-| **Endurance** | duration (min) | total_duration = sum of duration per set |
+| Type | UI Label | Fields per set | Derived metric |
+|---|---|---|---|
+| **Weighted** | weightxreps | weight (kg), reps | volume = sum of (weight x reps) per set |
+| **Bodyweight** | reps | reps | total_reps = sum of reps per set |
+| **Distance** | distance | distance (km) | total_distance = sum of distance per set |
+| **Endurance** | duration | duration (min) | total_duration = sum of duration per set |
 
 **Units are fixed:** kg, km, minutes. No unit conversion.
 

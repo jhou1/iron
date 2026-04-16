@@ -96,7 +96,7 @@ impl PracticesScreen {
                         Span::styled(marker, name_style),
                         Span::styled(&p.name, name_style),
                         Span::styled(
-                            format!(" ({})", p.practice_type),
+                            format!(" ({})", p.practice_type.label()),
                             Style::default().fg(Color::DarkGray),
                         ),
                     ])
@@ -142,7 +142,7 @@ impl PracticesScreen {
                         Style::default().fg(Color::DarkGray)
                     };
                     lines.push(Line::from(Span::styled(
-                        format!(" {}{}", marker, pt),
+                        format!(" {}{}", marker, pt.label()),
                         style,
                     )));
                 }

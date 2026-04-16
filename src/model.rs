@@ -19,6 +19,16 @@ impl PracticeType {
         PracticeType::Distance,
         PracticeType::Endurance,
     ];
+
+    /// Human-friendly label shown in the UI when selecting a practice type.
+    pub fn label(&self) -> &'static str {
+        match self {
+            PracticeType::Weighted => "weightxreps",
+            PracticeType::Bodyweight => "reps",
+            PracticeType::Distance => "distance",
+            PracticeType::Endurance => "duration",
+        }
+    }
 }
 
 impl fmt::Display for PracticeType {

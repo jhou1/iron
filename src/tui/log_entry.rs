@@ -149,7 +149,7 @@ impl LogEntryScreen {
                 let prefix = if i == self.selected { "> " } else { "  " };
                 let text = format!(
                     "{}{} ({})",
-                    prefix, practice.name, practice.practice_type
+                    prefix, practice.name, practice.practice_type.label()
                 );
                 let style = if i == self.selected {
                     Style::default().fg(GREEN)
@@ -271,7 +271,7 @@ impl LogEntryScreen {
                 Style::default().fg(PURPLE).bold(),
             ),
             Span::styled(
-                format!("({})", practice.practice_type),
+                format!("({})", practice.practice_type.label()),
                 Style::default().fg(Color::DarkGray),
             ),
         ]);
