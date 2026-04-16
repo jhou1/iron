@@ -57,7 +57,11 @@ fn run_app(
                 Screen::Dashboard => dashboard.handle_key(key),
                 Screen::LogEntry => log_entry.handle_key(key, db),
                 Screen::History => history.handle_key(key, db),
-                Screen::Trends => trends.handle_key(key),
+                Screen::Trends => {
+                    let action = trends.handle_key(key);
+                    trends.refresh_chart(&db);
+                    action
+                }
                 Screen::Practices => practices.handle_key(key, db),
             };
 
