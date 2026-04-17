@@ -289,3 +289,56 @@ fn delete_milestone() {
     assert_eq!(goals[0].milestones.len(), 1);
     assert_eq!(goals[0].milestones[0].title, "Keep");
 }
+
+#[test]
+fn toggle_goal_completion() {
+    let db = Database::open_in_memory().unwrap();
+    let id = db.create_goal("My Goal").unwrap();
+
+    let goals = db.list_goals().unwrap();
+    assert_eq!(goals[0].completed, false);
+    assert!(goals[0].completed_at.is_none());
+
+    db.toggle_goal(id).unwrap();
+    let goals = db.list_goals().unwrap();
+    assert_eq!(goals[0].completed, true);
+    assert!(goals[0].completed_at.is_some());
+
+    db.toggle_goal(id).unwrap();
+    let goals = db.list_goals().unwrap();
+    assert_eq!(goals[0].completed, false);
+    assert!(goals[0].completed_at.is_none());
+}
+
+#[test]
+fn milestone_toggle_tracks_completed_at() {
+    let db = Database::open_in_memory().unwrap();
+    let goal_id = db.create_goal("Goal").unwrap();
+    let ms_id = db.create_milestone(goal_id, "Step 1").unwrap();
+
+    db.toggle_milestone(ms_id).unwrap();
+    let goals = db.list_goals().unwrap();
+    assert!(goals[0].milestones[0].completed_at.is_some());
+
+    db.toggle_milestone(ms_id).unwrap();
+    let goals = db.list_goals().unwrap();
+    assert!(goals[0].milestones[0].completed_at.is_none());
+}
+
+#[test]
+fn set_completed_at_date() {
+    let db = Database::open_in_memory().unwrap();
+    let goal_id = db.create_goal("Goal").unwrap();
+    let ms_id = db.create_milestone(goal_id, "Step 1").unwrap();
+
+    db.toggle_goal(goal_id).unwrap();
+    db.toggle_milestone(ms_id).unwrap();
+
+    let custom_date = chrono::NaiveDate::from_ymd_opt(2026, 3, 15).unwrap().and_hms_opt(0, 0, 0).unwrap();
+    db.set_goal_completed_at(goal_id, &custom_date).unwrap();
+    db.set_milestone_completed_at(ms_id, &custom_date).unwrap();
+
+    let goals = db.list_goals().unwrap();
+    assert_eq!(goals[0].completed_at.unwrap().date(), chrono::NaiveDate::from_ymd_opt(2026, 3, 15).unwrap());
+    assert_eq!(goals[0].milestones[0].completed_at.unwrap().date(), chrono::NaiveDate::from_ymd_opt(2026, 3, 15).unwrap());
+}

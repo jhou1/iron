@@ -32,6 +32,7 @@ enum DashboardMode {
     AddGoal,
     AddMilestone,
     EditItem,
+    EditDate,
     ConfirmDelete,
 }
 
@@ -185,6 +186,8 @@ impl DashboardScreen {
                 Span::styled(" Toggle  ", Style::default().fg(Color::Gray)),
                 Span::styled("[d]", Style::default().fg(ACCENT)),
                 Span::styled(" Delete  ", Style::default().fg(Color::Gray)),
+                Span::styled("[D]", Style::default().fg(ACCENT)),
+                Span::styled(" Date  ", Style::default().fg(Color::Gray)),
                 Span::styled("[Esc]", Style::default().fg(ACCENT)),
                 Span::styled(" Back", Style::default().fg(Color::Gray)),
             ]
@@ -354,6 +357,14 @@ impl DashboardScreen {
                     Span::styled(&self.goal_input, Style::default().fg(GREEN)),
                     Span::styled("█", Style::default().fg(GREEN)),
                 ]));
+            } else if goal.completed {
+                let date_str = goal.completed_at
+                    .map(|dt| format!(" ({})", dt.format("%b %d")))
+                    .unwrap_or_default();
+                lines.push(Line::from(Span::styled(
+                    format!("☑ {}{}", goal.title, date_str),
+                    if is_selected { Style::default().fg(GREEN) } else { Style::default().fg(Color::DarkGray) },
+                )));
             } else {
                 let marker = if is_selected { "> " } else { "▸ " };
                 lines.push(Line::from(Span::styled(
@@ -374,13 +385,16 @@ impl DashboardScreen {
                         Span::styled("█", Style::default().fg(GREEN)),
                     ]));
                 } else if ms.completed {
+                    let date_str = ms.completed_at
+                        .map(|dt| format!(" ({})", dt.format("%b %d")))
+                        .unwrap_or_default();
                     let style = if is_ms_selected {
                         Style::default().fg(GREEN)
                     } else {
                         Style::default().fg(Color::DarkGray)
                     };
                     lines.push(Line::from(Span::styled(
-                        format!("  ☑ {}", ms.title),
+                        format!("  ☑ {}{}", ms.title, date_str),
                         style,
                     )));
                 } else {
@@ -414,6 +428,13 @@ impl DashboardScreen {
                     Span::styled("█", Style::default().fg(GREEN)),
                 ]));
             }
+            DashboardMode::EditDate => {
+                lines.push(Line::from(vec![
+                    Span::styled("  Date (YYYY-MM-DD): ", Style::default().fg(ACCENT)),
+                    Span::styled(&self.goal_input, Style::default().fg(GREEN)),
+                    Span::styled("█", Style::default().fg(GREEN)),
+                ]));
+            }
             DashboardMode::ConfirmDelete => {
                 lines.push(Line::from(Span::styled(
                     "  Delete? (y/n)",
@@ -440,6 +461,7 @@ impl DashboardScreen {
             DashboardMode::AddGoal => self.handle_add_goal(key, db),
             DashboardMode::AddMilestone => self.handle_add_milestone(key, db),
             DashboardMode::EditItem => self.handle_edit_item(key, db),
+            DashboardMode::EditDate => self.handle_edit_date(key, db),
             DashboardMode::ConfirmDelete => self.handle_confirm_delete(key, db),
         }
     }
@@ -510,9 +532,29 @@ impl DashboardScreen {
                 Action::None
             }
             KeyCode::Char(' ') => {
-                if let Some(GoalItem::Milestone(id)) = self.selected_goal_item() {
-                    let _ = db.toggle_milestone(id);
-                    let _ = self.reload_goals(db);
+                match self.selected_goal_item() {
+                    Some(GoalItem::Goal(id)) => {
+                        let _ = db.toggle_goal(id);
+                        let _ = self.reload_goals(db);
+                    }
+                    Some(GoalItem::Milestone(id)) => {
+                        let _ = db.toggle_milestone(id);
+                        let _ = self.reload_goals(db);
+                    }
+                    None => {}
+                }
+                Action::None
+            }
+            KeyCode::Char('D') => {
+                if let Some(item) = self.selected_goal_item() {
+                    let is_completed = match item {
+                        GoalItem::Goal(id) => self.goals.iter().find(|g| g.id == id).map(|g| g.completed).unwrap_or(false),
+                        GoalItem::Milestone(id) => self.goals.iter().flat_map(|g| &g.milestones).find(|m| m.id == id).map(|m| m.completed).unwrap_or(false),
+                    };
+                    if is_completed {
+                        self.goal_input.clear();
+                        self.mode = DashboardMode::EditDate;
+                    }
                 }
                 Action::None
             }
@@ -599,6 +641,40 @@ impl DashboardScreen {
                         match item {
                             GoalItem::Goal(id) => { let _ = db.update_goal(id, &title); }
                             GoalItem::Milestone(id) => { let _ = db.update_milestone(id, &title); }
+                        }
+                        let _ = self.reload_goals(db);
+                    }
+                }
+                self.goal_input.clear();
+                self.mode = DashboardMode::Goals;
+                Action::None
+            }
+            KeyCode::Esc => {
+                self.goal_input.clear();
+                self.mode = DashboardMode::Goals;
+                Action::None
+            }
+            KeyCode::Backspace => {
+                self.goal_input.pop();
+                Action::None
+            }
+            KeyCode::Char(c) => {
+                self.goal_input.push(c);
+                Action::None
+            }
+            _ => Action::None,
+        }
+    }
+
+    fn handle_edit_date(&mut self, key: KeyEvent, db: &Database) -> Action {
+        match key.code {
+            KeyCode::Enter => {
+                if let Ok(date) = chrono::NaiveDate::parse_from_str(&self.goal_input, "%Y-%m-%d") {
+                    let completed_at = date.and_hms_opt(0, 0, 0).unwrap();
+                    if let Some(item) = self.selected_goal_item() {
+                        match item {
+                            GoalItem::Goal(id) => { let _ = db.set_goal_completed_at(id, &completed_at); }
+                            GoalItem::Milestone(id) => { let _ = db.set_milestone_completed_at(id, &completed_at); }
                         }
                         let _ = self.reload_goals(db);
                     }

@@ -54,6 +54,10 @@ pub struct ExportSet {
 pub struct ExportGoal {
     pub title: String,
     pub position: i32,
+    #[serde(default)]
+    pub completed: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub completed_at: Option<String>,
     pub milestones: Vec<ExportMilestone>,
 }
 
@@ -62,6 +66,8 @@ pub struct ExportMilestone {
     pub title: String,
     pub completed: bool,
     pub position: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub completed_at: Option<String>,
 }
 
 // ── Export ──────────────────────────────────────────────────────────────
@@ -121,12 +127,15 @@ pub fn export_to_json(db: &Database, path: Option<PathBuf>) -> Result<()> {
         .map(|g| ExportGoal {
             title: g.title.clone(),
             position: g.position,
+            completed: g.completed,
+            completed_at: g.completed_at.map(|dt| dt.format("%Y-%m-%d %H:%M:%S%.f").to_string()),
             milestones: g.milestones
                 .iter()
                 .map(|m| ExportMilestone {
                     title: m.title.clone(),
                     completed: m.completed,
                     position: m.position,
+                    completed_at: m.completed_at.map(|dt| dt.format("%Y-%m-%d %H:%M:%S%.f").to_string()),
                 })
                 .collect(),
         })
@@ -234,10 +243,23 @@ pub fn import_from_json(db: &Database, path: &Path) -> Result<usize> {
 
         for eg in &data.goals {
             let goal_id = db.create_goal(&eg.title)?;
+            if eg.completed {
+                db.toggle_goal(goal_id)?;
+                if let Some(ref ca) = eg.completed_at {
+                    if let Ok(dt) = NaiveDateTime::parse_from_str(ca, "%Y-%m-%d %H:%M:%S%.f") {
+                        db.set_goal_completed_at(goal_id, &dt)?;
+                    }
+                }
+            }
             for em in &eg.milestones {
                 let ms_id = db.create_milestone(goal_id, &em.title)?;
                 if em.completed {
                     db.toggle_milestone(ms_id)?;
+                    if let Some(ref ca) = em.completed_at {
+                        if let Ok(dt) = NaiveDateTime::parse_from_str(ca, "%Y-%m-%d %H:%M:%S%.f") {
+                            db.set_milestone_completed_at(ms_id, &dt)?;
+                        }
+                    }
                 }
             }
         }

@@ -77,8 +77,10 @@ impl Database {
             CREATE TABLE IF NOT EXISTS goals (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
+                completed INTEGER NOT NULL DEFAULT 0,
                 position INTEGER NOT NULL,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                completed_at TEXT
             );
 
             CREATE TABLE IF NOT EXISTS milestones (
@@ -87,9 +89,16 @@ impl Database {
                 title TEXT NOT NULL,
                 completed INTEGER NOT NULL DEFAULT 0,
                 position INTEGER NOT NULL,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                completed_at TEXT
             );",
         )?;
+
+        // Migrations for existing databases
+        let _ = self.conn.execute("ALTER TABLE goals ADD COLUMN completed INTEGER NOT NULL DEFAULT 0", []);
+        let _ = self.conn.execute("ALTER TABLE goals ADD COLUMN completed_at TEXT", []);
+        let _ = self.conn.execute("ALTER TABLE milestones ADD COLUMN completed_at TEXT", []);
+
         Ok(())
     }
 
@@ -583,16 +592,20 @@ impl Database {
 
     pub fn list_goals(&self) -> Result<Vec<Goal>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, title, position, created_at FROM goals ORDER BY position"
+            "SELECT id, title, completed, position, created_at, completed_at FROM goals ORDER BY position"
         )?;
         let goals: Vec<Goal> = stmt.query_map([], |row| {
-            let created_str: String = row.get(3)?;
+            let created_str: String = row.get(4)?;
+            let completed_at_str: Option<String> = row.get(5)?;
             Ok(Goal {
                 id: row.get(0)?,
                 title: row.get(1)?,
-                position: row.get(2)?,
+                completed: row.get::<_, i32>(2)? != 0,
+                position: row.get(3)?,
                 created_at: NaiveDateTime::parse_from_str(&created_str, "%Y-%m-%d %H:%M:%S%.f")
                     .unwrap_or_default(),
+                completed_at: completed_at_str
+                    .and_then(|s| NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S%.f").ok()),
                 milestones: Vec::new(),
             })
         })?.collect::<std::result::Result<Vec<_>, _>>()?;
@@ -600,11 +613,12 @@ impl Database {
         let mut result = goals;
         for goal in &mut result {
             let mut ms_stmt = self.conn.prepare(
-                "SELECT id, goal_id, title, completed, position, created_at \
+                "SELECT id, goal_id, title, completed, position, created_at, completed_at \
                  FROM milestones WHERE goal_id = ?1 ORDER BY position"
             )?;
             goal.milestones = ms_stmt.query_map(params![goal.id], |row| {
                 let created_str: String = row.get(5)?;
+                let completed_at_str: Option<String> = row.get(6)?;
                 Ok(Milestone {
                     id: row.get(0)?,
                     goal_id: row.get(1)?,
@@ -613,6 +627,8 @@ impl Database {
                     position: row.get(4)?,
                     created_at: NaiveDateTime::parse_from_str(&created_str, "%Y-%m-%d %H:%M:%S%.f")
                         .unwrap_or_default(),
+                    completed_at: completed_at_str
+                        .and_then(|s| NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S%.f").ok()),
                 })
             })?.collect::<std::result::Result<Vec<_>, _>>()?;
         }
@@ -631,6 +647,32 @@ impl Database {
     pub fn delete_goal(&self, id: i64) -> Result<()> {
         self.conn.execute("DELETE FROM milestones WHERE goal_id = ?1", params![id])?;
         self.conn.execute("DELETE FROM goals WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    pub fn toggle_goal(&self, id: i64) -> Result<()> {
+        self.conn.execute(
+            "UPDATE goals SET completed = CASE WHEN completed = 0 THEN 1 ELSE 0 END, \
+             completed_at = CASE WHEN completed = 0 THEN ?1 ELSE NULL END \
+             WHERE id = ?2",
+            params![Local::now().naive_local().format("%Y-%m-%d %H:%M:%S%.f").to_string(), id],
+        )?;
+        Ok(())
+    }
+
+    pub fn set_goal_completed_at(&self, id: i64, completed_at: &NaiveDateTime) -> Result<()> {
+        self.conn.execute(
+            "UPDATE goals SET completed_at = ?1 WHERE id = ?2",
+            params![completed_at.format("%Y-%m-%d %H:%M:%S%.f").to_string(), id],
+        )?;
+        Ok(())
+    }
+
+    pub fn set_milestone_completed_at(&self, id: i64, completed_at: &NaiveDateTime) -> Result<()> {
+        self.conn.execute(
+            "UPDATE milestones SET completed_at = ?1 WHERE id = ?2",
+            params![completed_at.format("%Y-%m-%d %H:%M:%S%.f").to_string(), id],
+        )?;
         Ok(())
     }
 
@@ -661,9 +703,10 @@ impl Database {
 
     pub fn toggle_milestone(&self, id: i64) -> Result<()> {
         self.conn.execute(
-            "UPDATE milestones SET completed = CASE WHEN completed = 0 THEN 1 ELSE 0 END \
-             WHERE id = ?1",
-            params![id],
+            "UPDATE milestones SET completed = CASE WHEN completed = 0 THEN 1 ELSE 0 END, \
+             completed_at = CASE WHEN completed = 0 THEN ?1 ELSE NULL END \
+             WHERE id = ?2",
+            params![Local::now().naive_local().format("%Y-%m-%d %H:%M:%S%.f").to_string(), id],
         )?;
         Ok(())
     }

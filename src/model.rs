@@ -134,9 +134,11 @@ impl LogEntry {
 pub struct Goal {
     pub id: i64,
     pub title: String,
+    pub completed: bool,
     pub position: i32,
     #[allow(dead_code)]
     pub created_at: NaiveDateTime,
+    pub completed_at: Option<NaiveDateTime>,
     pub milestones: Vec<Milestone>,
 }
 
@@ -150,4 +152,5 @@ pub struct Milestone {
     pub position: i32,
     #[allow(dead_code)]
     pub created_at: NaiveDateTime,
+    pub completed_at: Option<NaiveDateTime>,
 }

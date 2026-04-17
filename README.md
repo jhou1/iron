@@ -117,13 +117,14 @@ Press `g` on the Dashboard to enter Goals editing mode. Goals help you set train
 
 - `a` — add a new goal
 - `m` — add a milestone to the selected goal
-- `Enter` — edit a goal or milestone
-- `Space` — toggle completion status
+- `Enter` — edit a goal or milestone title
+- `Space` — toggle completion status (goals and milestones)
+- `D` — edit completion date on a completed goal or milestone (format: YYYY-MM-DD)
 - `d` — delete a goal or milestone
 - `j/k` — navigate between goals and milestones
 - `Esc` — return to the Dashboard
 
-Goals and milestones are stored in the database and included in JSON export/import.
+Completed goals and milestones display a checkmark with the completion date inline (e.g., `☑ First competition (Apr 15)`). Goals and milestones are stored in the database and included in JSON export/import.
 
 ### Daily Quote
 
@@ -199,8 +200,9 @@ Units are fixed: **kg**, **km**, **minutes**.
 | `j/k` | Navigate |
 | `a` | Add goal |
 | `m` | Add milestone |
-| `Enter` | Edit goal/milestone |
+| `Enter` | Edit goal/milestone title |
 | `Space` | Toggle completion |
+| `D` | Edit completion date |
 | `d` | Delete goal/milestone |
 | `Esc` | Back to Dashboard |
 
