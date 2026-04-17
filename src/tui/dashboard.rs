@@ -125,7 +125,7 @@ impl DashboardScreen {
             )
         };
         let quote_lines = if quote_box_width > 0 {
-            (quote_text.len() + quote_box_width - 1) / quote_box_width
+            (quote_text.chars().count() + quote_box_width - 1) / quote_box_width
         } else {
             1
         } as u16;
@@ -418,7 +418,15 @@ impl DashboardScreen {
         }
 
         let mut lines: Vec<Line> = Vec::new();
-        let in_goals_mode = self.mode != DashboardMode::Normal;
+        let in_goals_mode = matches!(
+            self.mode,
+            DashboardMode::Goals
+                | DashboardMode::AddGoal
+                | DashboardMode::AddMilestone
+                | DashboardMode::EditItem
+                | DashboardMode::EditDate
+                | DashboardMode::ConfirmDelete
+        );
 
         // AddGoal input at top so it's always visible
         if self.mode == DashboardMode::AddGoal {
