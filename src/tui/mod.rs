@@ -2,6 +2,7 @@ pub mod dashboard;
 pub mod history;
 pub mod log_entry;
 pub mod practices;
+pub mod quotes;
 pub mod trends;
 pub mod widgets;
 
