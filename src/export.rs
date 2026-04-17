@@ -14,6 +14,8 @@ pub struct ExportData {
     pub exported_at: String,
     pub practices: Vec<ExportPractice>,
     pub logs: Vec<ExportLog>,
+    #[serde(default)]
+    pub goals: Vec<ExportGoal>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -46,6 +48,20 @@ pub struct ExportSet {
     pub distance: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub duration: Option<f64>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ExportGoal {
+    pub title: String,
+    pub position: i32,
+    pub milestones: Vec<ExportMilestone>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ExportMilestone {
+    pub title: String,
+    pub completed: bool,
+    pub position: i32,
 }
 
 // ── Export ──────────────────────────────────────────────────────────────
@@ -99,11 +115,29 @@ pub fn export_to_json(db: &Database, path: Option<PathBuf>) -> Result<()> {
         })
         .collect();
 
+    let goals = db.list_goals()?;
+    let export_goals: Vec<ExportGoal> = goals
+        .iter()
+        .map(|g| ExportGoal {
+            title: g.title.clone(),
+            position: g.position,
+            milestones: g.milestones
+                .iter()
+                .map(|m| ExportMilestone {
+                    title: m.title.clone(),
+                    completed: m.completed,
+                    position: m.position,
+                })
+                .collect(),
+        })
+        .collect();
+
     let data = ExportData {
-        version: 1,
+        version: 2,
         exported_at: Local::now().to_rfc3339(),
         practices: export_practices,
         logs: export_logs,
+        goals: export_goals,
     };
 
     let json = serde_json::to_string_pretty(&data)?;
@@ -190,6 +224,23 @@ pub fn import_from_json(db: &Database, path: &Path) -> Result<usize> {
         )?;
 
         imported += 1;
+    }
+
+    if !data.goals.is_empty() {
+        let existing_goals = db.list_goals()?;
+        for g in &existing_goals {
+            db.delete_goal(g.id)?;
+        }
+
+        for eg in &data.goals {
+            let goal_id = db.create_goal(&eg.title)?;
+            for em in &eg.milestones {
+                let ms_id = db.create_milestone(goal_id, &em.title)?;
+                if em.completed {
+                    db.toggle_milestone(ms_id)?;
+                }
+            }
+        }
     }
 
     Ok(imported)

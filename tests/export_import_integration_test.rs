@@ -348,3 +348,35 @@ fn set_ordering_preserved_across_export_import() {
     assert_eq!(entry.sets[4].set_number, 5);
     assert_eq!(entry.sets[2].data, entry.sets[4].data, "sets 3 and 5 should have identical data");
 }
+
+#[test]
+fn goals_and_milestones_survive_export_import() {
+    let source = TestDb::new();
+    let db = &source.db;
+
+    let g1 = db.create_goal("Master KB Sport").unwrap();
+    db.create_milestone(g1, "10-min snatch set").unwrap();
+    let m2 = db.create_milestone(g1, "First competition").unwrap();
+    db.toggle_milestone(m2).unwrap();
+
+    let g2 = db.create_goal("Run a marathon").unwrap();
+    db.create_milestone(g2, "Run 10km under 50min").unwrap();
+
+    let export_path = source._dir.path().join("export.json");
+    ironcli::export::export_to_json(db, Some(export_path.clone())).unwrap();
+
+    let target = TestDb::new();
+    ironcli::export::import_from_json(&target.db, &export_path).unwrap();
+
+    let goals = target.db.list_goals().unwrap();
+    assert_eq!(goals.len(), 2);
+    assert_eq!(goals[0].title, "Master KB Sport");
+    assert_eq!(goals[0].milestones.len(), 2);
+    assert_eq!(goals[0].milestones[0].title, "10-min snatch set");
+    assert_eq!(goals[0].milestones[0].completed, false);
+    assert_eq!(goals[0].milestones[1].title, "First competition");
+    assert_eq!(goals[0].milestones[1].completed, true);
+    assert_eq!(goals[1].title, "Run a marathon");
+    assert_eq!(goals[1].milestones.len(), 1);
+    assert_eq!(goals[1].milestones[0].title, "Run 10km under 50min");
+}
