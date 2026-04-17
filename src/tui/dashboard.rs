@@ -640,11 +640,8 @@ impl DashboardScreen {
         }
 
         let list_area_height = inner_chunks[0].height as usize;
-        let scroll = if self.quotes_selected >= list_area_height {
-            (self.quotes_selected - list_area_height + 1) as u16
-        } else {
-            0
-        };
+        let scroll = self.quotes_selected
+            .saturating_sub(list_area_height.saturating_sub(1)) as u16;
 
         frame.render_widget(
             Paragraph::new(lines).scroll((scroll, 0)),
@@ -683,8 +680,8 @@ impl DashboardScreen {
             DashboardMode::EditItem => self.handle_edit_item(key, db),
             DashboardMode::EditDate => self.handle_edit_date(key, db),
             DashboardMode::ConfirmDelete => self.handle_confirm_delete(key, db),
-            DashboardMode::QuotesManage => Action::None,
-            DashboardMode::QuotesEdit => Action::None,
+            DashboardMode::QuotesManage => Action::None, // handlers added in next task
+            DashboardMode::QuotesEdit => Action::None,   // handlers added in next task
         }
     }
 
