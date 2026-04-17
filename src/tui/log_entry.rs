@@ -124,13 +124,15 @@ impl LogEntryScreen {
     fn render_select_practice(&self, frame: &mut Frame) {
         let area = frame.area();
 
+        let list_height = (self.filtered_indices.len() as u16).max(1);
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1), // title
-                Constraint::Length(2), // filter bar
-                Constraint::Min(1),   // list
-                Constraint::Length(1), // footer
+                Constraint::Length(1),           // title
+                Constraint::Length(2),           // filter bar
+                Constraint::Length(list_height), // list
+                Constraint::Length(1),           // footer
+                Constraint::Min(0),              // spacer
             ])
             .split(area);
 
@@ -272,14 +274,16 @@ impl LogEntryScreen {
         let area = frame.area();
         let practice = self.chosen_practice.as_ref().unwrap();
 
+        let sets_height = (self.sets.len() as u16 + 3).max(3); // sets + input fields
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1), // title
-                Constraint::Length(1), // date line
-                Constraint::Min(1),   // committed sets + input
-                Constraint::Length(1), // running total
-                Constraint::Length(2), // footer
+                Constraint::Length(1),           // title
+                Constraint::Length(1),           // date line
+                Constraint::Length(sets_height), // committed sets + input
+                Constraint::Length(1),           // running total
+                Constraint::Length(1),           // footer
+                Constraint::Min(0),              // spacer
             ])
             .split(area);
 
@@ -623,8 +627,8 @@ impl LogEntryScreen {
                 Constraint::Length(3), // summary
                 Constraint::Length(1), // spacer
                 Constraint::Length(3), // note input
-                Constraint::Min(0),   // spacer
                 Constraint::Length(1), // footer
+                Constraint::Min(0),   // spacer absorbs excess
             ])
             .split(area);
 
@@ -683,7 +687,7 @@ impl LogEntryScreen {
             Span::styled("[Esc]", Style::default().fg(ACCENT)),
             Span::styled(" Cancel", Style::default().fg(Color::Gray)),
         ]);
-        frame.render_widget(Paragraph::new(footer), chunks[6]);
+        frame.render_widget(Paragraph::new(footer), chunks[5]);
     }
 
     fn handle_enter_note(&mut self, key: KeyEvent, db: &Database) -> Action {

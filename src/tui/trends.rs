@@ -94,13 +94,15 @@ impl TrendsScreen {
     fn render_select_practice(&self, frame: &mut Frame) {
         let area = frame.area();
 
+        let list_height = (self.filtered_indices.len() as u16).max(1);
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1), // title
-                Constraint::Length(2), // filter bar
-                Constraint::Min(1),   // list
-                Constraint::Length(1), // footer
+                Constraint::Length(1),           // title
+                Constraint::Length(2),           // filter bar
+                Constraint::Length(list_height), // list
+                Constraint::Length(1),           // footer
+                Constraint::Min(0),              // spacer
             ])
             .split(area);
 
@@ -241,16 +243,17 @@ impl TrendsScreen {
             None => return,
         };
 
+        let chart_height = (self.entries.len() as u16 * 3).max(4).min(20);
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1), // title
-                Constraint::Length(1), // subtitle
-                Constraint::Length(1), // spacer
-                Constraint::Min(4),   // chart
-                Constraint::Length(1), // spacer
-                Constraint::Length(1), // stats
-                Constraint::Length(1), // footer
+                Constraint::Length(1),            // title
+                Constraint::Length(1),            // subtitle
+                Constraint::Length(1),            // spacer
+                Constraint::Length(chart_height), // chart
+                Constraint::Length(1),            // stats
+                Constraint::Length(1),            // footer
+                Constraint::Min(0),               // spacer
             ])
             .split(area);
 
@@ -336,7 +339,7 @@ impl TrendsScreen {
                     Style::default().fg(trend_color),
                 ),
             ]);
-            frame.render_widget(Paragraph::new(stats_line), chunks[5]);
+            frame.render_widget(Paragraph::new(stats_line), chunks[4]);
         }
 
         // Footer
@@ -348,7 +351,7 @@ impl TrendsScreen {
             Span::styled("[Esc]", Style::default().fg(ACCENT)),
             Span::styled(" Dashboard", Style::default().fg(Color::Gray)),
         ]);
-        frame.render_widget(Paragraph::new(footer), chunks[6]);
+        frame.render_widget(Paragraph::new(footer), chunks[5]);
     }
 
     fn handle_view_chart(&mut self, key: KeyEvent) -> Action {

@@ -68,13 +68,15 @@ impl PracticesScreen {
             height: full.height,
         };
 
+        let list_height = (self.practices.len() as u16).max(1);
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(2), // title
-                Constraint::Min(4),   // practice list
-                Constraint::Length(6), // input/action area
-                Constraint::Length(2), // shortcuts
+                Constraint::Length(2),           // title
+                Constraint::Length(list_height), // practice list
+                Constraint::Length(6),           // input/action area
+                Constraint::Length(1),           // shortcuts
+                Constraint::Min(0),              // spacer
             ])
             .split(area);
 
