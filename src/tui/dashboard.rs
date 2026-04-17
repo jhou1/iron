@@ -216,8 +216,21 @@ impl DashboardScreen {
                 Span::styled(" Practices  ", Style::default().fg(Color::Gray)),
                 Span::styled("[g]", Style::default().fg(ACCENT)),
                 Span::styled(" Goals  ", Style::default().fg(Color::Gray)),
+                Span::styled("[Q]", Style::default().fg(ACCENT)),
+                Span::styled(" Quotes  ", Style::default().fg(Color::Gray)),
                 Span::styled("[q]", Style::default().fg(ACCENT)),
                 Span::styled(" Quit", Style::default().fg(Color::Gray)),
+            ]
+        } else if self.mode == DashboardMode::QuotesManage {
+            vec![
+                Span::styled(" [a]", Style::default().fg(ACCENT)),
+                Span::styled(" Add  ", Style::default().fg(Color::Gray)),
+                Span::styled("[e]", Style::default().fg(ACCENT)),
+                Span::styled(" Edit  ", Style::default().fg(Color::Gray)),
+                Span::styled("[d]", Style::default().fg(ACCENT)),
+                Span::styled(" Delete  ", Style::default().fg(Color::Gray)),
+                Span::styled("[Esc]", Style::default().fg(ACCENT)),
+                Span::styled(" Close", Style::default().fg(Color::Gray)),
             ]
         } else if self.mode == DashboardMode::Goals {
             vec![
@@ -680,8 +693,8 @@ impl DashboardScreen {
             DashboardMode::EditItem => self.handle_edit_item(key, db),
             DashboardMode::EditDate => self.handle_edit_date(key, db),
             DashboardMode::ConfirmDelete => self.handle_confirm_delete(key, db),
-            DashboardMode::QuotesManage => Action::None, // handlers added in next task
-            DashboardMode::QuotesEdit => Action::None,   // handlers added in next task
+            DashboardMode::QuotesManage => self.handle_quotes_manage(key, db),
+            DashboardMode::QuotesEdit => self.handle_quotes_edit(key, db),
         }
     }
 
@@ -768,6 +781,159 @@ impl DashboardScreen {
         }
     }
 
+    fn handle_quotes_text_input(&mut self, key: KeyEvent) -> bool {
+        match key.code {
+            KeyCode::Char('b') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                if self.quotes_cursor > 0 {
+                    let prev = self.quotes_input[..self.quotes_cursor]
+                        .char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+                    self.quotes_cursor = prev;
+                }
+                true
+            }
+            KeyCode::Left => {
+                if self.quotes_cursor > 0 {
+                    let prev = self.quotes_input[..self.quotes_cursor]
+                        .char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+                    self.quotes_cursor = prev;
+                }
+                true
+            }
+            KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                if self.quotes_cursor < self.quotes_input.len() {
+                    let next = self.quotes_input[self.quotes_cursor..]
+                        .char_indices().nth(1)
+                        .map(|(i, _)| self.quotes_cursor + i)
+                        .unwrap_or(self.quotes_input.len());
+                    self.quotes_cursor = next;
+                }
+                true
+            }
+            KeyCode::Right => {
+                if self.quotes_cursor < self.quotes_input.len() {
+                    let next = self.quotes_input[self.quotes_cursor..]
+                        .char_indices().nth(1)
+                        .map(|(i, _)| self.quotes_cursor + i)
+                        .unwrap_or(self.quotes_input.len());
+                    self.quotes_cursor = next;
+                }
+                true
+            }
+            KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.quotes_cursor = 0;
+                true
+            }
+            KeyCode::Home => {
+                self.quotes_cursor = 0;
+                true
+            }
+            KeyCode::Char('e') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.quotes_cursor = self.quotes_input.len();
+                true
+            }
+            KeyCode::End => {
+                self.quotes_cursor = self.quotes_input.len();
+                true
+            }
+            KeyCode::Backspace => {
+                if self.quotes_cursor > 0 {
+                    let prev = self.quotes_input[..self.quotes_cursor]
+                        .char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+                    self.quotes_input.remove(prev);
+                    self.quotes_cursor = prev;
+                }
+                true
+            }
+            KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.quotes_input.insert(self.quotes_cursor, c);
+                self.quotes_cursor += c.len_utf8();
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn handle_quotes_manage(&mut self, key: KeyEvent, db: &Database) -> Action {
+        match key.code {
+            KeyCode::Char('j') | KeyCode::Down => {
+                if !self.quotes.is_empty() && self.quotes_selected < self.quotes.len() - 1 {
+                    self.quotes_selected += 1;
+                }
+                Action::None
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                if self.quotes_selected > 0 {
+                    self.quotes_selected -= 1;
+                }
+                Action::None
+            }
+            KeyCode::Char('a') => {
+                self.quotes_input.clear();
+                self.quotes_cursor = 0;
+                self.quotes_editing_id = None;
+                self.mode = DashboardMode::QuotesEdit;
+                Action::None
+            }
+            KeyCode::Char('e') | KeyCode::Enter => {
+                if let Some(q) = self.quotes.get(self.quotes_selected) {
+                    self.quotes_input = q.text.clone();
+                    self.quotes_cursor = self.quotes_input.len();
+                    self.quotes_editing_id = Some(q.id);
+                    self.mode = DashboardMode::QuotesEdit;
+                }
+                Action::None
+            }
+            KeyCode::Char('d') => {
+                if let Some(q) = self.quotes.get(self.quotes_selected) {
+                    let id = q.id;
+                    let _ = db.delete_quote(id);
+                    let _ = self.reload_quotes(db);
+                    if self.quotes_selected >= self.quotes.len() && !self.quotes.is_empty() {
+                        self.quotes_selected = self.quotes.len() - 1;
+                    }
+                }
+                Action::None
+            }
+            KeyCode::Esc => {
+                self.mode = DashboardMode::Normal;
+                Action::None
+            }
+            _ => Action::None,
+        }
+    }
+
+    fn handle_quotes_edit(&mut self, key: KeyEvent, db: &Database) -> Action {
+        match key.code {
+            KeyCode::Enter => {
+                let text = self.quotes_input.trim().to_string();
+                if !text.is_empty() {
+                    if let Some(id) = self.quotes_editing_id {
+                        let _ = db.update_quote(id, &text);
+                    } else {
+                        let _ = db.create_quote(&text);
+                    }
+                    let _ = self.reload_quotes(db);
+                }
+                self.quotes_input.clear();
+                self.quotes_cursor = 0;
+                self.quotes_editing_id = None;
+                self.mode = DashboardMode::QuotesManage;
+                Action::None
+            }
+            KeyCode::Esc => {
+                self.quotes_input.clear();
+                self.quotes_cursor = 0;
+                self.quotes_editing_id = None;
+                self.mode = DashboardMode::QuotesManage;
+                Action::None
+            }
+            _ => {
+                self.handle_quotes_text_input(key);
+                Action::None
+            }
+        }
+    }
+
     fn handle_normal(&mut self, key: KeyEvent) -> Action {
         match key.code {
             KeyCode::Char('l') => Action::Navigate(Screen::LogEntry),
@@ -778,6 +944,11 @@ impl DashboardScreen {
                 self.mode = DashboardMode::Goals;
                 self.goal_selected = 0;
                 self.goal_scroll = 0;
+                Action::None
+            }
+            KeyCode::Char('Q') => {
+                self.quotes_selected = 0;
+                self.mode = DashboardMode::QuotesManage;
                 Action::None
             }
             KeyCode::Char('q') => Action::Quit,
