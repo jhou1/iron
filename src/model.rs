@@ -129,3 +129,22 @@ impl LogEntry {
             .unwrap_or("—")
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct Goal {
+    pub id: i64,
+    pub title: String,
+    pub position: i32,
+    pub created_at: NaiveDateTime,
+    pub milestones: Vec<Milestone>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Milestone {
+    pub id: i64,
+    pub goal_id: i64,
+    pub title: String,
+    pub completed: bool,
+    pub position: i32,
+    pub created_at: NaiveDateTime,
+}
