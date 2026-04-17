@@ -107,7 +107,7 @@ impl DashboardScreen {
         } as u16;
         let quote_height = quote_lines + 2; // content + top/bottom border
 
-        // Main vertical layout: title | heatmap | quote | panes | spacer | footer
+        // Main vertical layout: title | heatmap | quote | panes | footer | spacer
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
@@ -116,8 +116,8 @@ impl DashboardScreen {
                 Constraint::Length(10),           // [2] heatmap
                 Constraint::Length(quote_height), // [3] daily quote box
                 Constraint::Length(pane_height),  // [4] split panes
-                Constraint::Min(0),              // [5] spacer
-                Constraint::Length(2),            // [6] footer
+                Constraint::Length(1),            // [5] footer
+                Constraint::Min(0),              // [6] spacer absorbs excess at bottom
             ])
             .split(area);
 
@@ -221,7 +221,7 @@ impl DashboardScreen {
             ]
         };
         let footer = Line::from(footer_spans);
-        frame.render_widget(Paragraph::new(footer), chunks[6]);
+        frame.render_widget(Paragraph::new(footer), chunks[5]);
     }
 
     fn render_recent_pane(&self, frame: &mut Frame, area: Rect) {
