@@ -358,6 +358,80 @@ fn goals_insert_at_top_and_delete_by_index() {
 }
 
 #[test]
+fn delete_goal_with_milestones_by_list_index() {
+    let db = Database::open_in_memory().unwrap();
+    let g1 = db.create_goal("Goal A").unwrap();
+    db.create_milestone(g1, "A-milestone-1").unwrap();
+    db.create_milestone(g1, "A-milestone-2").unwrap();
+    let g2 = db.create_goal("Goal B").unwrap();
+    db.create_milestone(g2, "B-milestone-1").unwrap();
+
+    // Goal B is at index 0 (most recently added), Goal A at index 1
+    let goals = db.list_goals().unwrap();
+    assert_eq!(goals[0].title, "Goal B");
+    assert_eq!(goals[0].milestones.len(), 1);
+    assert_eq!(goals[1].title, "Goal A");
+    assert_eq!(goals[1].milestones.len(), 2);
+
+    // Flat navigation: index 0 = Goal B, 1 = B-milestone-1, 2 = Goal A, 3 = A-milestone-1, 4 = A-milestone-2
+    // Delete Goal A (index 2 in flat list -> goals[1])
+    db.delete_goal(goals[1].id).unwrap();
+
+    let goals = db.list_goals().unwrap();
+    assert_eq!(goals.len(), 1);
+    assert_eq!(goals[0].title, "Goal B");
+    assert_eq!(goals[0].milestones.len(), 1);
+}
+
+#[test]
+fn delete_milestone_by_list_index() {
+    let db = Database::open_in_memory().unwrap();
+    let g = db.create_goal("Goal").unwrap();
+    db.create_milestone(g, "Keep").unwrap();
+    db.create_milestone(g, "Delete me").unwrap();
+    db.create_milestone(g, "Also keep").unwrap();
+
+    let goals = db.list_goals().unwrap();
+    // Milestones ordered by position: Delete me(0), Keep(1), Also keep(2)
+    // Actually create_milestone inserts at MAX+1, so: Keep(1), Delete me(2), Also keep(3)
+    assert_eq!(goals[0].milestones.len(), 3);
+
+    // Delete the middle milestone by its id
+    let ms_to_delete = goals[0].milestones.iter()
+        .find(|m| m.title == "Delete me")
+        .unwrap();
+    db.delete_milestone(ms_to_delete.id).unwrap();
+
+    let goals = db.list_goals().unwrap();
+    assert_eq!(goals[0].milestones.len(), 2);
+    assert!(goals[0].milestones.iter().all(|m| m.title != "Delete me"));
+}
+
+#[test]
+fn add_goal_after_delete_preserves_order() {
+    let db = Database::open_in_memory().unwrap();
+    db.create_goal("A").unwrap();
+    db.create_goal("B").unwrap();
+    db.create_goal("C").unwrap();
+
+    // Order: C(0), B(1), A(2)
+    let goals = db.list_goals().unwrap();
+    assert_eq!(goals[0].title, "C");
+
+    // Delete B (index 1)
+    db.delete_goal(goals[1].id).unwrap();
+
+    // Add D — should appear at top
+    db.create_goal("D").unwrap();
+
+    let goals = db.list_goals().unwrap();
+    assert_eq!(goals.len(), 3);
+    assert_eq!(goals[0].title, "D");
+    assert_eq!(goals[1].title, "C");
+    assert_eq!(goals[2].title, "A");
+}
+
+#[test]
 fn set_completed_at_date() {
     let db = Database::open_in_memory().unwrap();
     let goal_id = db.create_goal("Goal").unwrap();

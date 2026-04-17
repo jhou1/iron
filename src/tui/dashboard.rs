@@ -337,7 +337,6 @@ impl DashboardScreen {
     }
 
     fn adjust_goal_scroll(&mut self) {
-        // Estimate visible height: pane_height - 2 (borders)
         let goals_lines = self.goals.iter()
             .map(|g| 1 + g.milestones.len())
             .sum::<usize>()
@@ -349,10 +348,19 @@ impl DashboardScreen {
         if visible_height == 0 {
             return;
         }
+
+        // Extra lines rendered after the selected item (inline prompts)
+        let extra = match self.mode {
+            DashboardMode::ConfirmDelete => 1,
+            DashboardMode::EditDate => 1,
+            DashboardMode::AddMilestone => 1,
+            _ => 0,
+        };
+
         if self.goal_selected < self.goal_scroll {
             self.goal_scroll = self.goal_selected;
-        } else if self.goal_selected >= self.goal_scroll + visible_height {
-            self.goal_scroll = self.goal_selected - visible_height + 1;
+        } else if self.goal_selected + extra >= self.goal_scroll + visible_height {
+            self.goal_scroll = (self.goal_selected + extra) - visible_height + 1;
         }
     }
 
@@ -673,6 +681,7 @@ impl DashboardScreen {
                     self.goal_input.clear();
                     self.goal_cursor = 0;
                     self.mode = DashboardMode::AddMilestone;
+                    self.adjust_goal_scroll();
                 }
                 Action::None
             }
@@ -721,6 +730,7 @@ impl DashboardScreen {
                         self.goal_input.clear();
                         self.goal_cursor = 0;
                         self.mode = DashboardMode::EditDate;
+                        self.adjust_goal_scroll();
                     }
                 }
                 Action::None
@@ -728,6 +738,7 @@ impl DashboardScreen {
             KeyCode::Char('d') => {
                 if self.selected_goal_item().is_some() {
                     self.mode = DashboardMode::ConfirmDelete;
+                    self.adjust_goal_scroll();
                 }
                 Action::None
             }
