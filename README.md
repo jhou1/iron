@@ -11,7 +11,7 @@ A beautiful terminal UI for tracking your training records. Log practices set-by
 - **4 practice types**: weighted (weightxreps), bodyweight (reps), distance (km), endurance (min)
 - **Vim-style navigation** throughout (j/k, h/l, /, Esc, Enter)
 - **Goals and milestones** — set training targets and track progress
-- **Daily motivational quote** on the Dashboard, customizable via `~/.ironcli/quotes.txt`
+- **Daily motivational quotes** on the Dashboard — add and manage quotes in the database
 - **JSON export/import** for backup and data portability
 - Data stored locally in SQLite — single file, zero cloud dependencies
 
@@ -128,20 +128,18 @@ Completed goals and milestones display a checkmark with the completion date inli
 
 ### Daily Quote
 
-A motivational quote rotates daily on the Dashboard. The quote changes each day automatically.
+A motivational quote rotates daily on the Dashboard. The quote changes each day automatically based on the day of year.
 
-To customize, create `~/.ironcli/quotes.txt` with one quote per line. Empty lines are ignored. When this file exists, it replaces the built-in quotes entirely.
+Press `Q` (uppercase) on the Dashboard to manage your quote library.
 
-**Example `~/.ironcli/quotes.txt`:**
+Inside the Quotes manager:
+- `j/k` — navigate your quotes list
+- `a` — add a new quote
+- `e` or `Enter` — edit the selected quote
+- `d` — delete a quote
+- `Esc` — close the manager and return to Dashboard
 
-```
-The only bad workout is the one that didn't happen.
-Fall seven times, stand up eight.
-You don't have to be extreme, just consistent.
-Discipline is choosing between what you want now and what you want most.
-```
-
-To go back to the built-in quotes, delete or rename the file.
+When no quotes exist, the Dashboard shows "No quotes yet — press Q to add one" in gray text. Quotes are stored in the SQLite database alongside all your training data.
 
 ## Practice Types
 
@@ -165,6 +163,7 @@ Units are fixed: **kg**, **km**, **minutes**.
 | `t` | View trends |
 | `e` | Manage practices |
 | `g` | Goals mode |
+| `Q` | Manage quotes |
 | `q` | Quit |
 
 ### Log Entry
@@ -218,6 +217,16 @@ Units are fixed: **kg**, **km**, **minutes**.
 | `D` | Edit completion date |
 | `d` | Delete goal/milestone |
 | `Esc` | Back to Dashboard |
+
+### Quotes Manager
+
+| Key | Action |
+|---|---|
+| `j/k` | Navigate quotes |
+| `a` | Add quote |
+| `e` or `Enter` | Edit quote |
+| `d` | Delete quote |
+| `Esc` | Close manager |
 
 ## Data Backup
 
