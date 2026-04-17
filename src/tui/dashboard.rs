@@ -52,6 +52,7 @@ pub struct DashboardScreen {
     goal_selected: usize,
     goal_input: String,
     goal_cursor: usize,
+    goal_scroll: usize,
 }
 
 impl DashboardScreen {
@@ -71,6 +72,7 @@ impl DashboardScreen {
             goal_selected: 0,
             goal_input: String::new(),
             goal_cursor: 0,
+            goal_scroll: 0,
         })
     }
 
@@ -334,6 +336,26 @@ impl DashboardScreen {
         Ok(())
     }
 
+    fn adjust_goal_scroll(&mut self) {
+        // Estimate visible height: pane_height - 2 (borders)
+        let goals_lines = self.goals.iter()
+            .map(|g| 1 + g.milestones.len())
+            .sum::<usize>()
+            .max(1);
+        let recent_lines = self.recent_entries.len() + 4;
+        let pane_height = recent_lines.max(goals_lines + 2).max(7);
+        let visible_height = pane_height.saturating_sub(2);
+
+        if visible_height == 0 {
+            return;
+        }
+        if self.goal_selected < self.goal_scroll {
+            self.goal_scroll = self.goal_selected;
+        } else if self.goal_selected >= self.goal_scroll + visible_height {
+            self.goal_scroll = self.goal_selected - visible_height + 1;
+        }
+    }
+
     fn render_goals_pane(&self, frame: &mut Frame, area: Rect) {
         let border_color = if self.mode != DashboardMode::Normal {
             ACCENT
@@ -499,7 +521,12 @@ impl DashboardScreen {
             )));
         }
 
-        frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
+        frame.render_widget(
+            Paragraph::new(lines)
+                .wrap(Wrap { trim: false })
+                .scroll((self.goal_scroll as u16, 0)),
+            inner,
+        );
     }
 
     pub fn handle_key(&mut self, key: KeyEvent, db: &Database) -> Action {
@@ -606,6 +633,7 @@ impl DashboardScreen {
             KeyCode::Char('g') => {
                 self.mode = DashboardMode::Goals;
                 self.goal_selected = 0;
+                self.goal_scroll = 0;
                 Action::None
             }
             KeyCode::Char('q') => Action::Quit,
@@ -621,12 +649,14 @@ impl DashboardScreen {
             KeyCode::Char('j') | KeyCode::Down => {
                 if item_count > 0 && self.goal_selected < item_count - 1 {
                     self.goal_selected += 1;
+                    self.adjust_goal_scroll();
                 }
                 Action::None
             }
             KeyCode::Char('k') | KeyCode::Up => {
                 if self.goal_selected > 0 {
                     self.goal_selected -= 1;
+                    self.adjust_goal_scroll();
                 }
                 Action::None
             }
