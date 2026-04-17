@@ -588,7 +588,7 @@ impl Database {
 
     pub fn list_goals(&self) -> Result<Vec<Goal>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, title, completed, position, created_at, completed_at FROM goals ORDER BY position"
+            "SELECT id, title, completed, position, created_at, completed_at FROM goals ORDER BY completed, position"
         )?;
         let goals: Vec<Goal> = stmt.query_map([], |row| {
             let created_str: String = row.get(4)?;
