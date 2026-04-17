@@ -155,7 +155,7 @@ pub struct Milestone {
     pub completed_at: Option<NaiveDateTime>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Quote {
     pub id: i64,
     pub text: String,
