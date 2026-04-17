@@ -361,6 +361,16 @@ impl DashboardScreen {
         let mut lines: Vec<Line> = Vec::new();
         let in_goals_mode = self.mode != DashboardMode::Normal;
 
+        // AddGoal input at top so it's always visible
+        if self.mode == DashboardMode::AddGoal {
+            lines.push(Line::from(vec![
+                Span::styled("▸ ", Style::default().fg(GREEN).bold()),
+                Span::styled(&self.goal_input[..self.goal_cursor], Style::default().fg(GREEN)),
+                Span::styled("█", Style::default().fg(GREEN)),
+                Span::styled(&self.goal_input[self.goal_cursor..], Style::default().fg(GREEN)),
+            ]));
+        }
+
         let mut idx = 0;
         for goal in &self.goals {
             let is_selected = in_goals_mode && idx == self.goal_selected;
@@ -471,16 +481,8 @@ impl DashboardScreen {
             }
         }
 
-        // Input line for add modes
+        // Input line for other modes
         match self.mode {
-            DashboardMode::AddGoal => {
-                lines.push(Line::from(vec![
-                    Span::styled("▸ ", Style::default().fg(GREEN).bold()),
-                    Span::styled(&self.goal_input[..self.goal_cursor], Style::default().fg(GREEN)),
-                    Span::styled("█", Style::default().fg(GREEN)),
-                    Span::styled(&self.goal_input[self.goal_cursor..], Style::default().fg(GREEN)),
-                ]));
-            }
             DashboardMode::ConfirmDelete => {
                 lines.push(Line::from(Span::styled(
                     "  Delete? (y/n)",
