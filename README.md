@@ -10,6 +10,8 @@ A beautiful terminal UI for tracking your training records. Log practices set-by
 - **14-day history** with inline set details and session notes
 - **4 practice types**: weighted (weightxreps), bodyweight (reps), distance (km), endurance (min)
 - **Vim-style navigation** throughout (j/k, h/l, /, Esc, Enter)
+- **Goals and milestones** — set training targets and track progress
+- **Daily motivational quote** on the Dashboard, customizable via `~/.ironcli/quotes.txt`
 - **JSON export/import** for backup and data portability
 - Data stored locally in SQLite — single file, zero cloud dependencies
 
@@ -109,6 +111,24 @@ Press `e` to manage your practice inventory.
 - `d` — delete a practice (removes all its logs and sets)
 - `Esc` — back to Dashboard
 
+### Goals
+
+Press `g` on the Dashboard to enter Goals editing mode. Goals help you set training targets and track milestones toward them.
+
+- `a` — add a new goal
+- `m` — add a milestone to the selected goal
+- `Enter` — edit a goal or milestone
+- `Space` — toggle completion status
+- `d` — delete a goal or milestone
+- `j/k` — navigate between goals and milestones
+- `Esc` — return to the Dashboard
+
+Goals and milestones are stored in the database and included in JSON export/import.
+
+### Daily Quote
+
+A motivational quote rotates daily on the Dashboard. To customize the quotes, create a file at `~/.ironcli/quotes.txt` with one quote per line. The app will use your custom quotes instead of the built-in defaults.
+
 ## Practice Types
 
 | Type | UI Label | You Enter | Tracked Metric |
@@ -130,6 +150,7 @@ Units are fixed: **kg**, **km**, **minutes**.
 | `h` | View history |
 | `t` | View trends |
 | `e` | Manage practices |
+| `g` | Goals mode |
 | `q` | Quit |
 
 ### Log Entry
@@ -170,6 +191,18 @@ Units are fixed: **kg**, **km**, **minutes**.
 | `Enter` | Edit name |
 | `d` | Delete practice |
 | `Esc` | Back |
+
+### Goals Mode
+
+| Key | Action |
+|---|---|
+| `j/k` | Navigate |
+| `a` | Add goal |
+| `m` | Add milestone |
+| `Enter` | Edit goal/milestone |
+| `Space` | Toggle completion |
+| `d` | Delete goal/milestone |
+| `Esc` | Back to Dashboard |
 
 ## Data Backup
 
