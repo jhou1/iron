@@ -135,6 +135,7 @@ pub struct Goal {
     pub id: i64,
     pub title: String,
     pub position: i32,
+    #[allow(dead_code)]
     pub created_at: NaiveDateTime,
     pub milestones: Vec<Milestone>,
 }
@@ -142,9 +143,11 @@ pub struct Goal {
 #[derive(Debug, Clone)]
 pub struct Milestone {
     pub id: i64,
+    #[allow(dead_code)]
     pub goal_id: i64,
     pub title: String,
     pub completed: bool,
     pub position: i32,
+    #[allow(dead_code)]
     pub created_at: NaiveDateTime,
 }
