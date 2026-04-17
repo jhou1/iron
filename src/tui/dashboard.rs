@@ -3,7 +3,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Paragraph, Wrap},
     Frame,
 };
 
@@ -430,7 +430,7 @@ impl DashboardScreen {
             )));
         }
 
-        frame.render_widget(Paragraph::new(lines), inner);
+        frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
     }
 
     pub fn handle_key(&mut self, key: KeyEvent, db: &Database) -> Action {
