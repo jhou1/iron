@@ -125,7 +125,7 @@ impl DashboardScreen {
             )
         };
         let quote_lines = if quote_box_width > 0 {
-            (quote_text.chars().count() + quote_box_width - 1) / quote_box_width
+            quote_text.chars().count().div_ceil(quote_box_width)
         } else {
             1
         } as u16;
