@@ -578,14 +578,10 @@ impl Database {
 
     pub fn create_goal(&self, title: &str) -> Result<i64> {
         let now = Local::now().naive_local();
-        let position: i32 = self.conn.query_row(
-            "SELECT COALESCE(MAX(position), 0) + 1 FROM goals",
-            [],
-            |row| row.get(0),
-        )?;
+        self.conn.execute("UPDATE goals SET position = position + 1", [])?;
         self.conn.execute(
-            "INSERT INTO goals (title, position, created_at) VALUES (?1, ?2, ?3)",
-            params![title, position, now.format("%Y-%m-%d %H:%M:%S%.f").to_string()],
+            "INSERT INTO goals (title, position, created_at) VALUES (?1, 0, ?2)",
+            params![title, now.format("%Y-%m-%d %H:%M:%S%.f").to_string()],
         )?;
         Ok(self.conn.last_insert_rowid())
     }

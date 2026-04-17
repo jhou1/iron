@@ -747,6 +747,8 @@ impl DashboardScreen {
                 }
                 self.goal_input.clear();
                 self.goal_cursor = 0;
+                self.goal_selected = 0;
+                self.goal_scroll = 0;
                 self.mode = DashboardMode::Goals;
                 Action::None
             }

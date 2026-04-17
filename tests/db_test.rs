@@ -197,12 +197,12 @@ fn create_and_list_goals() {
 
     let goals = db.list_goals().unwrap();
     assert_eq!(goals.len(), 2);
-    assert_eq!(goals[0].id, id1);
-    assert_eq!(goals[0].title, "Master KB Sport");
-    assert_eq!(goals[0].position, 1);
-    assert_eq!(goals[1].id, id2);
-    assert_eq!(goals[1].title, "Run a marathon");
-    assert_eq!(goals[1].position, 2);
+    assert_eq!(goals[0].id, id2);
+    assert_eq!(goals[0].title, "Run a marathon");
+    assert_eq!(goals[0].position, 0);
+    assert_eq!(goals[1].id, id1);
+    assert_eq!(goals[1].title, "Master KB Sport");
+    assert_eq!(goals[1].position, 1);
 }
 
 #[test]
