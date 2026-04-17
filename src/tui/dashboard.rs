@@ -377,6 +377,17 @@ impl DashboardScreen {
                     Span::styled("█", Style::default().fg(GREEN)),
                     Span::styled(&self.goal_input[self.goal_cursor..], Style::default().fg(GREEN)),
                 ]));
+            } else if is_selected && self.mode == DashboardMode::EditDate {
+                lines.push(Line::from(Span::styled(
+                    format!("☑ {}", goal.title),
+                    Style::default().fg(GREEN),
+                )));
+                lines.push(Line::from(vec![
+                    Span::styled("  Date (YYYY-MM-DD): ", Style::default().fg(ACCENT)),
+                    Span::styled(&self.goal_input[..self.goal_cursor], Style::default().fg(GREEN)),
+                    Span::styled("█", Style::default().fg(GREEN)),
+                    Span::styled(&self.goal_input[self.goal_cursor..], Style::default().fg(GREEN)),
+                ]));
             } else if goal.completed {
                 let date_str = goal.completed_at
                     .map(|dt| format!(" ({})", dt.format("%Y-%m-%d")))
@@ -401,6 +412,17 @@ impl DashboardScreen {
                     let check = if ms.completed { "☑ " } else { "☐ " };
                     lines.push(Line::from(vec![
                         Span::styled(format!("  {} ", check), Style::default().fg(GREEN)),
+                        Span::styled(&self.goal_input[..self.goal_cursor], Style::default().fg(GREEN)),
+                        Span::styled("█", Style::default().fg(GREEN)),
+                        Span::styled(&self.goal_input[self.goal_cursor..], Style::default().fg(GREEN)),
+                    ]));
+                } else if is_ms_selected && self.mode == DashboardMode::EditDate {
+                    lines.push(Line::from(Span::styled(
+                        format!("  ☑ {}", ms.title),
+                        Style::default().fg(GREEN),
+                    )));
+                    lines.push(Line::from(vec![
+                        Span::styled("    Date (YYYY-MM-DD): ", Style::default().fg(ACCENT)),
                         Span::styled(&self.goal_input[..self.goal_cursor], Style::default().fg(GREEN)),
                         Span::styled("█", Style::default().fg(GREEN)),
                         Span::styled(&self.goal_input[self.goal_cursor..], Style::default().fg(GREEN)),
@@ -454,14 +476,6 @@ impl DashboardScreen {
             DashboardMode::AddGoal => {
                 lines.push(Line::from(vec![
                     Span::styled("▸ ", Style::default().fg(GREEN).bold()),
-                    Span::styled(&self.goal_input[..self.goal_cursor], Style::default().fg(GREEN)),
-                    Span::styled("█", Style::default().fg(GREEN)),
-                    Span::styled(&self.goal_input[self.goal_cursor..], Style::default().fg(GREEN)),
-                ]));
-            }
-            DashboardMode::EditDate => {
-                lines.push(Line::from(vec![
-                    Span::styled("  Date (YYYY-MM-DD): ", Style::default().fg(ACCENT)),
                     Span::styled(&self.goal_input[..self.goal_cursor], Style::default().fg(GREEN)),
                     Span::styled("█", Style::default().fg(GREEN)),
                     Span::styled(&self.goal_input[self.goal_cursor..], Style::default().fg(GREEN)),
