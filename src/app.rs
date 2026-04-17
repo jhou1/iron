@@ -54,7 +54,7 @@ fn run_app(
             }
 
             let action = match current_screen {
-                Screen::Dashboard => dashboard.handle_key(key),
+                Screen::Dashboard => dashboard.handle_key(key, db),
                 Screen::LogEntry => log_entry.handle_key(key, db),
                 Screen::History => history.handle_key(key, db),
                 Screen::Trends => {

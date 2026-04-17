@@ -25,12 +25,31 @@ const HEADER_ART: [&str; 6] = [
     r#"                       \/        \/        \//_____/           \/     \/                        \/     "#,
 ];
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum DashboardMode {
+    Normal,
+    Goals,
+    AddGoal,
+    AddMilestone,
+    EditItem,
+    ConfirmDelete,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum GoalItem {
+    Goal(i64),
+    Milestone(i64),
+}
+
 pub struct DashboardScreen {
     heatmap_data: Vec<(String, i64)>,
     recent_entries: Vec<LogEntry>,
     stats: AggregateStats,
     quote: String,
     goals: Vec<Goal>,
+    mode: DashboardMode,
+    goal_selected: usize,
+    goal_input: String,
 }
 
 impl DashboardScreen {
@@ -46,6 +65,9 @@ impl DashboardScreen {
             stats,
             quote,
             goals,
+            mode: DashboardMode::Normal,
+            goal_selected: 0,
+            goal_input: String::new(),
         })
     }
 
@@ -136,18 +158,45 @@ impl DashboardScreen {
         self.render_goals_pane(frame, panes[1]);
 
         // ── Footer ──
-        let footer = Line::from(vec![
-            Span::styled(" [l]", Style::default().fg(ACCENT)),
-            Span::styled(" Log  ", Style::default().fg(Color::Gray)),
-            Span::styled("[h]", Style::default().fg(ACCENT)),
-            Span::styled(" History  ", Style::default().fg(Color::Gray)),
-            Span::styled("[t]", Style::default().fg(ACCENT)),
-            Span::styled(" Trends  ", Style::default().fg(Color::Gray)),
-            Span::styled("[e]", Style::default().fg(ACCENT)),
-            Span::styled(" Practices  ", Style::default().fg(Color::Gray)),
-            Span::styled("[q]", Style::default().fg(ACCENT)),
-            Span::styled(" Quit", Style::default().fg(Color::Gray)),
-        ]);
+        let footer_spans = if self.mode == DashboardMode::Normal {
+            vec![
+                Span::styled(" [l]", Style::default().fg(ACCENT)),
+                Span::styled(" Log  ", Style::default().fg(Color::Gray)),
+                Span::styled("[h]", Style::default().fg(ACCENT)),
+                Span::styled(" History  ", Style::default().fg(Color::Gray)),
+                Span::styled("[t]", Style::default().fg(ACCENT)),
+                Span::styled(" Trends  ", Style::default().fg(Color::Gray)),
+                Span::styled("[e]", Style::default().fg(ACCENT)),
+                Span::styled(" Practices  ", Style::default().fg(Color::Gray)),
+                Span::styled("[g]", Style::default().fg(ACCENT)),
+                Span::styled(" Goals  ", Style::default().fg(Color::Gray)),
+                Span::styled("[q]", Style::default().fg(ACCENT)),
+                Span::styled(" Quit", Style::default().fg(Color::Gray)),
+            ]
+        } else if self.mode == DashboardMode::Goals {
+            vec![
+                Span::styled(" [a]", Style::default().fg(ACCENT)),
+                Span::styled(" Add goal  ", Style::default().fg(Color::Gray)),
+                Span::styled("[m]", Style::default().fg(ACCENT)),
+                Span::styled(" Milestone  ", Style::default().fg(Color::Gray)),
+                Span::styled("[Enter]", Style::default().fg(ACCENT)),
+                Span::styled(" Edit  ", Style::default().fg(Color::Gray)),
+                Span::styled("[Space]", Style::default().fg(ACCENT)),
+                Span::styled(" Toggle  ", Style::default().fg(Color::Gray)),
+                Span::styled("[d]", Style::default().fg(ACCENT)),
+                Span::styled(" Delete  ", Style::default().fg(Color::Gray)),
+                Span::styled("[Esc]", Style::default().fg(ACCENT)),
+                Span::styled(" Back", Style::default().fg(Color::Gray)),
+            ]
+        } else {
+            vec![
+                Span::styled(" [Enter]", Style::default().fg(ACCENT)),
+                Span::styled(" Confirm  ", Style::default().fg(Color::Gray)),
+                Span::styled("[Esc]", Style::default().fg(ACCENT)),
+                Span::styled(" Cancel", Style::default().fg(Color::Gray)),
+            ]
+        };
+        let footer = Line::from(footer_spans);
         frame.render_widget(Paragraph::new(footer), chunks[6]);
     }
 
@@ -231,16 +280,54 @@ impl DashboardScreen {
         frame.render_widget(Paragraph::new(lines), inner);
     }
 
+    fn goal_items(&self) -> Vec<GoalItem> {
+        let mut items = Vec::new();
+        for goal in &self.goals {
+            items.push(GoalItem::Goal(goal.id));
+            for ms in &goal.milestones {
+                items.push(GoalItem::Milestone(ms.id));
+            }
+        }
+        items
+    }
+
+    fn selected_goal_item(&self) -> Option<GoalItem> {
+        let items = self.goal_items();
+        items.get(self.goal_selected).copied()
+    }
+
+    fn parent_goal_id(&self) -> Option<i64> {
+        match self.selected_goal_item()? {
+            GoalItem::Goal(id) => Some(id),
+            GoalItem::Milestone(ms_id) => {
+                self.goals.iter()
+                    .find(|g| g.milestones.iter().any(|m| m.id == ms_id))
+                    .map(|g| g.id)
+            }
+        }
+    }
+
+    fn reload_goals(&mut self, db: &Database) -> anyhow::Result<()> {
+        self.goals = db.list_goals()?;
+        Ok(())
+    }
+
     fn render_goals_pane(&self, frame: &mut Frame, area: Rect) {
+        let border_color = if self.mode != DashboardMode::Normal {
+            ACCENT
+        } else {
+            Color::DarkGray
+        };
+
         let block = Block::default()
             .title(Span::styled("Goals", Style::default().fg(Color::White).bold()))
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::DarkGray));
+            .border_style(Style::default().fg(border_color));
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
 
-        if self.goals.is_empty() {
+        if self.goals.is_empty() && self.mode == DashboardMode::Normal {
             let hint = Paragraph::new(Line::from(Span::styled(
                 "Press [g] to add goals",
                 Style::default().fg(Color::Gray),
@@ -250,37 +337,314 @@ impl DashboardScreen {
         }
 
         let mut lines: Vec<Line> = Vec::new();
+        let in_goals_mode = self.mode != DashboardMode::Normal;
+
+        let mut idx = 0;
         for goal in &self.goals {
-            lines.push(Line::from(Span::styled(
-                format!("▸ {}", goal.title),
-                Style::default().fg(Color::White).bold(),
-            )));
+            let is_selected = in_goals_mode && idx == self.goal_selected;
+            let style = if is_selected {
+                Style::default().fg(GREEN).bold()
+            } else {
+                Style::default().fg(Color::White).bold()
+            };
+
+            if is_selected && self.mode == DashboardMode::EditItem {
+                lines.push(Line::from(vec![
+                    Span::styled("▸ ", style),
+                    Span::styled(&self.goal_input, Style::default().fg(GREEN)),
+                    Span::styled("█", Style::default().fg(GREEN)),
+                ]));
+            } else {
+                let marker = if is_selected { "> " } else { "▸ " };
+                lines.push(Line::from(Span::styled(
+                    format!("{}{}", marker, goal.title),
+                    style,
+                )));
+            }
+            idx += 1;
+
             for ms in &goal.milestones {
-                if ms.completed {
+                let is_ms_selected = in_goals_mode && idx == self.goal_selected;
+
+                if is_ms_selected && self.mode == DashboardMode::EditItem {
+                    let check = if ms.completed { "☑ " } else { "☐ " };
+                    lines.push(Line::from(vec![
+                        Span::styled(format!("  {} ", check), Style::default().fg(GREEN)),
+                        Span::styled(&self.goal_input, Style::default().fg(GREEN)),
+                        Span::styled("█", Style::default().fg(GREEN)),
+                    ]));
+                } else if ms.completed {
+                    let style = if is_ms_selected {
+                        Style::default().fg(GREEN)
+                    } else {
+                        Style::default().fg(Color::DarkGray)
+                    };
                     lines.push(Line::from(Span::styled(
                         format!("  ☑ {}", ms.title),
-                        Style::default().fg(Color::DarkGray),
+                        style,
                     )));
                 } else {
+                    let style = if is_ms_selected {
+                        Style::default().fg(GREEN)
+                    } else {
+                        Style::default().fg(Color::White)
+                    };
                     lines.push(Line::from(Span::styled(
                         format!("  ☐ {}", ms.title),
-                        Style::default().fg(Color::White),
+                        style,
                     )));
                 }
+                idx += 1;
             }
+        }
+
+        // Input line for add modes
+        match self.mode {
+            DashboardMode::AddGoal => {
+                lines.push(Line::from(vec![
+                    Span::styled("▸ ", Style::default().fg(GREEN).bold()),
+                    Span::styled(&self.goal_input, Style::default().fg(GREEN)),
+                    Span::styled("█", Style::default().fg(GREEN)),
+                ]));
+            }
+            DashboardMode::AddMilestone => {
+                lines.push(Line::from(vec![
+                    Span::styled("  ☐ ", Style::default().fg(GREEN)),
+                    Span::styled(&self.goal_input, Style::default().fg(GREEN)),
+                    Span::styled("█", Style::default().fg(GREEN)),
+                ]));
+            }
+            DashboardMode::ConfirmDelete => {
+                lines.push(Line::from(Span::styled(
+                    "  Delete? (y/n)",
+                    Style::default().fg(Color::Red),
+                )));
+            }
+            _ => {}
+        }
+
+        if self.goals.is_empty() && self.mode == DashboardMode::Goals {
+            lines.push(Line::from(Span::styled(
+                "Press [a] to add a goal",
+                Style::default().fg(Color::Gray),
+            )));
         }
 
         frame.render_widget(Paragraph::new(lines), inner);
     }
 
-    pub fn handle_key(&mut self, key: KeyEvent) -> Action {
+    pub fn handle_key(&mut self, key: KeyEvent, db: &Database) -> Action {
+        match self.mode {
+            DashboardMode::Normal => self.handle_normal(key),
+            DashboardMode::Goals => self.handle_goals(key, db),
+            DashboardMode::AddGoal => self.handle_add_goal(key, db),
+            DashboardMode::AddMilestone => self.handle_add_milestone(key, db),
+            DashboardMode::EditItem => self.handle_edit_item(key, db),
+            DashboardMode::ConfirmDelete => self.handle_confirm_delete(key, db),
+        }
+    }
+
+    fn handle_normal(&mut self, key: KeyEvent) -> Action {
         match key.code {
             KeyCode::Char('l') => Action::Navigate(Screen::LogEntry),
             KeyCode::Char('h') => Action::Navigate(Screen::History),
             KeyCode::Char('t') => Action::Navigate(Screen::Trends),
             KeyCode::Char('e') => Action::Navigate(Screen::Practices),
+            KeyCode::Char('g') => {
+                self.mode = DashboardMode::Goals;
+                self.goal_selected = 0;
+                Action::None
+            }
             KeyCode::Char('q') => Action::Quit,
             _ => Action::None,
+        }
+    }
+
+    fn handle_goals(&mut self, key: KeyEvent, db: &Database) -> Action {
+        let items = self.goal_items();
+        let item_count = items.len();
+
+        match key.code {
+            KeyCode::Char('j') | KeyCode::Down => {
+                if item_count > 0 && self.goal_selected < item_count - 1 {
+                    self.goal_selected += 1;
+                }
+                Action::None
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                if self.goal_selected > 0 {
+                    self.goal_selected -= 1;
+                }
+                Action::None
+            }
+            KeyCode::Char('a') => {
+                self.goal_input.clear();
+                self.mode = DashboardMode::AddGoal;
+                Action::None
+            }
+            KeyCode::Char('m') => {
+                if self.parent_goal_id().is_some() {
+                    self.goal_input.clear();
+                    self.mode = DashboardMode::AddMilestone;
+                }
+                Action::None
+            }
+            KeyCode::Enter => {
+                if let Some(item) = self.selected_goal_item() {
+                    let current_title = match item {
+                        GoalItem::Goal(id) => {
+                            self.goals.iter().find(|g| g.id == id).map(|g| g.title.clone())
+                        }
+                        GoalItem::Milestone(id) => {
+                            self.goals.iter()
+                                .flat_map(|g| &g.milestones)
+                                .find(|m| m.id == id)
+                                .map(|m| m.title.clone())
+                        }
+                    };
+                    if let Some(title) = current_title {
+                        self.goal_input = title;
+                        self.mode = DashboardMode::EditItem;
+                    }
+                }
+                Action::None
+            }
+            KeyCode::Char(' ') => {
+                if let Some(GoalItem::Milestone(id)) = self.selected_goal_item() {
+                    let _ = db.toggle_milestone(id);
+                    let _ = self.reload_goals(db);
+                }
+                Action::None
+            }
+            KeyCode::Char('d') => {
+                if self.selected_goal_item().is_some() {
+                    self.mode = DashboardMode::ConfirmDelete;
+                }
+                Action::None
+            }
+            KeyCode::Esc => {
+                self.mode = DashboardMode::Normal;
+                Action::None
+            }
+            _ => Action::None,
+        }
+    }
+
+    fn handle_add_goal(&mut self, key: KeyEvent, db: &Database) -> Action {
+        match key.code {
+            KeyCode::Enter => {
+                let title = self.goal_input.trim().to_string();
+                if !title.is_empty() {
+                    let _ = db.create_goal(&title);
+                    let _ = self.reload_goals(db);
+                }
+                self.goal_input.clear();
+                self.mode = DashboardMode::Goals;
+                Action::None
+            }
+            KeyCode::Esc => {
+                self.goal_input.clear();
+                self.mode = DashboardMode::Goals;
+                Action::None
+            }
+            KeyCode::Backspace => {
+                self.goal_input.pop();
+                Action::None
+            }
+            KeyCode::Char(c) => {
+                self.goal_input.push(c);
+                Action::None
+            }
+            _ => Action::None,
+        }
+    }
+
+    fn handle_add_milestone(&mut self, key: KeyEvent, db: &Database) -> Action {
+        match key.code {
+            KeyCode::Enter => {
+                let title = self.goal_input.trim().to_string();
+                if !title.is_empty() {
+                    if let Some(goal_id) = self.parent_goal_id() {
+                        let _ = db.create_milestone(goal_id, &title);
+                        let _ = self.reload_goals(db);
+                    }
+                }
+                self.goal_input.clear();
+                self.mode = DashboardMode::Goals;
+                Action::None
+            }
+            KeyCode::Esc => {
+                self.goal_input.clear();
+                self.mode = DashboardMode::Goals;
+                Action::None
+            }
+            KeyCode::Backspace => {
+                self.goal_input.pop();
+                Action::None
+            }
+            KeyCode::Char(c) => {
+                self.goal_input.push(c);
+                Action::None
+            }
+            _ => Action::None,
+        }
+    }
+
+    fn handle_edit_item(&mut self, key: KeyEvent, db: &Database) -> Action {
+        match key.code {
+            KeyCode::Enter => {
+                let title = self.goal_input.trim().to_string();
+                if !title.is_empty() {
+                    if let Some(item) = self.selected_goal_item() {
+                        match item {
+                            GoalItem::Goal(id) => { let _ = db.update_goal(id, &title); }
+                            GoalItem::Milestone(id) => { let _ = db.update_milestone(id, &title); }
+                        }
+                        let _ = self.reload_goals(db);
+                    }
+                }
+                self.goal_input.clear();
+                self.mode = DashboardMode::Goals;
+                Action::None
+            }
+            KeyCode::Esc => {
+                self.goal_input.clear();
+                self.mode = DashboardMode::Goals;
+                Action::None
+            }
+            KeyCode::Backspace => {
+                self.goal_input.pop();
+                Action::None
+            }
+            KeyCode::Char(c) => {
+                self.goal_input.push(c);
+                Action::None
+            }
+            _ => Action::None,
+        }
+    }
+
+    fn handle_confirm_delete(&mut self, key: KeyEvent, db: &Database) -> Action {
+        match key.code {
+            KeyCode::Char('y') => {
+                if let Some(item) = self.selected_goal_item() {
+                    match item {
+                        GoalItem::Goal(id) => { let _ = db.delete_goal(id); }
+                        GoalItem::Milestone(id) => { let _ = db.delete_milestone(id); }
+                    }
+                    let _ = self.reload_goals(db);
+                    let items = self.goal_items();
+                    if self.goal_selected >= items.len() && !items.is_empty() {
+                        self.goal_selected = items.len() - 1;
+                    }
+                }
+                self.mode = DashboardMode::Goals;
+                Action::None
+            }
+            _ => {
+                self.mode = DashboardMode::Goals;
+                Action::None
+            }
         }
     }
 }
