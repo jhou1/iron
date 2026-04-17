@@ -1,6 +1,6 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
-    layout::{Constraint, Direction, Layout},
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span},
     widgets::Paragraph,
@@ -14,6 +14,7 @@ use super::{Action, Screen};
 const GREEN: Color = Color::Green;
 const ACCENT: Color = Color::Cyan;
 const NOTE_COLOR: Color = Color::Yellow;
+const CONTENT_WIDTH: u16 = 3 + 52 * 2;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Mode {
@@ -45,7 +46,13 @@ impl HistoryScreen {
     }
 
     pub fn render(&mut self, frame: &mut Frame) {
-        let area = frame.area();
+        let full = frame.area();
+        let area = Rect {
+            x: full.x + 1,
+            y: full.y,
+            width: full.width.saturating_sub(2).min(CONTENT_WIDTH),
+            height: full.height,
+        };
 
         // Vertical layout: title (2) | list (min 4) | detail (4) | shortcuts (2)
         let chunks = Layout::default()
