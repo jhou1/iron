@@ -3,7 +3,7 @@ use chrono::{Local, NaiveDateTime};
 use rusqlite::{params, Connection};
 use std::path::Path;
 
-use crate::model::{Log, LogEntry, Practice, PracticeType, Set, SetData};
+use crate::model::{Goal, Log, LogEntry, Milestone, Practice, PracticeType, Set, SetData};
 
 /// Aggregate statistics over a time period.
 pub struct AggregateStats {
@@ -72,6 +72,22 @@ impl Database {
                 reps INTEGER,
                 distance REAL,
                 duration REAL
+            );
+
+            CREATE TABLE IF NOT EXISTS goals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                position INTEGER NOT NULL,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS milestones (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                goal_id INTEGER NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
+                title TEXT NOT NULL,
+                completed INTEGER NOT NULL DEFAULT 0,
+                position INTEGER NOT NULL,
+                created_at TEXT NOT NULL
             );",
         )?;
         Ok(())
@@ -547,5 +563,113 @@ impl Database {
             });
         }
         Ok(sets)
+    }
+
+    // ── Goal CRUD ─────────────────────────────────────────────────────
+
+    pub fn create_goal(&self, title: &str) -> Result<i64> {
+        let now = Local::now().naive_local();
+        let position: i32 = self.conn.query_row(
+            "SELECT COALESCE(MAX(position), 0) + 1 FROM goals",
+            [],
+            |row| row.get(0),
+        )?;
+        self.conn.execute(
+            "INSERT INTO goals (title, position, created_at) VALUES (?1, ?2, ?3)",
+            params![title, position, now.format("%Y-%m-%d %H:%M:%S%.f").to_string()],
+        )?;
+        Ok(self.conn.last_insert_rowid())
+    }
+
+    pub fn list_goals(&self) -> Result<Vec<Goal>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, title, position, created_at FROM goals ORDER BY position"
+        )?;
+        let goals: Vec<Goal> = stmt.query_map([], |row| {
+            let created_str: String = row.get(3)?;
+            Ok(Goal {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                position: row.get(2)?,
+                created_at: NaiveDateTime::parse_from_str(&created_str, "%Y-%m-%d %H:%M:%S%.f")
+                    .unwrap_or_default(),
+                milestones: Vec::new(),
+            })
+        })?.collect::<std::result::Result<Vec<_>, _>>()?;
+
+        let mut result = goals;
+        for goal in &mut result {
+            let mut ms_stmt = self.conn.prepare(
+                "SELECT id, goal_id, title, completed, position, created_at \
+                 FROM milestones WHERE goal_id = ?1 ORDER BY position"
+            )?;
+            goal.milestones = ms_stmt.query_map(params![goal.id], |row| {
+                let created_str: String = row.get(5)?;
+                Ok(Milestone {
+                    id: row.get(0)?,
+                    goal_id: row.get(1)?,
+                    title: row.get(2)?,
+                    completed: row.get::<_, i32>(3)? != 0,
+                    position: row.get(4)?,
+                    created_at: NaiveDateTime::parse_from_str(&created_str, "%Y-%m-%d %H:%M:%S%.f")
+                        .unwrap_or_default(),
+                })
+            })?.collect::<std::result::Result<Vec<_>, _>>()?;
+        }
+
+        Ok(result)
+    }
+
+    pub fn update_goal(&self, id: i64, title: &str) -> Result<()> {
+        self.conn.execute(
+            "UPDATE goals SET title = ?1 WHERE id = ?2",
+            params![title, id],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_goal(&self, id: i64) -> Result<()> {
+        self.conn.execute("DELETE FROM milestones WHERE goal_id = ?1", params![id])?;
+        self.conn.execute("DELETE FROM goals WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    // ── Milestone CRUD ────────────────────────────────────────────────
+
+    pub fn create_milestone(&self, goal_id: i64, title: &str) -> Result<i64> {
+        let now = Local::now().naive_local();
+        let position: i32 = self.conn.query_row(
+            "SELECT COALESCE(MAX(position), 0) + 1 FROM milestones WHERE goal_id = ?1",
+            params![goal_id],
+            |row| row.get(0),
+        )?;
+        self.conn.execute(
+            "INSERT INTO milestones (goal_id, title, completed, position, created_at) \
+             VALUES (?1, ?2, 0, ?3, ?4)",
+            params![goal_id, title, position, now.format("%Y-%m-%d %H:%M:%S%.f").to_string()],
+        )?;
+        Ok(self.conn.last_insert_rowid())
+    }
+
+    pub fn update_milestone(&self, id: i64, title: &str) -> Result<()> {
+        self.conn.execute(
+            "UPDATE milestones SET title = ?1 WHERE id = ?2",
+            params![title, id],
+        )?;
+        Ok(())
+    }
+
+    pub fn toggle_milestone(&self, id: i64) -> Result<()> {
+        self.conn.execute(
+            "UPDATE milestones SET completed = CASE WHEN completed = 0 THEN 1 ELSE 0 END \
+             WHERE id = ?1",
+            params![id],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_milestone(&self, id: i64) -> Result<()> {
+        self.conn.execute("DELETE FROM milestones WHERE id = ?1", params![id])?;
+        Ok(())
     }
 }

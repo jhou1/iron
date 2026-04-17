@@ -188,3 +188,104 @@ fn fourteen_day_stats() {
     assert!((stats.total_distance - 5.0).abs() < f64::EPSILON);
     assert!((stats.total_duration - 0.0).abs() < f64::EPSILON);
 }
+
+#[test]
+fn create_and_list_goals() {
+    let db = Database::open_in_memory().unwrap();
+    let id1 = db.create_goal("Master KB Sport").unwrap();
+    let id2 = db.create_goal("Run a marathon").unwrap();
+
+    let goals = db.list_goals().unwrap();
+    assert_eq!(goals.len(), 2);
+    assert_eq!(goals[0].id, id1);
+    assert_eq!(goals[0].title, "Master KB Sport");
+    assert_eq!(goals[0].position, 1);
+    assert_eq!(goals[1].id, id2);
+    assert_eq!(goals[1].title, "Run a marathon");
+    assert_eq!(goals[1].position, 2);
+}
+
+#[test]
+fn update_goal_title() {
+    let db = Database::open_in_memory().unwrap();
+    let id = db.create_goal("Old title").unwrap();
+    db.update_goal(id, "New title").unwrap();
+
+    let goals = db.list_goals().unwrap();
+    assert_eq!(goals[0].title, "New title");
+}
+
+#[test]
+fn delete_goal_cascades_milestones() {
+    let db = Database::open_in_memory().unwrap();
+    let goal_id = db.create_goal("My Goal").unwrap();
+    db.create_milestone(goal_id, "Step 1").unwrap();
+    db.create_milestone(goal_id, "Step 2").unwrap();
+
+    db.delete_goal(goal_id).unwrap();
+
+    let goals = db.list_goals().unwrap();
+    assert!(goals.is_empty());
+}
+
+#[test]
+fn create_and_list_milestones() {
+    let db = Database::open_in_memory().unwrap();
+    let goal_id = db.create_goal("My Goal").unwrap();
+    let m1 = db.create_milestone(goal_id, "First milestone").unwrap();
+    let m2 = db.create_milestone(goal_id, "Second milestone").unwrap();
+
+    let goals = db.list_goals().unwrap();
+    assert_eq!(goals[0].milestones.len(), 2);
+    assert_eq!(goals[0].milestones[0].id, m1);
+    assert_eq!(goals[0].milestones[0].title, "First milestone");
+    assert_eq!(goals[0].milestones[0].completed, false);
+    assert_eq!(goals[0].milestones[0].position, 1);
+    assert_eq!(goals[0].milestones[1].id, m2);
+    assert_eq!(goals[0].milestones[1].title, "Second milestone");
+    assert_eq!(goals[0].milestones[1].position, 2);
+}
+
+#[test]
+fn toggle_milestone_completion() {
+    let db = Database::open_in_memory().unwrap();
+    let goal_id = db.create_goal("Goal").unwrap();
+    let m_id = db.create_milestone(goal_id, "Task").unwrap();
+
+    let goals = db.list_goals().unwrap();
+    assert_eq!(goals[0].milestones[0].completed, false);
+
+    db.toggle_milestone(m_id).unwrap();
+    let goals = db.list_goals().unwrap();
+    assert_eq!(goals[0].milestones[0].completed, true);
+
+    db.toggle_milestone(m_id).unwrap();
+    let goals = db.list_goals().unwrap();
+    assert_eq!(goals[0].milestones[0].completed, false);
+}
+
+#[test]
+fn update_milestone_title() {
+    let db = Database::open_in_memory().unwrap();
+    let goal_id = db.create_goal("Goal").unwrap();
+    let m_id = db.create_milestone(goal_id, "Old").unwrap();
+
+    db.update_milestone(m_id, "New").unwrap();
+
+    let goals = db.list_goals().unwrap();
+    assert_eq!(goals[0].milestones[0].title, "New");
+}
+
+#[test]
+fn delete_milestone() {
+    let db = Database::open_in_memory().unwrap();
+    let goal_id = db.create_goal("Goal").unwrap();
+    db.create_milestone(goal_id, "Keep").unwrap();
+    let m2 = db.create_milestone(goal_id, "Remove").unwrap();
+
+    db.delete_milestone(m2).unwrap();
+
+    let goals = db.list_goals().unwrap();
+    assert_eq!(goals[0].milestones.len(), 1);
+    assert_eq!(goals[0].milestones[0].title, "Keep");
+}
