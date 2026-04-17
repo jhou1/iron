@@ -3,7 +3,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap},
+    widgets::{Block, BorderType, Borders, Paragraph, Wrap},
     Frame,
 };
 
@@ -95,6 +95,16 @@ impl DashboardScreen {
             .max(goals_lines + 2)
             .max(7);
 
+        // Calculate quote box height: content lines + 2 for borders
+        let quote_box_width = area.width.saturating_sub(4).min(HEATMAP_CONTENT_WIDTH).saturating_sub(2) as usize; // inner width
+        let quote_text = format!("\"{}\"", &self.quote);
+        let quote_lines = if quote_box_width > 0 {
+            (quote_text.len() + quote_box_width - 1) / quote_box_width
+        } else {
+            1
+        } as u16;
+        let quote_height = quote_lines + 2; // content + top/bottom border
+
         // Main vertical layout: title | heatmap | quote | panes | spacer | footer
         let chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -102,7 +112,7 @@ impl DashboardScreen {
                 Constraint::Length(1),            // [0] title
                 Constraint::Length(7),            // [1] heatmap header ASCII art
                 Constraint::Length(10),           // [2] heatmap
-                Constraint::Length(1),            // [3] daily quote
+                Constraint::Length(quote_height), // [3] daily quote box
                 Constraint::Length(pane_height),  // [4] split panes
                 Constraint::Min(0),              // [5] spacer
                 Constraint::Length(2),            // [6] footer
@@ -132,18 +142,25 @@ impl DashboardScreen {
         let heatmap = Heatmap::new(&self.heatmap_data, 52);
         frame.render_widget(heatmap, heatmap_area);
 
-        // ── Daily quote ──
+        // ── Daily quote (centered, rounded border) ──
         let quote_area = Rect {
             x: chunks[3].x + 1,
             y: chunks[3].y,
             width: chunks[3].width.saturating_sub(2).min(HEATMAP_CONTENT_WIDTH),
             height: chunks[3].height,
         };
-        let quote_line = Line::from(Span::styled(
-            format!("  \"{}\"", &self.quote),
+        let quote_block = Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(Color::DarkGray));
+        let quote_paragraph = Paragraph::new(Line::from(Span::styled(
+            quote_text.clone(),
             Style::default().fg(Color::Yellow),
-        ));
-        frame.render_widget(Paragraph::new(quote_line), quote_area);
+        )))
+        .block(quote_block)
+        .wrap(Wrap { trim: false })
+        .alignment(ratatui::layout::Alignment::Center);
+        frame.render_widget(quote_paragraph, quote_area);
 
         // ── Split panes (match heatmap content width) ──
         let panes_area = Rect {
