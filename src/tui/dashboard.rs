@@ -3,7 +3,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Paragraph, Wrap},
+    widgets::{Block, BorderType, Borders, Clear, Paragraph, Wrap},
     Frame,
 };
 
@@ -246,6 +246,11 @@ impl DashboardScreen {
         };
         let footer = Line::from(footer_spans);
         frame.render_widget(Paragraph::new(footer), chunks[5]);
+
+        // ── Quotes modal overlay ──
+        if matches!(self.mode, DashboardMode::QuotesManage | DashboardMode::QuotesEdit) {
+            self.render_quotes_modal(frame);
+        }
     }
 
     fn render_recent_pane(&self, frame: &mut Frame, area: Rect) {
@@ -574,6 +579,99 @@ impl DashboardScreen {
                 .scroll((self.goal_scroll as u16, 0)),
             inner,
         );
+    }
+
+    fn render_quotes_modal(&self, frame: &mut Frame) {
+        let area = frame.area();
+
+        let modal_width = area.width.saturating_sub(4).min(HEATMAP_CONTENT_WIDTH);
+        let list_height = (self.quotes.len() as u16).max(1);
+        let modal_height = (list_height + 4).min(area.height.saturating_sub(4)).max(6);
+        let modal_x = area.x + (area.width.saturating_sub(modal_width)) / 2;
+        let modal_y = area.y + (area.height.saturating_sub(modal_height)) / 2;
+        let modal_rect = Rect {
+            x: modal_x,
+            y: modal_y,
+            width: modal_width,
+            height: modal_height,
+        };
+
+        frame.render_widget(Clear, modal_rect);
+
+        let title = format!(" Quotes ({}) ", self.quotes.len());
+        let block = Block::default()
+            .title(Span::styled(title, Style::default().fg(Color::White).bold()))
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(ACCENT));
+
+        let inner = block.inner(modal_rect);
+        frame.render_widget(block, modal_rect);
+
+        let inner_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(1), Constraint::Length(1)])
+            .split(inner);
+
+        let mut lines: Vec<Line> = Vec::new();
+        if self.quotes.is_empty() {
+            lines.push(Line::from(Span::styled(
+                "No quotes — press [a] to add one",
+                Style::default().fg(Color::DarkGray),
+            )));
+        } else {
+            for (i, q) in self.quotes.iter().enumerate() {
+                let is_sel = i == self.quotes_selected;
+                let prefix = if is_sel { "> " } else { "  " };
+                let style = if is_sel {
+                    Style::default().fg(GREEN).bold()
+                } else {
+                    Style::default().fg(Color::White)
+                };
+                let max_text = inner_chunks[0].width.saturating_sub(2) as usize;
+                let display = if q.text.chars().count() > max_text {
+                    let truncated: String = q.text.chars().take(max_text.saturating_sub(1)).collect();
+                    format!("{}{}…", prefix, truncated)
+                } else {
+                    format!("{}{}", prefix, q.text)
+                };
+                lines.push(Line::from(Span::styled(display, style)));
+            }
+        }
+
+        let list_area_height = inner_chunks[0].height as usize;
+        let scroll = if self.quotes_selected >= list_area_height {
+            (self.quotes_selected - list_area_height + 1) as u16
+        } else {
+            0
+        };
+
+        frame.render_widget(
+            Paragraph::new(lines).scroll((scroll, 0)),
+            inner_chunks[0],
+        );
+
+        if self.mode == DashboardMode::QuotesEdit {
+            let input_line = Line::from(vec![
+                Span::styled("> ", Style::default().fg(ACCENT)),
+                Span::styled(&self.quotes_input[..self.quotes_cursor], Style::default().fg(GREEN)),
+                Span::styled("█", Style::default().fg(GREEN)),
+                Span::styled(&self.quotes_input[self.quotes_cursor..], Style::default().fg(GREEN)),
+            ]);
+            frame.render_widget(Paragraph::new(input_line), inner_chunks[1]);
+        } else {
+            let shortcuts = Line::from(vec![
+                Span::styled("[a]", Style::default().fg(ACCENT)),
+                Span::styled(" add  ", Style::default().fg(Color::Gray)),
+                Span::styled("[e]", Style::default().fg(ACCENT)),
+                Span::styled(" edit  ", Style::default().fg(Color::Gray)),
+                Span::styled("[d]", Style::default().fg(ACCENT)),
+                Span::styled(" delete  ", Style::default().fg(Color::Gray)),
+                Span::styled("[Esc]", Style::default().fg(ACCENT)),
+                Span::styled(" close", Style::default().fg(Color::Gray)),
+            ]);
+            frame.render_widget(Paragraph::new(shortcuts), inner_chunks[1]);
+        }
     }
 
     pub fn handle_key(&mut self, key: KeyEvent, db: &Database) -> Action {
