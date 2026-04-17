@@ -72,7 +72,7 @@ impl PracticesScreen {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(2),           // title
+                Constraint::Length(1),           // title
                 Constraint::Length(list_height), // practice list
                 Constraint::Length(6),           // input/action area
                 Constraint::Length(1),           // shortcuts
@@ -84,7 +84,7 @@ impl PracticesScreen {
         let title = Line::from(vec![
             Span::styled(" Practices", Style::default().fg(ACCENT).add_modifier(Modifier::BOLD)),
         ]);
-        frame.render_widget(Paragraph::new(vec![title, Line::from("")]), chunks[0]);
+        frame.render_widget(Paragraph::new(title), chunks[0]);
 
         // ── Practice list ──
         let list_lines: Vec<Line> = if self.practices.is_empty() {
