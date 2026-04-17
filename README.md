@@ -128,7 +128,20 @@ Completed goals and milestones display a checkmark with the completion date inli
 
 ### Daily Quote
 
-A motivational quote rotates daily on the Dashboard. To customize the quotes, create a file at `~/.ironcli/quotes.txt` with one quote per line. The app will use your custom quotes instead of the built-in defaults.
+A motivational quote rotates daily on the Dashboard. The quote changes each day automatically.
+
+To customize, create `~/.ironcli/quotes.txt` with one quote per line. Empty lines are ignored. When this file exists, it replaces the built-in quotes entirely.
+
+**Example `~/.ironcli/quotes.txt`:**
+
+```
+The only bad workout is the one that didn't happen.
+Fall seven times, stand up eight.
+You don't have to be extreme, just consistent.
+Discipline is choosing between what you want now and what you want most.
+```
+
+To go back to the built-in quotes, delete or rename the file.
 
 ## Practice Types
 

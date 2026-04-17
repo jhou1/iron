@@ -408,8 +408,17 @@ impl LogEntryScreen {
             .first()
             .map(|s| s.metric_label())
             .unwrap_or(metric_label_for_type(&practice.practice_type));
+        let total_reps: i32 = self.sets.iter().map(|s| match s {
+            SetData::Weighted { reps, .. } => *reps,
+            _ => 0,
+        }).sum();
+        let total_text = if total_reps > 0 {
+            format!("  Sets: {}  Total: {:.1} {}  Reps: {}", self.sets.len(), total, label, total_reps)
+        } else {
+            format!("  Sets: {}  Total: {:.1} {}", self.sets.len(), total, label)
+        };
         let total_line = Line::from(Span::styled(
-            format!("  Sets: {}  Total: {:.1} {}", self.sets.len(), total, label),
+            total_text,
             Style::default().fg(Color::White),
         ));
         frame.render_widget(Paragraph::new(total_line), chunks[3]);
