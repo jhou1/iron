@@ -14,6 +14,7 @@ use super::{Action, Screen};
 
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
+const HEATMAP_CONTENT_WIDTH: u16 = 3 + 52 * 2; // day labels (3) + 52 weeks × 2 chars
 
 const HEADER_ART: [&str; 6] = [
     r#" ___________             .__       .__                    _____          __  .__      .__  __          "#,
@@ -83,19 +84,25 @@ impl DashboardScreen {
 
         // ── Heatmap ──
         let heatmap_area = Rect {
-            x: chunks[2].x + 1, // indent 1
+            x: chunks[2].x + 1,
             y: chunks[2].y,
-            width: chunks[2].width.saturating_sub(2),
+            width: chunks[2].width.saturating_sub(2).min(HEATMAP_CONTENT_WIDTH),
             height: chunks[2].height,
         };
         let heatmap = Heatmap::new(&self.heatmap_data, 52);
         frame.render_widget(heatmap, heatmap_area);
 
-        // ── Split panes ──
+        // ── Split panes (match heatmap content width) ──
+        let panes_area = Rect {
+            x: chunks[3].x + 1,
+            y: chunks[3].y,
+            width: chunks[3].width.saturating_sub(2).min(HEATMAP_CONTENT_WIDTH),
+            height: chunks[3].height,
+        };
         let panes = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-            .split(chunks[3]);
+            .split(panes_area);
 
         self.render_recent_pane(frame, panes[0]);
         self.render_stats_pane(frame, panes[1]);
