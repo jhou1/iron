@@ -414,8 +414,9 @@ impl DashboardScreen {
                     } else {
                         Style::default().fg(Color::DarkGray)
                     };
+                    let marker = if is_ms_selected { "> " } else { "  " };
                     lines.push(Line::from(Span::styled(
-                        format!("  ☑ {}{}", ms.title, date_str),
+                        format!("{}☑ {}{}", marker, ms.title, date_str),
                         style,
                     )));
                 } else {
@@ -424,8 +425,9 @@ impl DashboardScreen {
                     } else {
                         Style::default().fg(Color::White)
                     };
+                    let marker = if is_ms_selected { "> " } else { "  " };
                     lines.push(Line::from(Span::styled(
-                        format!("  ☐ {}", ms.title),
+                        format!("{}☐ {}", marker, ms.title),
                         style,
                     )));
                 }
