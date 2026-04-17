@@ -43,15 +43,19 @@ impl DashboardScreen {
     pub fn render(&self, frame: &mut Frame) {
         let area = frame.area();
 
-        // Main vertical layout: title | heatmap | panes | footer
+        // Pane height adapts to content: entries + 2 for borders, min 7 for stats pane
+        let pane_height = (self.recent_entries.len() as u16 + 2).max(7);
+
+        // Main vertical layout: title | heatmap | panes | spacer | footer
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1), // title
-                Constraint::Length(1), // heatmap header
-                Constraint::Length(10), // heatmap (1 month labels + 7 day rows + 1 legend + 1 padding)
-                Constraint::Min(4),   // split panes
-                Constraint::Length(2), // footer
+                Constraint::Length(1),            // title
+                Constraint::Length(2),            // heatmap header (with spacing)
+                Constraint::Length(10),           // heatmap (1 month labels + 7 day rows + 1 legend + 1 padding)
+                Constraint::Length(pane_height),  // split panes (sized to content)
+                Constraint::Min(0),              // spacer absorbs excess
+                Constraint::Length(2),            // footer pinned to bottom
             ])
             .split(area);
 
@@ -100,7 +104,7 @@ impl DashboardScreen {
             Span::styled("[q]", Style::default().fg(ACCENT)),
             Span::styled(" Quit", Style::default().fg(Color::Gray)),
         ]);
-        frame.render_widget(Paragraph::new(footer), chunks[4]);
+        frame.render_widget(Paragraph::new(footer), chunks[5]);
     }
 
     fn render_recent_pane(&self, frame: &mut Frame, area: Rect) {
