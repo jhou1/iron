@@ -8,7 +8,7 @@ use ratatui::{
 };
 
 use crate::db::{AggregateStats, Database};
-use crate::model::{Goal, LogEntry};
+use crate::model::{Goal, LogEntry, Quote};
 use super::widgets::heatmap::Heatmap;
 use super::{Action, Screen};
 
@@ -34,6 +34,8 @@ enum DashboardMode {
     EditItem,
     EditDate,
     ConfirmDelete,
+    QuotesManage,
+    QuotesEdit,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -48,6 +50,11 @@ pub struct DashboardScreen {
     stats: AggregateStats,
     quote: String,
     goals: Vec<Goal>,
+    quotes: Vec<Quote>,
+    quotes_selected: usize,
+    quotes_input: String,
+    quotes_cursor: usize,
+    quotes_editing_id: Option<i64>,
     mode: DashboardMode,
     goal_selected: usize,
     goal_input: String,
@@ -60,7 +67,8 @@ impl DashboardScreen {
         let heatmap_data = db.heatmap_counts(365)?;
         let recent_entries = db.list_logs_recent(14)?;
         let stats = db.aggregate_stats(14)?;
-        let quote = super::quotes::get_daily_quote();
+        let quotes = db.list_quotes()?;
+        let quote = super::quotes::pick_daily_quote(&quotes);
         let goals = db.list_goals()?;
         Ok(Self {
             heatmap_data,
@@ -68,6 +76,11 @@ impl DashboardScreen {
             stats,
             quote,
             goals,
+            quotes,
+            quotes_selected: 0,
+            quotes_input: String::new(),
+            quotes_cursor: 0,
+            quotes_editing_id: None,
             mode: DashboardMode::Normal,
             goal_selected: 0,
             goal_input: String::new(),
@@ -80,7 +93,8 @@ impl DashboardScreen {
         self.heatmap_data = db.heatmap_counts(365)?;
         self.recent_entries = db.list_logs_recent(14)?;
         self.stats = db.aggregate_stats(14)?;
-        self.quote = super::quotes::get_daily_quote();
+        self.quotes = db.list_quotes()?;
+        self.quote = super::quotes::pick_daily_quote(&self.quotes);
         self.goals = db.list_goals()?;
         Ok(())
     }
@@ -98,14 +112,24 @@ impl DashboardScreen {
             .max(7);
 
         // Calculate quote box height: content lines + 2 for borders
-        let quote_box_width = area.width.saturating_sub(4).min(HEATMAP_CONTENT_WIDTH).saturating_sub(2) as usize; // inner width
-        let quote_text = format!("\"{}\"", &self.quote);
+        let quote_box_width = area.width.saturating_sub(4).min(HEATMAP_CONTENT_WIDTH).saturating_sub(2) as usize;
+        let (quote_text, quote_style) = if self.quote.is_empty() {
+            (
+                "No quotes yet — press Q to add one".to_string(),
+                Style::default().fg(Color::DarkGray),
+            )
+        } else {
+            (
+                format!("\"{}\"", &self.quote),
+                Style::default().fg(Color::Yellow),
+            )
+        };
         let quote_lines = if quote_box_width > 0 {
             (quote_text.len() + quote_box_width - 1) / quote_box_width
         } else {
             1
         } as u16;
-        let quote_height = quote_lines + 2; // content + top/bottom border
+        let quote_height = quote_lines + 2;
 
         // Main vertical layout: title | heatmap | quote | panes | footer | spacer
         let chunks = Layout::default()
@@ -157,7 +181,7 @@ impl DashboardScreen {
             .border_style(Style::default().fg(Color::DarkGray));
         let quote_paragraph = Paragraph::new(Line::from(Span::styled(
             quote_text.clone(),
-            Style::default().fg(Color::Yellow),
+            quote_style,
         )))
         .block(quote_block)
         .wrap(Wrap { trim: false })
@@ -336,6 +360,12 @@ impl DashboardScreen {
         Ok(())
     }
 
+    fn reload_quotes(&mut self, db: &Database) -> anyhow::Result<()> {
+        self.quotes = db.list_quotes()?;
+        self.quote = super::quotes::pick_daily_quote(&self.quotes);
+        Ok(())
+    }
+
     fn adjust_goal_scroll(&mut self) {
         let goals_lines = self.goals.iter()
             .map(|g| 1 + g.milestones.len())
@@ -365,10 +395,9 @@ impl DashboardScreen {
     }
 
     fn render_goals_pane(&self, frame: &mut Frame, area: Rect) {
-        let border_color = if self.mode != DashboardMode::Normal {
-            ACCENT
-        } else {
-            Color::DarkGray
+        let border_color = match self.mode {
+            DashboardMode::Normal | DashboardMode::QuotesManage | DashboardMode::QuotesEdit => Color::DarkGray,
+            _ => ACCENT,
         };
 
         let block = Block::default()
@@ -548,6 +577,8 @@ impl DashboardScreen {
             DashboardMode::EditItem => self.handle_edit_item(key, db),
             DashboardMode::EditDate => self.handle_edit_date(key, db),
             DashboardMode::ConfirmDelete => self.handle_confirm_delete(key, db),
+            DashboardMode::QuotesManage => Action::None,
+            DashboardMode::QuotesEdit => Action::None,
         }
     }
 
