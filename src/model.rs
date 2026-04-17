@@ -154,3 +154,10 @@ pub struct Milestone {
     pub created_at: NaiveDateTime,
     pub completed_at: Option<NaiveDateTime>,
 }
+
+#[derive(Debug, Clone)]
+pub struct Quote {
+    pub id: i64,
+    pub text: String,
+    pub position: i32,
+}

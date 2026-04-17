@@ -3,7 +3,7 @@ use chrono::{Local, NaiveDateTime};
 use rusqlite::{params, Connection};
 use std::path::Path;
 
-use crate::model::{Goal, Log, LogEntry, Milestone, Practice, PracticeType, Set, SetData};
+use crate::model::{Goal, Log, LogEntry, Milestone, Practice, PracticeType, Quote, Set, SetData};
 
 /// Aggregate statistics over a time period.
 pub struct AggregateStats {
@@ -91,6 +91,12 @@ impl Database {
                 position INTEGER NOT NULL,
                 created_at TEXT NOT NULL,
                 completed_at TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS quotes (
+                id       INTEGER PRIMARY KEY AUTOINCREMENT,
+                text     TEXT NOT NULL,
+                position INTEGER NOT NULL
             );",
         )?;
 
@@ -709,6 +715,51 @@ impl Database {
 
     pub fn delete_milestone(&self, id: i64) -> Result<()> {
         self.conn.execute("DELETE FROM milestones WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    // ── Quote CRUD ────────────────────────────────────────────────────
+
+    pub fn create_quote(&self, text: &str) -> Result<Quote> {
+        let position: i32 = self.conn.query_row(
+            "SELECT COALESCE(MAX(position), 0) + 1 FROM quotes",
+            [],
+            |row| row.get(0),
+        )?;
+        self.conn.execute(
+            "INSERT INTO quotes (text, position) VALUES (?1, ?2)",
+            params![text, position],
+        )?;
+        let id = self.conn.last_insert_rowid();
+        Ok(Quote { id, text: text.to_string(), position })
+    }
+
+    pub fn list_quotes(&self) -> Result<Vec<Quote>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, text, position FROM quotes ORDER BY position",
+        )?;
+        let quotes = stmt
+            .query_map([], |row| {
+                Ok(Quote {
+                    id: row.get(0)?,
+                    text: row.get(1)?,
+                    position: row.get(2)?,
+                })
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(quotes)
+    }
+
+    pub fn update_quote(&self, id: i64, text: &str) -> Result<()> {
+        self.conn.execute(
+            "UPDATE quotes SET text = ?1 WHERE id = ?2",
+            params![text, id],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_quote(&self, id: i64) -> Result<()> {
+        self.conn.execute("DELETE FROM quotes WHERE id = ?1", params![id])?;
         Ok(())
     }
 }
