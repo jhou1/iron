@@ -1,4 +1,4 @@
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style, Stylize},
@@ -51,6 +51,7 @@ pub struct DashboardScreen {
     mode: DashboardMode,
     goal_selected: usize,
     goal_input: String,
+    goal_cursor: usize,
 }
 
 impl DashboardScreen {
@@ -69,6 +70,7 @@ impl DashboardScreen {
             mode: DashboardMode::Normal,
             goal_selected: 0,
             goal_input: String::new(),
+            goal_cursor: 0,
         })
     }
 
@@ -354,8 +356,9 @@ impl DashboardScreen {
             if is_selected && self.mode == DashboardMode::EditItem {
                 lines.push(Line::from(vec![
                     Span::styled("▸ ", style),
-                    Span::styled(&self.goal_input, Style::default().fg(GREEN)),
+                    Span::styled(&self.goal_input[..self.goal_cursor], Style::default().fg(GREEN)),
                     Span::styled("█", Style::default().fg(GREEN)),
+                    Span::styled(&self.goal_input[self.goal_cursor..], Style::default().fg(GREEN)),
                 ]));
             } else if goal.completed {
                 let date_str = goal.completed_at
@@ -381,8 +384,9 @@ impl DashboardScreen {
                     let check = if ms.completed { "☑ " } else { "☐ " };
                     lines.push(Line::from(vec![
                         Span::styled(format!("  {} ", check), Style::default().fg(GREEN)),
-                        Span::styled(&self.goal_input, Style::default().fg(GREEN)),
+                        Span::styled(&self.goal_input[..self.goal_cursor], Style::default().fg(GREEN)),
                         Span::styled("█", Style::default().fg(GREEN)),
+                        Span::styled(&self.goal_input[self.goal_cursor..], Style::default().fg(GREEN)),
                     ]));
                 } else if ms.completed {
                     let date_str = ms.completed_at
@@ -410,6 +414,20 @@ impl DashboardScreen {
                 }
                 idx += 1;
             }
+
+            // Show milestone input right after the selected goal's milestones
+            if self.mode == DashboardMode::AddMilestone {
+                if let Some(parent_id) = self.parent_goal_id() {
+                    if parent_id == goal.id {
+                        lines.push(Line::from(vec![
+                            Span::styled("  ☐ ", Style::default().fg(GREEN)),
+                            Span::styled(&self.goal_input[..self.goal_cursor], Style::default().fg(GREEN)),
+                            Span::styled("█", Style::default().fg(GREEN)),
+                            Span::styled(&self.goal_input[self.goal_cursor..], Style::default().fg(GREEN)),
+                        ]));
+                    }
+                }
+            }
         }
 
         // Input line for add modes
@@ -417,22 +435,17 @@ impl DashboardScreen {
             DashboardMode::AddGoal => {
                 lines.push(Line::from(vec![
                     Span::styled("▸ ", Style::default().fg(GREEN).bold()),
-                    Span::styled(&self.goal_input, Style::default().fg(GREEN)),
+                    Span::styled(&self.goal_input[..self.goal_cursor], Style::default().fg(GREEN)),
                     Span::styled("█", Style::default().fg(GREEN)),
-                ]));
-            }
-            DashboardMode::AddMilestone => {
-                lines.push(Line::from(vec![
-                    Span::styled("  ☐ ", Style::default().fg(GREEN)),
-                    Span::styled(&self.goal_input, Style::default().fg(GREEN)),
-                    Span::styled("█", Style::default().fg(GREEN)),
+                    Span::styled(&self.goal_input[self.goal_cursor..], Style::default().fg(GREEN)),
                 ]));
             }
             DashboardMode::EditDate => {
                 lines.push(Line::from(vec![
                     Span::styled("  Date (YYYY-MM-DD): ", Style::default().fg(ACCENT)),
-                    Span::styled(&self.goal_input, Style::default().fg(GREEN)),
+                    Span::styled(&self.goal_input[..self.goal_cursor], Style::default().fg(GREEN)),
                     Span::styled("█", Style::default().fg(GREEN)),
+                    Span::styled(&self.goal_input[self.goal_cursor..], Style::default().fg(GREEN)),
                 ]));
             }
             DashboardMode::ConfirmDelete => {
@@ -463,6 +476,89 @@ impl DashboardScreen {
             DashboardMode::EditItem => self.handle_edit_item(key, db),
             DashboardMode::EditDate => self.handle_edit_date(key, db),
             DashboardMode::ConfirmDelete => self.handle_confirm_delete(key, db),
+        }
+    }
+
+    fn handle_text_input(&mut self, key: KeyEvent) -> bool {
+        match key.code {
+            KeyCode::Char('b') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                if self.goal_cursor > 0 {
+                    let prev = self.goal_input[..self.goal_cursor]
+                        .char_indices()
+                        .next_back()
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
+                    self.goal_cursor = prev;
+                }
+                true
+            }
+            KeyCode::Left => {
+                if self.goal_cursor > 0 {
+                    let prev = self.goal_input[..self.goal_cursor]
+                        .char_indices()
+                        .next_back()
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
+                    self.goal_cursor = prev;
+                }
+                true
+            }
+            KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                if self.goal_cursor < self.goal_input.len() {
+                    let next = self.goal_input[self.goal_cursor..]
+                        .char_indices()
+                        .nth(1)
+                        .map(|(i, _)| self.goal_cursor + i)
+                        .unwrap_or(self.goal_input.len());
+                    self.goal_cursor = next;
+                }
+                true
+            }
+            KeyCode::Right => {
+                if self.goal_cursor < self.goal_input.len() {
+                    let next = self.goal_input[self.goal_cursor..]
+                        .char_indices()
+                        .nth(1)
+                        .map(|(i, _)| self.goal_cursor + i)
+                        .unwrap_or(self.goal_input.len());
+                    self.goal_cursor = next;
+                }
+                true
+            }
+            KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.goal_cursor = 0;
+                true
+            }
+            KeyCode::Home => {
+                self.goal_cursor = 0;
+                true
+            }
+            KeyCode::Char('e') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.goal_cursor = self.goal_input.len();
+                true
+            }
+            KeyCode::End => {
+                self.goal_cursor = self.goal_input.len();
+                true
+            }
+            KeyCode::Backspace => {
+                if self.goal_cursor > 0 {
+                    let prev = self.goal_input[..self.goal_cursor]
+                        .char_indices()
+                        .next_back()
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
+                    self.goal_input.remove(prev);
+                    self.goal_cursor = prev;
+                }
+                true
+            }
+            KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.goal_input.insert(self.goal_cursor, c);
+                self.goal_cursor += c.len_utf8();
+                true
+            }
+            _ => false,
         }
     }
 
@@ -501,12 +597,14 @@ impl DashboardScreen {
             }
             KeyCode::Char('a') => {
                 self.goal_input.clear();
+                self.goal_cursor = 0;
                 self.mode = DashboardMode::AddGoal;
                 Action::None
             }
             KeyCode::Char('m') => {
                 if self.parent_goal_id().is_some() {
                     self.goal_input.clear();
+                    self.goal_cursor = 0;
                     self.mode = DashboardMode::AddMilestone;
                 }
                 Action::None
@@ -526,6 +624,7 @@ impl DashboardScreen {
                     };
                     if let Some(title) = current_title {
                         self.goal_input = title;
+                        self.goal_cursor = self.goal_input.len();
                         self.mode = DashboardMode::EditItem;
                     }
                 }
@@ -553,6 +652,7 @@ impl DashboardScreen {
                     };
                     if is_completed {
                         self.goal_input.clear();
+                        self.goal_cursor = 0;
                         self.mode = DashboardMode::EditDate;
                     }
                 }
@@ -581,23 +681,20 @@ impl DashboardScreen {
                     let _ = self.reload_goals(db);
                 }
                 self.goal_input.clear();
+                self.goal_cursor = 0;
                 self.mode = DashboardMode::Goals;
                 Action::None
             }
             KeyCode::Esc => {
                 self.goal_input.clear();
+                self.goal_cursor = 0;
                 self.mode = DashboardMode::Goals;
                 Action::None
             }
-            KeyCode::Backspace => {
-                self.goal_input.pop();
+            _ => {
+                self.handle_text_input(key);
                 Action::None
             }
-            KeyCode::Char(c) => {
-                self.goal_input.push(c);
-                Action::None
-            }
-            _ => Action::None,
         }
     }
 
@@ -612,23 +709,20 @@ impl DashboardScreen {
                     }
                 }
                 self.goal_input.clear();
+                self.goal_cursor = 0;
                 self.mode = DashboardMode::Goals;
                 Action::None
             }
             KeyCode::Esc => {
                 self.goal_input.clear();
+                self.goal_cursor = 0;
                 self.mode = DashboardMode::Goals;
                 Action::None
             }
-            KeyCode::Backspace => {
-                self.goal_input.pop();
+            _ => {
+                self.handle_text_input(key);
                 Action::None
             }
-            KeyCode::Char(c) => {
-                self.goal_input.push(c);
-                Action::None
-            }
-            _ => Action::None,
         }
     }
 
@@ -646,23 +740,20 @@ impl DashboardScreen {
                     }
                 }
                 self.goal_input.clear();
+                self.goal_cursor = 0;
                 self.mode = DashboardMode::Goals;
                 Action::None
             }
             KeyCode::Esc => {
                 self.goal_input.clear();
+                self.goal_cursor = 0;
                 self.mode = DashboardMode::Goals;
                 Action::None
             }
-            KeyCode::Backspace => {
-                self.goal_input.pop();
+            _ => {
+                self.handle_text_input(key);
                 Action::None
             }
-            KeyCode::Char(c) => {
-                self.goal_input.push(c);
-                Action::None
-            }
-            _ => Action::None,
         }
     }
 
@@ -680,23 +771,20 @@ impl DashboardScreen {
                     }
                 }
                 self.goal_input.clear();
+                self.goal_cursor = 0;
                 self.mode = DashboardMode::Goals;
                 Action::None
             }
             KeyCode::Esc => {
                 self.goal_input.clear();
+                self.goal_cursor = 0;
                 self.mode = DashboardMode::Goals;
                 Action::None
             }
-            KeyCode::Backspace => {
-                self.goal_input.pop();
+            _ => {
+                self.handle_text_input(key);
                 Action::None
             }
-            KeyCode::Char(c) => {
-                self.goal_input.push(c);
-                Action::None
-            }
-            _ => Action::None,
         }
     }
 

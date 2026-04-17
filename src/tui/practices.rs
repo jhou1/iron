@@ -1,4 +1,4 @@
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
@@ -29,6 +29,7 @@ pub struct PracticesScreen {
     selected: usize,
     mode: Mode,
     input: String,
+    input_cursor: usize,
     type_selected: usize,
 }
 
@@ -40,6 +41,7 @@ impl PracticesScreen {
             selected: 0,
             mode: Mode::Browse,
             input: String::new(),
+            input_cursor: 0,
             type_selected: 0,
         })
     }
@@ -121,10 +123,12 @@ impl PracticesScreen {
                         " New practice name:",
                         Style::default().fg(Color::White),
                     )),
-                    Line::from(Span::styled(
-                        format!(" > {}_", self.input),
-                        Style::default().fg(GREEN),
-                    )),
+                    Line::from(vec![
+                        Span::styled(" > ", Style::default().fg(GREEN)),
+                        Span::styled(&self.input[..self.input_cursor], Style::default().fg(GREEN)),
+                        Span::styled("_", Style::default().fg(GREEN)),
+                        Span::styled(&self.input[self.input_cursor..], Style::default().fg(GREEN)),
+                    ]),
                     Line::from(""),
                     Line::from(""),
                 ]
@@ -155,10 +159,12 @@ impl PracticesScreen {
                         " Rename practice:",
                         Style::default().fg(Color::White),
                     )),
-                    Line::from(Span::styled(
-                        format!(" > {}_", self.input),
-                        Style::default().fg(GREEN),
-                    )),
+                    Line::from(vec![
+                        Span::styled(" > ", Style::default().fg(GREEN)),
+                        Span::styled(&self.input[..self.input_cursor], Style::default().fg(GREEN)),
+                        Span::styled("_", Style::default().fg(GREEN)),
+                        Span::styled(&self.input[self.input_cursor..], Style::default().fg(GREEN)),
+                    ]),
                     Line::from(""),
                     Line::from(""),
                 ]
@@ -233,6 +239,89 @@ impl PracticesScreen {
         }
     }
 
+    fn handle_text_input(&mut self, key: KeyEvent) -> bool {
+        match key.code {
+            KeyCode::Char('b') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                if self.input_cursor > 0 {
+                    let prev = self.input[..self.input_cursor]
+                        .char_indices()
+                        .next_back()
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
+                    self.input_cursor = prev;
+                }
+                true
+            }
+            KeyCode::Left => {
+                if self.input_cursor > 0 {
+                    let prev = self.input[..self.input_cursor]
+                        .char_indices()
+                        .next_back()
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
+                    self.input_cursor = prev;
+                }
+                true
+            }
+            KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                if self.input_cursor < self.input.len() {
+                    let next = self.input[self.input_cursor..]
+                        .char_indices()
+                        .nth(1)
+                        .map(|(i, _)| self.input_cursor + i)
+                        .unwrap_or(self.input.len());
+                    self.input_cursor = next;
+                }
+                true
+            }
+            KeyCode::Right => {
+                if self.input_cursor < self.input.len() {
+                    let next = self.input[self.input_cursor..]
+                        .char_indices()
+                        .nth(1)
+                        .map(|(i, _)| self.input_cursor + i)
+                        .unwrap_or(self.input.len());
+                    self.input_cursor = next;
+                }
+                true
+            }
+            KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.input_cursor = 0;
+                true
+            }
+            KeyCode::Home => {
+                self.input_cursor = 0;
+                true
+            }
+            KeyCode::Char('e') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.input_cursor = self.input.len();
+                true
+            }
+            KeyCode::End => {
+                self.input_cursor = self.input.len();
+                true
+            }
+            KeyCode::Backspace => {
+                if self.input_cursor > 0 {
+                    let prev = self.input[..self.input_cursor]
+                        .char_indices()
+                        .next_back()
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
+                    self.input.remove(prev);
+                    self.input_cursor = prev;
+                }
+                true
+            }
+            KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.input.insert(self.input_cursor, c);
+                self.input_cursor += c.len_utf8();
+                true
+            }
+            _ => false,
+        }
+    }
+
     fn handle_browse(&mut self, key: KeyEvent) -> Action {
         match key.code {
             KeyCode::Char('j') | KeyCode::Down => {
@@ -252,6 +341,7 @@ impl PracticesScreen {
             }
             KeyCode::Char('a') => {
                 self.input.clear();
+                self.input_cursor = 0;
                 self.type_selected = 0;
                 self.mode = Mode::AddName;
                 Action::None
@@ -259,6 +349,7 @@ impl PracticesScreen {
             KeyCode::Enter => {
                 if let Some(p) = self.practices.get(self.selected) {
                     self.input = p.name.clone();
+                    self.input_cursor = self.input.len();
                     self.mode = Mode::EditName;
                 }
                 Action::None
@@ -286,15 +377,10 @@ impl PracticesScreen {
                 self.mode = Mode::Browse;
                 Action::None
             }
-            KeyCode::Backspace => {
-                self.input.pop();
+            _ => {
+                self.handle_text_input(key);
                 Action::None
             }
-            KeyCode::Char(c) => {
-                self.input.push(c);
-                Action::None
-            }
-            _ => Action::None,
         }
     }
 
@@ -336,22 +422,21 @@ impl PracticesScreen {
                         self.refresh(db);
                     }
                 }
+                self.input.clear();
+                self.input_cursor = 0;
                 self.mode = Mode::Browse;
                 Action::None
             }
             KeyCode::Esc => {
+                self.input.clear();
+                self.input_cursor = 0;
                 self.mode = Mode::Browse;
                 Action::None
             }
-            KeyCode::Backspace => {
-                self.input.pop();
+            _ => {
+                self.handle_text_input(key);
                 Action::None
             }
-            KeyCode::Char(c) => {
-                self.input.push(c);
-                Action::None
-            }
-            _ => Action::None,
         }
     }
 

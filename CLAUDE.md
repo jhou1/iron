@@ -59,6 +59,8 @@ Nullable fields on `sets` — only the relevant ones are filled based on practic
 
 Vim-style throughout: `j/k` up/down, `h/l` left/right, `/` filter, `Esc` back, `Enter` confirm, `Ctrl+S` save log, `D` edit date, `d` delete, `q` quit.
 
+All text input fields use emacs-style cursor: `Ctrl+B`/Left back, `Ctrl+F`/Right forward, `Ctrl+A`/Home start, `Ctrl+E`/End end. Characters insert at cursor, not append.
+
 ## Color Scheme
 
 Uses ANSI terminal colors (not hardcoded RGB) for theme compatibility:

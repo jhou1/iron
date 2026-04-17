@@ -119,6 +119,20 @@ Use ANSI terminal colors instead of hardcoded RGB values so the app adapts to an
 
 Vim-style throughout: `j/k` for up/down, `h/l` for left/right or back/forward, `/` for filtering, `Esc` to go back, `Enter` to confirm.
 
+### Text Input (Emacs-Style Cursor)
+
+All text input fields (goal/milestone names, practice names, log notes, date inputs) support emacs-style cursor navigation:
+
+| Key | Action |
+|---|---|
+| `Ctrl+B` / `Left` | Move cursor back one character |
+| `Ctrl+F` / `Right` | Move cursor forward one character |
+| `Ctrl+A` / `Home` | Move cursor to beginning of line |
+| `Ctrl+E` / `End` | Move cursor to end of line |
+| `Backspace` | Delete character before cursor |
+
+Characters are inserted at the cursor position, not appended at the end. The cursor is shown as a block character (`█`) at the current position. This applies to all screens: dashboard goals, practices, and log entry notes.
+
 ### Dashboard Layout
 
 The home screen is organized as a vertical stack of fixed-width sections, all aligned to the heatmap content width (107 chars: 3-char day labels + 52 weeks × 2 chars each):
