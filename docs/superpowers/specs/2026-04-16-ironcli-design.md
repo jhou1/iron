@@ -110,10 +110,10 @@ Use ANSI terminal colors instead of hardcoded RGB values so the app adapts to an
 
 | Sessions | Character | Color |
 |---|---|---|
-| 0 (empty) | `·` (middle dot) | DarkGray |
-| 1 | `█` | DarkGray |
-| 2 | `█` | Green |
-| 3+ | `█` | LightGreen |
+| 0 (empty) | `▪` (small square, U+25AA) | DarkGray |
+| 1 | `■` (black square, U+25A0) | Indexed(65) muted teal |
+| 2 | `■` | Indexed(71) medium green |
+| 3+ | `■` | Indexed(118) bright lime |
 
 ### Navigation
 
@@ -121,12 +121,32 @@ Vim-style throughout: `j/k` for up/down, `h/l` for left/right or back/forward, `
 
 ### Dashboard Layout
 
-The home screen uses a full-width layout with split panes:
+The home screen is organized as a vertical stack of fixed-width sections, all aligned to the heatmap content width (107 chars: 3-char day labels + 52 weeks × 2 chars each):
 
-- **Top:** GitHub-style training activity heatmap spanning the year. Rows = days of the week (Mon–Sun). Empty days show `·` in DarkGray; training days show `█` in DarkGray/Green/LightGreen by session count. Legend at bottom.
-- **Bottom-left pane:** Today's training — lists all entries logged today with practice name, key metrics, and derived totals.
-- **Bottom-right pane:** Last 14 days — aggregated stats: total sessions, total volume, total reps, total distance.
-- **Footer:** Keyboard shortcut hints.
+```
+┌─────────────────────────────────────────────┐
+│ Title bar ("iron v0.1.1")                   │
+│ ASCII art header (6-line "Training Activity"│
+│   rendered in Cyan)                         │
+│ Heatmap (52-week grid, 7 day rows,          │
+│   month labels above, legend below)         │
+│ ┌──── Last 14 Days ────┬── Statistics ────┐ │
+│ │ Recent log entries    │ Sessions, volume │ │
+│ │ (dynamic height)      │ reps, distance,  │ │
+│ │                       │ duration         │ │
+│ └───────────────────────┴─────────────────┘ │
+│ (spacer absorbs excess vertical space)      │
+│ Footer (keyboard shortcut hints)            │
+└─────────────────────────────────────────────┘
+```
+
+- **Title bar:** App name and version.
+- **ASCII art header:** A 6-line stylized "Training Activity" banner rendered in Cyan.
+- **Heatmap:** GitHub-style contribution grid spanning 52 weeks. Rows = days of the week (Mon–Sun). Month labels above. Legend row below ("Less ▪ ■ ■ ■ More").
+- **Bottom-left pane:** "Last 14 Days" — lists all log entries from the past 14 days with date, practice name, set count, and derived metric. Pane height adapts dynamically to the number of entries (minimum 7 rows for the stats pane).
+- **Bottom-right pane:** "Statistics" — aggregated 14-day stats: sessions, volume (kg), reps, distance (km), duration (min).
+- **Width alignment:** The heatmap and both bottom panes share the same maximum content width and left margin (1-char indent), so their edges are visually aligned regardless of terminal width.
+- **Footer:** Keyboard shortcut hints pinned to the bottom.
 
 ### Log Entry Flow
 
@@ -213,7 +233,7 @@ src/
   db.rs            — SQLite schema, queries, migrations
   model.rs         — Practice, Log, Set, PracticeType structs
   tui/
-    dashboard.rs   — heatmap + today + 14-day stats
+    dashboard.rs   — ASCII art header + heatmap + last-14-days + stats
     log_entry.rs   — guided form with set-by-set input
     history.rs     — 14-day scrollable log
     trends.rs      — sparkline chart per practice
