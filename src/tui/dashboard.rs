@@ -15,6 +15,15 @@ use super::{Action, Screen};
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
 
+const HEADER_ART: [&str; 6] = [
+    r#" ___________             .__       .__                    _____          __  .__      .__  __          "#,
+    r#" \__    ___/___________  |__| ____ |__| ____    ____     /  _  \   _____/  |_|__|__  _|__|/  |_ ___.__."#,
+    r#"   |    |  \_  __ \__  \ |  |/    \|  |/    \  / ___\   /  /_\  \_/ ___\   __\  \  \/ /  \   __<   |  |"#,
+    r#"   |    |   |  | \// __ \|  |   |  \  |   |  \/ /_/  > /    |    \  \___|  | |  |\   /|  ||  |  \___  |"#,
+    r#"   |____|   |__|  (____  /__|___|  /__|___|  /\___  /  \____|__  /\___  >__| |__| \_/ |__||__|  / ____|"#,
+    r#"                       \/        \/        \//_____/           \/     \/                        \/     "#,
+];
+
 pub struct DashboardScreen {
     heatmap_data: Vec<(String, i64)>,
     recent_entries: Vec<LogEntry>,
@@ -51,7 +60,7 @@ impl DashboardScreen {
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(1),            // title
-                Constraint::Length(2),            // heatmap header (with spacing)
+                Constraint::Length(7),            // heatmap header ASCII art (6 lines + 1 spacing)
                 Constraint::Length(10),           // heatmap (1 month labels + 7 day rows + 1 legend + 1 padding)
                 Constraint::Length(pane_height),  // split panes (sized to content)
                 Constraint::Min(0),              // spacer absorbs excess
@@ -66,11 +75,11 @@ impl DashboardScreen {
         ]);
         frame.render_widget(Paragraph::new(title), chunks[0]);
 
-        // ── Heatmap header ──
-        let heatmap_header = Line::from(vec![
-            Span::styled(" Training Activity", Style::default().fg(Color::White).bold()),
-        ]);
-        frame.render_widget(Paragraph::new(heatmap_header), chunks[1]);
+        // ── Heatmap header (ASCII art) ──
+        let header_lines: Vec<Line> = HEADER_ART.iter()
+            .map(|line| Line::from(Span::styled(*line, Style::default().fg(ACCENT))))
+            .collect();
+        frame.render_widget(Paragraph::new(header_lines), chunks[1]);
 
         // ── Heatmap ──
         let heatmap_area = Rect {
