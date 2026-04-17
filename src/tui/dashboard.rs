@@ -72,7 +72,7 @@ impl DashboardScreen {
         // ── Title bar ──
         let title = Line::from(vec![
             Span::styled(" iron", Style::default().fg(ACCENT).bold()),
-            Span::styled(" v0.1.0", Style::default().fg(Color::Gray)),
+            Span::styled(format!(" v{}", env!("CARGO_PKG_VERSION")), Style::default().fg(Color::Gray)),
         ]);
         frame.render_widget(Paragraph::new(title), chunks[0]);
 
