@@ -1,7 +1,7 @@
 use chrono::Datelike;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout},
     style::{Color, Style, Stylize},
     text::{Line, Span},
     widgets::Paragraph,
@@ -16,7 +16,6 @@ use super::{Action, Screen};
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
 const RED: Color = Color::Red;
-const CONTENT_WIDTH: u16 = 3 + 52 * 2;
 
 #[derive(Debug, Clone, PartialEq)]
 enum Phase {
@@ -93,13 +92,7 @@ impl TrendsScreen {
     // ── Phase: SelectPractice ──────────────────────────────────────────
 
     fn render_select_practice(&self, frame: &mut Frame) {
-        let full = frame.area();
-        let area = Rect {
-            x: full.x + 1,
-            y: full.y,
-            width: full.width.saturating_sub(2).min(CONTENT_WIDTH),
-            height: full.height,
-        };
+        let area = frame.area();
 
         let chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -248,18 +241,16 @@ impl TrendsScreen {
             None => return,
         };
 
-        let chart_height = 20.min(area.height.saturating_sub(6));
-
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1),            // title
-                Constraint::Length(1),            // subtitle
-                Constraint::Length(1),            // spacer
-                Constraint::Length(chart_height), // chart (capped)
-                Constraint::Min(0),              // spacer absorbs excess
-                Constraint::Length(1),            // stats
-                Constraint::Length(1),            // footer
+                Constraint::Length(1), // title
+                Constraint::Length(1), // subtitle
+                Constraint::Length(1), // spacer
+                Constraint::Min(4),   // chart
+                Constraint::Length(1), // spacer
+                Constraint::Length(1), // stats
+                Constraint::Length(1), // footer
             ])
             .split(area);
 

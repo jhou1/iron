@@ -1,7 +1,7 @@
 use chrono::{Local, NaiveDate, NaiveTime};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout},
     style::{Color, Style, Stylize},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
@@ -14,7 +14,6 @@ use super::{Action, Screen};
 
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
-const CONTENT_WIDTH: u16 = 3 + 52 * 2;
 
 #[derive(Debug, Clone, PartialEq)]
 enum Phase {
@@ -123,13 +122,7 @@ impl LogEntryScreen {
     // ── Phase 1: SelectPractice ───────────────────────────────────────
 
     fn render_select_practice(&self, frame: &mut Frame) {
-        let full = frame.area();
-        let area = Rect {
-            x: full.x + 1,
-            y: full.y,
-            width: full.width.saturating_sub(2).min(CONTENT_WIDTH),
-            height: full.height,
-        };
+        let area = frame.area();
 
         let chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -276,13 +269,7 @@ impl LogEntryScreen {
     // ── Phase 2: EnterSets ────────────────────────────────────────────
 
     fn render_enter_sets(&self, frame: &mut Frame) {
-        let full = frame.area();
-        let area = Rect {
-            x: full.x + 1,
-            y: full.y,
-            width: full.width.saturating_sub(2).min(CONTENT_WIDTH),
-            height: full.height,
-        };
+        let area = frame.area();
         let practice = self.chosen_practice.as_ref().unwrap();
 
         let chunks = Layout::default()
@@ -625,13 +612,7 @@ impl LogEntryScreen {
     // ── Phase 3: EnterNote ────────────────────────────────────────────
 
     fn render_enter_note(&self, frame: &mut Frame) {
-        let full = frame.area();
-        let area = Rect {
-            x: full.x + 1,
-            y: full.y,
-            width: full.width.saturating_sub(2).min(CONTENT_WIDTH),
-            height: full.height,
-        };
+        let area = frame.area();
         let practice = self.chosen_practice.as_ref().unwrap();
 
         let chunks = Layout::default()
