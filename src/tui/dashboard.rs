@@ -888,7 +888,9 @@ impl DashboardScreen {
                     let id = q.id;
                     let _ = db.delete_quote(id);
                     let _ = self.reload_quotes(db);
-                    if self.quotes_selected >= self.quotes.len() && !self.quotes.is_empty() {
+                    if self.quotes.is_empty() {
+                        self.quotes_selected = 0;
+                    } else if self.quotes_selected >= self.quotes.len() {
                         self.quotes_selected = self.quotes.len() - 1;
                     }
                 }
