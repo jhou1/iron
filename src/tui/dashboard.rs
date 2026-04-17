@@ -435,6 +435,12 @@ impl DashboardScreen {
                     style,
                 )));
             }
+            if is_selected && self.mode == DashboardMode::ConfirmDelete {
+                lines.push(Line::from(Span::styled(
+                    "  Delete? (y/n)",
+                    Style::default().fg(Color::Red),
+                )));
+            }
             idx += 1;
 
             for ms in &goal.milestones {
@@ -485,6 +491,12 @@ impl DashboardScreen {
                         style,
                     )));
                 }
+                if is_ms_selected && self.mode == DashboardMode::ConfirmDelete {
+                    lines.push(Line::from(Span::styled(
+                        "    Delete? (y/n)",
+                        Style::default().fg(Color::Red),
+                    )));
+                }
                 idx += 1;
             }
 
@@ -503,16 +515,6 @@ impl DashboardScreen {
             }
         }
 
-        // Input line for other modes
-        match self.mode {
-            DashboardMode::ConfirmDelete => {
-                lines.push(Line::from(Span::styled(
-                    "  Delete? (y/n)",
-                    Style::default().fg(Color::Red),
-                )));
-            }
-            _ => {}
-        }
 
         if self.goals.is_empty() && self.mode == DashboardMode::Goals {
             lines.push(Line::from(Span::styled(

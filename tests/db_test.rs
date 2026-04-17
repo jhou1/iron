@@ -326,6 +326,38 @@ fn milestone_toggle_tracks_completed_at() {
 }
 
 #[test]
+fn goals_insert_at_top_and_delete_by_index() {
+    let db = Database::open_in_memory().unwrap();
+    db.create_goal("First").unwrap();
+    db.create_goal("Second").unwrap();
+    db.create_goal("Third").unwrap();
+
+    // Third was added last, so it's at position 0 (top)
+    let goals = db.list_goals().unwrap();
+    assert_eq!(goals.len(), 3);
+    assert_eq!(goals[0].title, "Third");
+    assert_eq!(goals[1].title, "Second");
+    assert_eq!(goals[2].title, "First");
+
+    // Delete the top goal (simulates user selecting index 0 and deleting)
+    let id_to_delete = goals[0].id;
+    db.delete_goal(id_to_delete).unwrap();
+
+    let goals = db.list_goals().unwrap();
+    assert_eq!(goals.len(), 2);
+    assert_eq!(goals[0].title, "Second");
+    assert_eq!(goals[1].title, "First");
+
+    // Delete the second goal (simulates user selecting index 1)
+    let id_to_delete = goals[1].id;
+    db.delete_goal(id_to_delete).unwrap();
+
+    let goals = db.list_goals().unwrap();
+    assert_eq!(goals.len(), 1);
+    assert_eq!(goals[0].title, "Second");
+}
+
+#[test]
 fn set_completed_at_date() {
     let db = Database::open_in_memory().unwrap();
     let goal_id = db.create_goal("Goal").unwrap();
