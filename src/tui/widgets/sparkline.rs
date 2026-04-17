@@ -11,7 +11,8 @@ const ACCENT: Color = Color::Cyan;
 ///
 /// Takes `Vec<(String, f64)>` where String is a label (e.g. date) and f64 is the value.
 /// Renders vertical bars from the bottom up, with green color intensity proportional
-/// to each value relative to the max.
+/// to each value relative to the max. Overlays a linear regression trendline and
+/// compact value labels above each bar.
 pub struct Sparkline {
     data: Vec<(String, f64)>,
 }
@@ -91,6 +92,15 @@ impl Widget for Sparkline {
                 }
             }
 
+            // Draw compact value label above the bar
+            if *value > 0.0 {
+                let num_str = format_compact(*value);
+                let num_row = chart_bottom.saturating_sub(bar_height + 1).max(chart_top);
+                if x < area.x + area.width {
+                    buf.set_string(x, num_row, &num_str, Style::default().fg(Color::Gray));
+                }
+            }
+
             // Draw x-axis labels below the chart.
             // Labels can contain "day\nmonth" (e.g., "21\nJan") for month boundaries,
             // or just "day" (e.g., "26") for regular entries.
@@ -117,6 +127,7 @@ impl Widget for Sparkline {
             // "0" at the bottom
             buf.set_string(y_label_x, chart_bottom, "0", Style::default().fg(Color::Gray));
         }
+
     }
 }
 

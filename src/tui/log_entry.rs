@@ -41,6 +41,7 @@ pub struct LogEntryScreen {
     date_confirmed: bool,   // false = cursor on date line, true = entering sets
     editing_date: bool,     // true when in date-edit mode
     date_input: String,     // buffer for typing a new date
+    return_to: Screen,     // screen to return to on Esc or save
 }
 
 impl LogEntryScreen {
@@ -67,6 +68,7 @@ impl LogEntryScreen {
             date_confirmed: false,
             editing_date: false,
             date_input: String::new(),
+            return_to: Screen::Dashboard,
         })
     }
 
@@ -100,6 +102,7 @@ impl LogEntryScreen {
             date_confirmed: true,
             editing_date: false,
             date_input: String::new(),
+            return_to: Screen::History,
         })
     }
 
@@ -219,7 +222,7 @@ impl LogEntryScreen {
         }
 
         match key.code {
-            KeyCode::Esc => Action::Navigate(Screen::Dashboard),
+            KeyCode::Esc => Action::Navigate(self.return_to.clone()),
             KeyCode::Char('/') => {
                 self.filtering = true;
                 Action::None
@@ -275,6 +278,7 @@ impl LogEntryScreen {
         let practice = self.chosen_practice.as_ref().unwrap();
 
         let sets_height = (self.sets.len() as u16 + 3).max(3); // sets + input fields
+        let note_height: u16 = if self.note.is_empty() { 0 } else { 1 };
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
@@ -282,6 +286,7 @@ impl LogEntryScreen {
                 Constraint::Length(1),           // date line
                 Constraint::Length(sets_height), // committed sets + input
                 Constraint::Length(1),           // running total
+                Constraint::Length(note_height), // note (if any)
                 Constraint::Length(1),           // footer
                 Constraint::Min(0),              // spacer
             ])
@@ -427,6 +432,15 @@ impl LogEntryScreen {
         ));
         frame.render_widget(Paragraph::new(total_line), chunks[3]);
 
+        // Note (if present)
+        if !self.note.is_empty() {
+            let note_line = Line::from(vec![
+                Span::styled("  Note: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(&self.note, Style::default().fg(Color::Yellow)),
+            ]);
+            frame.render_widget(Paragraph::new(note_line), chunks[4]);
+        }
+
         // Footer
         let footer = Line::from(vec![
             Span::styled(" [Enter]", Style::default().fg(ACCENT)),
@@ -440,7 +454,7 @@ impl LogEntryScreen {
             Span::styled("[Esc]", Style::default().fg(ACCENT)),
             Span::styled(" Cancel", Style::default().fg(Color::Gray)),
         ]);
-        frame.render_widget(Paragraph::new(footer), chunks[4]);
+        frame.render_widget(Paragraph::new(footer), chunks[5]);
     }
 
     fn handle_enter_sets(&mut self, key: KeyEvent) -> Action {
@@ -461,7 +475,7 @@ impl LogEntryScreen {
                     self.date_input = self.log_date.clone();
                     Action::None
                 }
-                KeyCode::Esc => Action::Navigate(Screen::Dashboard),
+                KeyCode::Esc => Action::Navigate(self.return_to.clone()),
                 _ => Action::None,
             };
         }
@@ -480,7 +494,7 @@ impl LogEntryScreen {
         }
 
         match key.code {
-            KeyCode::Esc => Action::Navigate(Screen::Dashboard),
+            KeyCode::Esc => Action::Navigate(self.return_to.clone()),
             KeyCode::Char('D') => {
                 self.editing_date = true;
                 self.date_input = self.log_date.clone();
@@ -735,7 +749,7 @@ impl LogEntryScreen {
         }
 
         match key.code {
-            KeyCode::Esc => Action::Navigate(Screen::Dashboard),
+            KeyCode::Esc => Action::Navigate(self.return_to.clone()),
             KeyCode::Enter => {
                 let practice = self.chosen_practice.as_ref().unwrap();
                 let note = if self.note.is_empty() {
@@ -751,7 +765,7 @@ impl LogEntryScreen {
                 } else {
                     let _ = db.create_log_at(practice.id, &datetime, &self.sets, note);
                 }
-                Action::Navigate(Screen::Dashboard)
+                Action::Navigate(self.return_to.clone())
             }
             KeyCode::Backspace => {
                 if self.note_cursor > 0 {

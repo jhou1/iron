@@ -1,6 +1,6 @@
 [package]
 name = "ironcli"
-version = "0.2.10"
+version = "0.2.22"
 edition = "2021"
 description = "A beautiful TUI for tracking training records"
 
