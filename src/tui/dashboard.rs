@@ -379,7 +379,7 @@ impl DashboardScreen {
                 ]));
             } else if goal.completed {
                 let date_str = goal.completed_at
-                    .map(|dt| format!(" ({})", dt.format("%b %d")))
+                    .map(|dt| format!(" ({})", dt.format("%Y-%m-%d")))
                     .unwrap_or_default();
                 lines.push(Line::from(Span::styled(
                     format!("☑ {}{}", goal.title, date_str),
@@ -407,7 +407,7 @@ impl DashboardScreen {
                     ]));
                 } else if ms.completed {
                     let date_str = ms.completed_at
-                        .map(|dt| format!(" ({})", dt.format("%b %d")))
+                        .map(|dt| format!(" ({})", dt.format("%Y-%m-%d")))
                         .unwrap_or_default();
                     let style = if is_ms_selected {
                         Style::default().fg(GREEN)
