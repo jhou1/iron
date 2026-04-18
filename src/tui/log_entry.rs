@@ -8,6 +8,8 @@ use ratatui::{
     Frame,
 };
 
+use unicode_width::UnicodeWidthStr;
+
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
 use crate::model::{LogEntry, Practice, PracticeType, SetData};
@@ -154,7 +156,7 @@ impl LogEntryScreen {
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(1),           // title
-                Constraint::Length(2),           // filter bar
+                Constraint::Length(2),           // filter bar + column header
                 Constraint::Length(list_height), // list
                 Constraint::Length(1),           // footer
                 Constraint::Min(0),              // spacer
@@ -168,7 +170,14 @@ impl LogEntryScreen {
         ));
         frame.render_widget(Paragraph::new(title), chunks[0]);
 
-        // Filter bar
+        // Column widths based on all practices (not just filtered)
+        let max_name_len = self.practices.iter()
+            .map(|p| p.name.width())
+            .max()
+            .unwrap_or(0);
+        let col_width = max_name_len + 4;
+
+        // Filter bar + column header
         let filter_display = if self.filtering {
             format!(" /{}█", self.filter_text)
         } else if !self.filter_text.is_empty() {
@@ -181,27 +190,43 @@ impl LogEntryScreen {
         } else {
             Style::default().fg(Color::Gray)
         };
-        let filter_line = Line::from(Span::styled(filter_display, filter_style));
-        frame.render_widget(Paragraph::new(filter_line), chunks[1]);
+        let name_header = tr("practices-col-name");
+        let type_header = tr("practices-col-type");
+        let header_padding = col_width.saturating_sub(name_header.width());
+        let filter_lines = vec![
+            Line::from(Span::styled(filter_display, filter_style)),
+            Line::from(vec![
+                Span::styled("  ", Style::default().fg(Color::DarkGray)),
+                Span::styled(&name_header, Style::default().fg(Color::DarkGray)),
+                Span::raw(" ".repeat(header_padding)),
+                Span::styled(&type_header, Style::default().fg(Color::DarkGray)),
+            ]),
+        ];
+        frame.render_widget(Paragraph::new(filter_lines), chunks[1]);
 
-        // Practice list
+        // Practice list (table layout)
         let lines: Vec<Line> = self
             .filtered_indices
             .iter()
             .enumerate()
             .map(|(i, &idx)| {
                 let practice = &self.practices[idx];
-                let prefix = if i == self.selected { "> " } else { "  " };
-                let text = format!(
-                    "{}{} ({})",
-                    prefix, practice.name, practice.practice_type.label()
-                );
-                let style = if i == self.selected {
-                    Style::default().fg(GREEN)
+                let marker = if i == self.selected { "> " } else { "  " };
+                let name_style = if i == self.selected {
+                    Style::default().fg(GREEN).bold()
                 } else {
                     Style::default().fg(Color::White)
                 };
-                Line::from(Span::styled(text, style))
+                let padding = col_width.saturating_sub(practice.name.width());
+                Line::from(vec![
+                    Span::styled(marker, name_style),
+                    Span::styled(&practice.name, name_style),
+                    Span::raw(" ".repeat(padding)),
+                    Span::styled(
+                        practice.practice_type.label(),
+                        Style::default().fg(Color::Gray),
+                    ),
+                ])
             })
             .collect();
         let list = Paragraph::new(lines);
