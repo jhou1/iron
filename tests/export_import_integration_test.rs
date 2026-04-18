@@ -380,3 +380,25 @@ fn goals_and_milestones_survive_export_import() {
     assert_eq!(goals[1].milestones.len(), 1);
     assert_eq!(goals[1].milestones[0].title, "Run 10km under 50min");
 }
+
+#[test]
+fn quotes_survive_export_import() {
+    let source = TestDb::new();
+    let db = &source.db;
+
+    db.create_quote("Anyone can cook!").unwrap();
+    db.create_quote("Train hard, rest harder.").unwrap();
+    db.create_quote("Consistency beats intensity.").unwrap();
+
+    let export_path = source._dir.path().join("export.json");
+    export_to_json(db, Some(export_path.clone())).unwrap();
+
+    let target = TestDb::new();
+    import_from_json(&target.db, &export_path).unwrap();
+
+    let quotes = target.db.list_quotes().unwrap();
+    assert_eq!(quotes.len(), 3);
+    assert_eq!(quotes[0].text, "Anyone can cook!");
+    assert_eq!(quotes[1].text, "Train hard, rest harder.");
+    assert_eq!(quotes[2].text, "Consistency beats intensity.");
+}

@@ -16,6 +16,8 @@ pub struct ExportData {
     pub logs: Vec<ExportLog>,
     #[serde(default)]
     pub goals: Vec<ExportGoal>,
+    #[serde(default)]
+    pub quotes: Vec<ExportQuote>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -68,6 +70,12 @@ pub struct ExportMilestone {
     pub position: i32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub completed_at: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ExportQuote {
+    pub text: String,
+    pub position: i32,
 }
 
 // ── Export ──────────────────────────────────────────────────────────────
@@ -141,12 +149,22 @@ pub fn export_to_json(db: &Database, path: Option<PathBuf>) -> Result<()> {
         })
         .collect();
 
+    let quotes = db.list_quotes()?;
+    let export_quotes: Vec<ExportQuote> = quotes
+        .iter()
+        .map(|q| ExportQuote {
+            text: q.text.clone(),
+            position: q.position,
+        })
+        .collect();
+
     let data = ExportData {
         version: 2,
         exported_at: Local::now().to_rfc3339(),
         practices: export_practices,
         logs: export_logs,
         goals: export_goals,
+        quotes: export_quotes,
     };
 
     let json = serde_json::to_string_pretty(&data)?;
@@ -262,6 +280,17 @@ pub fn import_from_json(db: &Database, path: &Path) -> Result<usize> {
                     }
                 }
             }
+        }
+    }
+
+    if !data.quotes.is_empty() {
+        let existing_quotes = db.list_quotes()?;
+        for q in &existing_quotes {
+            db.delete_quote(q.id)?;
+        }
+
+        for eq in &data.quotes {
+            db.create_quote(&eq.text)?;
         }
     }
 

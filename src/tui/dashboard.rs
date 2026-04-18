@@ -463,7 +463,7 @@ impl DashboardScreen {
             let style = if is_selected {
                 Style::default().fg(GREEN).bold()
             } else {
-                Style::default().fg(Color::White).bold()
+                Style::default().fg(GREEN)
             };
 
             if is_selected {
@@ -550,15 +550,10 @@ impl DashboardScreen {
                         style,
                     )));
                 } else {
-                    let style = if is_ms_selected {
-                        Style::default().fg(GREEN)
-                    } else {
-                        Style::default().fg(Color::White)
-                    };
                     let marker = if is_ms_selected { "> " } else { "  " };
                     lines.push(Line::from(Span::styled(
                         format!("{}☐ {}", marker, ms.title),
-                        style,
+                        Style::default().fg(GREEN),
                     )));
                 }
                 if is_ms_selected && self.mode == DashboardMode::ConfirmDelete {
