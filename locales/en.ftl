@@ -25,6 +25,10 @@ dashboard-date-prompt = Date (YYYY-MM-DD):
 dashboard-delete-confirm = Delete? (y/n)
 dashboard-quotes-count = Quotes ({ $count })
 dashboard-no-quotes-modal = No quotes — press [a] to add one
+dashboard-hrv-label = HRV
+dashboard-hrv-edit-hint = [v] edit
+dashboard-hrv-record-hint = [v] record
+dashboard-hrv-input-hint = (0-100, Enter to save, Esc to cancel)
 
 # ── Log Entry ──
 log-select-practice = Select Practice
@@ -45,6 +49,9 @@ log-add-note-title = Log { $name } — Add Note
 log-sets-logged = { $count } sets logged
 log-total-value = Total: { $total } { $label }
 log-note-optional = Note (optional)
+log-warmup-label = Warm-up
+log-cooldown-label = Cool-down
+log-warmup-cooldown-title = Log { $name } — Warm-up & Cool-down
 
 # ── History ──
 history-title = History
@@ -55,6 +62,8 @@ history-set-bodyweight = #{ $number }  { $reps } reps
 history-set-distance = #{ $number }  { $distance } km
 history-set-endurance = #{ $number }  { $duration } min
 history-note = Note: { $note }
+history-warmup = Warm-up: { $text }
+history-cooldown = Cool-down: { $text }
 history-delete-confirm = Delete this entry?
 
 # ── Trends ──
@@ -122,6 +131,8 @@ key-pick-practice = Pick practice
 key-dashboard = Dashboard
 key-yes = Yes
 key-no = No
+key-hrv = HRV
+key-next = Next
 
 # ── CLI ──
 cli-export-about = Export all data to JSON

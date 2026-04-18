@@ -25,6 +25,10 @@ dashboard-date-prompt = 日期 (YYYY-MM-DD)：
 dashboard-delete-confirm = 删除？(y/n)
 dashboard-quotes-count = 语录 ({ $count })
 dashboard-no-quotes-modal = 没有语录 - 按 [a] 添加
+dashboard-hrv-label = HRV
+dashboard-hrv-edit-hint = [v] 编辑
+dashboard-hrv-record-hint = [v] 记录
+dashboard-hrv-input-hint = (0-100, Enter 保存, Esc 取消)
 
 # ── 记录条目 ──
 log-select-practice = 选择练习项目
@@ -45,6 +49,9 @@ log-add-note-title = 记录 { $name } — 添加备注
 log-sets-logged = 已记录 { $count } 组
 log-total-value = 合计：{ $total } { $label }
 log-note-optional = 备注（可选）
+log-warmup-label = 热身
+log-cooldown-label = 放松
+log-warmup-cooldown-title = 记录 { $name } — 热身与放松
 
 # ── 历史 ──
 history-title = 历史
@@ -55,6 +62,8 @@ history-set-bodyweight = #{ $number }  { $reps } 次
 history-set-distance = #{ $number }  { $distance } 公里
 history-set-endurance = #{ $number }  { $duration } 分钟
 history-note = 备注：{ $note }
+history-warmup = 热身：{ $text }
+history-cooldown = 放松：{ $text }
 history-delete-confirm = 删除此记录？
 
 # ── 趋势 ──
@@ -122,6 +131,8 @@ key-pick-practice = 选择练习
 key-dashboard = 仪表盘
 key-yes = 是
 key-no = 否
+key-hrv = HRV
+key-next = 下一步
 
 # ── 命令行 ──
 cli-export-about = 导出所有数据为 JSON
