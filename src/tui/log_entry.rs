@@ -21,6 +21,7 @@ const GREEN: Color = Color::Green;
 enum Phase {
     SelectPractice,
     EnterSets,
+    EnterWarmUpCoolDown,
     EnterNote,
 }
 
@@ -38,6 +39,11 @@ pub struct LogEntryScreen {
     active_field: usize,
     note: String,
     note_cursor: usize,    // byte offset into note string
+    warm_up: String,
+    warm_up_cursor: usize,
+    cool_down: String,
+    cool_down_cursor: usize,
+    warmup_cooldown_active: usize, // 0 = warm_up, 1 = cool_down
     editing_log_id: Option<i64>,
     log_date: String,      // YYYY-MM-DD, defaults to today
     date_confirmed: bool,   // false = cursor on date line, true = entering sets
@@ -65,6 +71,11 @@ impl LogEntryScreen {
             active_field: 0,
             note: String::new(),
             note_cursor: 0,
+            warm_up: String::new(),
+            warm_up_cursor: 0,
+            cool_down: String::new(),
+            cool_down_cursor: 0,
+            warmup_cooldown_active: 0,
             editing_log_id: None,
             log_date: today,
             date_confirmed: false,
@@ -83,6 +94,8 @@ impl LogEntryScreen {
             .cloned();
         let sets: Vec<SetData> = log_entry.sets.iter().map(|s| s.data.clone()).collect();
         let note = log_entry.log.note.clone().unwrap_or_default();
+        let warm_up = log_entry.log.warm_up.clone().unwrap_or_default();
+        let cool_down = log_entry.log.cool_down.clone().unwrap_or_default();
 
         let log_date = log_entry.log.logged_at.format("%Y-%m-%d").to_string();
         Ok(Self {
@@ -99,6 +112,11 @@ impl LogEntryScreen {
             active_field: 0,
             note_cursor: note.len(),
             note,
+            warm_up_cursor: warm_up.len(),
+            warm_up,
+            cool_down_cursor: cool_down.len(),
+            cool_down,
+            warmup_cooldown_active: 0,
             editing_log_id: Some(log_entry.log.id),
             log_date,
             date_confirmed: true,
@@ -112,6 +130,7 @@ impl LogEntryScreen {
         match self.phase {
             Phase::SelectPractice => self.render_select_practice(frame),
             Phase::EnterSets => self.render_enter_sets(frame),
+            Phase::EnterWarmUpCoolDown => self.render_warmup_cooldown(frame),
             Phase::EnterNote => self.render_enter_note(frame),
         }
     }
@@ -120,6 +139,7 @@ impl LogEntryScreen {
         match self.phase {
             Phase::SelectPractice => self.handle_select_practice(key),
             Phase::EnterSets => self.handle_enter_sets(key),
+            Phase::EnterWarmUpCoolDown => self.handle_warmup_cooldown(key, db),
             Phase::EnterNote => self.handle_enter_note(key, db),
         }
     }
@@ -503,11 +523,11 @@ impl LogEntryScreen {
         let is_weighted = practice.practice_type == PracticeType::Weighted;
         let has_two_fields = is_weighted;
 
-        // Ctrl+S to save (move to note phase)
+        // Ctrl+S to save (move to warm-up/cool-down phase)
         if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('s') {
             if !self.sets.is_empty() {
-                self.phase = Phase::EnterNote;
-                self.note_cursor = self.note.len();
+                self.phase = Phase::EnterWarmUpCoolDown;
+                self.warmup_cooldown_active = 0;
             }
             return Action::None;
         }
@@ -646,6 +666,141 @@ impl LogEntryScreen {
         }
     }
 
+    // ── Phase 2.5: EnterWarmUpCoolDown ──────────────────────────────────
+
+    fn render_warmup_cooldown(&self, frame: &mut Frame) {
+        let area = frame.area();
+        let practice = self.chosen_practice.as_ref().unwrap();
+
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1), // title
+                Constraint::Length(1), // spacer
+                Constraint::Length(1), // warm-up input
+                Constraint::Length(1), // cool-down input
+                Constraint::Length(1), // spacer
+                Constraint::Length(1), // footer
+                Constraint::Min(0),   // spacer absorbs excess
+            ])
+            .split(area);
+
+        let title = Line::from(Span::styled(
+            format!(" {}", tr_args("log-warmup-cooldown-title", &[
+                ("name", FluentValue::from(practice.name.clone())),
+            ])),
+            Style::default().fg(ACCENT).bold(),
+        ));
+        frame.render_widget(Paragraph::new(title), chunks[0]);
+
+        // Warm-up input
+        let wu_active = self.warmup_cooldown_active == 0;
+        let wu_color = if wu_active { ACCENT } else { Color::White };
+        let (wu_before, wu_after) = self.warm_up.split_at(self.warm_up_cursor);
+        let warmup_line = Line::from(vec![
+            Span::styled(format!("  {}: ", tr("log-warmup-label")), Style::default().fg(Color::Gray)),
+            Span::styled(wu_before.to_string(), Style::default().fg(wu_color)),
+            if wu_active { Span::styled("\u{2588}", Style::default().fg(wu_color)) } else { Span::raw("") },
+            Span::styled(wu_after.to_string(), Style::default().fg(wu_color)),
+        ]);
+        frame.render_widget(Paragraph::new(warmup_line), chunks[2]);
+
+        // Cool-down input
+        let cd_active = self.warmup_cooldown_active == 1;
+        let cd_color = if cd_active { ACCENT } else { Color::White };
+        let (cd_before, cd_after) = self.cool_down.split_at(self.cool_down_cursor);
+        let cooldown_line = Line::from(vec![
+            Span::styled(format!("  {}: ", tr("log-cooldown-label")), Style::default().fg(Color::Gray)),
+            Span::styled(cd_before.to_string(), Style::default().fg(cd_color)),
+            if cd_active { Span::styled("\u{2588}", Style::default().fg(cd_color)) } else { Span::raw("") },
+            Span::styled(cd_after.to_string(), Style::default().fg(cd_color)),
+        ]);
+        frame.render_widget(Paragraph::new(cooldown_line), chunks[3]);
+
+        let footer = Line::from(vec![
+            Span::styled(" [Tab]", Style::default().fg(ACCENT)),
+            Span::styled(format!(" {}  ", tr("key-navigate")), Style::default().fg(Color::Gray)),
+            Span::styled("[Enter]", Style::default().fg(ACCENT)),
+            Span::styled(format!(" {}  ", tr("key-next")), Style::default().fg(Color::Gray)),
+            Span::styled("[Ctrl+S]", Style::default().fg(ACCENT)),
+            Span::styled(format!(" {}  ", tr("key-save")), Style::default().fg(Color::Gray)),
+            Span::styled("[Esc]", Style::default().fg(ACCENT)),
+            Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::Gray)),
+        ]);
+        frame.render_widget(Paragraph::new(footer), chunks[5]);
+    }
+
+    fn handle_warmup_cooldown(&mut self, key: KeyEvent, _db: &Database) -> Action {
+        let (text, cursor) = if self.warmup_cooldown_active == 0 {
+            (&mut self.warm_up, &mut self.warm_up_cursor)
+        } else {
+            (&mut self.cool_down, &mut self.cool_down_cursor)
+        };
+
+        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('s') {
+            self.phase = Phase::EnterNote;
+            self.note_cursor = self.note.len();
+            return Action::None;
+        }
+
+        // Emacs-style cursor nav
+        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('b')
+            || key.code == KeyCode::Left
+        {
+            if *cursor > 0 {
+                *cursor = text[..*cursor].char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+            }
+            return Action::None;
+        }
+        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('f')
+            || key.code == KeyCode::Right
+        {
+            if *cursor < text.len() {
+                *cursor = text[*cursor..].char_indices().nth(1).map(|(i, _)| *cursor + i).unwrap_or(text.len());
+            }
+            return Action::None;
+        }
+        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('a')
+            || key.code == KeyCode::Home
+        {
+            *cursor = 0;
+            return Action::None;
+        }
+        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('e')
+            || key.code == KeyCode::End
+        {
+            *cursor = text.len();
+            return Action::None;
+        }
+
+        match key.code {
+            KeyCode::Esc => Action::Navigate(self.return_to.clone()),
+            KeyCode::Tab => {
+                self.warmup_cooldown_active = if self.warmup_cooldown_active == 0 { 1 } else { 0 };
+                Action::None
+            }
+            KeyCode::Enter => {
+                self.phase = Phase::EnterNote;
+                self.note_cursor = self.note.len();
+                Action::None
+            }
+            KeyCode::Backspace => {
+                if *cursor > 0 {
+                    let prev = text[..*cursor].char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+                    text.remove(prev);
+                    *cursor = prev;
+                }
+                Action::None
+            }
+            KeyCode::Char(c) => {
+                text.insert(*cursor, c);
+                *cursor += c.len_utf8();
+                Action::None
+            }
+            _ => Action::None,
+        }
+    }
+
     // ── Phase 3: EnterNote ────────────────────────────────────────────
 
     fn render_enter_note(&self, frame: &mut Frame) {
@@ -779,18 +934,16 @@ impl LogEntryScreen {
             KeyCode::Esc => Action::Navigate(self.return_to.clone()),
             KeyCode::Enter => {
                 let practice = self.chosen_practice.as_ref().unwrap();
-                let note = if self.note.is_empty() {
-                    None
-                } else {
-                    Some(self.note.as_str())
-                };
+                let note = if self.note.is_empty() { None } else { Some(self.note.as_str()) };
+                let warm_up = if self.warm_up.is_empty() { None } else { Some(self.warm_up.as_str()) };
+                let cool_down = if self.cool_down.is_empty() { None } else { Some(self.cool_down.as_str()) };
                 let date = NaiveDate::parse_from_str(&self.log_date, "%Y-%m-%d")
                     .unwrap_or_else(|_| Local::now().date_naive());
                 let datetime = date.and_time(NaiveTime::from_hms_opt(12, 0, 0).unwrap());
                 if let Some(log_id) = self.editing_log_id {
-                    let _ = db.update_log(log_id, &self.sets, note, Some(&datetime), None, None);
+                    let _ = db.update_log(log_id, &self.sets, note, Some(&datetime), warm_up, cool_down);
                 } else {
-                    let _ = db.create_log_at(practice.id, &datetime, &self.sets, note, None, None);
+                    let _ = db.create_log_at(practice.id, &datetime, &self.sets, note, warm_up, cool_down);
                 }
                 Action::Navigate(self.return_to.clone())
             }
