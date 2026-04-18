@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod app;
 mod db;
 mod export;
+mod i18n;
 mod model;
 mod tui;
 
@@ -29,6 +30,7 @@ enum Commands {
 }
 
 fn main() -> anyhow::Result<()> {
+    i18n::init();
     let cli = Cli::parse();
 
     match cli.command {
