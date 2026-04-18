@@ -478,3 +478,29 @@ fn update_log_warmup_cooldown() {
     assert_eq!(entries[0].log.warm_up, Some("Foam rolling".to_string()));
     assert_eq!(entries[0].log.cool_down, Some("Cool down walk".to_string()));
 }
+
+#[test]
+fn set_and_get_daily_hrv() {
+    let db = Database::open_in_memory().unwrap();
+    let hrv = db.get_daily_hrv("2026-04-18").unwrap();
+    assert_eq!(hrv, None);
+    db.set_daily_hrv("2026-04-18", 72).unwrap();
+    let hrv = db.get_daily_hrv("2026-04-18").unwrap();
+    assert_eq!(hrv, Some(72));
+    db.set_daily_hrv("2026-04-18", 68).unwrap();
+    let hrv = db.get_daily_hrv("2026-04-18").unwrap();
+    assert_eq!(hrv, Some(68));
+}
+
+#[test]
+fn list_daily_metrics() {
+    let db = Database::open_in_memory().unwrap();
+    db.set_daily_hrv("2026-04-17", 65).unwrap();
+    db.set_daily_hrv("2026-04-18", 72).unwrap();
+    let metrics = db.list_daily_metrics().unwrap();
+    assert_eq!(metrics.len(), 2);
+    assert_eq!(metrics[0].date, "2026-04-17");
+    assert_eq!(metrics[0].hrv, Some(65));
+    assert_eq!(metrics[1].date, "2026-04-18");
+    assert_eq!(metrics[1].hrv, Some(72));
+}

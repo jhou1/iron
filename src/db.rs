@@ -792,4 +792,43 @@ impl Database {
         self.conn.execute("DELETE FROM quotes WHERE id = ?1", params![id])?;
         Ok(())
     }
+
+    // ── Daily Metrics CRUD ───────────────────────────────────────────
+
+    pub fn get_daily_hrv(&self, date: &str) -> Result<Option<i32>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT hrv FROM daily_metrics WHERE date = ?1",
+        )?;
+        let result = stmt.query_row(params![date], |row| row.get::<_, Option<i32>>(0));
+        match result {
+            Ok(hrv) => Ok(hrv),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    pub fn set_daily_hrv(&self, date: &str, hrv: i32) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO daily_metrics (date, hrv) VALUES (?1, ?2)
+             ON CONFLICT(date) DO UPDATE SET hrv = ?2",
+            params![date, hrv],
+        )?;
+        Ok(())
+    }
+
+    pub fn list_daily_metrics(&self) -> Result<Vec<crate::model::DailyMetrics>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, date, hrv FROM daily_metrics ORDER BY date",
+        )?;
+        let metrics = stmt
+            .query_map([], |row| {
+                Ok(crate::model::DailyMetrics {
+                    id: row.get(0)?,
+                    date: row.get(1)?,
+                    hrv: row.get(2)?,
+                })
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(metrics)
+    }
 }
