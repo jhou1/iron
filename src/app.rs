@@ -86,7 +86,11 @@ fn run_app(
                                 log_entry = LogEntryScreen::new(db)?;
                             }
                         }
-                        Screen::History => history = HistoryScreen::new(db)?,
+                        Screen::History => {
+                            if current_screen != Screen::LogEntry {
+                                history = HistoryScreen::new(db)?;
+                            }
+                        }
                         Screen::Trends => trends = TrendsScreen::new(db)?,
                         Screen::Practices => practices = PracticesScreen::new(db)?,
                     }
