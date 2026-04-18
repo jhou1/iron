@@ -37,12 +37,14 @@ fn main() -> anyhow::Result<()> {
         Some(Commands::Export { path }) => {
             let db = db::Database::open_default()?;
             export::export_to_json(&db, path)?;
-            println!("Export complete.");
+            println!("{}", i18n::tr("cli-export-complete"));
         }
         Some(Commands::Import { path }) => {
             let db = db::Database::open_default()?;
             let count = export::import_from_json(&db, &path)?;
-            println!("Imported {} logs.", count);
+            println!("{}", i18n::tr_args("cli-imported", &[
+                ("count", fluent_bundle::FluentValue::from(count as f64)),
+            ]));
         }
         None => {
             app::run()?;

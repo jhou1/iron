@@ -5,6 +5,8 @@ use std::path::{Path, PathBuf};
 
 use crate::db::Database;
 use crate::model::{PracticeType, SetData};
+use crate::i18n::tr_args;
+use fluent_bundle::FluentValue;
 
 // ── Export data structures ─────────────────────────────────────────────
 
@@ -182,7 +184,9 @@ pub fn export_to_json(db: &Database, path: Option<PathBuf>) -> Result<()> {
     };
 
     std::fs::write(&out_path, json)?;
-    eprintln!("Exported to {}", out_path.display());
+    eprintln!("{}", tr_args("cli-exported-to", &[
+        ("path", FluentValue::from(out_path.display().to_string())),
+    ]));
     Ok(())
 }
 
