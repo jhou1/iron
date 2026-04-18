@@ -9,8 +9,10 @@ use ratatui::{
 };
 
 use crate::db::Database;
+use crate::i18n::{tr, tr_args};
 use crate::model::{LogEntry, Practice, PracticeType, SetData};
 use super::{highlight_row, Action, Screen};
+use fluent_bundle::FluentValue;
 
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
@@ -141,7 +143,7 @@ impl LogEntryScreen {
 
         // Title
         let title = Line::from(Span::styled(
-            " Select Practice",
+            format!(" {}", tr("log-select-practice")),
             Style::default().fg(ACCENT).bold(),
         ));
         frame.render_widget(Paragraph::new(title), chunks[0]);
@@ -152,7 +154,7 @@ impl LogEntryScreen {
         } else if !self.filter_text.is_empty() {
             format!(" /{}", self.filter_text)
         } else {
-            String::from(" Press / to filter")
+            format!(" {}", tr("log-press-filter"))
         };
         let filter_style = if self.filtering {
             Style::default().fg(ACCENT)
@@ -192,13 +194,13 @@ impl LogEntryScreen {
         // Footer
         let footer = Line::from(vec![
             Span::styled(" [j/k]", Style::default().fg(ACCENT)),
-            Span::styled(" Navigate  ", Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}  ", tr("key-navigate")), Style::default().fg(Color::Gray)),
             Span::styled("[/]", Style::default().fg(ACCENT)),
-            Span::styled(" Filter  ", Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}  ", tr("key-filter")), Style::default().fg(Color::Gray)),
             Span::styled("[Enter]", Style::default().fg(ACCENT)),
-            Span::styled(" Select  ", Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}  ", tr("key-select")), Style::default().fg(Color::Gray)),
             Span::styled("[Esc]", Style::default().fg(ACCENT)),
-            Span::styled(" Back", Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::Gray)),
         ]);
         frame.render_widget(Paragraph::new(footer), chunks[3]);
     }
@@ -312,27 +314,27 @@ impl LogEntryScreen {
         // Date line
         let date_line = if self.editing_date {
             Line::from(vec![
-                Span::styled("  Date: ", Style::default().fg(Color::Gray)),
+                Span::styled(format!("  {}: ", tr("log-date-label")), Style::default().fg(Color::Gray)),
                 Span::styled(
                     format!("{}\u{2588}", self.date_input),
                     Style::default().fg(ACCENT),
                 ),
                 Span::styled(
-                    "  (YYYY-MM-DD, Enter to confirm)",
+                    format!("  {}", tr("log-date-edit-hint")),
                     Style::default().fg(Color::Gray),
                 ),
             ])
         } else if !self.date_confirmed {
             Line::from(vec![
-                Span::styled("> Date: ", Style::default().fg(GREEN).bold()),
+                Span::styled(format!("> {}: ", tr("log-date-label")), Style::default().fg(GREEN).bold()),
                 Span::styled(&self.log_date, Style::default().fg(GREEN).bold()),
-                Span::styled("  [Enter] confirm  [D] edit", Style::default().fg(Color::Gray)),
+                Span::styled(format!("  {}", tr("log-date-confirm-hint")), Style::default().fg(Color::Gray)),
             ])
         } else {
             Line::from(vec![
-                Span::styled("  Date: ", Style::default().fg(Color::Gray)),
+                Span::styled(format!("  {}: ", tr("log-date-label")), Style::default().fg(Color::Gray)),
                 Span::styled(&self.log_date, Style::default().fg(Color::White)),
-                Span::styled("  [D] to change", Style::default().fg(Color::Gray)),
+                Span::styled(format!("  {}", tr("log-date-change-hint")), Style::default().fg(Color::Gray)),
             ])
         };
         frame.render_widget(Paragraph::new(date_line), chunks[1]);
@@ -342,7 +344,10 @@ impl LogEntryScreen {
 
         // Show committed sets
         for (i, set) in self.sets.iter().enumerate() {
-            let text = format!("  Set {}: {}", i + 1, format_set_data(set));
+            let text = format!("  {}", tr_args("log-set-line", &[
+                ("number", FluentValue::from((i + 1) as f64)),
+                ("data", FluentValue::from(format_set_data(set))),
+            ]));
             lines.push(Line::from(Span::styled(text, Style::default().fg(GREEN))));
         }
 
@@ -357,12 +362,12 @@ impl LogEntryScreen {
                         format!("  Set {}: ", set_num),
                         Style::default().fg(Color::White),
                     ),
-                    Span::styled("Weight (kg): ", Style::default().fg(Color::Gray)),
+                    Span::styled(format!("{} ", tr("log-weight-label")), Style::default().fg(Color::Gray)),
                     Span::styled(
                         format!("{}{}", self.field1, weight_cursor),
                         Style::default().fg(if self.active_field == 0 { ACCENT } else { Color::White }),
                     ),
-                    Span::styled("  Reps: ", Style::default().fg(Color::Gray)),
+                    Span::styled(format!("  {} ", tr("log-reps-label")), Style::default().fg(Color::Gray)),
                     Span::styled(
                         format!("{}{}", self.field2, reps_cursor),
                         Style::default().fg(if self.active_field == 1 { ACCENT } else { Color::White }),
@@ -376,7 +381,7 @@ impl LogEntryScreen {
                         format!("  Set {}: ", set_num),
                         Style::default().fg(Color::White),
                     ),
-                    Span::styled("Reps: ", Style::default().fg(Color::Gray)),
+                    Span::styled(format!("{} ", tr("log-reps-label")), Style::default().fg(Color::Gray)),
                     Span::styled(
                         format!("{}{}", self.field1, cursor),
                         Style::default().fg(ACCENT),
@@ -390,7 +395,7 @@ impl LogEntryScreen {
                         format!("  Set {}: ", set_num),
                         Style::default().fg(Color::White),
                     ),
-                    Span::styled("Distance (km): ", Style::default().fg(Color::Gray)),
+                    Span::styled(format!("{} ", tr("log-distance-label")), Style::default().fg(Color::Gray)),
                     Span::styled(
                         format!("{}{}", self.field1, cursor),
                         Style::default().fg(ACCENT),
@@ -404,7 +409,7 @@ impl LogEntryScreen {
                         format!("  Set {}: ", set_num),
                         Style::default().fg(Color::White),
                     ),
-                    Span::styled("Duration (min): ", Style::default().fg(Color::Gray)),
+                    Span::styled(format!("{} ", tr("log-duration-label")), Style::default().fg(Color::Gray)),
                     Span::styled(
                         format!("{}{}", self.field1, cursor),
                         Style::default().fg(ACCENT),
@@ -425,10 +430,20 @@ impl LogEntryScreen {
             SetData::Weighted { reps, .. } => *reps,
             _ => 0,
         }).sum();
+        let total_formatted = format!("{:.1}", total);
         let total_text = if total_reps > 0 {
-            format!("  Sets: {}  Total: {:.1} {}  Reps: {}", self.sets.len(), total, label, total_reps)
+            format!("  {}", tr_args("log-sets-total-reps", &[
+                ("sets", FluentValue::from(self.sets.len() as f64)),
+                ("total", FluentValue::from(total_formatted)),
+                ("label", FluentValue::from(label.clone())),
+                ("reps", FluentValue::from(total_reps as f64)),
+            ]))
         } else {
-            format!("  Sets: {}  Total: {:.1} {}", self.sets.len(), total, label)
+            format!("  {}", tr_args("log-sets-total", &[
+                ("sets", FluentValue::from(self.sets.len() as f64)),
+                ("total", FluentValue::from(total_formatted)),
+                ("label", FluentValue::from(label.clone())),
+            ]))
         };
         let total_line = Line::from(Span::styled(
             total_text,
@@ -439,7 +454,7 @@ impl LogEntryScreen {
         // Note (if present)
         if !self.note.is_empty() {
             let note_line = Line::from(vec![
-                Span::styled("  Note: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(format!("  {}: ", tr("log-note-label")), Style::default().fg(Color::DarkGray)),
                 Span::styled(&self.note, Style::default().fg(Color::Yellow)),
             ]);
             frame.render_widget(Paragraph::new(note_line), chunks[4]);
@@ -448,15 +463,15 @@ impl LogEntryScreen {
         // Footer
         let footer = Line::from(vec![
             Span::styled(" [Enter]", Style::default().fg(ACCENT)),
-            Span::styled(" Add set  ", Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}  ", tr("key-add-set")), Style::default().fg(Color::Gray)),
             Span::styled("[Ctrl+S]", Style::default().fg(ACCENT)),
-            Span::styled(" Save  ", Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}  ", tr("key-save")), Style::default().fg(Color::Gray)),
             Span::styled("[D]", Style::default().fg(ACCENT)),
-            Span::styled(" Date  ", Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}  ", tr("key-date")), Style::default().fg(Color::Gray)),
             Span::styled("[d]", Style::default().fg(ACCENT)),
-            Span::styled(" Del last  ", Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}  ", tr("key-del-last")), Style::default().fg(Color::Gray)),
             Span::styled("[Esc]", Style::default().fg(ACCENT)),
-            Span::styled(" Cancel", Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::Gray)),
         ]);
         frame.render_widget(Paragraph::new(footer), chunks[5]);
     }
@@ -652,7 +667,9 @@ impl LogEntryScreen {
 
         // Title
         let title = Line::from(Span::styled(
-            format!(" Log {} \u{2014} Add Note", practice.name),
+            format!(" {}", tr_args("log-add-note-title", &[
+                ("name", FluentValue::from(practice.name.clone())),
+            ])),
             Style::default().fg(ACCENT).bold(),
         ));
         frame.render_widget(Paragraph::new(title), chunks[0]);
@@ -664,17 +681,23 @@ impl LogEntryScreen {
             .first()
             .map(|s| s.metric_label())
             .unwrap_or_else(|| "units".to_string());
+        let total_formatted = format!("{:.1}", total);
         let summary_lines = vec![
             Line::from(vec![
-                Span::styled("  Date: ", Style::default().fg(Color::Gray)),
+                Span::styled(format!("  {}: ", tr("log-date-label")), Style::default().fg(Color::Gray)),
                 Span::styled(&self.log_date, Style::default().fg(Color::White)),
             ]),
             Line::from(Span::styled(
-                format!("  {} sets logged", self.sets.len()),
+                format!("  {}", tr_args("log-sets-logged", &[
+                    ("count", FluentValue::from(self.sets.len() as f64)),
+                ])),
                 Style::default().fg(GREEN),
             )),
             Line::from(Span::styled(
-                format!("  Total: {:.1} {}", total, label),
+                format!("  {}", tr_args("log-total-value", &[
+                    ("total", FluentValue::from(total_formatted)),
+                    ("label", FluentValue::from(label.clone())),
+                ])),
                 Style::default().fg(Color::White),
             )),
         ];
@@ -683,7 +706,7 @@ impl LogEntryScreen {
         // Note input
         let note_block = Block::default()
             .title(Span::styled(
-                "Note (optional)",
+                tr("log-note-optional"),
                 Style::default().fg(Color::Gray),
             ))
             .borders(Borders::ALL)
@@ -701,9 +724,9 @@ impl LogEntryScreen {
         // Footer
         let footer = Line::from(vec![
             Span::styled(" [Enter]", Style::default().fg(ACCENT)),
-            Span::styled(" Save  ", Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}  ", tr("key-save")), Style::default().fg(Color::Gray)),
             Span::styled("[Esc]", Style::default().fg(ACCENT)),
-            Span::styled(" Cancel", Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::Gray)),
         ]);
         frame.render_widget(Paragraph::new(footer), chunks[5]);
     }
