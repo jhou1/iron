@@ -63,7 +63,7 @@ impl HistoryScreen {
             .constraints([
                 Constraint::Length(2),           // title
                 Constraint::Length(list_height), // scrollable list
-                Constraint::Length(4),           // detail pane
+                Constraint::Length(6),           // detail pane
                 Constraint::Length(1),           // shortcuts
                 Constraint::Min(0),              // spacer
             ])
@@ -215,6 +215,24 @@ impl HistoryScreen {
             };
             lines.push(Line::from(Span::styled(
                 detail,
+                Style::default().fg(Color::Gray),
+            )));
+        }
+
+        if let Some(warm_up) = &entry.log.warm_up {
+            lines.push(Line::from(Span::styled(
+                format!("    {}", tr_args("history-warmup", &[
+                    ("text", FluentValue::from(warm_up.clone())),
+                ])),
+                Style::default().fg(Color::Gray),
+            )));
+        }
+
+        if let Some(cool_down) = &entry.log.cool_down {
+            lines.push(Line::from(Span::styled(
+                format!("    {}", tr_args("history-cooldown", &[
+                    ("text", FluentValue::from(cool_down.clone())),
+                ])),
                 Style::default().fg(Color::Gray),
             )));
         }
