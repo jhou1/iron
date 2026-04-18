@@ -6,7 +6,6 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Clear, Paragraph, Wrap},
     Frame,
 };
-
 use unicode_width::UnicodeWidthStr;
 
 use crate::db::{AggregateStats, Database};
@@ -19,15 +18,6 @@ use super::{highlight_row, Action, Screen};
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
 const HEATMAP_CONTENT_WIDTH: u16 = 3 + 52 * 2; // day labels (3) + 52 weeks × 2 chars
-
-const HEADER_ART: [&str; 6] = [
-    r#" ___________             .__       .__                    _____          __  .__      .__  __          "#,
-    r#" \__    ___/___________  |__| ____ |__| ____    ____     /  _  \   _____/  |_|__|__  _|__|/  |_ ___.__."#,
-    r#"   |    |  \_  __ \__  \ |  |/    \|  |/    \  / ___\   /  /_\  \_/ ___\   __\  \  \/ /  \   __<   |  |"#,
-    r#"   |    |   |  | \// __ \|  |   |  \  |   |  \/ /_/  > /    |    \  \___|  | |  |\   /|  ||  |  \___  |"#,
-    r#"   |____|   |__|  (____  /__|___|  /__|___|  /\___  /  \____|__  /\___  >__| |__| \_/ |__||__|  / ____|"#,
-    r#"                       \/        \/        \//_____/           \/     \/                        \/     "#,
-];
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum DashboardMode {
@@ -128,46 +118,61 @@ impl DashboardScreen {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1),            // [0] title
-                Constraint::Length(7),            // [1] heatmap header ASCII art
-                Constraint::Length(10),           // [2] heatmap
-                Constraint::Length(quote_height), // [3] daily quote box
-                Constraint::Length(3),            // [4] HRV row (with spacing)
-                Constraint::Length(pane_height),  // [5] split panes
-                Constraint::Length(1),            // [6] footer
-                Constraint::Min(0),              // [7] spacer absorbs excess at bottom
+                Constraint::Length(3),            // [0] logo header (separator + title + separator)
+                Constraint::Length(10),           // [1] heatmap
+                Constraint::Length(quote_height), // [2] daily quote box
+                Constraint::Length(3),            // [3] HRV row (with spacing)
+                Constraint::Length(pane_height),  // [4] split panes
+                Constraint::Length(1),            // [5] footer
+                Constraint::Min(0),              // [6] spacer absorbs excess at bottom
             ])
             .split(area);
 
-        // ── Title bar ──
-        let title = Line::from(vec![
-            Span::styled(format!(" {}", tr("dashboard-title")), Style::default().fg(ACCENT).bold()),
-            Span::styled(format!(" v{}", env!("CARGO_PKG_VERSION")), Style::default().fg(Color::Gray)),
-        ]);
-        frame.render_widget(Paragraph::new(title), chunks[0]);
-
-        // ── Heatmap header (ASCII art) ──
-        let header_lines: Vec<Line> = HEADER_ART.iter()
-            .map(|line| Line::from(Span::styled(*line, Style::default().fg(ACCENT))))
-            .collect();
-        frame.render_widget(Paragraph::new(header_lines), chunks[1]);
+        // ── Logo header: separator / title+version / separator ──
+        let logo_area = Rect {
+            x: chunks[0].x + 1,
+            y: chunks[0].y,
+            width: chunks[0].width.saturating_sub(2).min(HEATMAP_CONTENT_WIDTH),
+            height: chunks[0].height,
+        };
+        let sep = "━".repeat(logo_area.width as usize);
+        let logo_text = tr("dashboard-logo-text");
+        let version = format!("v{}", env!("CARGO_PKG_VERSION"));
+        let logo_lines = vec![
+            Line::from(Span::styled(&sep, Style::default().fg(Color::DarkGray))),
+            Line::from(vec![
+                Span::styled(format!(" {}", logo_text), Style::default().fg(ACCENT).bold()),
+                Span::styled(
+                    format!(
+                        "{}{}",
+                        " ".repeat(logo_area.width.saturating_sub(
+                            logo_text.width() as u16 + 1 + version.len() as u16 + 1
+                        ) as usize),
+                        version
+                    ),
+                    Style::default().fg(Color::Gray),
+                ),
+            ]),
+            Line::from(Span::styled(&sep, Style::default().fg(Color::DarkGray))),
+        ];
+        frame.render_widget(Paragraph::new(logo_lines), logo_area);
 
         // ── Heatmap ──
         let heatmap_area = Rect {
-            x: chunks[2].x + 1,
-            y: chunks[2].y,
-            width: chunks[2].width.saturating_sub(2).min(HEATMAP_CONTENT_WIDTH),
-            height: chunks[2].height,
+            x: chunks[1].x + 1,
+            y: chunks[1].y,
+            width: chunks[1].width.saturating_sub(2).min(HEATMAP_CONTENT_WIDTH),
+            height: chunks[1].height,
         };
         let heatmap = Heatmap::new(&self.heatmap_data, 52);
         frame.render_widget(heatmap, heatmap_area);
 
         // ── Daily quote (centered, rounded border) ──
         let quote_area = Rect {
-            x: chunks[3].x + 1,
-            y: chunks[3].y,
-            width: chunks[3].width.saturating_sub(2).min(HEATMAP_CONTENT_WIDTH),
-            height: chunks[3].height,
+            x: chunks[2].x + 1,
+            y: chunks[2].y,
+            width: chunks[2].width.saturating_sub(2).min(HEATMAP_CONTENT_WIDTH),
+            height: chunks[2].height,
         };
         let quote_block = Block::default()
             .borders(Borders::ALL)
@@ -184,9 +189,9 @@ impl DashboardScreen {
 
         // ── HRV row (centered in 3-line area) ──
         let hrv_area = Rect {
-            x: chunks[4].x + 1,
-            y: chunks[4].y + 1,
-            width: chunks[4].width.saturating_sub(2).min(HEATMAP_CONTENT_WIDTH),
+            x: chunks[3].x + 1,
+            y: chunks[3].y + 1,
+            width: chunks[3].width.saturating_sub(2).min(HEATMAP_CONTENT_WIDTH),
             height: 1,
         };
         let hrv_line = if self.mode == DashboardMode::HrvInput {
@@ -213,10 +218,10 @@ impl DashboardScreen {
 
         // ── Split panes (match heatmap content width) ──
         let panes_area = Rect {
-            x: chunks[5].x + 1,
-            y: chunks[5].y,
-            width: chunks[5].width.saturating_sub(2).min(HEATMAP_CONTENT_WIDTH),
-            height: chunks[5].height,
+            x: chunks[4].x + 1,
+            y: chunks[4].y,
+            width: chunks[4].width.saturating_sub(2).min(HEATMAP_CONTENT_WIDTH),
+            height: chunks[4].height,
         };
         let panes = Layout::default()
             .direction(Direction::Horizontal)
@@ -266,7 +271,7 @@ impl DashboardScreen {
             ]
         };
         let footer = Line::from(footer_spans);
-        frame.render_widget(Paragraph::new(footer), chunks[6]);
+        frame.render_widget(Paragraph::new(footer), chunks[5]);
 
         // ── Quotes modal overlay ──
         if matches!(self.mode, DashboardMode::QuotesManage | DashboardMode::QuotesEdit) {

@@ -27,6 +27,7 @@ heatmap-dec = 12月
 
 # ── 仪表盘 ──
 dashboard-title = iron
+dashboard-logo-text = 训练日志
 dashboard-last-14-days = 最近 14 天
 dashboard-last-7-days = 最近 7 天
 dashboard-goals = 目标

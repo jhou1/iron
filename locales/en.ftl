@@ -27,6 +27,7 @@ heatmap-dec = Dec
 
 # ── Dashboard ──
 dashboard-title = iron
+dashboard-logo-text = Training Activity
 dashboard-last-14-days = Last 14 Days
 dashboard-last-7-days = Last 7 Days
 dashboard-goals = Goals
