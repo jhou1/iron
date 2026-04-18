@@ -9,7 +9,9 @@ use ratatui::{
 };
 
 use crate::db::Database;
+use crate::i18n::{tr, tr_args};
 use crate::model::{LogEntry, Practice};
+use fluent_bundle::FluentValue;
 use super::widgets::sparkline::Sparkline;
 use super::{highlight_row, Action, Screen};
 
@@ -108,7 +110,7 @@ impl TrendsScreen {
 
         // Title
         let title = Line::from(Span::styled(
-            " Trends \u{2014} Select Practice",
+            format!(" {}", tr("trends-title")),
             Style::default().fg(ACCENT).bold(),
         ));
         frame.render_widget(Paragraph::new(title), chunks[0]);
@@ -119,7 +121,7 @@ impl TrendsScreen {
         } else if !self.filter_text.is_empty() {
             format!(" /{}", self.filter_text)
         } else {
-            String::from(" Press / to filter")
+            format!(" {}", tr("log-press-filter"))
         };
         let filter_style = if self.filtering {
             Style::default().fg(ACCENT)
@@ -159,13 +161,13 @@ impl TrendsScreen {
         // Footer
         let footer = Line::from(vec![
             Span::styled(" [j/k]", Style::default().fg(ACCENT)),
-            Span::styled(" Navigate  ", Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}  ", tr("key-navigate")), Style::default().fg(Color::Gray)),
             Span::styled("[/]", Style::default().fg(ACCENT)),
-            Span::styled(" Filter  ", Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}  ", tr("key-filter")), Style::default().fg(Color::Gray)),
             Span::styled("[Enter]", Style::default().fg(ACCENT)),
-            Span::styled(" Select  ", Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}  ", tr("key-select")), Style::default().fg(Color::Gray)),
             Span::styled("[Esc]", Style::default().fg(ACCENT)),
-            Span::styled(" Back", Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::Gray)),
         ]);
         frame.render_widget(Paragraph::new(footer), chunks[3]);
     }
@@ -285,7 +287,7 @@ impl TrendsScreen {
 
         // Subtitle
         let subtitle = Line::from(Span::styled(
-            format!(" Last {} days", self.days_window),
+            format!(" {}", tr_args("trends-last-days", &[("days", FluentValue::from(self.days_window as f64))])),
             Style::default().fg(Color::Gray),
         ));
         frame.render_widget(Paragraph::new(subtitle), chunks[1]);
@@ -293,7 +295,7 @@ impl TrendsScreen {
         // Chart
         if self.entries.is_empty() {
             let msg = Line::from(Span::styled(
-                "  No data for this period.",
+                format!("  {}", tr("trends-no-data")),
                 Style::default().fg(Color::Gray),
             ));
             frame.render_widget(Paragraph::new(msg), chunks[3]);
@@ -329,17 +331,17 @@ impl TrendsScreen {
 
             let stats_line = Line::from(vec![
                 Span::styled(
-                    format!("  Avg: {:.1}", avg),
+                    format!("  {}", tr_args("trends-avg", &[("value", FluentValue::from(format!("{:.1}", avg)))])),
                     Style::default().fg(Color::White),
                 ),
                 Span::styled("  |  ", Style::default().fg(Color::Gray)),
                 Span::styled(
-                    format!("Peak: {:.1}", peak),
+                    tr_args("trends-peak", &[("value", FluentValue::from(format!("{:.1}", peak)))]),
                     Style::default().fg(Color::White),
                 ),
                 Span::styled("  |  ", Style::default().fg(Color::Gray)),
                 Span::styled(
-                    format!("Trend: {}{:.1}%", trend_sign, trend_pct),
+                    tr_args("trends-trend", &[("sign", FluentValue::from(trend_sign.to_string())), ("value", FluentValue::from(format!("{:.1}", trend_pct)))]),
                     Style::default().fg(trend_color),
                 ),
             ]);
@@ -349,11 +351,11 @@ impl TrendsScreen {
         // Footer
         let footer = Line::from(vec![
             Span::styled(" [h/l]", Style::default().fg(ACCENT)),
-            Span::styled(" Window  ", Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}  ", tr("key-window")), Style::default().fg(Color::Gray)),
             Span::styled("[/]", Style::default().fg(ACCENT)),
-            Span::styled(" Pick practice  ", Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}  ", tr("key-pick-practice")), Style::default().fg(Color::Gray)),
             Span::styled("[Esc]", Style::default().fg(ACCENT)),
-            Span::styled(" Dashboard", Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}", tr("key-dashboard")), Style::default().fg(Color::Gray)),
         ]);
         frame.render_widget(Paragraph::new(footer), chunks[5]);
     }
