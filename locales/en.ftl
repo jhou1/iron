@@ -5,10 +5,30 @@ app-about = Track your training
 # ── Heatmap ──
 heatmap-less = Less
 heatmap-more = More
+heatmap-mon = Mo
+heatmap-tue = Tu
+heatmap-wed = We
+heatmap-thu = Th
+heatmap-fri = Fr
+heatmap-sat = Sa
+heatmap-sun = Su
+heatmap-jan = Jan
+heatmap-feb = Feb
+heatmap-mar = Mar
+heatmap-apr = Apr
+heatmap-may = May
+heatmap-jun = Jun
+heatmap-jul = Jul
+heatmap-aug = Aug
+heatmap-sep = Sep
+heatmap-oct = Oct
+heatmap-nov = Nov
+heatmap-dec = Dec
 
 # ── Dashboard ──
 dashboard-title = iron
 dashboard-last-14-days = Last 14 Days
+dashboard-last-7-days = Last 7 Days
 dashboard-goals = Goals
 dashboard-quotes = Quotes
 dashboard-no-quotes = No quotes yet — press Q to add one
@@ -29,6 +49,9 @@ dashboard-hrv-label = HRV
 dashboard-hrv-edit-hint = [v] edit
 dashboard-hrv-record-hint = [v] record
 dashboard-hrv-input-hint = (0-100, Enter to save, Esc to cancel)
+
+# ── Goals ──
+goals-title = Goals
 
 # ── Log Entry ──
 log-select-practice = Select Practice
@@ -55,6 +78,9 @@ log-warmup-cooldown-title = Log { $name } — Warm-up & Cool-down
 
 # ── History ──
 history-title = History
+history-col-date = Date
+history-col-practice = Practice
+history-col-volume = Volume
 history-no-entries = No entries yet
 history-entry = { $date }  { $name }  { $sets } sets  { $total } { $label }
 history-set-weighted = #{ $number }  { $weight }kg x { $reps }
@@ -76,6 +102,8 @@ trends-trend = Trend: { $sign }{ $value }%
 
 # ── Practices ──
 practices-title = Practices
+practices-col-name = Name
+practices-col-type = Type
 practices-no-items = No practices yet. Press 'a' to add one.
 practices-new-name = New practice name:
 practices-select-type = Select type:
@@ -133,6 +161,7 @@ key-yes = Yes
 key-no = No
 key-hrv = HRV
 key-next = Next
+key-switch-field = Switch field
 
 # ── CLI ──
 cli-export-about = Export all data to JSON

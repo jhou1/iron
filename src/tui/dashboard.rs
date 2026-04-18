@@ -30,20 +30,9 @@ const HEADER_ART: [&str; 6] = [
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum DashboardMode {
     Normal,
-    Goals,
-    AddGoal,
-    AddMilestone,
-    EditItem,
-    EditDate,
-    ConfirmDelete,
     QuotesManage,
     QuotesEdit,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum GoalItem {
-    Goal(i64),
-    Milestone(i64),
+    HrvInput,
 }
 
 pub struct DashboardScreen {
@@ -58,20 +47,20 @@ pub struct DashboardScreen {
     quotes_cursor: usize,
     quotes_editing_id: Option<i64>,
     mode: DashboardMode,
-    goal_selected: usize,
-    goal_input: String,
-    goal_cursor: usize,
-    goal_scroll: usize,
+    hrv_today: Option<i32>,
+    hrv_input: String,
 }
 
 impl DashboardScreen {
     pub fn new(db: &Database) -> anyhow::Result<Self> {
         let heatmap_data = db.heatmap_counts(365)?;
-        let recent_entries = db.list_logs_recent(14)?;
-        let stats = db.aggregate_stats(14)?;
+        let recent_entries = db.list_logs_recent(7)?;
+        let stats = db.aggregate_stats(7)?;
         let quotes = db.list_quotes()?;
         let quote = super::quotes::pick_daily_quote(&quotes);
         let goals = db.list_goals()?;
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        let hrv_today = db.get_daily_hrv(&today)?;
         Ok(Self {
             heatmap_data,
             recent_entries,
@@ -84,20 +73,20 @@ impl DashboardScreen {
             quotes_cursor: 0,
             quotes_editing_id: None,
             mode: DashboardMode::Normal,
-            goal_selected: 0,
-            goal_input: String::new(),
-            goal_cursor: 0,
-            goal_scroll: 0,
+            hrv_today,
+            hrv_input: String::new(),
         })
     }
 
     pub fn refresh(&mut self, db: &Database) -> anyhow::Result<()> {
         self.heatmap_data = db.heatmap_counts(365)?;
-        self.recent_entries = db.list_logs_recent(14)?;
-        self.stats = db.aggregate_stats(14)?;
+        self.recent_entries = db.list_logs_recent(7)?;
+        self.stats = db.aggregate_stats(7)?;
         self.quotes = db.list_quotes()?;
         self.quote = super::quotes::pick_daily_quote(&self.quotes);
         self.goals = db.list_goals()?;
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        self.hrv_today = db.get_daily_hrv(&today)?;
         Ok(())
     }
 
@@ -133,7 +122,7 @@ impl DashboardScreen {
         } as u16;
         let quote_height = quote_lines + 2;
 
-        // Main vertical layout: title | heatmap | quote | panes | footer | spacer
+        // Main vertical layout: title | heatmap | quote | HRV | panes | footer | spacer
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
@@ -141,9 +130,10 @@ impl DashboardScreen {
                 Constraint::Length(7),            // [1] heatmap header ASCII art
                 Constraint::Length(10),           // [2] heatmap
                 Constraint::Length(quote_height), // [3] daily quote box
-                Constraint::Length(pane_height),  // [4] split panes
-                Constraint::Length(1),            // [5] footer
-                Constraint::Min(0),              // [6] spacer absorbs excess at bottom
+                Constraint::Length(1),            // [4] HRV row
+                Constraint::Length(pane_height),  // [5] split panes
+                Constraint::Length(1),            // [6] footer
+                Constraint::Min(0),              // [7] spacer absorbs excess at bottom
             ])
             .split(area);
 
@@ -190,12 +180,41 @@ impl DashboardScreen {
         .alignment(ratatui::layout::Alignment::Center);
         frame.render_widget(quote_paragraph, quote_area);
 
-        // ── Split panes (match heatmap content width) ──
-        let panes_area = Rect {
+        // ── HRV row ──
+        let hrv_area = Rect {
             x: chunks[4].x + 1,
             y: chunks[4].y,
             width: chunks[4].width.saturating_sub(2).min(HEATMAP_CONTENT_WIDTH),
             height: chunks[4].height,
+        };
+        let hrv_line = if self.mode == DashboardMode::HrvInput {
+            Line::from(vec![
+                Span::styled(format!(" {}: ", tr("dashboard-hrv-label")), Style::default().fg(Color::Gray)),
+                Span::styled(&self.hrv_input, Style::default().fg(ACCENT)),
+                Span::styled("\u{2588}", Style::default().fg(ACCENT)),
+                Span::styled(format!("  {}", tr("dashboard-hrv-input-hint")), Style::default().fg(Color::Gray)),
+            ])
+        } else if let Some(hrv) = self.hrv_today {
+            Line::from(vec![
+                Span::styled(format!(" {}: ", tr("dashboard-hrv-label")), Style::default().fg(Color::Gray)),
+                Span::styled(format!("{}", hrv), Style::default().fg(GREEN)),
+                Span::styled(format!("  {}", tr("dashboard-hrv-edit-hint")), Style::default().fg(Color::DarkGray)),
+            ])
+        } else {
+            Line::from(vec![
+                Span::styled(format!(" {}: ", tr("dashboard-hrv-label")), Style::default().fg(Color::Gray)),
+                Span::styled("--", Style::default().fg(Color::DarkGray)),
+                Span::styled(format!("  {}", tr("dashboard-hrv-record-hint")), Style::default().fg(Color::DarkGray)),
+            ])
+        };
+        frame.render_widget(Paragraph::new(hrv_line), hrv_area);
+
+        // ── Split panes (match heatmap content width) ──
+        let panes_area = Rect {
+            x: chunks[5].x + 1,
+            y: chunks[5].y,
+            width: chunks[5].width.saturating_sub(2).min(HEATMAP_CONTENT_WIDTH),
+            height: chunks[5].height,
         };
         let panes = Layout::default()
             .direction(Direction::Horizontal)
@@ -220,6 +239,8 @@ impl DashboardScreen {
                 Span::styled(format!(" {}  ", tr("key-goals")), Style::default().fg(Color::Gray)),
                 Span::styled("[Q]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}  ", tr("key-quotes")), Style::default().fg(Color::Gray)),
+                Span::styled("[v]", Style::default().fg(ACCENT)),
+                Span::styled(format!(" {}  ", tr("key-hrv")), Style::default().fg(Color::Gray)),
                 Span::styled("[q]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}", tr("key-quit")), Style::default().fg(Color::Gray)),
             ]
@@ -234,23 +255,6 @@ impl DashboardScreen {
                 Span::styled("[Esc]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}", tr("key-close")), Style::default().fg(Color::Gray)),
             ]
-        } else if self.mode == DashboardMode::Goals {
-            vec![
-                Span::styled(" [a]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-add-goal")), Style::default().fg(Color::Gray)),
-                Span::styled("[m]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-milestone")), Style::default().fg(Color::Gray)),
-                Span::styled("[Enter]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::Gray)),
-                Span::styled("[Space]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-toggle")), Style::default().fg(Color::Gray)),
-                Span::styled("[d]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::Gray)),
-                Span::styled("[D]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-date")), Style::default().fg(Color::Gray)),
-                Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::Gray)),
-            ]
         } else {
             vec![
                 Span::styled(" [Enter]", Style::default().fg(ACCENT)),
@@ -260,7 +264,7 @@ impl DashboardScreen {
             ]
         };
         let footer = Line::from(footer_spans);
-        frame.render_widget(Paragraph::new(footer), chunks[5]);
+        frame.render_widget(Paragraph::new(footer), chunks[6]);
 
         // ── Quotes modal overlay ──
         if matches!(self.mode, DashboardMode::QuotesManage | DashboardMode::QuotesEdit) {
@@ -270,7 +274,7 @@ impl DashboardScreen {
 
     fn render_recent_pane(&self, frame: &mut Frame, area: Rect) {
         let block = Block::default()
-            .title(Span::styled(tr("dashboard-last-14-days"), Style::default().fg(Color::White).bold()))
+            .title(Span::styled(tr("dashboard-last-7-days"), Style::default().fg(Color::White).bold()))
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::DarkGray));
 
@@ -357,87 +361,25 @@ impl DashboardScreen {
         frame.render_widget(Paragraph::new(lines), inner);
     }
 
-    fn goal_items(&self) -> Vec<GoalItem> {
-        let mut items = Vec::new();
-        for goal in &self.goals {
-            items.push(GoalItem::Goal(goal.id));
-            for ms in &goal.milestones {
-                items.push(GoalItem::Milestone(ms.id));
-            }
-        }
-        items
-    }
-
-    fn selected_goal_item(&self) -> Option<GoalItem> {
-        let items = self.goal_items();
-        items.get(self.goal_selected).copied()
-    }
-
-    fn parent_goal_id(&self) -> Option<i64> {
-        match self.selected_goal_item()? {
-            GoalItem::Goal(id) => Some(id),
-            GoalItem::Milestone(ms_id) => {
-                self.goals.iter()
-                    .find(|g| g.milestones.iter().any(|m| m.id == ms_id))
-                    .map(|g| g.id)
-            }
-        }
-    }
-
-    fn reload_goals(&mut self, db: &Database) -> anyhow::Result<()> {
-        self.goals = db.list_goals()?;
-        Ok(())
-    }
-
     fn reload_quotes(&mut self, db: &Database) -> anyhow::Result<()> {
         self.quotes = db.list_quotes()?;
         self.quote = super::quotes::pick_daily_quote(&self.quotes);
         Ok(())
     }
 
-    fn adjust_goal_scroll(&mut self) {
-        let goals_lines = self.goals.iter()
-            .map(|g| 1 + g.milestones.len())
-            .sum::<usize>()
-            .max(1);
-        let recent_lines = self.recent_entries.len() + 4;
-        let pane_height = recent_lines.max(goals_lines + 2).max(7);
-        let visible_height = pane_height.saturating_sub(2);
-
-        if visible_height == 0 {
-            return;
-        }
-
-        // Extra lines rendered after the selected item (inline prompts)
-        let extra = match self.mode {
-            DashboardMode::ConfirmDelete => 1,
-            DashboardMode::EditDate => 1,
-            DashboardMode::AddMilestone => 1,
-            _ => 0,
-        };
-
-        if self.goal_selected < self.goal_scroll {
-            self.goal_scroll = self.goal_selected;
-        } else if self.goal_selected + extra >= self.goal_scroll + visible_height {
-            self.goal_scroll = (self.goal_selected + extra) - visible_height + 1;
-        }
-    }
-
     fn render_goals_pane(&self, frame: &mut Frame, area: Rect) {
-        let border_color = match self.mode {
-            DashboardMode::Normal | DashboardMode::QuotesManage | DashboardMode::QuotesEdit => Color::DarkGray,
-            _ => ACCENT,
-        };
-
         let block = Block::default()
             .title(Span::styled(tr("dashboard-goals"), Style::default().fg(Color::White).bold()))
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(border_color));
+            .border_style(Style::default().fg(Color::DarkGray));
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
 
-        if self.goals.is_empty() && self.mode == DashboardMode::Normal {
+        // Show only active (uncompleted) goals, read-only
+        let active_goals: Vec<&Goal> = self.goals.iter().filter(|g| !g.completed).collect();
+
+        if active_goals.is_empty() {
             let hint = Paragraph::new(Line::from(Span::styled(
                 tr("dashboard-press-g"),
                 Style::default().fg(Color::Gray),
@@ -447,189 +389,15 @@ impl DashboardScreen {
         }
 
         let mut lines: Vec<Line> = Vec::new();
-        let in_goals_mode = matches!(
-            self.mode,
-            DashboardMode::Goals
-                | DashboardMode::AddGoal
-                | DashboardMode::AddMilestone
-                | DashboardMode::EditItem
-                | DashboardMode::EditDate
-                | DashboardMode::ConfirmDelete
-        );
-        let mut sel_line_idx: Option<usize> = None;
-
-        // AddGoal input at top so it's always visible
-        if self.mode == DashboardMode::AddGoal {
+        for goal in &active_goals {
             lines.push(Line::from(vec![
-                Span::styled("▸ ", Style::default().fg(GREEN).bold()),
-                Span::styled(&self.goal_input[..self.goal_cursor], Style::default().fg(GREEN)),
-                Span::styled("█", Style::default().fg(GREEN)),
-                Span::styled(&self.goal_input[self.goal_cursor..], Style::default().fg(GREEN)),
+                Span::styled("  ", Style::default()),
+                Span::styled("\u{231b} ", Style::default().fg(Color::Yellow)),
+                Span::styled(&goal.title, Style::default().fg(GREEN)),
             ]));
         }
 
-        let mut idx = 0;
-        for goal in &self.goals {
-            let is_selected = in_goals_mode && idx == self.goal_selected;
-            let style = if is_selected {
-                Style::default().fg(GREEN).bold()
-            } else {
-                Style::default().fg(GREEN)
-            };
-
-            if is_selected {
-                sel_line_idx = Some(lines.len());
-            }
-            if is_selected && self.mode == DashboardMode::EditItem {
-                lines.push(Line::from(vec![
-                    Span::styled("▸ ", style),
-                    Span::styled(&self.goal_input[..self.goal_cursor], Style::default().fg(GREEN)),
-                    Span::styled("█", Style::default().fg(GREEN)),
-                    Span::styled(&self.goal_input[self.goal_cursor..], Style::default().fg(GREEN)),
-                ]));
-            } else if is_selected && self.mode == DashboardMode::EditDate {
-                lines.push(Line::from(Span::styled(
-                    format!("☑ {}", goal.title),
-                    Style::default().fg(GREEN),
-                )));
-                lines.push(Line::from(vec![
-                    Span::styled(format!("  {} ", tr("dashboard-date-prompt")), Style::default().fg(ACCENT)),
-                    Span::styled(&self.goal_input[..self.goal_cursor], Style::default().fg(GREEN)),
-                    Span::styled("█", Style::default().fg(GREEN)),
-                    Span::styled(&self.goal_input[self.goal_cursor..], Style::default().fg(GREEN)),
-                ]));
-            } else if goal.completed {
-                let date_str = goal.completed_at
-                    .map(|dt| format!(" ({})", dt.format("%Y-%m-%d")))
-                    .unwrap_or_default();
-                lines.push(Line::from(Span::styled(
-                    format!("☑ {}{}", goal.title, date_str),
-                    if is_selected { Style::default().fg(GREEN) } else { Style::default().fg(Color::DarkGray) },
-                )));
-            } else {
-                let marker = if is_selected { "> " } else { "▸ " };
-                lines.push(Line::from(Span::styled(
-                    format!("{}{}", marker, goal.title),
-                    style,
-                )));
-            }
-            if is_selected && self.mode == DashboardMode::ConfirmDelete {
-                lines.push(Line::from(Span::styled(
-                    format!("  {}", tr("dashboard-delete-confirm")),
-                    Style::default().fg(Color::Red),
-                )));
-            }
-            idx += 1;
-
-            for ms in &goal.milestones {
-                let is_ms_selected = in_goals_mode && idx == self.goal_selected;
-
-                if is_ms_selected {
-                    sel_line_idx = Some(lines.len());
-                }
-                if is_ms_selected && self.mode == DashboardMode::EditItem {
-                    let check = if ms.completed { "☑ " } else { "☐ " };
-                    lines.push(Line::from(vec![
-                        Span::styled(format!("  {} ", check), Style::default().fg(GREEN)),
-                        Span::styled(&self.goal_input[..self.goal_cursor], Style::default().fg(GREEN)),
-                        Span::styled("█", Style::default().fg(GREEN)),
-                        Span::styled(&self.goal_input[self.goal_cursor..], Style::default().fg(GREEN)),
-                    ]));
-                } else if is_ms_selected && self.mode == DashboardMode::EditDate {
-                    lines.push(Line::from(Span::styled(
-                        format!("  ☑ {}", ms.title),
-                        Style::default().fg(GREEN),
-                    )));
-                    lines.push(Line::from(vec![
-                        Span::styled(format!("    {} ", tr("dashboard-date-prompt")), Style::default().fg(ACCENT)),
-                        Span::styled(&self.goal_input[..self.goal_cursor], Style::default().fg(GREEN)),
-                        Span::styled("█", Style::default().fg(GREEN)),
-                        Span::styled(&self.goal_input[self.goal_cursor..], Style::default().fg(GREEN)),
-                    ]));
-                } else if ms.completed {
-                    let date_str = ms.completed_at
-                        .map(|dt| format!(" ({})", dt.format("%Y-%m-%d")))
-                        .unwrap_or_default();
-                    let style = if is_ms_selected {
-                        Style::default().fg(GREEN)
-                    } else {
-                        Style::default().fg(Color::DarkGray)
-                    };
-                    let marker = if is_ms_selected { "> " } else { "  " };
-                    lines.push(Line::from(Span::styled(
-                        format!("{}☑ {}{}", marker, ms.title, date_str),
-                        style,
-                    )));
-                } else {
-                    let marker = if is_ms_selected { "> " } else { "  " };
-                    lines.push(Line::from(Span::styled(
-                        format!("{}☐ {}", marker, ms.title),
-                        Style::default().fg(GREEN),
-                    )));
-                }
-                if is_ms_selected && self.mode == DashboardMode::ConfirmDelete {
-                    lines.push(Line::from(Span::styled(
-                        format!("    {}", tr("dashboard-delete-confirm")),
-                        Style::default().fg(Color::Red),
-                    )));
-                }
-                idx += 1;
-            }
-
-            // Show milestone input right after the selected goal's milestones
-            if self.mode == DashboardMode::AddMilestone {
-                if let Some(parent_id) = self.parent_goal_id() {
-                    if parent_id == goal.id {
-                        lines.push(Line::from(vec![
-                            Span::styled("  ☐ ", Style::default().fg(GREEN)),
-                            Span::styled(&self.goal_input[..self.goal_cursor], Style::default().fg(GREEN)),
-                            Span::styled("█", Style::default().fg(GREEN)),
-                            Span::styled(&self.goal_input[self.goal_cursor..], Style::default().fg(GREEN)),
-                        ]));
-                    }
-                }
-            }
-        }
-
-
-        if self.goals.is_empty() && self.mode == DashboardMode::Goals {
-            lines.push(Line::from(Span::styled(
-                tr("dashboard-press-a-goal"),
-                Style::default().fg(Color::Gray),
-            )));
-        }
-
-        let sel_visual = sel_line_idx.map(|idx| {
-            let w = inner.width;
-            let mut visual_row = 0u16;
-            for (i, line) in lines.iter().enumerate() {
-                if i == idx {
-                    break;
-                }
-                let lw = line.width() as u16;
-                visual_row += if w > 0 && lw > 0 { lw.div_ceil(w) } else { 1 };
-            }
-            let sel_w = lines[idx].width() as u16;
-            let sel_rows = if w > 0 && sel_w > 0 { sel_w.div_ceil(w) } else { 1 };
-            (visual_row, sel_rows)
-        });
-
-        frame.render_widget(
-            Paragraph::new(lines)
-                .wrap(Wrap { trim: false })
-                .scroll((self.goal_scroll as u16, 0)),
-            inner,
-        );
-
-        if let Some((visual_row, sel_rows)) = sel_visual {
-            let scroll = self.goal_scroll as u16;
-            for r in 0..sel_rows {
-                let abs_row = visual_row + r;
-                if abs_row >= scroll && abs_row < scroll + inner.height {
-                    highlight_row(frame, inner, abs_row - scroll);
-                }
-            }
-        }
+        frame.render_widget(Paragraph::new(lines), inner);
     }
 
     fn render_quotes_modal(&self, frame: &mut Frame) {
@@ -730,97 +498,9 @@ impl DashboardScreen {
     pub fn handle_key(&mut self, key: KeyEvent, db: &Database) -> Action {
         match self.mode {
             DashboardMode::Normal => self.handle_normal(key),
-            DashboardMode::Goals => self.handle_goals(key, db),
-            DashboardMode::AddGoal => self.handle_add_goal(key, db),
-            DashboardMode::AddMilestone => self.handle_add_milestone(key, db),
-            DashboardMode::EditItem => self.handle_edit_item(key, db),
-            DashboardMode::EditDate => self.handle_edit_date(key, db),
-            DashboardMode::ConfirmDelete => self.handle_confirm_delete(key, db),
             DashboardMode::QuotesManage => self.handle_quotes_manage(key, db),
             DashboardMode::QuotesEdit => self.handle_quotes_edit(key, db),
-        }
-    }
-
-    fn handle_text_input(&mut self, key: KeyEvent) -> bool {
-        match key.code {
-            KeyCode::Char('b') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                if self.goal_cursor > 0 {
-                    let prev = self.goal_input[..self.goal_cursor]
-                        .char_indices()
-                        .next_back()
-                        .map(|(i, _)| i)
-                        .unwrap_or(0);
-                    self.goal_cursor = prev;
-                }
-                true
-            }
-            KeyCode::Left => {
-                if self.goal_cursor > 0 {
-                    let prev = self.goal_input[..self.goal_cursor]
-                        .char_indices()
-                        .next_back()
-                        .map(|(i, _)| i)
-                        .unwrap_or(0);
-                    self.goal_cursor = prev;
-                }
-                true
-            }
-            KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                if self.goal_cursor < self.goal_input.len() {
-                    let next = self.goal_input[self.goal_cursor..]
-                        .char_indices()
-                        .nth(1)
-                        .map(|(i, _)| self.goal_cursor + i)
-                        .unwrap_or(self.goal_input.len());
-                    self.goal_cursor = next;
-                }
-                true
-            }
-            KeyCode::Right => {
-                if self.goal_cursor < self.goal_input.len() {
-                    let next = self.goal_input[self.goal_cursor..]
-                        .char_indices()
-                        .nth(1)
-                        .map(|(i, _)| self.goal_cursor + i)
-                        .unwrap_or(self.goal_input.len());
-                    self.goal_cursor = next;
-                }
-                true
-            }
-            KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.goal_cursor = 0;
-                true
-            }
-            KeyCode::Home => {
-                self.goal_cursor = 0;
-                true
-            }
-            KeyCode::Char('e') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.goal_cursor = self.goal_input.len();
-                true
-            }
-            KeyCode::End => {
-                self.goal_cursor = self.goal_input.len();
-                true
-            }
-            KeyCode::Backspace => {
-                if self.goal_cursor > 0 {
-                    let prev = self.goal_input[..self.goal_cursor]
-                        .char_indices()
-                        .next_back()
-                        .map(|(i, _)| i)
-                        .unwrap_or(0);
-                    self.goal_input.remove(prev);
-                    self.goal_cursor = prev;
-                }
-                true
-            }
-            KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.goal_input.insert(self.goal_cursor, c);
-                self.goal_cursor += c.len_utf8();
-                true
-            }
-            _ => false,
+            DashboardMode::HrvInput => self.handle_hrv_input(key, db),
         }
     }
 
@@ -985,15 +665,15 @@ impl DashboardScreen {
             KeyCode::Char('h') => Action::Navigate(Screen::History),
             KeyCode::Char('t') => Action::Navigate(Screen::Trends),
             KeyCode::Char('e') => Action::Navigate(Screen::Practices),
-            KeyCode::Char('g') => {
-                self.mode = DashboardMode::Goals;
-                self.goal_selected = 0;
-                self.goal_scroll = 0;
-                Action::None
-            }
+            KeyCode::Char('g') => Action::Navigate(Screen::Goals),
             KeyCode::Char('Q') => {
                 self.quotes_selected = 0;
                 self.mode = DashboardMode::QuotesManage;
+                Action::None
+            }
+            KeyCode::Char('v') => {
+                self.hrv_input = self.hrv_today.map(|v| v.to_string()).unwrap_or_default();
+                self.mode = DashboardMode::HrvInput;
                 Action::None
             }
             KeyCode::Char('q') => Action::Quit,
@@ -1001,244 +681,34 @@ impl DashboardScreen {
         }
     }
 
-    fn handle_goals(&mut self, key: KeyEvent, db: &Database) -> Action {
-        let items = self.goal_items();
-        let item_count = items.len();
-
+    fn handle_hrv_input(&mut self, key: KeyEvent, db: &Database) -> Action {
         match key.code {
-            KeyCode::Char('j') | KeyCode::Down => {
-                if item_count > 0 && self.goal_selected < item_count - 1 {
-                    self.goal_selected += 1;
-                    self.adjust_goal_scroll();
-                }
-                Action::None
-            }
-            KeyCode::Char('k') | KeyCode::Up => {
-                if self.goal_selected > 0 {
-                    self.goal_selected -= 1;
-                    self.adjust_goal_scroll();
-                }
-                Action::None
-            }
-            KeyCode::Char('a') => {
-                self.goal_input.clear();
-                self.goal_cursor = 0;
-                self.mode = DashboardMode::AddGoal;
-                Action::None
-            }
-            KeyCode::Char('m') => {
-                if self.parent_goal_id().is_some() {
-                    self.goal_input.clear();
-                    self.goal_cursor = 0;
-                    self.mode = DashboardMode::AddMilestone;
-                    self.adjust_goal_scroll();
-                }
-                Action::None
-            }
             KeyCode::Enter => {
-                if let Some(item) = self.selected_goal_item() {
-                    let current_title = match item {
-                        GoalItem::Goal(id) => {
-                            self.goals.iter().find(|g| g.id == id).map(|g| g.title.clone())
-                        }
-                        GoalItem::Milestone(id) => {
-                            self.goals.iter()
-                                .flat_map(|g| &g.milestones)
-                                .find(|m| m.id == id)
-                                .map(|m| m.title.clone())
-                        }
-                    };
-                    if let Some(title) = current_title {
-                        self.goal_input = title;
-                        self.goal_cursor = self.goal_input.len();
-                        self.mode = DashboardMode::EditItem;
+                if let Ok(hrv) = self.hrv_input.parse::<i32>() {
+                    if (0..=100).contains(&hrv) {
+                        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+                        let _ = db.set_daily_hrv(&today, hrv);
+                        self.hrv_today = Some(hrv);
+                        self.mode = DashboardMode::Normal;
                     }
-                }
-                Action::None
-            }
-            KeyCode::Char(' ') => {
-                match self.selected_goal_item() {
-                    Some(GoalItem::Goal(id)) => {
-                        let _ = db.toggle_goal(id);
-                        let _ = self.reload_goals(db);
-                    }
-                    Some(GoalItem::Milestone(id)) => {
-                        let _ = db.toggle_milestone(id);
-                        let _ = self.reload_goals(db);
-                    }
-                    None => {}
-                }
-                Action::None
-            }
-            KeyCode::Char('D') => {
-                if let Some(item) = self.selected_goal_item() {
-                    let is_completed = match item {
-                        GoalItem::Goal(id) => self.goals.iter().find(|g| g.id == id).map(|g| g.completed).unwrap_or(false),
-                        GoalItem::Milestone(id) => self.goals.iter().flat_map(|g| &g.milestones).find(|m| m.id == id).map(|m| m.completed).unwrap_or(false),
-                    };
-                    if is_completed {
-                        self.goal_input.clear();
-                        self.goal_cursor = 0;
-                        self.mode = DashboardMode::EditDate;
-                        self.adjust_goal_scroll();
-                    }
-                }
-                Action::None
-            }
-            KeyCode::Char('d') => {
-                if self.selected_goal_item().is_some() {
-                    self.mode = DashboardMode::ConfirmDelete;
-                    self.adjust_goal_scroll();
                 }
                 Action::None
             }
             KeyCode::Esc => {
+                self.hrv_input.clear();
                 self.mode = DashboardMode::Normal;
+                Action::None
+            }
+            KeyCode::Backspace => {
+                self.hrv_input.pop();
+                Action::None
+            }
+            KeyCode::Char(c) if c.is_ascii_digit() => {
+                self.hrv_input.push(c);
                 Action::None
             }
             _ => Action::None,
         }
     }
 
-    fn handle_add_goal(&mut self, key: KeyEvent, db: &Database) -> Action {
-        match key.code {
-            KeyCode::Enter => {
-                let title = self.goal_input.trim().to_string();
-                if !title.is_empty() {
-                    let _ = db.create_goal(&title);
-                    let _ = self.reload_goals(db);
-                }
-                self.goal_input.clear();
-                self.goal_cursor = 0;
-                self.goal_selected = 0;
-                self.goal_scroll = 0;
-                self.mode = DashboardMode::Goals;
-                Action::None
-            }
-            KeyCode::Esc => {
-                self.goal_input.clear();
-                self.goal_cursor = 0;
-                self.mode = DashboardMode::Goals;
-                Action::None
-            }
-            _ => {
-                self.handle_text_input(key);
-                Action::None
-            }
-        }
-    }
-
-    fn handle_add_milestone(&mut self, key: KeyEvent, db: &Database) -> Action {
-        match key.code {
-            KeyCode::Enter => {
-                let title = self.goal_input.trim().to_string();
-                if !title.is_empty() {
-                    if let Some(goal_id) = self.parent_goal_id() {
-                        let _ = db.create_milestone(goal_id, &title);
-                        let _ = self.reload_goals(db);
-                    }
-                }
-                self.goal_input.clear();
-                self.goal_cursor = 0;
-                self.mode = DashboardMode::Goals;
-                Action::None
-            }
-            KeyCode::Esc => {
-                self.goal_input.clear();
-                self.goal_cursor = 0;
-                self.mode = DashboardMode::Goals;
-                Action::None
-            }
-            _ => {
-                self.handle_text_input(key);
-                Action::None
-            }
-        }
-    }
-
-    fn handle_edit_item(&mut self, key: KeyEvent, db: &Database) -> Action {
-        match key.code {
-            KeyCode::Enter => {
-                let title = self.goal_input.trim().to_string();
-                if !title.is_empty() {
-                    if let Some(item) = self.selected_goal_item() {
-                        match item {
-                            GoalItem::Goal(id) => { let _ = db.update_goal(id, &title); }
-                            GoalItem::Milestone(id) => { let _ = db.update_milestone(id, &title); }
-                        }
-                        let _ = self.reload_goals(db);
-                    }
-                }
-                self.goal_input.clear();
-                self.goal_cursor = 0;
-                self.mode = DashboardMode::Goals;
-                Action::None
-            }
-            KeyCode::Esc => {
-                self.goal_input.clear();
-                self.goal_cursor = 0;
-                self.mode = DashboardMode::Goals;
-                Action::None
-            }
-            _ => {
-                self.handle_text_input(key);
-                Action::None
-            }
-        }
-    }
-
-    fn handle_edit_date(&mut self, key: KeyEvent, db: &Database) -> Action {
-        match key.code {
-            KeyCode::Enter => {
-                if let Ok(date) = chrono::NaiveDate::parse_from_str(&self.goal_input, "%Y-%m-%d") {
-                    let completed_at = date.and_hms_opt(0, 0, 0).unwrap();
-                    if let Some(item) = self.selected_goal_item() {
-                        match item {
-                            GoalItem::Goal(id) => { let _ = db.set_goal_completed_at(id, &completed_at); }
-                            GoalItem::Milestone(id) => { let _ = db.set_milestone_completed_at(id, &completed_at); }
-                        }
-                        let _ = self.reload_goals(db);
-                    }
-                }
-                self.goal_input.clear();
-                self.goal_cursor = 0;
-                self.mode = DashboardMode::Goals;
-                Action::None
-            }
-            KeyCode::Esc => {
-                self.goal_input.clear();
-                self.goal_cursor = 0;
-                self.mode = DashboardMode::Goals;
-                Action::None
-            }
-            _ => {
-                self.handle_text_input(key);
-                Action::None
-            }
-        }
-    }
-
-    fn handle_confirm_delete(&mut self, key: KeyEvent, db: &Database) -> Action {
-        match key.code {
-            KeyCode::Char('y') => {
-                if let Some(item) = self.selected_goal_item() {
-                    match item {
-                        GoalItem::Goal(id) => { let _ = db.delete_goal(id); }
-                        GoalItem::Milestone(id) => { let _ = db.delete_milestone(id); }
-                    }
-                    let _ = self.reload_goals(db);
-                    let items = self.goal_items();
-                    if self.goal_selected >= items.len() && !items.is_empty() {
-                        self.goal_selected = items.len() - 1;
-                    }
-                }
-                self.mode = DashboardMode::Goals;
-                Action::None
-            }
-            _ => {
-                self.mode = DashboardMode::Goals;
-                Action::None
-            }
-        }
-    }
 }

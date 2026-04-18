@@ -1,4 +1,5 @@
 pub mod dashboard;
+pub mod goals;
 pub mod history;
 pub mod log_entry;
 pub mod practices;
@@ -34,6 +35,7 @@ pub enum Screen {
     History,
     Trends,
     Practices,
+    Goals,
 }
 
 pub enum Action {

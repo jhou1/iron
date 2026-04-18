@@ -10,6 +10,7 @@ use std::io::stdout;
 use crate::db::Database;
 use crate::tui::{
     dashboard::DashboardScreen,
+    goals::GoalsScreen,
     history::HistoryScreen,
     log_entry::LogEntryScreen,
     practices::PracticesScreen,
@@ -34,6 +35,7 @@ fn run_app(
 ) -> Result<()> {
     let mut current_screen = Screen::Dashboard;
     let mut dashboard = DashboardScreen::new(db)?;
+    let mut goals_screen = GoalsScreen::new(db)?;
     let mut log_entry = LogEntryScreen::new(db)?;
     let mut history = HistoryScreen::new(db)?;
     let mut trends = TrendsScreen::new(db)?;
@@ -42,6 +44,7 @@ fn run_app(
     loop {
         terminal.draw(|frame| match current_screen {
             Screen::Dashboard => dashboard.render(frame),
+            Screen::Goals => goals_screen.render(frame),
             Screen::LogEntry => log_entry.render(frame),
             Screen::History => history.render(frame),
             Screen::Trends => trends.render(frame),
@@ -55,6 +58,7 @@ fn run_app(
 
             let action = match current_screen {
                 Screen::Dashboard => dashboard.handle_key(key, db),
+                Screen::Goals => goals_screen.handle_key(key, db),
                 Screen::LogEntry => log_entry.handle_key(key, db),
                 Screen::History => history.handle_key(key, db),
                 Screen::Trends => {
@@ -70,6 +74,7 @@ fn run_app(
                 Action::Navigate(screen) => {
                     match &screen {
                         Screen::Dashboard => dashboard.refresh(db)?,
+                        Screen::Goals => goals_screen = GoalsScreen::new(db)?,
                         Screen::LogEntry => {
                             if current_screen == Screen::History {
                                 if let Some(entry) = history.selected_entry() {

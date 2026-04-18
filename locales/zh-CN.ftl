@@ -5,10 +5,30 @@ app-about = 记录你的训练
 # ── 热力图 ──
 heatmap-less = 少
 heatmap-more = 多
+heatmap-mon = 一
+heatmap-tue = 二
+heatmap-wed = 三
+heatmap-thu = 四
+heatmap-fri = 五
+heatmap-sat = 六
+heatmap-sun = 日
+heatmap-jan = 1月
+heatmap-feb = 2月
+heatmap-mar = 3月
+heatmap-apr = 4月
+heatmap-may = 5月
+heatmap-jun = 6月
+heatmap-jul = 7月
+heatmap-aug = 8月
+heatmap-sep = 9月
+heatmap-oct = 10月
+heatmap-nov = 11月
+heatmap-dec = 12月
 
 # ── 仪表盘 ──
 dashboard-title = iron
 dashboard-last-14-days = 最近 14 天
+dashboard-last-7-days = 最近 7 天
 dashboard-goals = 目标
 dashboard-quotes = 语录
 dashboard-no-quotes = 还没有语录 - 按 Q 添加
@@ -29,6 +49,9 @@ dashboard-hrv-label = HRV
 dashboard-hrv-edit-hint = [v] 编辑
 dashboard-hrv-record-hint = [v] 记录
 dashboard-hrv-input-hint = (0-100, Enter 保存, Esc 取消)
+
+# ── 目标 ──
+goals-title = 目标
 
 # ── 记录条目 ──
 log-select-practice = 选择练习项目
@@ -55,6 +78,9 @@ log-warmup-cooldown-title = 记录 { $name } — 热身与放松
 
 # ── 历史 ──
 history-title = 历史
+history-col-date = 日期
+history-col-practice = 练习
+history-col-volume = 量
 history-no-entries = 暂无记录
 history-entry = { $date }  { $name }  { $sets } 组  { $total } { $label }
 history-set-weighted = #{ $number }  { $weight }公斤 x { $reps }
@@ -76,6 +102,8 @@ trends-trend = 趋势：{ $sign }{ $value }%
 
 # ── 练习项目 ──
 practices-title = 练习项目
+practices-col-name = 名称
+practices-col-type = 类型
 practices-no-items = 还没有练习项目。按 'a' 添加。
 practices-new-name = 新练习名称：
 practices-select-type = 选择类型：
@@ -133,6 +161,7 @@ key-yes = 是
 key-no = 否
 key-hrv = HRV
 key-next = 下一步
+key-switch-field = 切换字段
 
 # ── 命令行 ──
 cli-export-about = 导出所有数据为 JSON
