@@ -547,7 +547,7 @@ dependencies = [
 
 [[package]]
 name = "ironcli"
-version = "0.2.42"
+version = "0.2.60"
 dependencies = [
  "anyhow",
  "chrono",

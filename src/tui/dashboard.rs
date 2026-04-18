@@ -8,7 +8,9 @@ use ratatui::{
 };
 
 use crate::db::{AggregateStats, Database};
+use crate::i18n::{tr, tr_args};
 use crate::model::{Goal, LogEntry, Quote};
+use fluent_bundle::FluentValue;
 use super::widgets::heatmap::Heatmap;
 use super::{highlight_row, Action, Screen};
 
@@ -115,7 +117,7 @@ impl DashboardScreen {
         let quote_box_width = area.width.saturating_sub(4).min(HEATMAP_CONTENT_WIDTH).saturating_sub(2) as usize;
         let (quote_text, quote_style) = if self.quote.is_empty() {
             (
-                "No quotes yet — press Q to add one".to_string(),
+                tr("dashboard-no-quotes"),
                 Style::default().fg(Color::DarkGray),
             )
         } else {
@@ -147,7 +149,7 @@ impl DashboardScreen {
 
         // ── Title bar ──
         let title = Line::from(vec![
-            Span::styled(" iron", Style::default().fg(ACCENT).bold()),
+            Span::styled(format!(" {}", tr("dashboard-title")), Style::default().fg(ACCENT).bold()),
             Span::styled(format!(" v{}", env!("CARGO_PKG_VERSION")), Style::default().fg(Color::Gray)),
         ]);
         frame.render_widget(Paragraph::new(title), chunks[0]);
@@ -207,54 +209,54 @@ impl DashboardScreen {
         let footer_spans = if self.mode == DashboardMode::Normal {
             vec![
                 Span::styled(" [l]", Style::default().fg(ACCENT)),
-                Span::styled(" Log  ", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-log")), Style::default().fg(Color::Gray)),
                 Span::styled("[h]", Style::default().fg(ACCENT)),
-                Span::styled(" History  ", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-history")), Style::default().fg(Color::Gray)),
                 Span::styled("[t]", Style::default().fg(ACCENT)),
-                Span::styled(" Trends  ", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-trends")), Style::default().fg(Color::Gray)),
                 Span::styled("[e]", Style::default().fg(ACCENT)),
-                Span::styled(" Practices  ", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-practices")), Style::default().fg(Color::Gray)),
                 Span::styled("[g]", Style::default().fg(ACCENT)),
-                Span::styled(" Goals  ", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-goals")), Style::default().fg(Color::Gray)),
                 Span::styled("[Q]", Style::default().fg(ACCENT)),
-                Span::styled(" Quotes  ", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-quotes")), Style::default().fg(Color::Gray)),
                 Span::styled("[q]", Style::default().fg(ACCENT)),
-                Span::styled(" Quit", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}", tr("key-quit")), Style::default().fg(Color::Gray)),
             ]
         } else if self.mode == DashboardMode::QuotesManage {
             vec![
                 Span::styled(" [a]", Style::default().fg(ACCENT)),
-                Span::styled(" Add  ", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-add")), Style::default().fg(Color::Gray)),
                 Span::styled("[e]", Style::default().fg(ACCENT)),
-                Span::styled(" Edit  ", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::Gray)),
                 Span::styled("[d]", Style::default().fg(ACCENT)),
-                Span::styled(" Delete  ", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::Gray)),
                 Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(" Close", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}", tr("key-close")), Style::default().fg(Color::Gray)),
             ]
         } else if self.mode == DashboardMode::Goals {
             vec![
                 Span::styled(" [a]", Style::default().fg(ACCENT)),
-                Span::styled(" Add goal  ", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-add-goal")), Style::default().fg(Color::Gray)),
                 Span::styled("[m]", Style::default().fg(ACCENT)),
-                Span::styled(" Milestone  ", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-milestone")), Style::default().fg(Color::Gray)),
                 Span::styled("[Enter]", Style::default().fg(ACCENT)),
-                Span::styled(" Edit  ", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::Gray)),
                 Span::styled("[Space]", Style::default().fg(ACCENT)),
-                Span::styled(" Toggle  ", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-toggle")), Style::default().fg(Color::Gray)),
                 Span::styled("[d]", Style::default().fg(ACCENT)),
-                Span::styled(" Delete  ", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::Gray)),
                 Span::styled("[D]", Style::default().fg(ACCENT)),
-                Span::styled(" Date  ", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-date")), Style::default().fg(Color::Gray)),
                 Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(" Back", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::Gray)),
             ]
         } else {
             vec![
                 Span::styled(" [Enter]", Style::default().fg(ACCENT)),
-                Span::styled(" Confirm  ", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-confirm")), Style::default().fg(Color::Gray)),
                 Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(" Cancel", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::Gray)),
             ]
         };
         let footer = Line::from(footer_spans);
@@ -268,7 +270,7 @@ impl DashboardScreen {
 
     fn render_recent_pane(&self, frame: &mut Frame, area: Rect) {
         let block = Block::default()
-            .title(Span::styled("Last 14 Days", Style::default().fg(Color::White).bold()))
+            .title(Span::styled(tr("dashboard-last-14-days"), Style::default().fg(Color::White).bold()))
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::DarkGray));
 
@@ -280,34 +282,38 @@ impl DashboardScreen {
         // Summary line
         let mut parts: Vec<Span> = Vec::new();
         parts.push(Span::styled(
-            format!("{} sessions", self.stats.sessions),
+            tr_args("dashboard-sessions", &[("count", FluentValue::from(self.stats.sessions))]),
             Style::default().fg(GREEN),
         ));
         if self.stats.total_volume > 0.0 {
             parts.push(Span::styled(" · ", Style::default().fg(Color::DarkGray)));
+            let formatted = format!("{:.0}", self.stats.total_volume);
             parts.push(Span::styled(
-                format!("{:.0} kg", self.stats.total_volume),
+                tr_args("dashboard-total-volume", &[("value", FluentValue::from(formatted))]),
                 Style::default().fg(GREEN),
             ));
         }
         if self.stats.total_reps > 0.0 {
             parts.push(Span::styled(" · ", Style::default().fg(Color::DarkGray)));
+            let formatted = format!("{:.0}", self.stats.total_reps);
             parts.push(Span::styled(
-                format!("{:.0} reps", self.stats.total_reps),
+                tr_args("dashboard-total-reps", &[("value", FluentValue::from(formatted))]),
                 Style::default().fg(GREEN),
             ));
         }
         if self.stats.total_distance > 0.0 {
             parts.push(Span::styled(" · ", Style::default().fg(Color::DarkGray)));
+            let formatted = format!("{:.1}", self.stats.total_distance);
             parts.push(Span::styled(
-                format!("{:.1} km", self.stats.total_distance),
+                tr_args("dashboard-total-distance", &[("value", FluentValue::from(formatted))]),
                 Style::default().fg(GREEN),
             ));
         }
         if self.stats.total_duration > 0.0 {
             parts.push(Span::styled(" · ", Style::default().fg(Color::DarkGray)));
+            let formatted = format!("{:.0}", self.stats.total_duration);
             parts.push(Span::styled(
-                format!("{:.0} min", self.stats.total_duration),
+                tr_args("dashboard-total-duration", &[("value", FluentValue::from(formatted))]),
                 Style::default().fg(GREEN),
             ));
         }
@@ -323,20 +329,25 @@ impl DashboardScreen {
         // Entry list
         if self.recent_entries.is_empty() {
             lines.push(Line::from(Span::styled(
-                "No entries in the last 14 days",
+                tr("dashboard-no-entries"),
                 Style::default().fg(Color::Gray),
             )));
         } else {
             for entry in &self.recent_entries {
                 let date = entry.log.logged_at.format("%b %d").to_string();
                 let sets_count = entry.sets.len();
-                let total = entry.total_metric();
+                let total = format!("{:.0}", entry.total_metric());
                 let label = entry.metric_label();
+                let sets_text = tr_args("dashboard-sets-metric", &[
+                    ("sets", FluentValue::from(sets_count)),
+                    ("total", FluentValue::from(total)),
+                    ("label", FluentValue::from(label)),
+                ]);
                 lines.push(Line::from(vec![
                     Span::styled(format!("{} ", date), Style::default().fg(Color::Gray)),
                     Span::styled(&entry.practice_name, Style::default().fg(GREEN)),
                     Span::styled(
-                        format!("  {} sets, {:.0} {}", sets_count, total, label),
+                        format!("  {}", sets_text),
                         Style::default().fg(Color::Gray),
                     ),
                 ]));
@@ -419,7 +430,7 @@ impl DashboardScreen {
         };
 
         let block = Block::default()
-            .title(Span::styled("Goals", Style::default().fg(Color::White).bold()))
+            .title(Span::styled(tr("dashboard-goals"), Style::default().fg(Color::White).bold()))
             .borders(Borders::ALL)
             .border_style(Style::default().fg(border_color));
 
@@ -428,7 +439,7 @@ impl DashboardScreen {
 
         if self.goals.is_empty() && self.mode == DashboardMode::Normal {
             let hint = Paragraph::new(Line::from(Span::styled(
-                "Press [g] to add goals",
+                tr("dashboard-press-g"),
                 Style::default().fg(Color::Gray),
             )));
             frame.render_widget(hint, inner);
@@ -482,7 +493,7 @@ impl DashboardScreen {
                     Style::default().fg(GREEN),
                 )));
                 lines.push(Line::from(vec![
-                    Span::styled("  Date (YYYY-MM-DD): ", Style::default().fg(ACCENT)),
+                    Span::styled(format!("  {} ", tr("dashboard-date-prompt")), Style::default().fg(ACCENT)),
                     Span::styled(&self.goal_input[..self.goal_cursor], Style::default().fg(GREEN)),
                     Span::styled("█", Style::default().fg(GREEN)),
                     Span::styled(&self.goal_input[self.goal_cursor..], Style::default().fg(GREEN)),
@@ -504,7 +515,7 @@ impl DashboardScreen {
             }
             if is_selected && self.mode == DashboardMode::ConfirmDelete {
                 lines.push(Line::from(Span::styled(
-                    "  Delete? (y/n)",
+                    format!("  {}", tr("dashboard-delete-confirm")),
                     Style::default().fg(Color::Red),
                 )));
             }
@@ -530,7 +541,7 @@ impl DashboardScreen {
                         Style::default().fg(GREEN),
                     )));
                     lines.push(Line::from(vec![
-                        Span::styled("    Date (YYYY-MM-DD): ", Style::default().fg(ACCENT)),
+                        Span::styled(format!("    {} ", tr("dashboard-date-prompt")), Style::default().fg(ACCENT)),
                         Span::styled(&self.goal_input[..self.goal_cursor], Style::default().fg(GREEN)),
                         Span::styled("█", Style::default().fg(GREEN)),
                         Span::styled(&self.goal_input[self.goal_cursor..], Style::default().fg(GREEN)),
@@ -558,7 +569,7 @@ impl DashboardScreen {
                 }
                 if is_ms_selected && self.mode == DashboardMode::ConfirmDelete {
                     lines.push(Line::from(Span::styled(
-                        "    Delete? (y/n)",
+                        format!("    {}", tr("dashboard-delete-confirm")),
                         Style::default().fg(Color::Red),
                     )));
                 }
@@ -583,7 +594,7 @@ impl DashboardScreen {
 
         if self.goals.is_empty() && self.mode == DashboardMode::Goals {
             lines.push(Line::from(Span::styled(
-                "Press [a] to add a goal",
+                tr("dashboard-press-a-goal"),
                 Style::default().fg(Color::Gray),
             )));
         }
@@ -638,7 +649,7 @@ impl DashboardScreen {
 
         frame.render_widget(Clear, modal_rect);
 
-        let title = format!(" Quotes ({}) ", self.quotes.len());
+        let title = format!(" {} ", tr_args("dashboard-quotes-count", &[("count", FluentValue::from(self.quotes.len()))]));
         let block = Block::default()
             .title(Span::styled(title, Style::default().fg(Color::White).bold()))
             .borders(Borders::ALL)
@@ -656,7 +667,7 @@ impl DashboardScreen {
         let mut lines: Vec<Line> = Vec::new();
         if self.quotes.is_empty() {
             lines.push(Line::from(Span::styled(
-                "No quotes — press [a] to add one",
+                tr("dashboard-no-quotes-modal"),
                 Style::default().fg(Color::DarkGray),
             )));
         } else {
@@ -704,13 +715,13 @@ impl DashboardScreen {
         } else {
             let shortcuts = Line::from(vec![
                 Span::styled("[a]", Style::default().fg(ACCENT)),
-                Span::styled(" add  ", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-add")), Style::default().fg(Color::Gray)),
                 Span::styled("[e]", Style::default().fg(ACCENT)),
-                Span::styled(" edit  ", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::Gray)),
                 Span::styled("[d]", Style::default().fg(ACCENT)),
-                Span::styled(" delete  ", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::Gray)),
                 Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(" close", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}", tr("key-close")), Style::default().fg(Color::Gray)),
             ]);
             frame.render_widget(Paragraph::new(shortcuts), inner_chunks[1]);
         }

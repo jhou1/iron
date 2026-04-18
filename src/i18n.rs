@@ -42,6 +42,11 @@ fn detect_locale() -> String {
 
 pub fn tr(key: &str) -> String {
     BUNDLE.with(|b| {
+        // Auto-initialize if not yet initialized for this thread
+        if b.borrow().is_none() {
+            drop(b.borrow());
+            init();
+        }
         let borrow = b.borrow();
         let i18n = match borrow.as_ref() {
             Some(i) => i,
@@ -62,6 +67,11 @@ pub fn tr(key: &str) -> String {
 
 pub fn tr_args(key: &str, args: &[(&str, FluentValue)]) -> String {
     BUNDLE.with(|b| {
+        // Auto-initialize if not yet initialized for this thread
+        if b.borrow().is_none() {
+            drop(b.borrow());
+            init();
+        }
         let borrow = b.borrow();
         let i18n = match borrow.as_ref() {
             Some(i) => i,
