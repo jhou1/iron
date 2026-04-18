@@ -49,7 +49,7 @@ impl DashboardScreen {
         let recent_entries = db.list_logs_recent(7)?;
         let stats = db.aggregate_stats(7)?;
         let quotes = db.list_quotes()?;
-        let quote = super::quotes::pick_daily_quote(&quotes);
+        let quote = super::quotes::pick_random_quote(&quotes);
         let goals = db.list_goals()?;
         let today = chrono::Local::now().format("%Y-%m-%d").to_string();
         let hrv_today = db.get_daily_hrv(&today)?;
@@ -75,7 +75,7 @@ impl DashboardScreen {
         self.recent_entries = db.list_logs_recent(7)?;
         self.stats = db.aggregate_stats(7)?;
         self.quotes = db.list_quotes()?;
-        self.quote = super::quotes::pick_daily_quote(&self.quotes);
+        self.quote = super::quotes::pick_random_quote(&self.quotes);
         self.goals = db.list_goals()?;
         let today = chrono::Local::now().format("%Y-%m-%d").to_string();
         self.hrv_today = db.get_daily_hrv(&today)?;
@@ -367,7 +367,7 @@ impl DashboardScreen {
 
     fn reload_quotes(&mut self, db: &Database) -> anyhow::Result<()> {
         self.quotes = db.list_quotes()?;
-        self.quote = super::quotes::pick_daily_quote(&self.quotes);
+        self.quote = super::quotes::pick_random_quote(&self.quotes);
         Ok(())
     }
 
