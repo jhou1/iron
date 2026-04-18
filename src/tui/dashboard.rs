@@ -85,11 +85,9 @@ impl DashboardScreen {
     pub fn render(&self, frame: &mut Frame) {
         let area = frame.area();
 
-        // Pane height adapts to content
-        let goals_lines: u16 = self.goals.iter()
-            .map(|g| 1 + g.milestones.len() as u16)
-            .sum::<u16>()
-            .max(1);
+        // Pane height adapts to content — each active goal = 2 lines (title + gauge)
+        let active_goal_count = self.goals.iter().filter(|g| !g.completed).count() as u16;
+        let goals_lines: u16 = (active_goal_count * 2).max(1);
         let pane_height = (self.recent_entries.len() as u16 + 4)
             .max(goals_lines + 2)
             .max(7);
@@ -401,6 +399,7 @@ impl DashboardScreen {
                 Span::styled("\u{231b} ", Style::default().fg(Color::Yellow)),
                 Span::styled(&goal.title, Style::default().fg(GREEN)),
             ]));
+            lines.push(dashboard_gauge_line(goal));
         }
 
         frame.render_widget(Paragraph::new(lines), inner);
@@ -717,4 +716,24 @@ impl DashboardScreen {
         }
     }
 
+}
+
+fn dashboard_gauge_line(goal: &Goal) -> Line<'static> {
+    const BAR_WIDTH: usize = 12;
+    let milestones = &goal.milestones;
+    let ratio = if milestones.is_empty() {
+        if goal.completed { 1.0 } else { 0.0 }
+    } else {
+        milestones.iter().filter(|m| m.completed).count() as f64 / milestones.len() as f64
+    };
+    let done = milestones.iter().filter(|m| m.completed).count();
+    let total = milestones.len();
+    let filled = (ratio * BAR_WIDTH as f64).round() as usize;
+    let empty = BAR_WIDTH - filled;
+    Line::from(vec![
+        Span::raw("    "),
+        Span::styled("█".repeat(filled), Style::default().fg(Color::Green)),
+        Span::styled("░".repeat(empty), Style::default().fg(Color::DarkGray)),
+        Span::styled(format!("  {}/{}", done, total), Style::default().fg(Color::Gray)),
+    ])
 }

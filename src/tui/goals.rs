@@ -3,7 +3,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Paragraph, Wrap},
+    widgets::{LineGauge, Paragraph, Wrap},
     Frame,
 };
 
@@ -15,6 +15,19 @@ use super::{highlight_row, Action, Screen};
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
 const CONTENT_WIDTH: u16 = 3 + 52 * 2;
+
+fn goal_gauge_ratio(goal: &Goal) -> f64 {
+    if goal.milestones.is_empty() {
+        return if goal.completed { 1.0 } else { 0.0 };
+    }
+    let done = goal.milestones.iter().filter(|m| m.completed).count();
+    done as f64 / goal.milestones.len() as f64
+}
+
+fn goal_gauge_label(goal: &Goal) -> String {
+    let done = goal.milestones.iter().filter(|m| m.completed).count();
+    format!("{}/{}", done, goal.milestones.len())
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Mode {
@@ -273,6 +286,7 @@ impl GoalsScreen {
                     Span::styled("✓ ", Style::default().fg(GREEN)),
                     Span::styled(format!("{}{}", goal.title, date_str), style),
                 ]));
+                lines.push(render_gauge_line(goal, Color::DarkGray));
             } else {
                 let marker = if is_selected { "» " } else { "  " };
                 let style = if is_selected {
@@ -285,6 +299,7 @@ impl GoalsScreen {
                     Span::styled("⏳ ", Style::default().fg(Color::Yellow)),
                     Span::styled(&goal.title, style),
                 ]));
+                lines.push(render_gauge_line(goal, GREEN));
             }
 
             if is_selected && self.mode == Mode::ConfirmDelete {
@@ -685,4 +700,18 @@ impl GoalsScreen {
             }
         }
     }
+}
+
+fn render_gauge_line(goal: &Goal, fill_color: Color) -> Line<'static> {
+    const BAR_WIDTH: usize = 16;
+    let ratio = goal_gauge_ratio(goal);
+    let filled = (ratio * BAR_WIDTH as f64).round() as usize;
+    let empty = BAR_WIDTH - filled;
+    let label = goal_gauge_label(goal);
+    Line::from(vec![
+        Span::raw("    "),
+        Span::styled("█".repeat(filled), Style::default().fg(fill_color)),
+        Span::styled("░".repeat(empty), Style::default().fg(Color::DarkGray)),
+        Span::styled(format!("  {}", label), Style::default().fg(Color::Gray)),
+    ])
 }
