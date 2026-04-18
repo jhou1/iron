@@ -8,8 +8,10 @@ use ratatui::{
 };
 
 use crate::db::Database;
+use crate::i18n::{tr, tr_args};
 use crate::model::{Practice, PracticeType};
 use super::{highlight_row, Action, Screen};
+use fluent_bundle::FluentValue;
 
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
@@ -86,14 +88,14 @@ impl PracticesScreen {
 
         // ── Title ──
         let title = Line::from(vec![
-            Span::styled(" Practices", Style::default().fg(ACCENT).add_modifier(Modifier::BOLD)),
+            Span::styled(tr("practices-title"), Style::default().fg(ACCENT).add_modifier(Modifier::BOLD)),
         ]);
         frame.render_widget(Paragraph::new(title), chunks[0]);
 
         // ── Practice list ──
         let list_lines: Vec<Line> = if self.practices.is_empty() {
             vec![Line::from(Span::styled(
-                "  No practices yet. Press 'a' to add one.",
+                tr("practices-no-items"),
                 Style::default().fg(Color::Gray),
             ))]
         } else {
@@ -137,7 +139,7 @@ impl PracticesScreen {
             Mode::AddName => {
                 vec![
                     Line::from(Span::styled(
-                        " New practice name:",
+                        tr("practices-new-name"),
                         Style::default().fg(Color::White),
                     )),
                     Line::from(vec![
@@ -152,7 +154,7 @@ impl PracticesScreen {
             }
             Mode::AddType => {
                 let mut lines: Vec<Line> = vec![Line::from(Span::styled(
-                    " Select type:",
+                    tr("practices-select-type"),
                     Style::default().fg(Color::White),
                 ))];
                 for (i, pt) in PracticeType::ALL.iter().enumerate() {
@@ -173,7 +175,7 @@ impl PracticesScreen {
             Mode::EditName => {
                 vec![
                     Line::from(Span::styled(
-                        " Rename practice:",
+                        tr("practices-rename"),
                         Style::default().fg(Color::White),
                     )),
                     Line::from(vec![
@@ -194,11 +196,11 @@ impl PracticesScreen {
                     .unwrap_or("?");
                 vec![
                     Line::from(Span::styled(
-                        format!(" Delete {}?", name),
+                        tr_args("practices-delete-confirm", &[("name", FluentValue::from(name.to_string()))]),
                         Style::default().fg(RED),
                     )),
                     Line::from(Span::styled(
-                        " This removes all its logs.",
+                        tr("practices-delete-warning"),
                         Style::default().fg(RED),
                     )),
                     Line::from(""),
@@ -216,35 +218,35 @@ impl PracticesScreen {
         let shortcuts = match &self.mode {
             Mode::Browse => Line::from(vec![
                 Span::styled(" [j/k]", Style::default().fg(ACCENT)),
-                Span::styled(" Navigate  ", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-navigate")), Style::default().fg(Color::Gray)),
                 Span::styled("[a]", Style::default().fg(ACCENT)),
-                Span::styled(" Add  ", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-add")), Style::default().fg(Color::Gray)),
                 Span::styled("[Enter]", Style::default().fg(ACCENT)),
-                Span::styled(" Edit  ", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::Gray)),
                 Span::styled("[d]", Style::default().fg(ACCENT)),
-                Span::styled(" Delete  ", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::Gray)),
                 Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(" Back", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::Gray)),
             ]),
             Mode::AddName | Mode::EditName => Line::from(vec![
                 Span::styled(" [Enter]", Style::default().fg(ACCENT)),
-                Span::styled(" Confirm  ", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-confirm")), Style::default().fg(Color::Gray)),
                 Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(" Cancel", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::Gray)),
             ]),
             Mode::AddType => Line::from(vec![
                 Span::styled(" [j/k]", Style::default().fg(ACCENT)),
-                Span::styled(" Select  ", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-select")), Style::default().fg(Color::Gray)),
                 Span::styled("[Enter]", Style::default().fg(ACCENT)),
-                Span::styled(" Confirm  ", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-confirm")), Style::default().fg(Color::Gray)),
                 Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(" Cancel", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::Gray)),
             ]),
             Mode::ConfirmDelete => Line::from(vec![
                 Span::styled(" [y]", Style::default().fg(ACCENT)),
-                Span::styled(" Yes  ", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::Gray)),
                 Span::styled("[n]", Style::default().fg(ACCENT)),
-                Span::styled(" No", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}", tr("key-no")), Style::default().fg(Color::Gray)),
             ]),
         };
         frame.render_widget(Paragraph::new(vec![shortcuts]), chunks[3]);
