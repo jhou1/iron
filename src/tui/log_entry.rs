@@ -10,7 +10,7 @@ use ratatui::{
 
 use crate::db::Database;
 use crate::model::{LogEntry, Practice, PracticeType, SetData};
-use super::{Action, Screen};
+use super::{highlight_row, Action, Screen};
 
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
@@ -184,6 +184,10 @@ impl LogEntryScreen {
             .collect();
         let list = Paragraph::new(lines);
         frame.render_widget(list, chunks[2]);
+
+        if !self.filtered_indices.is_empty() {
+            highlight_row(frame, chunks[2], self.selected as u16);
+        }
 
         // Footer
         let footer = Line::from(vec![

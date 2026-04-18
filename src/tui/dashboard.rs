@@ -10,7 +10,7 @@ use ratatui::{
 use crate::db::{AggregateStats, Database};
 use crate::model::{Goal, LogEntry, Quote};
 use super::widgets::heatmap::Heatmap;
-use super::{Action, Screen};
+use super::{highlight_row, Action, Screen};
 
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
@@ -445,6 +445,7 @@ impl DashboardScreen {
                 | DashboardMode::EditDate
                 | DashboardMode::ConfirmDelete
         );
+        let mut sel_line_idx: Option<usize> = None;
 
         // AddGoal input at top so it's always visible
         if self.mode == DashboardMode::AddGoal {
@@ -465,6 +466,9 @@ impl DashboardScreen {
                 Style::default().fg(Color::White).bold()
             };
 
+            if is_selected {
+                sel_line_idx = Some(lines.len());
+            }
             if is_selected && self.mode == DashboardMode::EditItem {
                 lines.push(Line::from(vec![
                     Span::styled("▸ ", style),
@@ -509,6 +513,9 @@ impl DashboardScreen {
             for ms in &goal.milestones {
                 let is_ms_selected = in_goals_mode && idx == self.goal_selected;
 
+                if is_ms_selected {
+                    sel_line_idx = Some(lines.len());
+                }
                 if is_ms_selected && self.mode == DashboardMode::EditItem {
                     let check = if ms.completed { "☑ " } else { "☐ " };
                     lines.push(Line::from(vec![
@@ -586,12 +593,37 @@ impl DashboardScreen {
             )));
         }
 
+        let sel_visual = sel_line_idx.map(|idx| {
+            let w = inner.width;
+            let mut visual_row = 0u16;
+            for (i, line) in lines.iter().enumerate() {
+                if i == idx {
+                    break;
+                }
+                let lw = line.width() as u16;
+                visual_row += if w > 0 && lw > 0 { lw.div_ceil(w) } else { 1 };
+            }
+            let sel_w = lines[idx].width() as u16;
+            let sel_rows = if w > 0 && sel_w > 0 { sel_w.div_ceil(w) } else { 1 };
+            (visual_row, sel_rows)
+        });
+
         frame.render_widget(
             Paragraph::new(lines)
                 .wrap(Wrap { trim: false })
                 .scroll((self.goal_scroll as u16, 0)),
             inner,
         );
+
+        if let Some((visual_row, sel_rows)) = sel_visual {
+            let scroll = self.goal_scroll as u16;
+            for r in 0..sel_rows {
+                let abs_row = visual_row + r;
+                if abs_row >= scroll && abs_row < scroll + inner.height {
+                    highlight_row(frame, inner, abs_row - scroll);
+                }
+            }
+        }
     }
 
     fn render_quotes_modal(&self, frame: &mut Frame) {
@@ -660,6 +692,11 @@ impl DashboardScreen {
             Paragraph::new(lines).scroll((scroll, 0)),
             inner_chunks[0],
         );
+
+        if !self.quotes.is_empty() {
+            let visible_row = self.quotes_selected.saturating_sub(scroll as usize);
+            highlight_row(frame, inner_chunks[0], visible_row as u16);
+        }
 
         if self.mode == DashboardMode::QuotesEdit {
             let input_line = Line::from(vec![

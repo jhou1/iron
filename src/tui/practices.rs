@@ -9,7 +9,7 @@ use ratatui::{
 
 use crate::db::Database;
 use crate::model::{Practice, PracticeType};
-use super::{Action, Screen};
+use super::{highlight_row, Action, Screen};
 
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
@@ -120,6 +120,10 @@ impl PracticesScreen {
         };
         frame.render_widget(Paragraph::new(list_lines), chunks[1]);
 
+        if !self.practices.is_empty() {
+            highlight_row(frame, chunks[1], self.selected as u16);
+        }
+
         // ── Input/action area ──
         let action_lines = match &self.mode {
             Mode::Browse => {
@@ -203,6 +207,10 @@ impl PracticesScreen {
             }
         };
         frame.render_widget(Paragraph::new(action_lines), chunks[2]);
+
+        if self.mode == Mode::AddType {
+            highlight_row(frame, chunks[2], (self.type_selected + 1) as u16);
+        }
 
         // ── Shortcuts ──
         let shortcuts = match &self.mode {

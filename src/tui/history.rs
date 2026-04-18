@@ -9,7 +9,7 @@ use ratatui::{
 
 use crate::db::Database;
 use crate::model::{LogEntry, SetData};
-use super::{Action, Screen};
+use super::{highlight_row, Action, Screen};
 
 const GREEN: Color = Color::Green;
 const ACCENT: Color = Color::Cyan;
@@ -156,6 +156,11 @@ impl HistoryScreen {
             .collect();
 
         frame.render_widget(Paragraph::new(lines), area);
+
+        if !self.entries.is_empty() && self.selected >= self.scroll_offset {
+            let row = (self.selected - self.scroll_offset) as u16;
+            highlight_row(frame, area, row);
+        }
     }
 
     fn render_detail(&self, frame: &mut Frame, area: ratatui::layout::Rect) {
