@@ -3,7 +3,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::Paragraph,
+    widgets::{Block, Borders, Paragraph},
     Frame,
 };
 
@@ -18,7 +18,6 @@ use fluent_bundle::FluentValue;
 const GREEN: Color = Color::Green;
 const ACCENT: Color = Color::Cyan;
 const NOTE_COLOR: Color = Color::Yellow;
-const CONTENT_WIDTH: u16 = 3 + 52 * 2;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Mode {
@@ -54,29 +53,35 @@ impl HistoryScreen {
         let area = Rect {
             x: full.x + 1,
             y: full.y,
-            width: full.width.saturating_sub(2).min(CONTENT_WIDTH),
+            width: full.width.saturating_sub(2),
             height: full.height,
         };
 
-        // Vertical layout: title | list | detail | shortcuts | spacer
-        let list_height = (self.entries.len() as u16).max(1);
-        let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(2),           // title
-                Constraint::Length(list_height), // scrollable list
-                Constraint::Length(6),           // detail pane
-                Constraint::Length(1),           // shortcuts
-                Constraint::Min(0),              // spacer
-            ])
-            .split(area);
-
-        // ── Title + column headers ──
         let max_name_len = self.entries.iter()
             .map(|e| e.practice_name.width())
             .max()
             .unwrap_or(0);
         let name_col = max_name_len + 2;
+        let list_width = (3 + 13 + 2 + name_col + 16) as u16;
+
+        // Horizontal split: list (left) | detail panel (right)
+        let h_chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(list_width),
+                Constraint::Min(20),
+            ])
+            .split(area);
+
+        // ── Left: title + list + shortcuts ──
+        let left_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(2),  // title + column headers
+                Constraint::Min(1),    // scrollable list
+                Constraint::Length(1), // shortcuts
+            ])
+            .split(h_chunks[0]);
 
         let date_header = tr("history-col-date");
         let practice_header = tr("history-col-practice");
@@ -96,17 +101,12 @@ impl HistoryScreen {
                 Span::styled(&volume_header, Style::default().fg(Color::DarkGray)),
             ]),
         ];
-        frame.render_widget(Paragraph::new(title_lines), chunks[0]);
+        frame.render_widget(Paragraph::new(title_lines), left_chunks[0]);
 
-        // ── List pane ──
-        let list_height = chunks[1].height as usize;
+        let list_height = left_chunks[1].height as usize;
         self.adjust_scroll(list_height);
-        self.render_list(frame, chunks[1], list_height, name_col);
+        self.render_list(frame, left_chunks[1], list_height, name_col);
 
-        // ── Detail pane ──
-        self.render_detail(frame, chunks[2]);
-
-        // ── Shortcuts ──
         let shortcuts = {
             let navigate_text = format!(" {}  ", tr("key-navigate"));
             let edit_text = format!(" {}  ", tr("key-edit"));
@@ -123,7 +123,10 @@ impl HistoryScreen {
                 Span::styled(back_text, Style::default().fg(Color::Gray)),
             ])
         };
-        frame.render_widget(Paragraph::new(shortcuts), chunks[3]);
+        frame.render_widget(Paragraph::new(shortcuts), left_chunks[2]);
+
+        // ── Right: detail panel ──
+        self.render_detail(frame, h_chunks[1]);
     }
 
     /// Adjusts scroll_offset so the selected item is visible within the given height.
@@ -153,7 +156,7 @@ impl HistoryScreen {
         let mut lines: Vec<Line> = Vec::new();
         for (i, entry) in self.entries.iter().enumerate().skip(self.scroll_offset).take(visible) {
             let marker = if i == self.selected { " > " } else { "   " };
-            let date = entry.log.logged_at.format("%b %d").to_string();
+            let date = entry.log.logged_at.format("%Y %b %d").to_string();
             let total = format!("{:.0}", entry.total_metric());
             let label = entry.metric_label();
             let name_padding = name_col.saturating_sub(entry.practice_name.width());
@@ -196,34 +199,46 @@ impl HistoryScreen {
 
     fn render_detail(&self, frame: &mut Frame, area: ratatui::layout::Rect) {
         let Some(entry) = self.selected_entry() else {
+            let block = Block::default()
+                .borders(Borders::LEFT)
+                .border_style(Style::default().fg(Color::DarkGray));
+            frame.render_widget(block, area);
             return;
         };
 
+        let title = format!(" {} — {} ", entry.practice_name,
+            entry.log.logged_at.format("%Y %b %d"));
+        let block = Block::default()
+            .title(Span::styled(title, Style::default().fg(ACCENT)))
+            .borders(Borders::LEFT)
+            .border_style(Style::default().fg(Color::DarkGray));
+
         let mut lines: Vec<Line> = Vec::new();
+        lines.push(Line::from(""));
 
         for set in &entry.sets {
             let detail = match &set.data {
                 SetData::Weighted { weight, reps } => {
-                    format!("    {}", tr_args("history-set-weighted", &[
+                    format!("  {}", tr_args("history-set-weighted", &[
                         ("number", FluentValue::from(set.set_number as f64)),
                         ("weight", FluentValue::from(*weight)),
                         ("reps", FluentValue::from(*reps as f64)),
                     ]))
                 }
                 SetData::Bodyweight { reps } => {
-                    format!("    {}", tr_args("history-set-bodyweight", &[
+                    format!("  {}", tr_args("history-set-bodyweight", &[
                         ("number", FluentValue::from(set.set_number as f64)),
                         ("reps", FluentValue::from(*reps as f64)),
                     ]))
                 }
                 SetData::Distance { distance } => {
-                    format!("    {}", tr_args("history-set-distance", &[
+                    format!("  {}", tr_args("history-set-distance", &[
                         ("number", FluentValue::from(set.set_number as f64)),
                         ("distance", FluentValue::from(*distance)),
                     ]))
                 }
                 SetData::Endurance { duration } => {
-                    format!("    {}", tr_args("history-set-endurance", &[
+                    format!("  {}", tr_args("history-set-endurance", &[
                         ("number", FluentValue::from(set.set_number as f64)),
                         ("duration", FluentValue::from(*duration as f64)),
                     ]))
@@ -231,13 +246,14 @@ impl HistoryScreen {
             };
             lines.push(Line::from(Span::styled(
                 detail,
-                Style::default().fg(Color::Gray),
+                Style::default().fg(Color::White),
             )));
         }
 
         if let Some(warm_up) = &entry.log.warm_up {
+            lines.push(Line::from(""));
             lines.push(Line::from(Span::styled(
-                format!("    {}", tr_args("history-warmup", &[
+                format!("  {}", tr_args("history-warmup", &[
                     ("text", FluentValue::from(warm_up.clone())),
                 ])),
                 Style::default().fg(Color::Gray),
@@ -246,7 +262,7 @@ impl HistoryScreen {
 
         if let Some(cool_down) = &entry.log.cool_down {
             lines.push(Line::from(Span::styled(
-                format!("    {}", tr_args("history-cooldown", &[
+                format!("  {}", tr_args("history-cooldown", &[
                     ("text", FluentValue::from(cool_down.clone())),
                 ])),
                 Style::default().fg(Color::Gray),
@@ -254,15 +270,17 @@ impl HistoryScreen {
         }
 
         if let Some(note) = &entry.log.note {
+            lines.push(Line::from(""));
             lines.push(Line::from(Span::styled(
-                format!("    {}", tr_args("history-note", &[
+                format!("  {}", tr_args("history-note", &[
                     ("note", FluentValue::from(note.clone())),
                 ])),
                 Style::default().fg(NOTE_COLOR),
             )));
         }
 
-        frame.render_widget(Paragraph::new(lines), area);
+        let paragraph = Paragraph::new(lines).block(block);
+        frame.render_widget(paragraph, area);
     }
 
     pub fn handle_key(&mut self, key: KeyEvent, db: &Database) -> Action {
