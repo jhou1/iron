@@ -41,6 +41,26 @@ Or install directly via Cargo:
 cargo install --path .
 ```
 
+## Language / i18n
+
+IronCLI supports multiple languages with automatic detection from environment variables.
+
+**Supported languages:**
+- English (default)
+- Chinese (Simplified)
+
+The app automatically detects your language from the `LANG` or `LC_ALL` environment variables. All UI text and CLI messages are translated.
+
+To run in a specific language:
+
+```bash
+# Run in English
+iron
+
+# Run in Chinese (Simplified)
+LANG=zh_CN.UTF-8 iron
+```
+
 ## Usage
 
 Launch the app:
