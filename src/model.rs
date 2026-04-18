@@ -21,12 +21,13 @@ impl PracticeType {
     ];
 
     /// Human-friendly label shown in the UI when selecting a practice type.
-    pub fn label(&self) -> &'static str {
+    pub fn label(&self) -> String {
+        use crate::i18n::tr;
         match self {
-            PracticeType::Weighted => "weightxreps",
-            PracticeType::Bodyweight => "reps",
-            PracticeType::Distance => "distance",
-            PracticeType::Endurance => "duration",
+            PracticeType::Weighted => tr("practice-type-weighted"),
+            PracticeType::Bodyweight => tr("practice-type-bodyweight"),
+            PracticeType::Distance => tr("practice-type-distance"),
+            PracticeType::Endurance => tr("practice-type-endurance"),
         }
     }
 }
@@ -98,12 +99,13 @@ impl SetData {
         }
     }
 
-    pub fn metric_label(&self) -> &'static str {
+    pub fn metric_label(&self) -> String {
+        use crate::i18n::tr;
         match self {
-            SetData::Weighted { .. } => "kg vol",
-            SetData::Bodyweight { .. } => "reps",
-            SetData::Distance { .. } => "km",
-            SetData::Endurance { .. } => "min",
+            SetData::Weighted { .. } => tr("metric-kg-vol"),
+            SetData::Bodyweight { .. } => tr("metric-reps"),
+            SetData::Distance { .. } => tr("metric-km"),
+            SetData::Endurance { .. } => tr("metric-min"),
         }
     }
 }
@@ -122,11 +124,11 @@ impl LogEntry {
         self.sets.iter().map(|s| s.data.metric_value()).sum()
     }
 
-    pub fn metric_label(&self) -> &'static str {
+    pub fn metric_label(&self) -> String {
         self.sets
             .first()
             .map(|s| s.data.metric_label())
-            .unwrap_or("—")
+            .unwrap_or_else(|| "—".to_string())
     }
 }
 

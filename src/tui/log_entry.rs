@@ -663,7 +663,7 @@ impl LogEntryScreen {
             .sets
             .first()
             .map(|s| s.metric_label())
-            .unwrap_or("units");
+            .unwrap_or_else(|| "units".to_string());
         let summary_lines = vec![
             Line::from(vec![
                 Span::styled("  Date: ", Style::default().fg(Color::Gray)),
@@ -794,19 +794,31 @@ impl LogEntryScreen {
 }
 
 fn format_set_data(set: &SetData) -> String {
+    use crate::i18n::tr_args;
+    use fluent_bundle::FluentValue;
     match set {
-        SetData::Weighted { weight, reps } => format!("{:.1} kg x {} reps", weight, reps),
-        SetData::Bodyweight { reps } => format!("{} reps", reps),
-        SetData::Distance { distance } => format!("{:.2} km", distance),
-        SetData::Endurance { duration } => format!("{:.1} min", duration),
+        SetData::Weighted { weight, reps } => tr_args("set-weighted", &[
+            ("weight", FluentValue::from(*weight)),
+            ("reps", FluentValue::from(*reps as f64)),
+        ]),
+        SetData::Bodyweight { reps } => tr_args("set-bodyweight", &[
+            ("reps", FluentValue::from(*reps as f64)),
+        ]),
+        SetData::Distance { distance } => tr_args("set-distance", &[
+            ("distance", FluentValue::from(*distance)),
+        ]),
+        SetData::Endurance { duration } => tr_args("set-endurance", &[
+            ("duration", FluentValue::from(*duration)),
+        ]),
     }
 }
 
-fn metric_label_for_type(pt: &PracticeType) -> &'static str {
+fn metric_label_for_type(pt: &PracticeType) -> String {
+    use crate::i18n::tr;
     match pt {
-        PracticeType::Weighted => "kg vol",
-        PracticeType::Bodyweight => "reps",
-        PracticeType::Distance => "km",
-        PracticeType::Endurance => "min",
+        PracticeType::Weighted => tr("metric-kg-vol"),
+        PracticeType::Bodyweight => tr("metric-reps"),
+        PracticeType::Distance => tr("metric-km"),
+        PracticeType::Endurance => tr("metric-min"),
     }
 }

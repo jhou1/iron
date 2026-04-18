@@ -266,7 +266,7 @@ impl TrendsScreen {
             .entries
             .first()
             .map(|e| e.metric_label())
-            .unwrap_or("\u{2014}");
+            .unwrap_or_else(|| "\u{2014}".to_string());
         let title = Line::from(vec![
             Span::styled(
                 format!(" {} ", practice.name),
