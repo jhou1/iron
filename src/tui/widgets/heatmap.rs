@@ -7,6 +7,7 @@ use ratatui::{
     widgets::Widget,
 };
 use std::collections::HashMap;
+use unicode_width::UnicodeWidthStr;
 
 /// A GitHub-style contribution heatmap widget.
 pub struct Heatmap<'a> {
@@ -48,8 +49,16 @@ impl<'a> Widget for Heatmap<'a> {
         let start_monday = current_week_monday - Duration::weeks((self.weeks as i64) - 1);
 
         // Day labels on the left (3 chars wide), shifted down 1 row for month labels
-        let day_labels = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
-        let label_width: u16 = 3; // "Mo " etc.
+        let day_labels = [
+            crate::i18n::tr("heatmap-mon"),
+            crate::i18n::tr("heatmap-tue"),
+            crate::i18n::tr("heatmap-wed"),
+            crate::i18n::tr("heatmap-thu"),
+            crate::i18n::tr("heatmap-fri"),
+            crate::i18n::tr("heatmap-sat"),
+            crate::i18n::tr("heatmap-sun"),
+        ];
+        let label_width: u16 = 3;
         let month_row_y = area.y;
         let grid_y = area.y + 1; // grid starts 1 row below for month labels
 
@@ -68,8 +77,18 @@ impl<'a> Widget for Heatmap<'a> {
         let num_weeks = (cols_available / cell_width).min(self.weeks);
 
         let month_names = [
-            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+            crate::i18n::tr("heatmap-jan"),
+            crate::i18n::tr("heatmap-feb"),
+            crate::i18n::tr("heatmap-mar"),
+            crate::i18n::tr("heatmap-apr"),
+            crate::i18n::tr("heatmap-may"),
+            crate::i18n::tr("heatmap-jun"),
+            crate::i18n::tr("heatmap-jul"),
+            crate::i18n::tr("heatmap-aug"),
+            crate::i18n::tr("heatmap-sep"),
+            crate::i18n::tr("heatmap-oct"),
+            crate::i18n::tr("heatmap-nov"),
+            crate::i18n::tr("heatmap-dec"),
         ];
 
         // Track which months to label: place label at the first week column of each month
@@ -83,9 +102,9 @@ impl<'a> Widget for Heatmap<'a> {
             // Place month label at the first week column of each new month
             if last_labeled_month != Some(month) {
                 let x = area.x + label_width + week * cell_width;
-                let label = month_names[(month - 1) as usize];
-                // Only render if there's room for the 3-char label
-                if x + 3 <= area.x + area.width {
+                let label = &month_names[(month - 1) as usize];
+                let label_len = label.width() as u16;
+                if x + label_len <= area.x + area.width {
                     buf.set_string(x, month_row_y, label, Style::default().fg(Color::Gray));
                 }
                 last_labeled_month = Some(month);

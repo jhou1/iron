@@ -7,6 +7,8 @@ use ratatui::{
     Frame,
 };
 
+use unicode_width::UnicodeWidthStr;
+
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
 use crate::model::{LogEntry, SetData};
@@ -69,37 +71,43 @@ impl HistoryScreen {
             ])
             .split(area);
 
-        // ── Title ──
-        let title_text = tr("history-title");
-        let title = Line::from(vec![
-            Span::styled(
-                &title_text,
+        // ── Title + column headers ──
+        let max_name_len = self.entries.iter()
+            .map(|e| e.practice_name.width())
+            .max()
+            .unwrap_or(0);
+        let name_col = max_name_len + 2;
+
+        let date_header = tr("history-col-date");
+        let practice_header = tr("history-col-practice");
+        let volume_header = tr("history-col-volume");
+        let header_name_padding = name_col.saturating_sub(practice_header.width());
+        let title_lines = vec![
+            Line::from(Span::styled(
+                tr("history-title"),
                 Style::default().fg(Color::White).bold(),
-            ),
-        ]);
-        frame.render_widget(Paragraph::new(title), chunks[0]);
+            )),
+            Line::from(vec![
+                Span::styled("   ", Style::default().fg(Color::DarkGray)),
+                Span::styled(&date_header, Style::default().fg(Color::DarkGray)),
+                Span::raw("  "),
+                Span::styled(&practice_header, Style::default().fg(Color::DarkGray)),
+                Span::raw(" ".repeat(header_name_padding)),
+                Span::styled(&volume_header, Style::default().fg(Color::DarkGray)),
+            ]),
+        ];
+        frame.render_widget(Paragraph::new(title_lines), chunks[0]);
 
         // ── List pane ──
         let list_height = chunks[1].height as usize;
         self.adjust_scroll(list_height);
-        self.render_list(frame, chunks[1], list_height);
+        self.render_list(frame, chunks[1], list_height, name_col);
 
         // ── Detail pane ──
         self.render_detail(frame, chunks[2]);
 
         // ── Shortcuts ──
-        let shortcuts = if self.mode == Mode::ConfirmDelete {
-            let delete_confirm_text = format!(" {} ", tr("history-delete-confirm"));
-            let yes_text = format!(" {}  ", tr("key-yes"));
-            let cancel_text = format!(" {}", tr("key-cancel"));
-            Line::from(vec![
-                Span::styled(delete_confirm_text, Style::default().fg(Color::Red)),
-                Span::styled("[y]", Style::default().fg(ACCENT)),
-                Span::styled(yes_text, Style::default().fg(Color::Gray)),
-                Span::styled("[any]", Style::default().fg(ACCENT)),
-                Span::styled(cancel_text, Style::default().fg(Color::Gray)),
-            ])
-        } else {
+        let shortcuts = {
             let navigate_text = format!(" {}  ", tr("key-navigate"));
             let edit_text = format!(" {}  ", tr("key-edit"));
             let delete_text = format!(" {}  ", tr("key-delete"));
@@ -131,7 +139,7 @@ impl HistoryScreen {
         }
     }
 
-    fn render_list(&self, frame: &mut Frame, area: ratatui::layout::Rect, visible: usize) {
+    fn render_list(&self, frame: &mut Frame, area: ratatui::layout::Rect, visible: usize, name_col: usize) {
         if self.entries.is_empty() {
             let no_entries_text = format!("  {}", tr("history-no-entries"));
             let empty = Paragraph::new(Line::from(Span::styled(
@@ -142,33 +150,41 @@ impl HistoryScreen {
             return;
         }
 
-        let lines: Vec<Line> = self
-            .entries
-            .iter()
-            .enumerate()
-            .skip(self.scroll_offset)
-            .take(visible)
-            .map(|(i, entry)| {
-                let marker = if i == self.selected { " > " } else { "   " };
-                let date = entry.log.logged_at.format("%b %d %H:%M").to_string();
-                let sets_count = entry.sets.len();
-                let total = entry.total_metric();
-                let label = entry.metric_label();
-                let info = tr_args("history-entry", &[
-                    ("date", FluentValue::from(date.clone())),
-                    ("name", FluentValue::from(entry.practice_name.clone())),
-                    ("sets", FluentValue::from(sets_count as f64)),
-                    ("total", FluentValue::from(format!("{:.0}", total))),
-                    ("label", FluentValue::from(label.clone())),
-                ]);
-                let text = format!("{}{}", marker, info);
-                if i == self.selected {
-                    Line::from(Span::styled(text, Style::default().fg(GREEN).bold()))
-                } else {
-                    Line::from(Span::styled(text, Style::default().fg(Color::White)))
-                }
-            })
-            .collect();
+        let mut lines: Vec<Line> = Vec::new();
+        for (i, entry) in self.entries.iter().enumerate().skip(self.scroll_offset).take(visible) {
+            let marker = if i == self.selected { " > " } else { "   " };
+            let date = entry.log.logged_at.format("%b %d").to_string();
+            let total = format!("{:.0}", entry.total_metric());
+            let label = entry.metric_label();
+            let name_padding = name_col.saturating_sub(entry.practice_name.width());
+
+            let style = if i == self.selected {
+                Style::default().fg(GREEN).bold()
+            } else {
+                Style::default().fg(Color::White)
+            };
+            let dim = Style::default().fg(Color::Gray);
+
+            lines.push(Line::from(vec![
+                Span::styled(marker, style),
+                Span::styled(date, dim),
+                Span::raw("  "),
+                Span::styled(&entry.practice_name, style),
+                Span::raw(" ".repeat(name_padding)),
+                Span::styled(format!("{} {}", total, label), dim),
+            ]));
+
+            if i == self.selected && self.mode == Mode::ConfirmDelete {
+                let confirm_text = format!("     {} ", tr("history-delete-confirm"));
+                lines.push(Line::from(vec![
+                    Span::styled(confirm_text, Style::default().fg(Color::Red)),
+                    Span::styled("[y]", Style::default().fg(ACCENT)),
+                    Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::Gray)),
+                    Span::styled("[any]", Style::default().fg(ACCENT)),
+                    Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::Gray)),
+                ]));
+            }
+        }
 
         frame.render_widget(Paragraph::new(lines), area);
 

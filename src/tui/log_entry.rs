@@ -304,7 +304,8 @@ impl LogEntryScreen {
         let practice = self.chosen_practice.as_ref().unwrap();
 
         let sets_height = (self.sets.len() as u16 + 3).max(3); // sets + input fields
-        let note_height: u16 = if self.note.is_empty() { 0 } else { 1 };
+        let meta_height: u16 = [!self.warm_up.is_empty(), !self.cool_down.is_empty(), !self.note.is_empty()]
+            .iter().filter(|&&v| v).count() as u16;
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
@@ -312,7 +313,7 @@ impl LogEntryScreen {
                 Constraint::Length(1),           // date line
                 Constraint::Length(sets_height), // committed sets + input
                 Constraint::Length(1),           // running total
-                Constraint::Length(note_height), // note (if any)
+                Constraint::Length(meta_height), // warm-up/cool-down/note (if any)
                 Constraint::Length(1),           // footer
                 Constraint::Min(0),              // spacer
             ])
@@ -358,6 +359,9 @@ impl LogEntryScreen {
             ])
         };
         frame.render_widget(Paragraph::new(date_line), chunks[1]);
+        if !self.date_confirmed && !self.editing_date {
+            highlight_row(frame, chunks[1], 0);
+        }
 
         // Committed sets + current input
         let mut lines: Vec<Line> = Vec::new();
@@ -471,13 +475,28 @@ impl LogEntryScreen {
         ));
         frame.render_widget(Paragraph::new(total_line), chunks[3]);
 
-        // Note (if present)
+        // Warm-up, cool-down, note (if present)
+        let mut meta_lines: Vec<Line> = Vec::new();
+        if !self.warm_up.is_empty() {
+            meta_lines.push(Line::from(vec![
+                Span::styled(format!("  {}: ", tr("log-warmup-label")), Style::default().fg(Color::Gray)),
+                Span::styled(&self.warm_up, Style::default().fg(Color::Yellow)),
+            ]));
+        }
+        if !self.cool_down.is_empty() {
+            meta_lines.push(Line::from(vec![
+                Span::styled(format!("  {}: ", tr("log-cooldown-label")), Style::default().fg(Color::Gray)),
+                Span::styled(&self.cool_down, Style::default().fg(Color::Yellow)),
+            ]));
+        }
         if !self.note.is_empty() {
-            let note_line = Line::from(vec![
-                Span::styled(format!("  {}: ", tr("log-note-label")), Style::default().fg(Color::DarkGray)),
+            meta_lines.push(Line::from(vec![
+                Span::styled(format!("  {}: ", tr("log-note-label")), Style::default().fg(Color::Gray)),
                 Span::styled(&self.note, Style::default().fg(Color::Yellow)),
-            ]);
-            frame.render_widget(Paragraph::new(note_line), chunks[4]);
+            ]));
+        }
+        if !meta_lines.is_empty() {
+            frame.render_widget(Paragraph::new(meta_lines), chunks[4]);
         }
 
         // Footer
@@ -719,7 +738,7 @@ impl LogEntryScreen {
 
         let footer = Line::from(vec![
             Span::styled(" [Tab]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}  ", tr("key-navigate")), Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}  ", tr("key-switch-field")), Style::default().fg(Color::Gray)),
             Span::styled("[Enter]", Style::default().fg(ACCENT)),
             Span::styled(format!(" {}  ", tr("key-next")), Style::default().fg(Color::Gray)),
             Span::styled("[Ctrl+S]", Style::default().fg(ACCENT)),
@@ -780,8 +799,12 @@ impl LogEntryScreen {
                 Action::None
             }
             KeyCode::Enter => {
-                self.phase = Phase::EnterNote;
-                self.note_cursor = self.note.len();
+                if self.warmup_cooldown_active == 0 {
+                    self.warmup_cooldown_active = 1;
+                } else {
+                    self.phase = Phase::EnterNote;
+                    self.note_cursor = self.note.len();
+                }
                 Action::None
             }
             KeyCode::Backspace => {

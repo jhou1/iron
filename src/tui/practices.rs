@@ -7,6 +7,8 @@ use ratatui::{
     Frame,
 };
 
+use unicode_width::UnicodeWidthStr;
+
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
 use crate::model::{Practice, PracticeType};
@@ -78,7 +80,7 @@ impl PracticesScreen {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1),             // title
+                Constraint::Length(2),             // title + header
                 Constraint::Length(list_height),   // practice list
                 Constraint::Length(action_height), // input/action area
                 Constraint::Length(1),             // shortcuts
@@ -86,11 +88,29 @@ impl PracticesScreen {
             ])
             .split(area);
 
-        // ── Title ──
-        let title = Line::from(vec![
-            Span::styled(tr("practices-title"), Style::default().fg(ACCENT).add_modifier(Modifier::BOLD)),
-        ]);
-        frame.render_widget(Paragraph::new(title), chunks[0]);
+        // ── Title + header ──
+        let max_name_len = self.practices.iter()
+            .map(|p| p.name.width())
+            .max()
+            .unwrap_or(0);
+        let col_width = max_name_len + 4;
+
+        let name_header = tr("practices-col-name");
+        let type_header = tr("practices-col-type");
+        let header_padding = col_width.saturating_sub(name_header.width());
+        let title_lines = vec![
+            Line::from(Span::styled(
+                tr("practices-title"),
+                Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
+            )),
+            Line::from(vec![
+                Span::styled("  ", Style::default().fg(Color::DarkGray)),
+                Span::styled(&name_header, Style::default().fg(Color::DarkGray)),
+                Span::raw(" ".repeat(header_padding)),
+                Span::styled(&type_header, Style::default().fg(Color::DarkGray)),
+            ]),
+        ];
+        frame.render_widget(Paragraph::new(title_lines), chunks[0]);
 
         // ── Practice list ──
         let list_lines: Vec<Line> = if self.practices.is_empty() {
@@ -109,11 +129,13 @@ impl PracticesScreen {
                     } else {
                         Style::default().fg(Color::White)
                     };
+                    let padding = col_width.saturating_sub(p.name.width());
                     Line::from(vec![
                         Span::styled(marker, name_style),
                         Span::styled(&p.name, name_style),
+                        Span::raw(" ".repeat(padding)),
                         Span::styled(
-                            format!(" ({})", p.practice_type.label()),
+                            p.practice_type.label(),
                             Style::default().fg(Color::Gray),
                         ),
                     ])

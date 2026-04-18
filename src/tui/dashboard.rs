@@ -7,6 +7,8 @@ use ratatui::{
     Frame,
 };
 
+use unicode_width::UnicodeWidthStr;
+
 use crate::db::{AggregateStats, Database};
 use crate::i18n::{tr, tr_args};
 use crate::model::{Goal, LogEntry, Quote};
@@ -130,7 +132,7 @@ impl DashboardScreen {
                 Constraint::Length(7),            // [1] heatmap header ASCII art
                 Constraint::Length(10),           // [2] heatmap
                 Constraint::Length(quote_height), // [3] daily quote box
-                Constraint::Length(1),            // [4] HRV row
+                Constraint::Length(3),            // [4] HRV row (with spacing)
                 Constraint::Length(pane_height),  // [5] split panes
                 Constraint::Length(1),            // [6] footer
                 Constraint::Min(0),              // [7] spacer absorbs excess at bottom
@@ -180,12 +182,12 @@ impl DashboardScreen {
         .alignment(ratatui::layout::Alignment::Center);
         frame.render_widget(quote_paragraph, quote_area);
 
-        // ── HRV row ──
+        // ── HRV row (centered in 3-line area) ──
         let hrv_area = Rect {
             x: chunks[4].x + 1,
-            y: chunks[4].y,
+            y: chunks[4].y + 1,
             width: chunks[4].width.saturating_sub(2).min(HEATMAP_CONTENT_WIDTH),
-            height: chunks[4].height,
+            height: 1,
         };
         let hrv_line = if self.mode == DashboardMode::HrvInput {
             Line::from(vec![
@@ -330,30 +332,29 @@ impl DashboardScreen {
             Style::default().fg(Color::DarkGray),
         )));
 
-        // Entry list
+        // Entry list (table layout)
         if self.recent_entries.is_empty() {
             lines.push(Line::from(Span::styled(
                 tr("dashboard-no-entries"),
                 Style::default().fg(Color::Gray),
             )));
         } else {
+            let max_name = self.recent_entries.iter()
+                .map(|e| e.practice_name.width())
+                .max()
+                .unwrap_or(0);
+            let name_col = max_name + 2;
+
             for entry in &self.recent_entries {
                 let date = entry.log.logged_at.format("%b %d").to_string();
-                let sets_count = entry.sets.len();
                 let total = format!("{:.0}", entry.total_metric());
                 let label = entry.metric_label();
-                let sets_text = tr_args("dashboard-sets-metric", &[
-                    ("sets", FluentValue::from(sets_count)),
-                    ("total", FluentValue::from(total)),
-                    ("label", FluentValue::from(label)),
-                ]);
+                let padding = name_col.saturating_sub(entry.practice_name.width());
                 lines.push(Line::from(vec![
                     Span::styled(format!("{} ", date), Style::default().fg(Color::Gray)),
                     Span::styled(&entry.practice_name, Style::default().fg(GREEN)),
-                    Span::styled(
-                        format!("  {}", sets_text),
-                        Style::default().fg(Color::Gray),
-                    ),
+                    Span::raw(" ".repeat(padding)),
+                    Span::styled(format!("{} {}", total, label), Style::default().fg(Color::Gray)),
                 ]));
             }
         }

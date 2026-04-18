@@ -267,19 +267,12 @@ impl GoalsScreen {
                     .map(|dt| format!(" ({})", dt.format("%Y-%m-%d")))
                     .unwrap_or_default();
                 let marker = if is_selected { "» " } else { "  " };
-                if is_selected {
-                    lines.push(Line::from(vec![
-                        Span::styled(marker, Style::default().fg(GREEN)),
-                        Span::styled("✓ ", Style::default().fg(GREEN)),
-                        Span::styled(format!("{}{}", goal.title, date_str), Style::default().fg(GREEN)),
-                    ]));
-                } else {
-                    lines.push(Line::from(vec![
-                        Span::raw(marker),
-                        Span::styled("✓ ", Style::default().fg(Color::DarkGray)),
-                        Span::styled(format!("{}{}", goal.title, date_str), Style::default().fg(Color::DarkGray)),
-                    ]));
-                }
+                let style = if is_selected { Style::default().fg(GREEN) } else { Style::default().fg(Color::Gray) };
+                lines.push(Line::from(vec![
+                    Span::styled(marker, style),
+                    Span::styled("✓ ", Style::default().fg(GREEN)),
+                    Span::styled(format!("{}{}", goal.title, date_str), style),
+                ]));
             } else {
                 let marker = if is_selected { "» " } else { "  " };
                 let style = if is_selected {
@@ -334,19 +327,13 @@ impl GoalsScreen {
                         .map(|dt| format!(" ({})", dt.format("%Y-%m-%d")))
                         .unwrap_or_default();
                     let marker = if is_ms_selected { "» " } else { "  " };
-                    if is_ms_selected {
-                        lines.push(Line::from(vec![
-                            Span::styled(marker, Style::default().fg(GREEN)),
-                            Span::styled("✓ ", Style::default().fg(GREEN)),
-                            Span::styled(format!("{}{}", ms.title, date_str), Style::default().fg(GREEN)),
-                        ]));
-                    } else {
-                        lines.push(Line::from(vec![
-                            Span::raw(marker),
-                            Span::styled("✓ ", Style::default().fg(Color::DarkGray)),
-                            Span::styled(format!("{}{}", ms.title, date_str), Style::default().fg(Color::DarkGray)),
-                        ]));
-                    }
+                    let style = if is_ms_selected { Style::default().fg(GREEN) } else { Style::default().fg(Color::Gray) };
+                    lines.push(Line::from(vec![
+                        Span::styled(marker, style),
+                        Span::raw("  "),
+                        Span::styled("✓ ", Style::default().fg(GREEN)),
+                        Span::styled(format!("{}{}", ms.title, date_str), style),
+                    ]));
                 } else {
                     let marker = if is_ms_selected { "» " } else { "  " };
                     let style = if is_ms_selected {
