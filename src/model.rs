@@ -71,6 +71,8 @@ pub struct Log {
     pub practice_id: i64,
     pub logged_at: NaiveDateTime,
     pub note: Option<String>,
+    pub warm_up: Option<String>,
+    pub cool_down: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -162,4 +164,11 @@ pub struct Quote {
     pub id: i64,
     pub text: String,
     pub position: i32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DailyMetrics {
+    pub id: i64,
+    pub date: String,
+    pub hrv: Option<i32>,
 }
