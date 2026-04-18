@@ -12,6 +12,8 @@ A beautiful terminal UI for tracking your training records. Log practices set-by
 - **Vim-style navigation** throughout (j/k, h/l, /, Esc, Enter)
 - **Goals and milestones** — set training targets and track progress
 - **Daily motivational quotes** on the Dashboard — add and manage quotes in the database
+- **Warm-up & cool-down notes** — optional text fields on each training log
+- **Daily HRV tracking** — record your morning HRV score (0-100) on the dashboard
 - **JSON export/import** for backup and data portability
 - Data stored locally in SQLite — single file, zero cloud dependencies
 
@@ -93,8 +95,9 @@ You'll land on the **Dashboard** — the home screen showing your training heatm
    - For other types: type the value and press Enter
 4. Press `D` to change the log date (defaults to today, format: YYYY-MM-DD)
 5. Press `Ctrl+S` when done adding sets
-6. Type an optional note (e.g., "Felt strong today") or press Enter to skip
-7. Press Enter to save
+6. Optionally enter warm-up and cool-down notes (e.g., "5 min jump rope"), press Enter to skip
+7. Type an optional note (e.g., "Felt strong today") or press Enter to skip
+8. Press Enter to save
 
 Example — logging kettlebell snatches:
 
@@ -161,6 +164,15 @@ Inside the Quotes manager:
 
 When no quotes exist, the Dashboard shows "No quotes yet — press Q to add one" in gray text. Quotes are stored in the SQLite database alongside all your training data.
 
+### HRV Tracking
+
+Record your morning Heart Rate Variability score on the Dashboard.
+
+- Press `v` to enter your HRV score (0-100)
+- Type the number and press Enter to save
+- Today's HRV is displayed inline on the Dashboard
+- HRV data is included in JSON export/import for long-term analysis
+
 ## Practice Types
 
 | Type | UI Label | You Enter | Tracked Metric |
@@ -184,6 +196,7 @@ Units are fixed: **kg**, **km**, **minutes**.
 | `e` | Manage practices |
 | `g` | Goals mode |
 | `Q` | Manage quotes |
+| `v` | Record/edit today's HRV |
 | `q` | Quit |
 
 ### Log Entry
