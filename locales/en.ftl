@@ -2,6 +2,10 @@
 app-name = IronCLI
 app-about = Track your training
 
+# ── Heatmap ──
+heatmap-less = Less
+heatmap-more = More
+
 # ── Dashboard ──
 dashboard-title = iron
 dashboard-last-14-days = Last 14 Days

@@ -112,7 +112,7 @@ impl<'a> Widget for Heatmap<'a> {
         let legend_y = grid_y + 7;
         if legend_y < area.y + area.height {
             let legend = Line::from(vec![
-                Span::styled("Less ", Style::default().fg(Color::Gray)),
+                Span::styled(format!("{} ", crate::i18n::tr("heatmap-less")), Style::default().fg(Color::Gray)),
                 Span::styled("\u{25AA}", Style::default().fg(Color::DarkGray)),
                 Span::raw(" "),
                 Span::styled("\u{25A0}", Style::default().fg(Color::Indexed(65))),
@@ -120,7 +120,7 @@ impl<'a> Widget for Heatmap<'a> {
                 Span::styled("\u{25A0}", Style::default().fg(Color::Indexed(71))),
                 Span::raw(" "),
                 Span::styled("\u{25A0}", Style::default().fg(Color::Indexed(118))),
-                Span::styled(" More", Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}", crate::i18n::tr("heatmap-more")), Style::default().fg(Color::Gray)),
             ]);
             buf.set_line(area.x + label_width, legend_y, &legend, area.width.saturating_sub(label_width));
         }

@@ -2,6 +2,10 @@
 app-name = IronCLI
 app-about = 记录你的训练
 
+# ── 热力图 ──
+heatmap-less = 少
+heatmap-more = 多
+
 # ── 仪表盘 ──
 dashboard-title = iron
 dashboard-last-14-days = 最近 14 天
