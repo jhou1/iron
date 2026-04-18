@@ -20,6 +20,8 @@ pub struct ExportData {
     pub goals: Vec<ExportGoal>,
     #[serde(default)]
     pub quotes: Vec<ExportQuote>,
+    #[serde(default)]
+    pub daily_metrics: Vec<ExportDailyMetrics>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -38,6 +40,10 @@ pub struct ExportLog {
     pub logged_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub warm_up: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub cool_down: Option<String>,
     pub sets: Vec<ExportSet>,
 }
 
@@ -78,6 +84,13 @@ pub struct ExportMilestone {
 pub struct ExportQuote {
     pub text: String,
     pub position: i32,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ExportDailyMetrics {
+    pub date: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hrv: Option<i32>,
 }
 
 // ── Export ──────────────────────────────────────────────────────────────
@@ -126,6 +139,8 @@ pub fn export_to_json(db: &Database, path: Option<PathBuf>) -> Result<()> {
                 practice: entry.practice_name.clone(),
                 logged_at: entry.log.logged_at.format("%Y-%m-%d %H:%M:%S%.f").to_string(),
                 note: entry.log.note.clone(),
+                warm_up: entry.log.warm_up.clone(),
+                cool_down: entry.log.cool_down.clone(),
                 sets,
             }
         })
@@ -160,6 +175,15 @@ pub fn export_to_json(db: &Database, path: Option<PathBuf>) -> Result<()> {
         })
         .collect();
 
+    let daily_metrics_list = db.list_daily_metrics()?;
+    let export_daily_metrics: Vec<ExportDailyMetrics> = daily_metrics_list
+        .iter()
+        .map(|m| ExportDailyMetrics {
+            date: m.date.clone(),
+            hrv: m.hrv,
+        })
+        .collect();
+
     let data = ExportData {
         version: 2,
         exported_at: Local::now().to_rfc3339(),
@@ -167,6 +191,7 @@ pub fn export_to_json(db: &Database, path: Option<PathBuf>) -> Result<()> {
         logs: export_logs,
         goals: export_goals,
         quotes: export_quotes,
+        daily_metrics: export_daily_metrics,
     };
 
     let json = serde_json::to_string_pretty(&data)?;
@@ -252,8 +277,8 @@ pub fn import_from_json(db: &Database, path: &Path) -> Result<usize> {
             &logged_at,
             &sets,
             log.note.as_deref(),
-            None,
-            None,
+            log.warm_up.as_deref(),
+            log.cool_down.as_deref(),
         )?;
 
         imported += 1;
@@ -297,6 +322,12 @@ pub fn import_from_json(db: &Database, path: &Path) -> Result<usize> {
 
         for eq in &data.quotes {
             db.create_quote(&eq.text)?;
+        }
+    }
+
+    for dm in &data.daily_metrics {
+        if let Some(hrv) = dm.hrv {
+            let _ = db.set_daily_hrv(&dm.date, hrv);
         }
     }
 

@@ -402,3 +402,39 @@ fn quotes_survive_export_import() {
     assert_eq!(quotes[1].text, "Train hard, rest harder.");
     assert_eq!(quotes[2].text, "Consistency beats intensity.");
 }
+
+#[test]
+fn warmup_cooldown_survive_export_import() {
+    let source = TestDb::new();
+    let db = &source.db;
+    let bench = db.create_practice("Bench Press", PracticeType::Weighted).unwrap();
+    let t1 = dt("2026-04-18 10:00:00");
+    let sets = vec![SetData::Weighted { weight: 60.0, reps: 10 }];
+    db.create_log_at(bench.id, &t1, &sets, Some("Good"), Some("Jump rope"), Some("Stretches")).unwrap();
+    let export_path = source.export_path();
+    export_to_json(db, Some(export_path.clone())).unwrap();
+    let target = TestDb::new();
+    import_from_json(&target.db, &export_path).unwrap();
+    let entries = target.db.export_all().unwrap();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].log.warm_up, Some("Jump rope".to_string()));
+    assert_eq!(entries[0].log.cool_down, Some("Stretches".to_string()));
+}
+
+#[test]
+fn daily_metrics_survive_export_import() {
+    let source = TestDb::new();
+    let db = &source.db;
+    db.set_daily_hrv("2026-04-17", 65).unwrap();
+    db.set_daily_hrv("2026-04-18", 72).unwrap();
+    let export_path = source.export_path();
+    export_to_json(db, Some(export_path.clone())).unwrap();
+    let target = TestDb::new();
+    import_from_json(&target.db, &export_path).unwrap();
+    let metrics = target.db.list_daily_metrics().unwrap();
+    assert_eq!(metrics.len(), 2);
+    assert_eq!(metrics[0].date, "2026-04-17");
+    assert_eq!(metrics[0].hrv, Some(65));
+    assert_eq!(metrics[1].date, "2026-04-18");
+    assert_eq!(metrics[1].hrv, Some(72));
+}
