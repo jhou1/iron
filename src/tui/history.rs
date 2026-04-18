@@ -8,8 +8,10 @@ use ratatui::{
 };
 
 use crate::db::Database;
+use crate::i18n::{tr, tr_args};
 use crate::model::{LogEntry, SetData};
 use super::{highlight_row, Action, Screen};
+use fluent_bundle::FluentValue;
 
 const GREEN: Color = Color::Green;
 const ACCENT: Color = Color::Cyan;
@@ -68,9 +70,10 @@ impl HistoryScreen {
             .split(area);
 
         // ── Title ──
+        let title_text = tr("history-title");
         let title = Line::from(vec![
             Span::styled(
-                " History",
+                &title_text,
                 Style::default().fg(Color::White).bold(),
             ),
         ]);
@@ -86,23 +89,30 @@ impl HistoryScreen {
 
         // ── Shortcuts ──
         let shortcuts = if self.mode == Mode::ConfirmDelete {
+            let delete_confirm_text = format!(" {} ", tr("history-delete-confirm"));
+            let yes_text = format!(" {}  ", tr("key-yes"));
+            let cancel_text = format!(" {}", tr("key-cancel"));
             Line::from(vec![
-                Span::styled(" Delete this entry? ", Style::default().fg(Color::Red)),
+                Span::styled(delete_confirm_text, Style::default().fg(Color::Red)),
                 Span::styled("[y]", Style::default().fg(ACCENT)),
-                Span::styled(" Yes  ", Style::default().fg(Color::Gray)),
+                Span::styled(yes_text, Style::default().fg(Color::Gray)),
                 Span::styled("[any]", Style::default().fg(ACCENT)),
-                Span::styled(" Cancel", Style::default().fg(Color::Gray)),
+                Span::styled(cancel_text, Style::default().fg(Color::Gray)),
             ])
         } else {
+            let navigate_text = format!(" {}  ", tr("key-navigate"));
+            let edit_text = format!(" {}  ", tr("key-edit"));
+            let delete_text = format!(" {}  ", tr("key-delete"));
+            let back_text = format!(" {}", tr("key-back"));
             Line::from(vec![
                 Span::styled(" [j/k]", Style::default().fg(ACCENT)),
-                Span::styled(" Navigate  ", Style::default().fg(Color::Gray)),
+                Span::styled(navigate_text, Style::default().fg(Color::Gray)),
                 Span::styled("[Enter]", Style::default().fg(ACCENT)),
-                Span::styled(" Edit  ", Style::default().fg(Color::Gray)),
+                Span::styled(edit_text, Style::default().fg(Color::Gray)),
                 Span::styled("[d]", Style::default().fg(ACCENT)),
-                Span::styled(" Delete  ", Style::default().fg(Color::Gray)),
+                Span::styled(delete_text, Style::default().fg(Color::Gray)),
                 Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(" Back", Style::default().fg(Color::Gray)),
+                Span::styled(back_text, Style::default().fg(Color::Gray)),
             ])
         };
         frame.render_widget(Paragraph::new(shortcuts), chunks[3]);
@@ -123,8 +133,9 @@ impl HistoryScreen {
 
     fn render_list(&self, frame: &mut Frame, area: ratatui::layout::Rect, visible: usize) {
         if self.entries.is_empty() {
+            let no_entries_text = format!("  {}", tr("history-no-entries"));
             let empty = Paragraph::new(Line::from(Span::styled(
-                "  No entries yet",
+                no_entries_text,
                 Style::default().fg(Color::Gray),
             )));
             frame.render_widget(empty, area);
@@ -143,10 +154,14 @@ impl HistoryScreen {
                 let sets_count = entry.sets.len();
                 let total = entry.total_metric();
                 let label = entry.metric_label();
-                let text = format!(
-                    "{}{}  {}  {} sets  {:.0} {}",
-                    marker, date, entry.practice_name, sets_count, total, label
-                );
+                let info = tr_args("history-entry", &[
+                    ("date", FluentValue::from(date.clone())),
+                    ("name", FluentValue::from(entry.practice_name.clone())),
+                    ("sets", FluentValue::from(sets_count as f64)),
+                    ("total", FluentValue::from(format!("{:.0}", total))),
+                    ("label", FluentValue::from(label.clone())),
+                ]);
+                let text = format!("{}{}", marker, info);
                 if i == self.selected {
                     Line::from(Span::styled(text, Style::default().fg(GREEN).bold()))
                 } else {
@@ -173,16 +188,29 @@ impl HistoryScreen {
         for set in &entry.sets {
             let detail = match &set.data {
                 SetData::Weighted { weight, reps } => {
-                    format!("    #{}  {}kg x {}", set.set_number, weight, reps)
+                    format!("    {}", tr_args("history-set-weighted", &[
+                        ("number", FluentValue::from(set.set_number as f64)),
+                        ("weight", FluentValue::from(*weight)),
+                        ("reps", FluentValue::from(*reps as f64)),
+                    ]))
                 }
                 SetData::Bodyweight { reps } => {
-                    format!("    #{}  {} reps", set.set_number, reps)
+                    format!("    {}", tr_args("history-set-bodyweight", &[
+                        ("number", FluentValue::from(set.set_number as f64)),
+                        ("reps", FluentValue::from(*reps as f64)),
+                    ]))
                 }
                 SetData::Distance { distance } => {
-                    format!("    #{}  {} km", set.set_number, distance)
+                    format!("    {}", tr_args("history-set-distance", &[
+                        ("number", FluentValue::from(set.set_number as f64)),
+                        ("distance", FluentValue::from(*distance)),
+                    ]))
                 }
                 SetData::Endurance { duration } => {
-                    format!("    #{}  {} min", set.set_number, duration)
+                    format!("    {}", tr_args("history-set-endurance", &[
+                        ("number", FluentValue::from(set.set_number as f64)),
+                        ("duration", FluentValue::from(*duration as f64)),
+                    ]))
                 }
             };
             lines.push(Line::from(Span::styled(
@@ -193,7 +221,9 @@ impl HistoryScreen {
 
         if let Some(note) = &entry.log.note {
             lines.push(Line::from(Span::styled(
-                format!("    Note: {}", note),
+                format!("    {}", tr_args("history-note", &[
+                    ("note", FluentValue::from(note.clone())),
+                ])),
                 Style::default().fg(NOTE_COLOR),
             )));
         }
