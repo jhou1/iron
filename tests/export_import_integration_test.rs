@@ -131,10 +131,10 @@ fn export_delete_reimport_restores_all_data() {
     let run_sets = vec![SetData::Distance { distance: 5.0 }];
     let plank_sets = vec![SetData::Endurance { duration: 2.5 }];
 
-    db.create_log_at(kb.id, &t1, &kb_sets, Some("Felt strong")).unwrap();
-    db.create_log_at(pu.id, &t2, &pu_sets, None).unwrap();
-    db.create_log_at(run.id, &t3, &run_sets, Some("Morning run")).unwrap();
-    db.create_log_at(plank.id, &t4, &plank_sets, None).unwrap();
+    db.create_log_at(kb.id, &t1, &kb_sets, Some("Felt strong"), None, None).unwrap();
+    db.create_log_at(pu.id, &t2, &pu_sets, None, None, None).unwrap();
+    db.create_log_at(run.id, &t3, &run_sets, Some("Morning run"), None, None).unwrap();
+    db.create_log_at(plank.id, &t4, &plank_sets, None, None, None).unwrap();
 
     // Pre-export integrity check
     let entries = db.export_all().unwrap();
@@ -188,9 +188,9 @@ fn partial_delete_reimport_merges_correctly() {
     let squat_sets2 = vec![SetData::Weighted { weight: 105.0, reps: 5 }];
     let run_sets = vec![SetData::Distance { distance: 3.0 }];
 
-    let log1_id = db.create_log_at(squat.id, &t1, &squat_sets1, Some("Heavy day")).unwrap();
-    db.create_log_at(squat.id, &t2, &squat_sets2, None).unwrap();
-    db.create_log_at(run.id, &t3, &run_sets, None).unwrap();
+    let log1_id = db.create_log_at(squat.id, &t1, &squat_sets1, Some("Heavy day"), None, None).unwrap();
+    db.create_log_at(squat.id, &t2, &squat_sets2, None, None, None).unwrap();
+    db.create_log_at(run.id, &t3, &run_sets, None, None, None).unwrap();
 
     // Export all 3 logs
     export_to_json(db, Some(export_path.clone())).unwrap();
@@ -241,10 +241,10 @@ fn import_skips_duplicates_all_practice_types() {
     let t3 = dt("2025-03-03 10:00:00");
     let t4 = dt("2025-03-04 11:00:00");
 
-    db.create_log_at(kb.id, &t1, &[SetData::Weighted { weight: 24.0, reps: 10 }], None).unwrap();
-    db.create_log_at(pu.id, &t2, &[SetData::Bodyweight { reps: 20 }], Some("Easy")).unwrap();
-    db.create_log_at(run.id, &t3, &[SetData::Distance { distance: 5.0 }], None).unwrap();
-    db.create_log_at(plank.id, &t4, &[SetData::Endurance { duration: 3.0 }], None).unwrap();
+    db.create_log_at(kb.id, &t1, &[SetData::Weighted { weight: 24.0, reps: 10 }], None, None, None).unwrap();
+    db.create_log_at(pu.id, &t2, &[SetData::Bodyweight { reps: 20 }], Some("Easy"), None, None).unwrap();
+    db.create_log_at(run.id, &t3, &[SetData::Distance { distance: 5.0 }], None, None, None).unwrap();
+    db.create_log_at(plank.id, &t4, &[SetData::Endurance { duration: 3.0 }], None, None, None).unwrap();
 
     // Export
     export_to_json(db, Some(export_path.clone())).unwrap();
@@ -277,10 +277,10 @@ fn notes_and_timestamps_survive_round_trip() {
     let note3 = Some("Line 1\nLine 2");
     let note4 = Some("Unicode: caf\u{00e9} \u{2192} weights");
 
-    db.create_log_at(bench.id, &t1, &simple_set, note1).unwrap();
-    db.create_log_at(bench.id, &t2, &simple_set, note2).unwrap();
-    db.create_log_at(bench.id, &t3, &simple_set, note3).unwrap();
-    db.create_log_at(bench.id, &t4, &simple_set, note4).unwrap();
+    db.create_log_at(bench.id, &t1, &simple_set, note1, None, None).unwrap();
+    db.create_log_at(bench.id, &t2, &simple_set, note2, None, None).unwrap();
+    db.create_log_at(bench.id, &t3, &simple_set, note3, None, None).unwrap();
+    db.create_log_at(bench.id, &t4, &simple_set, note4, None, None).unwrap();
 
     // Export, delete, re-import
     export_to_json(db, Some(export_path.clone())).unwrap();
@@ -325,7 +325,7 @@ fn set_ordering_preserved_across_export_import() {
         SetData::Weighted { weight: 80.0, reps: 8 },   // backoff — same as set 3
     ];
 
-    db.create_log_at(bench.id, &t1, &sets, Some("Pyramid day")).unwrap();
+    db.create_log_at(bench.id, &t1, &sets, Some("Pyramid day"), None, None).unwrap();
 
     // Export, delete, re-import
     export_to_json(db, Some(export_path.clone())).unwrap();

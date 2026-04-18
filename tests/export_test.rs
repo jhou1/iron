@@ -34,22 +34,28 @@ fn round_trip_export_import() {
             },
         ],
         Some("Felt great"),
+        None,
+        None,
     )
     .unwrap();
 
-    db1.create_log(pushups.id, &[SetData::Bodyweight { reps: 20 }], None)
+    db1.create_log(pushups.id, &[SetData::Bodyweight { reps: 20 }], None, None, None)
         .unwrap();
 
     db1.create_log(
         run.id,
         &[SetData::Distance { distance: 5.2 }],
         Some("Morning run"),
+        None,
+        None,
     )
     .unwrap();
 
     db1.create_log(
         plank.id,
         &[SetData::Endurance { duration: 2.5 }],
+        None,
+        None,
         None,
     )
     .unwrap();
@@ -142,6 +148,8 @@ fn import_skips_duplicates() {
             reps: 5,
         }],
         Some("Heavy day"),
+        None,
+        None,
     )
     .unwrap();
 

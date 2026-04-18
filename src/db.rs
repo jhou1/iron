@@ -97,6 +97,12 @@ impl Database {
                 id       INTEGER PRIMARY KEY AUTOINCREMENT,
                 text     TEXT NOT NULL,
                 position INTEGER NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS daily_metrics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date TEXT NOT NULL UNIQUE,
+                hrv INTEGER
             );",
         )?;
 
@@ -104,6 +110,8 @@ impl Database {
         let _ = self.conn.execute("ALTER TABLE goals ADD COLUMN completed INTEGER NOT NULL DEFAULT 0", []);
         let _ = self.conn.execute("ALTER TABLE goals ADD COLUMN completed_at TEXT", []);
         let _ = self.conn.execute("ALTER TABLE milestones ADD COLUMN completed_at TEXT", []);
+        let _ = self.conn.execute("ALTER TABLE logs ADD COLUMN warm_up TEXT", []);
+        let _ = self.conn.execute("ALTER TABLE logs ADD COLUMN cool_down TEXT", []);
 
         Ok(())
     }
@@ -182,11 +190,13 @@ impl Database {
         practice_id: i64,
         sets: &[SetData],
         note: Option<&str>,
+        warm_up: Option<&str>,
+        cool_down: Option<&str>,
     ) -> Result<i64> {
         let now = Local::now().naive_local();
         self.conn.execute(
-            "INSERT INTO logs (practice_id, logged_at, note) VALUES (?1, ?2, ?3)",
-            params![practice_id, now.to_string(), note],
+            "INSERT INTO logs (practice_id, logged_at, note, warm_up, cool_down) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![practice_id, now.to_string(), note, warm_up, cool_down],
         )?;
         let log_id = self.conn.last_insert_rowid();
         self.insert_sets(log_id, sets)?;
@@ -200,10 +210,12 @@ impl Database {
         logged_at: &NaiveDateTime,
         sets: &[SetData],
         note: Option<&str>,
+        warm_up: Option<&str>,
+        cool_down: Option<&str>,
     ) -> Result<i64> {
         self.conn.execute(
-            "INSERT INTO logs (practice_id, logged_at, note) VALUES (?1, ?2, ?3)",
-            params![practice_id, logged_at.to_string(), note],
+            "INSERT INTO logs (practice_id, logged_at, note, warm_up, cool_down) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![practice_id, logged_at.to_string(), note, warm_up, cool_down],
         )?;
         let log_id = self.conn.last_insert_rowid();
         self.insert_sets(log_id, sets)?;
@@ -216,15 +228,17 @@ impl Database {
         sets: &[SetData],
         note: Option<&str>,
         logged_at: Option<&NaiveDateTime>,
+        warm_up: Option<&str>,
+        cool_down: Option<&str>,
     ) -> Result<()> {
         if let Some(dt) = logged_at {
             self.conn.execute(
-                "UPDATE logs SET note = ?1, logged_at = ?2 WHERE id = ?3",
-                params![note, dt.to_string(), log_id],
+                "UPDATE logs SET note = ?1, logged_at = ?2, warm_up = ?3, cool_down = ?4 WHERE id = ?5",
+                params![note, dt.to_string(), warm_up, cool_down, log_id],
             )?;
         } else {
             self.conn
-                .execute("UPDATE logs SET note = ?1 WHERE id = ?2", params![note, log_id])?;
+                .execute("UPDATE logs SET note = ?1, warm_up = ?2, cool_down = ?3 WHERE id = ?4", params![note, warm_up, cool_down, log_id])?;
         }
         // Delete old sets and insert new ones
         self.conn
@@ -270,7 +284,7 @@ impl Database {
 
     pub fn list_logs_all(&self) -> Result<Vec<LogEntry>> {
         let mut stmt = self.conn.prepare(
-            "SELECT l.id, l.practice_id, l.logged_at, l.note, p.name, p.practice_type
+            "SELECT l.id, l.practice_id, l.logged_at, l.note, l.warm_up, l.cool_down, p.name, p.practice_type
              FROM logs l
              JOIN practices p ON l.practice_id = p.id
              ORDER BY l.logged_at DESC",
@@ -281,14 +295,16 @@ impl Database {
                 row.get::<_, i64>(1)?,
                 row.get::<_, String>(2)?,
                 row.get::<_, Option<String>>(3)?,
-                row.get::<_, String>(4)?,
-                row.get::<_, String>(5)?,
+                row.get::<_, Option<String>>(4)?,
+                row.get::<_, Option<String>>(5)?,
+                row.get::<_, String>(6)?,
+                row.get::<_, String>(7)?,
             ))
         })?;
 
         let mut entries = Vec::new();
         for row in rows {
-            let (log_id, practice_id, logged_at_str, note, practice_name, pt_str) = row?;
+            let (log_id, practice_id, logged_at_str, note, warm_up, cool_down, practice_name, pt_str) = row?;
             let logged_at =
                 NaiveDateTime::parse_from_str(&logged_at_str, "%Y-%m-%d %H:%M:%S%.f")
                     .context("failed to parse logged_at")?;
@@ -301,6 +317,8 @@ impl Database {
                     practice_id,
                     logged_at,
                     note,
+                    warm_up,
+                    cool_down,
                 },
                 practice_name,
                 practice_type,
@@ -313,7 +331,7 @@ impl Database {
     pub fn list_logs_recent(&self, days: i64) -> Result<Vec<LogEntry>> {
         let cutoff = Local::now().naive_local() - chrono::Duration::days(days);
         let mut stmt = self.conn.prepare(
-            "SELECT l.id, l.practice_id, l.logged_at, l.note, p.name, p.practice_type
+            "SELECT l.id, l.practice_id, l.logged_at, l.note, l.warm_up, l.cool_down, p.name, p.practice_type
              FROM logs l
              JOIN practices p ON l.practice_id = p.id
              WHERE l.logged_at >= ?1
@@ -325,14 +343,16 @@ impl Database {
                 row.get::<_, i64>(1)?,
                 row.get::<_, String>(2)?,
                 row.get::<_, Option<String>>(3)?,
-                row.get::<_, String>(4)?,
-                row.get::<_, String>(5)?,
+                row.get::<_, Option<String>>(4)?,
+                row.get::<_, Option<String>>(5)?,
+                row.get::<_, String>(6)?,
+                row.get::<_, String>(7)?,
             ))
         })?;
 
         let mut entries = Vec::new();
         for row in rows {
-            let (log_id, practice_id, logged_at_str, note, practice_name, pt_str) = row?;
+            let (log_id, practice_id, logged_at_str, note, warm_up, cool_down, practice_name, pt_str) = row?;
             let logged_at =
                 NaiveDateTime::parse_from_str(&logged_at_str, "%Y-%m-%d %H:%M:%S%.f")
                     .context("failed to parse logged_at")?;
@@ -345,6 +365,8 @@ impl Database {
                     practice_id,
                     logged_at,
                     note,
+                    warm_up,
+                    cool_down,
                 },
                 practice_name,
                 practice_type,
@@ -357,7 +379,7 @@ impl Database {
     pub fn list_logs_for_practice(&self, practice_id: i64, days: i64) -> Result<Vec<LogEntry>> {
         let cutoff = Local::now().naive_local() - chrono::Duration::days(days);
         let mut stmt = self.conn.prepare(
-            "SELECT l.id, l.practice_id, l.logged_at, l.note, p.name, p.practice_type
+            "SELECT l.id, l.practice_id, l.logged_at, l.note, l.warm_up, l.cool_down, p.name, p.practice_type
              FROM logs l
              JOIN practices p ON l.practice_id = p.id
              WHERE l.practice_id = ?1 AND l.logged_at >= ?2
@@ -369,14 +391,16 @@ impl Database {
                 row.get::<_, i64>(1)?,
                 row.get::<_, String>(2)?,
                 row.get::<_, Option<String>>(3)?,
-                row.get::<_, String>(4)?,
-                row.get::<_, String>(5)?,
+                row.get::<_, Option<String>>(4)?,
+                row.get::<_, Option<String>>(5)?,
+                row.get::<_, String>(6)?,
+                row.get::<_, String>(7)?,
             ))
         })?;
 
         let mut entries = Vec::new();
         for row in rows {
-            let (log_id, pid, logged_at_str, note, practice_name, pt_str) = row?;
+            let (log_id, pid, logged_at_str, note, warm_up, cool_down, practice_name, pt_str) = row?;
             let logged_at =
                 NaiveDateTime::parse_from_str(&logged_at_str, "%Y-%m-%d %H:%M:%S%.f")
                     .context("failed to parse logged_at")?;
@@ -389,6 +413,8 @@ impl Database {
                     practice_id: pid,
                     logged_at,
                     note,
+                    warm_up,
+                    cool_down,
                 },
                 practice_name,
                 practice_type,
@@ -479,7 +505,7 @@ impl Database {
     /// Exports all log entries (all time).
     pub fn export_all(&self) -> Result<Vec<LogEntry>> {
         let mut stmt = self.conn.prepare(
-            "SELECT l.id, l.practice_id, l.logged_at, l.note, p.name, p.practice_type
+            "SELECT l.id, l.practice_id, l.logged_at, l.note, l.warm_up, l.cool_down, p.name, p.practice_type
              FROM logs l
              JOIN practices p ON l.practice_id = p.id
              ORDER BY l.logged_at DESC",
@@ -490,14 +516,16 @@ impl Database {
                 row.get::<_, i64>(1)?,
                 row.get::<_, String>(2)?,
                 row.get::<_, Option<String>>(3)?,
-                row.get::<_, String>(4)?,
-                row.get::<_, String>(5)?,
+                row.get::<_, Option<String>>(4)?,
+                row.get::<_, Option<String>>(5)?,
+                row.get::<_, String>(6)?,
+                row.get::<_, String>(7)?,
             ))
         })?;
 
         let mut entries = Vec::new();
         for row in rows {
-            let (log_id, practice_id, logged_at_str, note, practice_name, pt_str) = row?;
+            let (log_id, practice_id, logged_at_str, note, warm_up, cool_down, practice_name, pt_str) = row?;
             let logged_at =
                 NaiveDateTime::parse_from_str(&logged_at_str, "%Y-%m-%d %H:%M:%S%.f")
                     .context("failed to parse logged_at")?;
@@ -510,6 +538,8 @@ impl Database {
                     practice_id,
                     logged_at,
                     note,
+                    warm_up,
+                    cool_down,
                 },
                 practice_name,
                 practice_type,

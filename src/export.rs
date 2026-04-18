@@ -252,6 +252,8 @@ pub fn import_from_json(db: &Database, path: &Path) -> Result<usize> {
             &logged_at,
             &sets,
             log.note.as_deref(),
+            None,
+            None,
         )?;
 
         imported += 1;

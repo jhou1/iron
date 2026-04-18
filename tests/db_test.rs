@@ -62,7 +62,7 @@ fn create_log_with_sets() {
         SetData::Weighted { weight: 100.0, reps: 5 },
     ];
 
-    db.create_log(practice_id, &sets, Some("Felt good")).unwrap();
+    db.create_log(practice_id, &sets, Some("Felt good"), None, None).unwrap();
 
     let entries = db.list_logs_recent(1).unwrap();
     assert_eq!(entries.len(), 1);
@@ -84,7 +84,7 @@ fn update_log_sets_and_note() {
     let sets = vec![
         SetData::Weighted { weight: 60.0, reps: 10 },
     ];
-    db.create_log(practice_id, &sets, Some("First attempt")).unwrap();
+    db.create_log(practice_id, &sets, Some("First attempt"), None, None).unwrap();
 
     let entries = db.list_logs_recent(1).unwrap();
     let log_id = entries[0].log.id;
@@ -93,7 +93,7 @@ fn update_log_sets_and_note() {
         SetData::Weighted { weight: 80.0, reps: 8 },
         SetData::Weighted { weight: 100.0, reps: 5 },
     ];
-    db.update_log(log_id, &new_sets, Some("Updated"), None).unwrap();
+    db.update_log(log_id, &new_sets, Some("Updated"), None, None, None).unwrap();
 
     let entries = db.list_logs_recent(1).unwrap();
     assert_eq!(entries[0].sets.len(), 2);
@@ -110,7 +110,7 @@ fn delete_log() {
     let practice_id = practices[0].id;
 
     let sets = vec![SetData::Distance { distance: 5.0 }];
-    db.create_log(practice_id, &sets, None).unwrap();
+    db.create_log(practice_id, &sets, None, None, None).unwrap();
 
     let entries = db.list_logs_recent(1).unwrap();
     let log_id = entries[0].log.id;
@@ -129,8 +129,8 @@ fn heatmap_data() {
     let practice_id = practices[0].id;
 
     let sets = vec![SetData::Bodyweight { reps: 20 }];
-    db.create_log(practice_id, &sets, None).unwrap();
-    db.create_log(practice_id, &sets, None).unwrap();
+    db.create_log(practice_id, &sets, None, None, None).unwrap();
+    db.create_log(practice_id, &sets, None, None, None).unwrap();
 
     let counts = db.heatmap_counts(30).unwrap();
     // Today's date should have count 2
@@ -149,8 +149,8 @@ fn logs_for_practice_trend() {
 
     let sets1 = vec![SetData::Weighted { weight: 100.0, reps: 5 }];
     let sets2 = vec![SetData::Weighted { weight: 110.0, reps: 5 }];
-    db.create_log(practice_id, &sets1, None).unwrap();
-    db.create_log(practice_id, &sets2, None).unwrap();
+    db.create_log(practice_id, &sets1, None, None, None).unwrap();
+    db.create_log(practice_id, &sets2, None, None, None).unwrap();
 
     let entries = db.list_logs_for_practice(practice_id, 30).unwrap();
     assert_eq!(entries.len(), 2);
@@ -169,7 +169,7 @@ fn fourteen_day_stats() {
         SetData::Weighted { weight: 60.0, reps: 10 }, // volume = 600
         SetData::Weighted { weight: 80.0, reps: 5 },  // volume = 400
     ];
-    db.create_log(bench_id, &weighted_sets, None).unwrap();
+    db.create_log(bench_id, &weighted_sets, None, None, None).unwrap();
 
     // Create a distance practice with one log
     db.create_practice("Run", PracticeType::Distance).unwrap();
@@ -179,7 +179,7 @@ fn fourteen_day_stats() {
     let distance_sets = vec![
         SetData::Distance { distance: 5.0 },
     ];
-    db.create_log(run_id, &distance_sets, None).unwrap();
+    db.create_log(run_id, &distance_sets, None, None, None).unwrap();
 
     let stats = db.aggregate_stats(14).unwrap();
     assert_eq!(stats.sessions, 2);
@@ -447,4 +447,34 @@ fn set_completed_at_date() {
     let goals = db.list_goals().unwrap();
     assert_eq!(goals[0].completed_at.unwrap().date(), chrono::NaiveDate::from_ymd_opt(2026, 3, 15).unwrap());
     assert_eq!(goals[0].milestones[0].completed_at.unwrap().date(), chrono::NaiveDate::from_ymd_opt(2026, 3, 15).unwrap());
+}
+
+#[test]
+fn create_log_with_warmup_cooldown() {
+    let db = Database::open_in_memory().unwrap();
+    db.create_practice("Bench Press", PracticeType::Weighted).unwrap();
+    let practices = db.list_practices().unwrap();
+    let practice_id = practices[0].id;
+    let sets = vec![SetData::Weighted { weight: 60.0, reps: 10 }];
+    db.create_log(practice_id, &sets, Some("Good session"), Some("5 min jump rope"), Some("Static stretches")).unwrap();
+    let entries = db.list_logs_recent(1).unwrap();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].log.warm_up, Some("5 min jump rope".to_string()));
+    assert_eq!(entries[0].log.cool_down, Some("Static stretches".to_string()));
+}
+
+#[test]
+fn update_log_warmup_cooldown() {
+    let db = Database::open_in_memory().unwrap();
+    db.create_practice("Squat", PracticeType::Weighted).unwrap();
+    let practices = db.list_practices().unwrap();
+    let practice_id = practices[0].id;
+    let sets = vec![SetData::Weighted { weight: 60.0, reps: 10 }];
+    db.create_log(practice_id, &sets, None, None, None).unwrap();
+    let entries = db.list_logs_recent(1).unwrap();
+    let log_id = entries[0].log.id;
+    db.update_log(log_id, &sets, Some("Updated"), None, Some("Foam rolling"), Some("Cool down walk")).unwrap();
+    let entries = db.list_logs_recent(1).unwrap();
+    assert_eq!(entries[0].log.warm_up, Some("Foam rolling".to_string()));
+    assert_eq!(entries[0].log.cool_down, Some("Cool down walk".to_string()));
 }

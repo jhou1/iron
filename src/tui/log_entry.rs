@@ -788,9 +788,9 @@ impl LogEntryScreen {
                     .unwrap_or_else(|_| Local::now().date_naive());
                 let datetime = date.and_time(NaiveTime::from_hms_opt(12, 0, 0).unwrap());
                 if let Some(log_id) = self.editing_log_id {
-                    let _ = db.update_log(log_id, &self.sets, note, Some(&datetime));
+                    let _ = db.update_log(log_id, &self.sets, note, Some(&datetime), None, None);
                 } else {
-                    let _ = db.create_log_at(practice.id, &datetime, &self.sets, note);
+                    let _ = db.create_log_at(practice.id, &datetime, &self.sets, note, None, None);
                 }
                 Action::Navigate(self.return_to.clone())
             }
