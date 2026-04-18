@@ -1,53 +1,32 @@
 use std::collections::HashSet;
 
+// These tests mutate process-wide env vars (LANG/LC_ALL) and re-init the
+// thread-local bundle, so they must not run in parallel with each other.
+// We consolidate them into a single test to avoid races.
 #[test]
-fn tr_returns_english_by_default() {
+fn tr_locale_switching() {
+    // English
     std::env::set_var("LANG", "en_US.UTF-8");
     std::env::remove_var("LC_ALL");
     ironcli::i18n::init();
 
-    let result = ironcli::i18n::tr("dashboard-goals");
-    assert_eq!(result, "Goals");
-}
+    assert_eq!(ironcli::i18n::tr("dashboard-goals"), "Goals");
+    assert_eq!(
+        ironcli::i18n::tr_args("dashboard-sessions", &[("count", 5.0.into())]),
+        "5 sessions"
+    );
+    assert_eq!(ironcli::i18n::tr("nonexistent-key"), "nonexistent-key");
 
-#[test]
-fn tr_returns_chinese_when_locale_is_zh() {
+    // Chinese
     std::env::set_var("LANG", "zh_CN.UTF-8");
     std::env::remove_var("LC_ALL");
     ironcli::i18n::init();
 
-    let result = ironcli::i18n::tr("dashboard-goals");
-    assert_eq!(result, "目标");
-}
-
-#[test]
-fn tr_args_interpolates_values() {
-    std::env::set_var("LANG", "en_US.UTF-8");
-    std::env::remove_var("LC_ALL");
-    ironcli::i18n::init();
-
-    let result = ironcli::i18n::tr_args("dashboard-sessions", &[("count", 5.0.into())]);
-    assert_eq!(result, "5 sessions");
-}
-
-#[test]
-fn tr_args_interpolates_chinese() {
-    std::env::set_var("LANG", "zh_CN.UTF-8");
-    std::env::remove_var("LC_ALL");
-    ironcli::i18n::init();
-
-    let result = ironcli::i18n::tr_args("dashboard-sessions", &[("count", 5.0.into())]);
-    assert_eq!(result, "5 次训练");
-}
-
-#[test]
-fn tr_fallback_for_missing_key() {
-    std::env::set_var("LANG", "en_US.UTF-8");
-    std::env::remove_var("LC_ALL");
-    ironcli::i18n::init();
-
-    let result = ironcli::i18n::tr("nonexistent-key");
-    assert_eq!(result, "nonexistent-key");
+    assert_eq!(ironcli::i18n::tr("dashboard-goals"), "目标");
+    assert_eq!(
+        ironcli::i18n::tr_args("dashboard-sessions", &[("count", 5.0.into())]),
+        "5 次训练"
+    );
 }
 
 #[test]
