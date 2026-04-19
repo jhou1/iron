@@ -15,7 +15,7 @@ use crate::i18n::{tr, tr_args};
 use crate::model::{LogEntry, Practice};
 use fluent_bundle::FluentValue;
 use super::widgets::sparkline::Sparkline;
-use super::{highlight_row, Action, Screen};
+use super::{centered_area, highlight_row, Action, Screen, CONTENT_WIDTH};
 
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
@@ -96,7 +96,7 @@ impl TrendsScreen {
     // ── Phase: SelectPractice ──────────────────────────────────────────
 
     fn render_select_practice(&self, frame: &mut Frame) {
-        let area = frame.area();
+        let area = centered_area(frame.area(), CONTENT_WIDTH);
 
         let list_height = (self.filtered_indices.len() as u16).max(1);
         let chunks = Layout::default()
@@ -264,7 +264,7 @@ impl TrendsScreen {
     // ── Phase: ViewChart ───────────────────────────────────────────────
 
     fn render_view_chart(&self, frame: &mut Frame) {
-        let area = frame.area();
+        let area = centered_area(frame.area(), CONTENT_WIDTH);
         let practice = match self.chosen_practice.as_ref() {
             Some(p) => p,
             None => return,

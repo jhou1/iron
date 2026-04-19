@@ -1,6 +1,6 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::Paragraph,
@@ -12,13 +12,12 @@ use unicode_width::UnicodeWidthStr;
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
 use crate::model::{Practice, PracticeType};
-use super::{highlight_row, Action, Screen};
+use super::{centered_area, highlight_row, Action, Screen, CONTENT_WIDTH};
 use fluent_bundle::FluentValue;
 
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
 const RED: Color = Color::Red;
-const CONTENT_WIDTH: u16 = 3 + 52 * 2;
 
 #[derive(Debug, Clone, PartialEq)]
 enum Mode {
@@ -64,13 +63,7 @@ impl PracticesScreen {
     }
 
     pub fn render(&self, frame: &mut Frame) {
-        let full = frame.area();
-        let area = Rect {
-            x: full.x + 1,
-            y: full.y,
-            width: full.width.saturating_sub(2).min(CONTENT_WIDTH),
-            height: full.height,
-        };
+        let area = centered_area(frame.area(), CONTENT_WIDTH);
 
         let list_height = (self.practices.len() as u16).max(1);
         let action_height: u16 = match &self.mode {

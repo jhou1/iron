@@ -1,6 +1,6 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout},
     style::{Color, Style, Stylize},
     text::{Line, Span},
     widgets::{Paragraph, Wrap},
@@ -10,11 +10,10 @@ use ratatui::{
 use crate::db::Database;
 use crate::i18n::tr;
 use crate::model::Goal;
-use super::{highlight_row, Action, Screen};
+use super::{centered_area, highlight_row, Action, Screen, CONTENT_WIDTH};
 
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
-const CONTENT_WIDTH: u16 = 3 + 52 * 2;
 
 fn goal_gauge_ratio(goal: &Goal) -> f64 {
     if goal.milestones.is_empty() {
@@ -200,13 +199,7 @@ impl GoalsScreen {
     }
 
     pub fn render(&self, frame: &mut Frame) {
-        let full = frame.area();
-        let area = Rect {
-            x: full.x + 1,
-            y: full.y,
-            width: full.width.saturating_sub(2).min(CONTENT_WIDTH),
-            height: full.height,
-        };
+        let area = centered_area(frame.area(), CONTENT_WIDTH);
 
         let chunks = Layout::default()
             .direction(Direction::Vertical)

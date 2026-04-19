@@ -1,6 +1,6 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout},
     style::{Color, Style, Stylize},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
@@ -12,7 +12,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
 use crate::model::{LogEntry, SetData};
-use super::{highlight_row, Action, Screen};
+use super::{centered_area, highlight_row, Action, Screen, CONTENT_WIDTH};
 use fluent_bundle::FluentValue;
 
 const GREEN: Color = Color::Green;
@@ -49,13 +49,7 @@ impl HistoryScreen {
     }
 
     pub fn render(&mut self, frame: &mut Frame) {
-        let full = frame.area();
-        let area = Rect {
-            x: full.x + 1,
-            y: full.y,
-            width: full.width.saturating_sub(2),
-            height: full.height,
-        };
+        let area = centered_area(frame.area(), CONTENT_WIDTH);
 
         let max_name_len = self.entries.iter()
             .map(|e| e.practice_name.width())

@@ -13,7 +13,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
 use crate::model::{LogEntry, Practice, PracticeType, SetData};
-use super::{highlight_row, Action, Screen};
+use super::{centered_area, highlight_row, Action, Screen, CONTENT_WIDTH};
 use fluent_bundle::FluentValue;
 
 const ACCENT: Color = Color::Cyan;
@@ -149,7 +149,7 @@ impl LogEntryScreen {
     // ── Phase 1: SelectPractice ───────────────────────────────────────
 
     fn render_select_practice(&self, frame: &mut Frame) {
-        let area = frame.area();
+        let area = centered_area(frame.area(), CONTENT_WIDTH);
 
         let list_height = (self.filtered_indices.len() as u16).max(1);
         let chunks = Layout::default()
@@ -325,7 +325,7 @@ impl LogEntryScreen {
     // ── Phase 2: EnterSets ────────────────────────────────────────────
 
     fn render_enter_sets(&self, frame: &mut Frame) {
-        let area = frame.area();
+        let area = centered_area(frame.area(), CONTENT_WIDTH);
         let practice = self.chosen_practice.as_ref().unwrap();
 
         let sets_height = (self.sets.len() as u16 + 3).max(3); // sets + input fields
@@ -713,7 +713,7 @@ impl LogEntryScreen {
     // ── Phase 2.5: EnterWarmUpCoolDown ──────────────────────────────────
 
     fn render_warmup_cooldown(&self, frame: &mut Frame) {
-        let area = frame.area();
+        let area = centered_area(frame.area(), CONTENT_WIDTH);
         let practice = self.chosen_practice.as_ref().unwrap();
 
         let chunks = Layout::default()
@@ -852,7 +852,7 @@ impl LogEntryScreen {
     // ── Phase 3: EnterNote ────────────────────────────────────────────
 
     fn render_enter_note(&self, frame: &mut Frame) {
-        let area = frame.area();
+        let area = centered_area(frame.area(), CONTENT_WIDTH);
         let practice = self.chosen_practice.as_ref().unwrap();
 
         let chunks = Layout::default()

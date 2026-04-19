@@ -14,6 +14,13 @@ use ratatui::{
 };
 
 const HIGHLIGHT_BG: Color = Color::DarkGray;
+pub const CONTENT_WIDTH: u16 = 3 + 52 * 2;
+
+pub fn centered_area(full: Rect, max_width: u16) -> Rect {
+    let width = full.width.min(max_width);
+    let x = full.x + (full.width.saturating_sub(width)) / 2;
+    Rect { x, y: full.y, width, height: full.height }
+}
 
 pub fn highlight_row(frame: &mut Frame, area: Rect, row: u16) {
     let y = area.y + row;

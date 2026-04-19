@@ -13,11 +13,10 @@ use crate::i18n::{tr, tr_args};
 use crate::model::{Goal, LogEntry, Quote};
 use fluent_bundle::FluentValue;
 use super::widgets::heatmap::Heatmap;
-use super::{highlight_row, Action, Screen};
+use super::{centered_area, highlight_row, Action, Screen, CONTENT_WIDTH};
 
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
-const HEATMAP_CONTENT_WIDTH: u16 = 3 + 52 * 2; // day labels (3) + 52 weeks × 2 chars
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum DashboardMode {
@@ -83,7 +82,7 @@ impl DashboardScreen {
     }
 
     pub fn render(&self, frame: &mut Frame) {
-        let area = frame.area();
+        let area = centered_area(frame.area(), CONTENT_WIDTH);
 
         // Pane height adapts to content — each active goal = 2 lines (title + gauge)
         let active_goal_count = self.goals.iter().filter(|g| !g.completed).count() as u16;
@@ -93,7 +92,7 @@ impl DashboardScreen {
             .max(7);
 
         // Calculate quote box height: content lines + 2 for borders
-        let quote_box_width = area.width.saturating_sub(4).min(HEATMAP_CONTENT_WIDTH).saturating_sub(2) as usize;
+        let quote_box_width = area.width.saturating_sub(4) as usize;
         let (quote_text, quote_style) = if self.quote.is_empty() {
             (
                 tr("dashboard-no-quotes"),
@@ -126,52 +125,35 @@ impl DashboardScreen {
             ])
             .split(area);
 
-        // ── Logo header: separator / title+version / separator ──
-        let logo_area = Rect {
-            x: chunks[0].x + 1,
-            y: chunks[0].y,
-            width: chunks[0].width.saturating_sub(2).min(HEATMAP_CONTENT_WIDTH),
-            height: chunks[0].height,
-        };
-        let sep = "━".repeat(logo_area.width as usize);
+        // ── Logo header (rounded border box) ──
         let logo_text = tr("dashboard-logo-text");
         let version = format!("v{}", env!("CARGO_PKG_VERSION"));
-        let logo_lines = vec![
-            Line::from(Span::styled(&sep, Style::default().fg(Color::DarkGray))),
-            Line::from(vec![
-                Span::styled(format!(" {}", logo_text), Style::default().fg(ACCENT).bold()),
-                Span::styled(
-                    format!(
-                        "{}{}",
-                        " ".repeat(logo_area.width.saturating_sub(
-                            logo_text.width() as u16 + 1 + version.len() as u16 + 1
-                        ) as usize),
-                        version
-                    ),
-                    Style::default().fg(Color::Gray),
+        let inner_width = chunks[0].width.saturating_sub(2);
+        let logo_line = Line::from(vec![
+            Span::styled(logo_text.clone(), Style::default().fg(ACCENT).bold()),
+            Span::styled(
+                format!(
+                    "{} {}",
+                    " ".repeat(inner_width.saturating_sub(
+                        logo_text.width() as u16 + version.len() as u16 + 1
+                    ) as usize),
+                    version
                 ),
-            ]),
-            Line::from(Span::styled(&sep, Style::default().fg(Color::DarkGray))),
-        ];
-        frame.render_widget(Paragraph::new(logo_lines), logo_area);
+                Style::default().fg(Color::Gray),
+            ),
+        ]);
+        let logo_block = Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(Color::DarkGray));
+        let logo_paragraph = Paragraph::new(logo_line).block(logo_block);
+        frame.render_widget(logo_paragraph, chunks[0]);
 
         // ── Heatmap ──
-        let heatmap_area = Rect {
-            x: chunks[1].x + 1,
-            y: chunks[1].y,
-            width: chunks[1].width.saturating_sub(2).min(HEATMAP_CONTENT_WIDTH),
-            height: chunks[1].height,
-        };
         let heatmap = Heatmap::new(&self.heatmap_data, 52);
-        frame.render_widget(heatmap, heatmap_area);
+        frame.render_widget(heatmap, chunks[1]);
 
         // ── Daily quote (centered, rounded border) ──
-        let quote_area = Rect {
-            x: chunks[2].x + 1,
-            y: chunks[2].y,
-            width: chunks[2].width.saturating_sub(2).min(HEATMAP_CONTENT_WIDTH),
-            height: chunks[2].height,
-        };
         let quote_block = Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
@@ -183,13 +165,13 @@ impl DashboardScreen {
         .block(quote_block)
         .wrap(Wrap { trim: false })
         .alignment(ratatui::layout::Alignment::Center);
-        frame.render_widget(quote_paragraph, quote_area);
+        frame.render_widget(quote_paragraph, chunks[2]);
 
         // ── HRV row (centered in 3-line area) ──
         let hrv_area = Rect {
-            x: chunks[3].x + 1,
+            x: chunks[3].x,
             y: chunks[3].y + 1,
-            width: chunks[3].width.saturating_sub(2).min(HEATMAP_CONTENT_WIDTH),
+            width: chunks[3].width,
             height: 1,
         };
         let hrv_line = if self.mode == DashboardMode::HrvInput {
@@ -214,17 +196,11 @@ impl DashboardScreen {
         };
         frame.render_widget(Paragraph::new(hrv_line), hrv_area);
 
-        // ── Split panes (match heatmap content width) ──
-        let panes_area = Rect {
-            x: chunks[4].x + 1,
-            y: chunks[4].y,
-            width: chunks[4].width.saturating_sub(2).min(HEATMAP_CONTENT_WIDTH),
-            height: chunks[4].height,
-        };
+        // ── Split panes ──
         let panes = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-            .split(panes_area);
+            .split(chunks[4]);
 
         self.render_recent_pane(frame, panes[0]);
         self.render_goals_pane(frame, panes[1]);
@@ -408,7 +384,7 @@ impl DashboardScreen {
     fn render_quotes_modal(&self, frame: &mut Frame) {
         let area = frame.area();
 
-        let modal_width = area.width.saturating_sub(4).min(HEATMAP_CONTENT_WIDTH);
+        let modal_width = area.width.saturating_sub(4).min(CONTENT_WIDTH);
         let list_height = (self.quotes.len() as u16).max(1);
         let modal_height = (list_height + 4).min(area.height.saturating_sub(4)).max(6);
         let modal_x = area.x + (area.width.saturating_sub(modal_width)) / 2;
