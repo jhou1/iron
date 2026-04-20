@@ -360,7 +360,7 @@ impl LogEntryScreen {
         // Date line
         let date_line = if self.editing_date {
             Line::from(vec![
-                Span::styled(format!("  {}: ", tr("log-date-label")), Style::default().fg(Color::Gray)),
+                Span::styled(format!("  {} ", tr("log-date-label")), Style::default().fg(Color::Gray)),
                 Span::styled(
                     format!("{}\u{2588}", self.date_input),
                     Style::default().fg(ACCENT),
@@ -372,13 +372,13 @@ impl LogEntryScreen {
             ])
         } else if !self.date_confirmed {
             Line::from(vec![
-                Span::styled(format!("> {}: ", tr("log-date-label")), Style::default().fg(GREEN).bold()),
+                Span::styled(format!("> {} ", tr("log-date-label")), Style::default().fg(GREEN).bold()),
                 Span::styled(&self.log_date, Style::default().fg(GREEN).bold()),
                 Span::styled(format!("  {}", tr("log-date-confirm-hint")), Style::default().fg(Color::Gray)),
             ])
         } else {
             Line::from(vec![
-                Span::styled(format!("  {}: ", tr("log-date-label")), Style::default().fg(Color::Gray)),
+                Span::styled(format!("  {} ", tr("log-date-label")), Style::default().fg(Color::Gray)),
                 Span::styled(&self.log_date, Style::default().fg(Color::White)),
                 Span::styled(format!("  {}", tr("log-date-change-hint")), Style::default().fg(Color::Gray)),
             ])
@@ -516,7 +516,7 @@ impl LogEntryScreen {
         }
         if !self.note.is_empty() {
             meta_lines.push(Line::from(vec![
-                Span::styled(format!("  {}: ", tr("log-note-label")), Style::default().fg(Color::Gray)),
+                Span::styled(format!("  {} ", tr("log-note-label")), Style::default().fg(Color::Gray)),
                 Span::styled(&self.note, Style::default().fg(Color::Yellow)),
             ]));
         }
@@ -887,7 +887,7 @@ impl LogEntryScreen {
         let total_formatted = format!("{:.1}", total);
         let summary_lines = vec![
             Line::from(vec![
-                Span::styled(format!("  {}: ", tr("log-date-label")), Style::default().fg(Color::Gray)),
+                Span::styled(format!("  {} ", tr("log-date-label")), Style::default().fg(Color::Gray)),
                 Span::styled(&self.log_date, Style::default().fg(Color::White)),
             ]),
             Line::from(Span::styled(

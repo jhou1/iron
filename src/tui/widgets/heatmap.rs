@@ -48,7 +48,7 @@ impl<'a> Widget for Heatmap<'a> {
         let current_week_monday = today - Duration::days(today_weekday as i64);
         let start_monday = current_week_monday - Duration::weeks((self.weeks as i64) - 1);
 
-        // Day labels on the left (3 chars wide), shifted down 1 row for month labels
+        // Day labels on the left, shifted down 1 row for month labels
         let day_labels = [
             crate::i18n::tr("heatmap-mon"),
             crate::i18n::tr("heatmap-tue"),
@@ -58,7 +58,10 @@ impl<'a> Widget for Heatmap<'a> {
             crate::i18n::tr("heatmap-sat"),
             crate::i18n::tr("heatmap-sun"),
         ];
-        let label_width: u16 = 3;
+        let label_width = day_labels.iter()
+            .map(|l| l.width())
+            .max()
+            .unwrap_or(2) as u16 + 1;
         let month_row_y = area.y;
         let grid_y = area.y + 1; // grid starts 1 row below for month labels
 
@@ -93,19 +96,23 @@ impl<'a> Widget for Heatmap<'a> {
 
         // Track which months to label: place label at the first week column of each month
         let mut last_labeled_month: Option<u32> = None;
+        let mut last_label_end_x: u16 = 0;
 
         for week in 0..num_weeks {
             // Determine the month for this week's Monday
             let week_monday = start_monday + Duration::weeks(week as i64);
             let month = week_monday.month();
 
-            // Place month label at the first week column of each new month
+            // Place month label at the first week column of each new month;
+            // if it would overlap the previous label, shift it right just enough
             if last_labeled_month != Some(month) {
-                let x = area.x + label_width + week * cell_width;
+                let natural_x = area.x + label_width + week * cell_width;
+                let x = natural_x.max(last_label_end_x);
                 let label = &month_names[(month - 1) as usize];
                 let label_len = label.width() as u16;
                 if x + label_len <= area.x + area.width {
                     buf.set_string(x, month_row_y, label, Style::default().fg(Color::Gray));
+                    last_label_end_x = x + label_len + 1;
                 }
                 last_labeled_month = Some(month);
             }
