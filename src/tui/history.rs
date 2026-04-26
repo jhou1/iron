@@ -109,7 +109,7 @@ impl HistoryScreen {
             Line::from(vec![
                 Span::styled(" [j/k]", Style::default().fg(ACCENT)),
                 Span::styled(navigate_text, Style::default().fg(Color::Gray)),
-                Span::styled("[Enter]", Style::default().fg(ACCENT)),
+                Span::styled("[e]", Style::default().fg(ACCENT)),
                 Span::styled(edit_text, Style::default().fg(Color::Gray)),
                 Span::styled("[d]", Style::default().fg(ACCENT)),
                 Span::styled(delete_text, Style::default().fg(Color::Gray)),
@@ -304,7 +304,7 @@ impl HistoryScreen {
                 }
                 Action::None
             }
-            KeyCode::Enter => {
+            KeyCode::Char('e') => {
                 if !self.entries.is_empty() {
                     return Action::Navigate(Screen::LogEntry);
                 }

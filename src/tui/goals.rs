@@ -419,7 +419,7 @@ impl GoalsScreen {
                 Span::styled(format!(" {}  ", tr("key-add-goal")), Style::default().fg(Color::Gray)),
                 Span::styled("[m]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}  ", tr("key-milestone")), Style::default().fg(Color::Gray)),
-                Span::styled("[Enter]", Style::default().fg(ACCENT)),
+                Span::styled("[e]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::Gray)),
                 Span::styled("[Space]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}  ", tr("key-toggle")), Style::default().fg(Color::Gray)),
@@ -490,7 +490,7 @@ impl GoalsScreen {
                 }
                 Action::None
             }
-            KeyCode::Enter => {
+            KeyCode::Char('e') => {
                 if let Some(item) = self.selected_goal_item() {
                     let current_title = match item {
                         GoalItem::Goal(id) => {

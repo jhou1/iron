@@ -530,10 +530,10 @@ impl LogEntryScreen {
             Span::styled(format!(" {}  ", tr("key-add-set")), Style::default().fg(Color::Gray)),
             Span::styled("[Ctrl+S]", Style::default().fg(ACCENT)),
             Span::styled(format!(" {}  ", tr("key-save")), Style::default().fg(Color::Gray)),
+            Span::styled("[Backspace]", Style::default().fg(ACCENT)),
+            Span::styled(format!(" {}  ", tr("key-del-last")), Style::default().fg(Color::Gray)),
             Span::styled("[D]", Style::default().fg(ACCENT)),
             Span::styled(format!(" {}  ", tr("key-date")), Style::default().fg(Color::Gray)),
-            Span::styled("[d]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}  ", tr("key-del-last")), Style::default().fg(Color::Gray)),
             Span::styled("[Esc]", Style::default().fg(ACCENT)),
             Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::Gray)),
         ]);
@@ -553,11 +553,11 @@ impl LogEntryScreen {
                     self.date_confirmed = true;
                     Action::None
                 }
-                KeyCode::Char('D') | KeyCode::Char('d') => {
-                    self.editing_date = true;
-                    self.date_input = self.log_date.clone();
-                    Action::None
-                }
+            KeyCode::Char('D') => {
+                self.editing_date = true;
+                self.date_input = self.log_date.clone();
+                Action::None
+            }
                 KeyCode::Esc => Action::Navigate(self.return_to.clone()),
                 _ => Action::None,
             };
@@ -598,18 +598,14 @@ impl LogEntryScreen {
                 Action::None
             }
             KeyCode::Backspace => {
-                if self.active_field == 0 {
-                    self.field1.pop();
-                } else {
-                    self.field2.pop();
-                }
-                Action::None
-            }
-            KeyCode::Char('d') => {
                 let fields_empty = self.field1.is_empty()
                     && (self.field2.is_empty() || !has_two_fields);
                 if fields_empty && !self.sets.is_empty() {
                     self.sets.pop();
+                } else if self.active_field == 0 {
+                    self.field1.pop();
+                } else {
+                    self.field2.pop();
                 }
                 Action::None
             }

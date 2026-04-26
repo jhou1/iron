@@ -236,7 +236,7 @@ impl PracticesScreen {
                 Span::styled(format!(" {}  ", tr("key-navigate")), Style::default().fg(Color::Gray)),
                 Span::styled("[a]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}  ", tr("key-add")), Style::default().fg(Color::Gray)),
-                Span::styled("[Enter]", Style::default().fg(ACCENT)),
+                Span::styled("[e]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::Gray)),
                 Span::styled("[d]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::Gray)),
@@ -384,7 +384,7 @@ impl PracticesScreen {
                 self.mode = Mode::AddName;
                 Action::None
             }
-            KeyCode::Enter => {
+            KeyCode::Char('e') => {
                 if let Some(p) = self.practices.get(self.selected) {
                     self.input = p.name.clone();
                     self.input_cursor = self.input.len();
