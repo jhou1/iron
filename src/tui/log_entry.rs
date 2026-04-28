@@ -31,13 +31,16 @@ pub struct LogEntryScreen {
     practices: Vec<Practice>,
     filtered_indices: Vec<usize>,
     filter_text: String,
+    filter_cursor: usize,
     filtering: bool,
     selected: usize,
     phase: Phase,
     chosen_practice: Option<Practice>,
     sets: Vec<SetData>,
     field1: String,
+    field1_cursor: usize,
     field2: String,
+    field2_cursor: usize,
     active_field: usize,
     note: String,
     note_cursor: usize,    // byte offset into note string
@@ -51,6 +54,7 @@ pub struct LogEntryScreen {
     date_confirmed: bool,   // false = cursor on date line, true = entering sets
     editing_date: bool,     // true when in date-edit mode
     date_input: String,     // buffer for typing a new date
+    date_input_cursor: usize,
     return_to: Screen,     // screen to return to on Esc or save
 }
 
@@ -63,13 +67,16 @@ impl LogEntryScreen {
             practices,
             filtered_indices,
             filter_text: String::new(),
+            filter_cursor: 0,
             filtering: false,
             selected: 0,
             phase: Phase::SelectPractice,
             chosen_practice: None,
             sets: Vec::new(),
             field1: String::new(),
+            field1_cursor: 0,
             field2: String::new(),
+            field2_cursor: 0,
             active_field: 0,
             note: String::new(),
             note_cursor: 0,
@@ -83,6 +90,7 @@ impl LogEntryScreen {
             date_confirmed: false,
             editing_date: false,
             date_input: String::new(),
+            date_input_cursor: 0,
             return_to: Screen::Dashboard,
         })
     }
@@ -104,13 +112,16 @@ impl LogEntryScreen {
             practices,
             filtered_indices,
             filter_text: String::new(),
+            filter_cursor: 0,
             filtering: false,
             selected: 0,
             phase: Phase::EnterSets,
             chosen_practice: practice,
             sets,
             field1: String::new(),
+            field1_cursor: 0,
             field2: String::new(),
+            field2_cursor: 0,
             active_field: 0,
             note_cursor: note.len(),
             note,
@@ -124,6 +135,7 @@ impl LogEntryScreen {
             date_confirmed: true,
             editing_date: false,
             date_input: String::new(),
+            date_input_cursor: 0,
             return_to: Screen::History,
         })
     }
@@ -179,7 +191,8 @@ impl LogEntryScreen {
 
         // Filter bar + column header
         let filter_display = if self.filtering {
-            format!(" /{}█", self.filter_text)
+            let (before, after) = self.filter_text.split_at(self.filter_cursor);
+            format!(" /{}{}{}", before, "\u{2588}", after)
         } else if !self.filter_text.is_empty() {
             format!(" /{}", self.filter_text)
         } else {
@@ -259,12 +272,59 @@ impl LogEntryScreen {
                 KeyCode::Enter => {
                     self.filtering = false;
                 }
+                KeyCode::Char('b') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    if self.filter_cursor > 0 {
+                        self.filter_cursor = self.filter_text[..self.filter_cursor]
+                            .char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+                    }
+                }
+                KeyCode::Left => {
+                    if self.filter_cursor > 0 {
+                        self.filter_cursor = self.filter_text[..self.filter_cursor]
+                            .char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+                    }
+                }
+                KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    if self.filter_cursor < self.filter_text.len() {
+                        self.filter_cursor = self.filter_text[self.filter_cursor..]
+                            .char_indices().nth(1).map(|(i, _)| self.filter_cursor + i)
+                            .unwrap_or(self.filter_text.len());
+                    }
+                }
+                KeyCode::Right => {
+                    if self.filter_cursor < self.filter_text.len() {
+                        self.filter_cursor = self.filter_text[self.filter_cursor..]
+                            .char_indices().nth(1).map(|(i, _)| self.filter_cursor + i)
+                            .unwrap_or(self.filter_text.len());
+                    }
+                }
+                KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    self.filter_cursor = 0;
+                }
+                KeyCode::Home => {
+                    self.filter_cursor = 0;
+                }
+                KeyCode::Char('e') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    self.filter_cursor = self.filter_text.len();
+                }
+                KeyCode::End => {
+                    self.filter_cursor = self.filter_text.len();
+                }
                 KeyCode::Backspace => {
-                    self.filter_text.pop();
-                    self.apply_filter();
+                    if self.filter_cursor > 0 {
+                        let prev = self.filter_text[..self.filter_cursor]
+                            .char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+                        self.filter_text.remove(prev);
+                        self.filter_cursor = prev;
+                        self.apply_filter();
+                    }
+                }
+                KeyCode::Char('k') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    self.filter_text.truncate(self.filter_cursor);
                 }
                 KeyCode::Char(c) => {
-                    self.filter_text.push(c);
+                    self.filter_text.insert(self.filter_cursor, c);
+                    self.filter_cursor += c.len_utf8();
                     self.apply_filter();
                 }
                 _ => {}
@@ -300,7 +360,9 @@ impl LogEntryScreen {
                     self.phase = Phase::EnterSets;
                     self.sets.clear();
                     self.field1.clear();
+                    self.field1_cursor = 0;
                     self.field2.clear();
+                    self.field2_cursor = 0;
                     self.active_field = 0;
                     self.date_confirmed = false;
                 }
@@ -359,12 +421,12 @@ impl LogEntryScreen {
 
         // Date line
         let date_line = if self.editing_date {
+            let (before, after) = self.date_input.split_at(self.date_input_cursor);
             Line::from(vec![
                 Span::styled(format!("  {} ", tr("log-date-label")), Style::default().fg(Color::Gray)),
-                Span::styled(
-                    format!("{}\u{2588}", self.date_input),
-                    Style::default().fg(ACCENT),
-                ),
+                Span::styled(before, Style::default().fg(ACCENT)),
+                Span::styled("\u{2588}", Style::default().fg(ACCENT)),
+                Span::styled(after, Style::default().fg(ACCENT)),
                 Span::styled(
                     format!("  {}", tr("log-date-edit-hint")),
                     Style::default().fg(Color::Gray),
@@ -400,69 +462,66 @@ impl LogEntryScreen {
             lines.push(Line::from(Span::styled(text, Style::default().fg(GREEN))));
         }
 
-        // Current input fields
+        // Current input fields – show cursor at any position
         let set_num = self.sets.len() + 1;
         match practice.practice_type {
             PracticeType::Weighted => {
-                let weight_cursor = if self.active_field == 0 { "\u{2588}" } else { "" };
-                let reps_cursor = if self.active_field == 1 { "\u{2588}" } else { "" };
+                let (f1_before, f1_after) = self.field1.split_at(self.field1_cursor);
+                let (f2_before, f2_after) = self.field2.split_at(self.field2_cursor);
+                let f1_style = if self.active_field == 0 { ACCENT } else { Color::White };
+                let f2_style = if self.active_field == 1 { ACCENT } else { Color::White };
                 lines.push(Line::from(vec![
                     Span::styled(
                         format!("  Set {}: ", set_num),
                         Style::default().fg(Color::White),
                     ),
                     Span::styled(format!("{} ", tr("log-weight-label")), Style::default().fg(Color::Gray)),
-                    Span::styled(
-                        format!("{}{}", self.field1, weight_cursor),
-                        Style::default().fg(if self.active_field == 0 { ACCENT } else { Color::White }),
-                    ),
+                    Span::styled(f1_before, Style::default().fg(f1_style)),
+                    if self.active_field == 0 { Span::styled("\u{2588}", Style::default().fg(ACCENT)) } else { Span::raw("") },
+                    Span::styled(f1_after, Style::default().fg(f1_style)),
                     Span::styled(format!("  {} ", tr("log-reps-label")), Style::default().fg(Color::Gray)),
-                    Span::styled(
-                        format!("{}{}", self.field2, reps_cursor),
-                        Style::default().fg(if self.active_field == 1 { ACCENT } else { Color::White }),
-                    ),
+                    Span::styled(f2_before, Style::default().fg(f2_style)),
+                    if self.active_field == 1 { Span::styled("\u{2588}", Style::default().fg(ACCENT)) } else { Span::raw("") },
+                    Span::styled(f2_after, Style::default().fg(f2_style)),
                 ]));
             }
             PracticeType::Bodyweight => {
-                let cursor = "\u{2588}";
+                let (f1_before, f1_after) = self.field1.split_at(self.field1_cursor);
                 lines.push(Line::from(vec![
                     Span::styled(
                         format!("  Set {}: ", set_num),
                         Style::default().fg(Color::White),
                     ),
                     Span::styled(format!("{} ", tr("log-reps-label")), Style::default().fg(Color::Gray)),
-                    Span::styled(
-                        format!("{}{}", self.field1, cursor),
-                        Style::default().fg(ACCENT),
-                    ),
+                    Span::styled(f1_before, Style::default().fg(ACCENT)),
+                    Span::styled("\u{2588}", Style::default().fg(ACCENT)),
+                    Span::styled(f1_after, Style::default().fg(ACCENT)),
                 ]));
             }
             PracticeType::Distance => {
-                let cursor = "\u{2588}";
+                let (f1_before, f1_after) = self.field1.split_at(self.field1_cursor);
                 lines.push(Line::from(vec![
                     Span::styled(
                         format!("  Set {}: ", set_num),
                         Style::default().fg(Color::White),
                     ),
                     Span::styled(format!("{} ", tr("log-distance-label")), Style::default().fg(Color::Gray)),
-                    Span::styled(
-                        format!("{}{}", self.field1, cursor),
-                        Style::default().fg(ACCENT),
-                    ),
+                    Span::styled(f1_before, Style::default().fg(ACCENT)),
+                    Span::styled("\u{2588}", Style::default().fg(ACCENT)),
+                    Span::styled(f1_after, Style::default().fg(ACCENT)),
                 ]));
             }
             PracticeType::Endurance => {
-                let cursor = "\u{2588}";
+                let (f1_before, f1_after) = self.field1.split_at(self.field1_cursor);
                 lines.push(Line::from(vec![
                     Span::styled(
                         format!("  Set {}: ", set_num),
                         Style::default().fg(Color::White),
                     ),
                     Span::styled(format!("{} ", tr("log-duration-label")), Style::default().fg(Color::Gray)),
-                    Span::styled(
-                        format!("{}{}", self.field1, cursor),
-                        Style::default().fg(ACCENT),
-                    ),
+                    Span::styled(f1_before, Style::default().fg(ACCENT)),
+                    Span::styled("\u{2588}", Style::default().fg(ACCENT)),
+                    Span::styled(f1_after, Style::default().fg(ACCENT)),
                 ]));
             }
         }
@@ -553,11 +612,12 @@ impl LogEntryScreen {
                     self.date_confirmed = true;
                     Action::None
                 }
-            KeyCode::Char('D') => {
-                self.editing_date = true;
-                self.date_input = self.log_date.clone();
-                Action::None
-            }
+                KeyCode::Char('D') => {
+                    self.editing_date = true;
+                    self.date_input = self.log_date.clone();
+                    self.date_input_cursor = self.date_input.len();
+                    Action::None
+                }
                 KeyCode::Esc => Action::Navigate(self.return_to.clone()),
                 _ => Action::None,
             };
@@ -576,11 +636,74 @@ impl LogEntryScreen {
             return Action::None;
         }
 
+        // Ctrl+K – delete from cursor to end (handled per-field to avoid borrow conflicts)
+        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('k') {
+            if has_two_fields && self.active_field == 0 {
+                self.field1.truncate(self.field1_cursor);
+            } else if has_two_fields && self.active_field == 1 {
+                self.field2.truncate(self.field2_cursor);
+            } else {
+                self.field1.truncate(self.field1_cursor);
+            }
+            return Action::None;
+        }
+
+        // Compute this before borrowing any field mutably
+        let both_fields_empty = self.field1.is_empty()
+            && (self.field2.is_empty() || !has_two_fields);
+
+        // Determine active text field and cursor
+        let (text, cursor) = if has_two_fields {
+            if self.active_field == 0 {
+                (&mut self.field1, &mut self.field1_cursor)
+            } else {
+                (&mut self.field2, &mut self.field2_cursor)
+            }
+        } else {
+            (&mut self.field1, &mut self.field1_cursor)
+        };
+
+        // Ctrl+B / Left – move cursor back
+        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('b')
+            || key.code == KeyCode::Left
+        {
+            if *cursor > 0 {
+                *cursor = text[..*cursor].char_indices()
+                    .next_back().map(|(i, _)| i).unwrap_or(0);
+            }
+            return Action::None;
+        }
+        // Ctrl+F / Right – move cursor forward
+        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('f')
+            || key.code == KeyCode::Right
+        {
+            if *cursor < text.len() {
+                *cursor = text[*cursor..].char_indices().nth(1)
+                    .map(|(i, _)| *cursor + i).unwrap_or(text.len());
+            }
+            return Action::None;
+        }
+        // Ctrl+A / Home – jump to start
+        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('a')
+            || key.code == KeyCode::Home
+        {
+            *cursor = 0;
+            return Action::None;
+        }
+        // Ctrl+E / End – jump to end
+        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('e')
+            || key.code == KeyCode::End
+        {
+            *cursor = text.len();
+            return Action::None;
+        }
+
         match key.code {
             KeyCode::Esc => Action::Navigate(self.return_to.clone()),
             KeyCode::Char('D') => {
                 self.editing_date = true;
                 self.date_input = self.log_date.clone();
+                self.date_input_cursor = self.date_input.len();
                 Action::None
             }
             KeyCode::Tab => {
@@ -598,23 +721,19 @@ impl LogEntryScreen {
                 Action::None
             }
             KeyCode::Backspace => {
-                let fields_empty = self.field1.is_empty()
-                    && (self.field2.is_empty() || !has_two_fields);
-                if fields_empty && !self.sets.is_empty() {
+                if text.is_empty() && both_fields_empty && !self.sets.is_empty() {
                     self.sets.pop();
-                } else if self.active_field == 0 {
-                    self.field1.pop();
-                } else {
-                    self.field2.pop();
+                } else if *cursor > 0 {
+                    let prev = text[..*cursor].char_indices().next_back()
+                        .map(|(i, _)| i).unwrap_or(0);
+                    text.remove(prev);
+                    *cursor = prev;
                 }
                 Action::None
             }
             KeyCode::Char(c) if c.is_ascii_digit() || c == '.' => {
-                if self.active_field == 0 {
-                    self.field1.push(c);
-                } else {
-                    self.field2.push(c);
-                }
+                text.insert(*cursor, c);
+                *cursor += c.len_utf8();
                 Action::None
             }
             _ => Action::None,
@@ -622,9 +741,47 @@ impl LogEntryScreen {
     }
 
     fn handle_date_edit(&mut self, key: KeyEvent) -> Action {
+        let (text, cursor) = (&mut self.date_input, &mut self.date_input_cursor);
+
+        // Emacs cursor nav
+        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('b')
+            || key.code == KeyCode::Left
+        {
+            if *cursor > 0 {
+                *cursor = text[..*cursor].char_indices().next_back()
+                    .map(|(i, _)| i).unwrap_or(0);
+            }
+            return Action::None;
+        }
+        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('f')
+            || key.code == KeyCode::Right
+        {
+            if *cursor < text.len() {
+                *cursor = text[*cursor..].char_indices().nth(1)
+                    .map(|(i, _)| *cursor + i).unwrap_or(text.len());
+            }
+            return Action::None;
+        }
+        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('a')
+            || key.code == KeyCode::Home
+        {
+            *cursor = 0;
+            return Action::None;
+        }
+        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('e')
+            || key.code == KeyCode::End
+        {
+            *cursor = text.len();
+            return Action::None;
+        }
+        // Ctrl+K – delete from cursor to end
+        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('k') {
+            text.truncate(*cursor);
+            return Action::None;
+        }
+
         match key.code {
             KeyCode::Enter => {
-                // Validate the date
                 if NaiveDate::parse_from_str(&self.date_input, "%Y-%m-%d").is_ok() {
                     self.log_date = self.date_input.clone();
                     self.date_confirmed = true;
@@ -635,10 +792,16 @@ impl LogEntryScreen {
                 self.editing_date = false;
             }
             KeyCode::Backspace => {
-                self.date_input.pop();
+                if *cursor > 0 {
+                    let prev = text[..*cursor].char_indices().next_back()
+                        .map(|(i, _)| i).unwrap_or(0);
+                    text.remove(prev);
+                    *cursor = prev;
+                }
             }
             KeyCode::Char(c) if c.is_ascii_digit() || c == '-' => {
-                self.date_input.push(c);
+                text.insert(*cursor, c);
+                *cursor += c.len_utf8();
             }
             _ => {}
         }
@@ -698,9 +861,11 @@ impl LogEntryScreen {
             if practice.practice_type == PracticeType::Weighted {
                 // Keep field1 (weight), clear field2 (reps), set active to field2
                 self.field2.clear();
+                self.field2_cursor = 0;
                 self.active_field = 1;
             } else {
                 self.field1.clear();
+                self.field1_cursor = 0;
                 self.active_field = 0;
             }
         }
@@ -810,6 +975,11 @@ impl LogEntryScreen {
             || key.code == KeyCode::End
         {
             *cursor = text.len();
+            return Action::None;
+        }
+        // Ctrl+K – delete from cursor to end
+        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('k') {
+            text.truncate(*cursor);
             return Action::None;
         }
 
@@ -971,6 +1141,11 @@ impl LogEntryScreen {
             || key.code == KeyCode::End
         {
             self.note_cursor = self.note.len();
+            return Action::None;
+        }
+        // Ctrl+K – delete from cursor to end
+        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('k') {
+            self.note.truncate(self.note_cursor);
             return Action::None;
         }
 

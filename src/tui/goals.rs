@@ -189,6 +189,10 @@ impl GoalsScreen {
                 }
                 true
             }
+            KeyCode::Char('k') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.input.truncate(self.cursor);
+                true
+            }
             KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.input.insert(self.cursor, c);
                 self.cursor += c.len_utf8();

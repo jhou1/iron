@@ -351,6 +351,10 @@ impl PracticesScreen {
                 }
                 true
             }
+            KeyCode::Char('k') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.input.truncate(self.input_cursor);
+                true
+            }
             KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.input.insert(self.input_cursor, c);
                 self.input_cursor += c.len_utf8();
