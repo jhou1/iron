@@ -210,9 +210,11 @@ impl HistoryScreen {
         let mut lines: Vec<Line> = Vec::new();
         lines.push(Line::from(""));
 
+        let mut total_reps = 0.0;
         for set in &entry.sets {
             let detail = match &set.data {
                 SetData::Weighted { weight, reps } => {
+                    total_reps += *reps as f64;
                     format!("  {}", tr_args("history-set-weighted", &[
                         ("number", FluentValue::from(set.set_number as f64)),
                         ("weight", FluentValue::from(*weight)),
@@ -220,6 +222,7 @@ impl HistoryScreen {
                     ]))
                 }
                 SetData::Bodyweight { reps } => {
+                    total_reps += *reps as f64;
                     format!("  {}", tr_args("history-set-bodyweight", &[
                         ("number", FluentValue::from(set.set_number as f64)),
                         ("reps", FluentValue::from(*reps as f64)),
@@ -241,6 +244,23 @@ impl HistoryScreen {
             lines.push(Line::from(Span::styled(
                 detail,
                 Style::default().fg(Color::White),
+            )));
+        }
+
+        // Summary line: total reps + volume for weighted training
+        if matches!(entry.practice_type, crate::model::PracticeType::Weighted | crate::model::PracticeType::Bodyweight) && total_reps > 0.0 {
+            lines.push(Line::from(""));
+            let total_vol = entry.total_metric();
+            let vol_label = entry.metric_label();
+            let reps_label = tr("metric-reps");
+            lines.push(Line::from(Span::styled(
+                format!("  {}", tr_args("history-summary", &[
+                    ("reps", FluentValue::from(total_reps)),
+                    ("reps_label", FluentValue::from(reps_label)),
+                    ("vol", FluentValue::from(total_vol)),
+                    ("vol_label", FluentValue::from(vol_label)),
+                ])),
+                Style::default().fg(Color::Green),
             )));
         }
 

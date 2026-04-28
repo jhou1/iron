@@ -92,6 +92,7 @@ history-note = Note: { $note }
 history-warmup = Warm-up: { $text }
 history-cooldown = Cool-down: { $text }
 history-delete-confirm = Delete this entry?
+history-summary =      Total reps: { $reps } { $reps_label }  Volume: { $vol } { $vol_label }
 
 # ── Trends ──
 trends-title = Trends — Select Practice

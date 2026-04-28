@@ -92,6 +92,7 @@ history-note = 备注：{ $note }
 history-warmup = 热身：{ $text }
 history-cooldown = 放松：{ $text }
 history-delete-confirm = 删除此记录？
+history-summary =      总次数: { $reps } { $reps_label }  总容量: { $vol } { $vol_label }
 
 # ── 趋势 ──
 trends-title = 趋势 — 选择练习项目
