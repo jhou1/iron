@@ -1,9 +1,9 @@
-use ironcli::model::{PracticeType, SetData};
+use iron::model::{PracticeType, SetData};
 
 fn init() {
     static INIT: std::sync::Once = std::sync::Once::new();
     INIT.call_once(|| {
-        ironcli::i18n::init();
+        iron::i18n::init();
     });
 }
 

@@ -1,5 +1,5 @@
-use ironcli::db::Database;
-use ironcli::model::{PracticeType, SetData};
+use iron::db::Database;
+use iron::model::{PracticeType, SetData};
 
 #[test]
 fn create_and_list_practices() {

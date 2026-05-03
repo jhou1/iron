@@ -558,8 +558,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "ironcli"
-version = "0.5.1"
+name = "iron"
+version = "0.5.7"
 dependencies = [
  "anyhow",
  "chrono",

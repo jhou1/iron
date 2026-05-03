@@ -1,5 +1,5 @@
 # ── Common ──
-app-name = IronCLI
+app-name = iron
 app-about = Track your training
 
 # ── Heatmap ──
@@ -168,7 +168,7 @@ key-switch-field = Switch field
 # ── CLI ──
 cli-export-about = Export all data to JSON
 cli-import-about = Import data from JSON
-cli-export-path-help = Output file path (defaults to ~/.ironcli/iron-export-YYYY-MM-DD.json)
+cli-export-path-help = Output file path (defaults to ~/.iron/iron-export-YYYY-MM-DD.json)
 cli-import-path-help = Input file path
 cli-export-complete = Export complete.
 cli-imported = Imported { $count } logs.

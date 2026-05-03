@@ -19,14 +19,25 @@ pub struct Database {
 }
 
 impl Database {
-    /// Opens the default database at `~/.ironcli/iron.db`, creating it if needed.
+    /// Opens the default database at `~/.iron/iron.db`, creating it if needed.
+    /// Automatically migrates data from `~/.ironcli/iron.db` on first use.
     pub fn open_default() -> Result<Self> {
-        let dir = dirs::home_dir()
-            .context("could not determine home directory")?
-            .join(".ironcli");
-        std::fs::create_dir_all(&dir)?;
-        let path = dir.join("iron.db");
-        Self::open(&path)
+        let home = dirs::home_dir().context("could not determine home directory")?;
+        let new_dir = home.join(".iron");
+        let old_dir = home.join(".ironcli");
+        let new_path = new_dir.join("iron.db");
+        let old_path = old_dir.join("iron.db");
+
+        // One-time migration: copy old database to new location if it exists
+        if !new_path.exists() && old_path.exists() {
+            std::fs::create_dir_all(&new_dir)?;
+            std::fs::copy(&old_path, &new_path)
+                .with_context(|| format!("failed to migrate database from {} to {}", old_path.display(), new_path.display()))?;
+            eprintln!("Migrated database from {} to {}", old_path.display(), new_path.display());
+        }
+
+        std::fs::create_dir_all(&new_dir)?;
+        Self::open(&new_path)
     }
 
     /// Opens a database at the given path.

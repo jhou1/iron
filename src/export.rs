@@ -201,7 +201,7 @@ pub fn export_to_json(db: &Database, path: Option<PathBuf>) -> Result<()> {
         None => {
             let dir = dirs::home_dir()
                 .context("could not determine home directory")?
-                .join(".ironcli");
+                .join(".iron");
             std::fs::create_dir_all(&dir)?;
             let date = Local::now().format("%Y-%m-%d").to_string();
             dir.join(format!("iron-export-{}.json", date))

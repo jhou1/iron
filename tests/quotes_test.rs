@@ -1,5 +1,5 @@
-use ironcli::model::Quote;
-use ironcli::tui::quotes::pick_random_quote;
+use iron::model::Quote;
+use iron::tui::quotes::pick_random_quote;
 
 fn make_quotes(texts: &[&str]) -> Vec<Quote> {
     texts

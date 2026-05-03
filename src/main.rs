@@ -19,7 +19,7 @@ struct Cli {
 enum Commands {
     /// Export all data to JSON
     Export {
-        /// Output file path (defaults to ~/.ironcli/iron-export-YYYY-MM-DD.json)
+        /// Output file path (defaults to ~/.iron/iron-export-YYYY-MM-DD.json)
         path: Option<PathBuf>,
     },
     /// Import data from JSON

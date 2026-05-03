@@ -8,23 +8,23 @@ fn tr_locale_switching() {
     // English
     std::env::set_var("LANG", "en_US.UTF-8");
     std::env::remove_var("LC_ALL");
-    ironcli::i18n::init();
+    iron::i18n::init();
 
-    assert_eq!(ironcli::i18n::tr("dashboard-goals"), "Goals");
+    assert_eq!(iron::i18n::tr("dashboard-goals"), "Goals");
     assert_eq!(
-        ironcli::i18n::tr_args("dashboard-sessions", &[("count", 5.0.into())]),
+        iron::i18n::tr_args("dashboard-sessions", &[("count", 5.0.into())]),
         "5 sessions"
     );
-    assert_eq!(ironcli::i18n::tr("nonexistent-key"), "nonexistent-key");
+    assert_eq!(iron::i18n::tr("nonexistent-key"), "nonexistent-key");
 
     // Chinese
     std::env::set_var("LANG", "zh_CN.UTF-8");
     std::env::remove_var("LC_ALL");
-    ironcli::i18n::init();
+    iron::i18n::init();
 
-    assert_eq!(ironcli::i18n::tr("dashboard-goals"), "目标");
+    assert_eq!(iron::i18n::tr("dashboard-goals"), "目标");
     assert_eq!(
-        ironcli::i18n::tr_args("dashboard-sessions", &[("count", 5.0.into())]),
+        iron::i18n::tr_args("dashboard-sessions", &[("count", 5.0.into())]),
         "5 次训练"
     );
 }

@@ -1,6 +1,6 @@
-use ironcli::db::Database;
-use ironcli::export::{export_to_json, import_from_json};
-use ironcli::model::{PracticeType, SetData};
+use iron::db::Database;
+use iron::export::{export_to_json, import_from_json};
+use iron::model::{PracticeType, SetData};
 
 #[test]
 fn round_trip_export_import() {

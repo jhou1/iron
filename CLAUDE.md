@@ -1,11 +1,11 @@
-# IronCLI
+# iron
 
 A terminal UI application for tracking training records, built in Rust.
 
 ## Quick Reference
 
 ```bash
-cargo run              # Launch the TUI (opens ~/.ironcli/iron.db)
+cargo run              # Launch the TUI (opens ~/.iron/iron.db)
 cargo test             # Run all 23 tests
 cargo clippy           # Lint check
 cargo build --release  # Build release binary at target/release/iron
@@ -47,7 +47,7 @@ src/
 
 ## Data Model (SQLite)
 
-Three tables in `~/.ironcli/iron.db`:
+Three tables in `~/.iron/iron.db`:
 
 - `practices` (id, name UNIQUE, practice_type TEXT, created_at)
 - `logs` (id, practice_id FK, logged_at TEXT, note TEXT nullable)
@@ -77,7 +77,7 @@ Uses ANSI terminal colors (not hardcoded RGB) for theme compatibility:
 ## Testing
 
 ```bash
-cargo test                                          # all 23 tests
+cargo test                                          # all tests
 cargo test --test model_test                        # 6 model unit tests
 cargo test --test db_test                           # 10 database CRUD tests
 cargo test --test export_test                       # 2 basic export/import tests
@@ -99,3 +99,7 @@ Integration tests use file-based SQLite databases via `TestDb` helper (creates t
 
 - Design spec: `docs/superpowers/specs/2026-04-16-ironcli-design.md`
 - Implementation plan: `docs/superpowers/plans/2026-04-16-ironcli-implementation.md`
+
+## Renaming
+
+The project was renamed from `ironcli` to `iron` in May 2026. The data directory moved from `~/.ironcli/` to `~/.iron/`. A one-time migration copies the database automatically — no manual action needed.

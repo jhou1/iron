@@ -1,5 +1,5 @@
 # ── 通用 ──
-app-name = IronCLI
+app-name = iron
 app-about = 记录你的训练
 
 # ── 热力图 ──
@@ -168,7 +168,7 @@ key-switch-field = 切换字段
 # ── 命令行 ──
 cli-export-about = 导出所有数据为 JSON
 cli-import-about = 从 JSON 导入数据
-cli-export-path-help = 输出文件路径（默认 ~/.ironcli/iron-export-YYYY-MM-DD.json）
+cli-export-path-help = 输出文件路径（默认 ~/.iron/iron-export-YYYY-MM-DD.json）
 cli-import-path-help = 输入文件路径
 cli-export-complete = 导出完成。
 cli-imported = 已导入 { $count } 条记录。

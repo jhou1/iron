@@ -1,9 +1,9 @@
 use chrono::NaiveDateTime;
 use std::path::PathBuf;
 
-use ironcli::db::Database;
-use ironcli::export::{export_to_json, import_from_json};
-use ironcli::model::{LogEntry, PracticeType, SetData};
+use iron::db::Database;
+use iron::export::{export_to_json, import_from_json};
+use iron::model::{LogEntry, PracticeType, SetData};
 
 // ── Test Database with setup/teardown ────────────────────────────────────
 
@@ -363,10 +363,10 @@ fn goals_and_milestones_survive_export_import() {
     db.create_milestone(g2, "Run 10km under 50min").unwrap();
 
     let export_path = source._dir.path().join("export.json");
-    ironcli::export::export_to_json(db, Some(export_path.clone())).unwrap();
+    iron::export::export_to_json(db, Some(export_path.clone())).unwrap();
 
     let target = TestDb::new();
-    ironcli::export::import_from_json(&target.db, &export_path).unwrap();
+    iron::export::import_from_json(&target.db, &export_path).unwrap();
 
     let goals = target.db.list_goals().unwrap();
     assert_eq!(goals.len(), 2);

@@ -1,4 +1,4 @@
-# IronCLI
+# iron
 
 A beautiful terminal UI for tracking your training records. Log practices set-by-set, visualize consistency with a GitHub-style heatmap, and track progress with sparkline charts.
 
@@ -27,7 +27,7 @@ A beautiful terminal UI for tracking your training records. Log practices set-by
 
 ```bash
 git clone <repo-url>
-cd ironcli
+cd iron
 cargo build --release
 ```
 
@@ -45,7 +45,7 @@ cargo install --path .
 
 ## Language / i18n
 
-IronCLI supports multiple languages with automatic detection from environment variables.
+iron supports multiple languages with automatic detection from environment variables.
 
 **Supported languages:**
 - English (default)
@@ -266,7 +266,7 @@ Units are fixed: **kg**, **km**, **minutes**.
 ### Export
 
 ```bash
-iron export                     # exports to ~/.ironcli/iron-export-YYYY-MM-DD.json
+iron export                     # exports to ~/.iron/iron-export-YYYY-MM-DD.json
 iron export /path/to/backup.json  # exports to a specific path
 ```
 
@@ -283,7 +283,9 @@ Import is safe — it skips duplicate logs (matched by practice name + timestamp
 All data is stored in a single SQLite file:
 
 ```
-~/.ironcli/iron.db
+~/.iron/iron.db
 ```
 
 To back up manually, just copy this file. To reset, delete it — a fresh database will be created on next launch.
+
+The data directory was previously `~/.ironcli/`. If you have an existing database there, iron automatically migrates it to `~/.iron/` the first time you launch the new version. No manual action needed.
