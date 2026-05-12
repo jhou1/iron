@@ -12,7 +12,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
 use crate::model::{LogEntry, SetData};
-use super::{centered_area, highlight_row, Action, Screen, CONTENT_WIDTH};
+use super::{centered_area, highlight_row, render_help_overlay, render_status_line, Action, Screen, StatusMessage, CONTENT_WIDTH};
 use fluent_bundle::FluentValue;
 
 const GREEN: Color = Color::Green;
@@ -34,6 +34,9 @@ pub struct HistoryScreen {
     selected: usize,
     mode: Mode,
     scroll_offset: usize,
+    status_msg: StatusMessage,
+    show_help: bool,
+    last_deleted: Option<LogEntry>,
 }
 
 impl HistoryScreen {
@@ -49,6 +52,9 @@ impl HistoryScreen {
             selected: 0,
             mode: Mode::Browse,
             scroll_offset: 0,
+            status_msg: None,
+            show_help: false,
+            last_deleted: None,
         })
     }
 
@@ -89,12 +95,13 @@ impl HistoryScreen {
             ])
             .split(area);
 
-        // ── Left: title + filter + list + shortcuts ──
+        // ── Left: title + filter + list + status + shortcuts ──
         let left_chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(3),  // title + filter + column headers
                 Constraint::Min(1),    // scrollable list
+                Constraint::Length(1), // status line
                 Constraint::Length(1), // shortcuts
             ])
             .split(h_chunks[0]);
@@ -142,8 +149,7 @@ impl HistoryScreen {
             let filter_text = format!(" {}  ", tr("key-filter"));
             let edit_text = format!(" {}  ", tr("key-edit"));
             let delete_text = format!(" {}  ", tr("key-delete"));
-            let back_text = format!(" {}", tr("key-back"));
-            Line::from(vec![
+            let mut spans = vec![
                 Span::styled(" [j/k]", Style::default().fg(ACCENT)),
                 Span::styled(navigate_text, Style::default().fg(Color::Gray)),
                 Span::styled("[/]", Style::default().fg(ACCENT)),
@@ -152,14 +158,39 @@ impl HistoryScreen {
                 Span::styled(edit_text, Style::default().fg(Color::Gray)),
                 Span::styled("[d]", Style::default().fg(ACCENT)),
                 Span::styled(delete_text, Style::default().fg(Color::Gray)),
-                Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(back_text, Style::default().fg(Color::Gray)),
-            ])
+            ];
+            if self.last_deleted.is_some() {
+                let undo_text = format!(" {}  ", tr("key-undo"));
+                spans.push(Span::styled("[u]", Style::default().fg(ACCENT)));
+                spans.push(Span::styled(undo_text, Style::default().fg(Color::Gray)));
+            }
+            let help_text = format!(" {}  ", tr("key-help"));
+            spans.push(Span::styled("[?]", Style::default().fg(ACCENT)));
+            spans.push(Span::styled(help_text, Style::default().fg(Color::Gray)));
+            let back_text = format!(" {}", tr("key-back"));
+            spans.push(Span::styled("[Esc]", Style::default().fg(ACCENT)));
+            spans.push(Span::styled(back_text, Style::default().fg(Color::Gray)));
+            Line::from(spans)
         };
-        frame.render_widget(Paragraph::new(shortcuts), left_chunks[2]);
+        render_status_line(frame, left_chunks[2], &self.status_msg);
+        frame.render_widget(Paragraph::new(shortcuts), left_chunks[3]);
 
         // ── Right: detail panel ──
         self.render_detail(frame, h_chunks[1]);
+
+        // ── Help overlay ──
+        if self.show_help {
+            let bindings = &[
+                ("j/k", "Navigate"),
+                ("/", "Filter"),
+                ("e", "Edit"),
+                ("d", "Delete"),
+                ("u", "Undo"),
+                ("?", "Help"),
+                ("Esc", "Back"),
+            ];
+            render_help_overlay(frame, area, bindings);
+        }
     }
 
     /// Adjusts scroll_offset so the selected item is visible within the given height.
@@ -277,7 +308,7 @@ impl HistoryScreen {
                 SetData::Endurance { duration } => {
                     format!("  {}", tr_args("history-set-endurance", &[
                         ("number", FluentValue::from(set.set_number as f64)),
-                        ("duration", FluentValue::from(*duration as f64)),
+                        ("duration", FluentValue::from(*duration)),
                     ]))
                 }
             };
@@ -338,6 +369,7 @@ impl HistoryScreen {
     }
 
     pub fn handle_key(&mut self, key: KeyEvent, db: &Database) -> Action {
+        self.status_msg = None;
         match self.mode {
             Mode::Browse => {
                 if self.filtering {
@@ -416,7 +448,7 @@ impl HistoryScreen {
         }
     }
 
-    fn handle_browse(&mut self, key: KeyEvent, _db: &Database) -> Action {
+    fn handle_browse(&mut self, key: KeyEvent, db: &Database) -> Action {
         match key.code {
             KeyCode::Char('j') | KeyCode::Down => {
                 if !self.filtered_indices.is_empty() && self.selected < self.filtered_indices.len() - 1 {
@@ -449,8 +481,33 @@ impl HistoryScreen {
                 }
                 Action::None
             }
+            KeyCode::Char('u') => {
+                if let Some(entry) = self.last_deleted.take() {
+                    match db.restore_log(&entry) {
+                        Ok(_) => {
+                            if let Ok(entries) = db.list_logs_all() {
+                                self.entries = entries;
+                            }
+                            self.apply_filter();
+                            self.status_msg = Some((tr("status-restored"), false));
+                        }
+                        Err(e) => {
+                            self.last_deleted = Some(entry);
+                            self.status_msg = Some((format!("Restore failed: {}", e), true));
+                        }
+                    }
+                }
+                Action::None
+            }
+            KeyCode::Char('?') => {
+                self.show_help = !self.show_help;
+                Action::None
+            }
             KeyCode::Esc => {
-                if !self.filter_text.is_empty() {
+                if self.show_help {
+                    self.show_help = false;
+                    Action::None
+                } else if !self.filter_text.is_empty() {
                     self.filter_text.clear();
                     self.filter_cursor = 0;
                     self.apply_filter();
@@ -466,17 +523,26 @@ impl HistoryScreen {
     fn handle_confirm_delete(&mut self, key: KeyEvent, db: &Database) -> Action {
         if key.code == KeyCode::Char('y') {
             if let Some(entry) = self.selected_entry() {
+                let entry_clone = entry.clone();
                 let log_id = entry.log.id;
-                let _ = db.delete_log(log_id);
-                if let Ok(entries) = db.list_logs_all() {
-                    self.entries = entries;
-                }
-                self.apply_filter();
-                if self.selected >= self.filtered_indices.len() && !self.filtered_indices.is_empty() {
-                    self.selected = self.filtered_indices.len() - 1;
-                }
-                if self.filtered_indices.is_empty() {
-                    self.selected = 0;
+                match db.delete_log(log_id) {
+                    Ok(()) => {
+                        self.last_deleted = Some(entry_clone);
+                        self.status_msg = Some((tr("status-deleted-undo"), false));
+                        if let Ok(entries) = db.list_logs_all() {
+                            self.entries = entries;
+                        }
+                        self.apply_filter();
+                        if self.selected >= self.filtered_indices.len() && !self.filtered_indices.is_empty() {
+                            self.selected = self.filtered_indices.len() - 1;
+                        }
+                        if self.filtered_indices.is_empty() {
+                            self.selected = 0;
+                        }
+                    }
+                    Err(e) => {
+                        self.status_msg = Some((format!("Delete failed: {}", e), true));
+                    }
                 }
             }
         }

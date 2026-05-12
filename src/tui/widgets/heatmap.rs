@@ -13,19 +13,29 @@ use unicode_width::UnicodeWidthStr;
 pub struct Heatmap<'a> {
     data: &'a [(String, i64)],
     weeks: u16,
+    no_color: bool,
 }
 
 impl<'a> Heatmap<'a> {
-    pub fn new(data: &'a [(String, i64)], weeks: u16) -> Self {
-        Self { data, weeks }
+    pub fn new(data: &'a [(String, i64)], weeks: u16, no_color: bool) -> Self {
+        Self { data, weeks, no_color }
     }
 
-    fn cell_for_count(count: i64) -> (&'static str, Color) {
-        match count {
-            0 => ("\u{25AA}", Color::DarkGray),                  // ▪ small square
-            1 => ("\u{25A0}", Color::Indexed(65)),               // ■ muted teal
-            2 => ("\u{25A0}", Color::Indexed(71)),               // ■ medium green
-            _ => ("\u{25A0}", Color::Indexed(118)),              // ■ bright lime
+    fn cell_for_count(&self, count: i64) -> (&'static str, Color) {
+        if self.no_color {
+            match count {
+                0 => (" ", Color::Reset),
+                1 => ("\u{2591}", Color::Reset),    // ░
+                2 => ("\u{2592}", Color::Reset),    // ▒
+                _ => ("\u{2588}", Color::Reset),    // █
+            }
+        } else {
+            match count {
+                0 => ("\u{25AA}", Color::DarkGray),                  // ▪ small square
+                1 => ("\u{25A0}", Color::Indexed(65)),               // ■ muted teal
+                2 => ("\u{25A0}", Color::Indexed(71)),               // ■ medium green
+                _ => ("\u{25A0}", Color::Indexed(118)),              // ■ bright lime
+            }
         }
     }
 }
@@ -124,7 +134,7 @@ impl<'a> Widget for Heatmap<'a> {
                 }
                 let date_str = date.format("%Y-%m-%d").to_string();
                 let count = counts.get(&date_str).copied().unwrap_or(0);
-                let (ch, color) = Heatmap::cell_for_count(count);
+                let (ch, color) = self.cell_for_count(count);
 
                 let x = area.x + label_width + week * cell_width;
                 let y = grid_y + day;
@@ -137,17 +147,31 @@ impl<'a> Widget for Heatmap<'a> {
         // Render legend row below the 7 day rows
         let legend_y = grid_y + 7;
         if legend_y < area.y + area.height {
-            let legend = Line::from(vec![
-                Span::styled(format!("{} ", crate::i18n::tr("heatmap-less")), Style::default().fg(Color::Gray)),
-                Span::styled("\u{25AA}", Style::default().fg(Color::DarkGray)),
-                Span::raw(" "),
-                Span::styled("\u{25A0}", Style::default().fg(Color::Indexed(65))),
-                Span::raw(" "),
-                Span::styled("\u{25A0}", Style::default().fg(Color::Indexed(71))),
-                Span::raw(" "),
-                Span::styled("\u{25A0}", Style::default().fg(Color::Indexed(118))),
-                Span::styled(format!(" {}", crate::i18n::tr("heatmap-more")), Style::default().fg(Color::Gray)),
-            ]);
+            let legend = if self.no_color {
+                Line::from(vec![
+                    Span::styled(format!("{} ", crate::i18n::tr("heatmap-less")), Style::default()),
+                    Span::raw(" "),
+                    Span::raw(" "),
+                    Span::raw("\u{2591}"),
+                    Span::raw(" "),
+                    Span::raw("\u{2592}"),
+                    Span::raw(" "),
+                    Span::raw("\u{2588}"),
+                    Span::styled(format!(" {}", crate::i18n::tr("heatmap-more")), Style::default()),
+                ])
+            } else {
+                Line::from(vec![
+                    Span::styled(format!("{} ", crate::i18n::tr("heatmap-less")), Style::default().fg(Color::Gray)),
+                    Span::styled("\u{25AA}", Style::default().fg(Color::DarkGray)),
+                    Span::raw(" "),
+                    Span::styled("\u{25A0}", Style::default().fg(Color::Indexed(65))),
+                    Span::raw(" "),
+                    Span::styled("\u{25A0}", Style::default().fg(Color::Indexed(71))),
+                    Span::raw(" "),
+                    Span::styled("\u{25A0}", Style::default().fg(Color::Indexed(118))),
+                    Span::styled(format!(" {}", crate::i18n::tr("heatmap-more")), Style::default().fg(Color::Gray)),
+                ])
+            };
             buf.set_line(area.x + label_width, legend_y, &legend, area.width.saturating_sub(label_width));
         }
     }

@@ -1,3 +1,4 @@
+use chrono::NaiveDateTime;
 use iron::db::Database;
 use iron::model::{PracticeType, SetData};
 
@@ -577,4 +578,130 @@ fn inactive_practice_hidden_from_heatmap() {
     let today_count = counts.iter().find(|(d, _)| d == &today);
     assert!(today_count.is_some());
     assert_eq!(today_count.unwrap().1, 1);
+}
+
+#[test]
+fn test_restore_log() {
+    let db = Database::open_in_memory().unwrap();
+
+    // Create a practice
+    let practice = db.create_practice("Bench Press", PracticeType::Weighted).unwrap();
+
+    // Create a log with sets, note, warm_up, cool_down
+    let sets = vec![
+        SetData::Weighted { weight: 80.0, reps: 8 },
+        SetData::Weighted { weight: 85.0, reps: 6 },
+        SetData::Weighted { weight: 90.0, reps: 4 },
+    ];
+    let dt = NaiveDateTime::parse_from_str("2025-01-15 10:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+    let log_id = db.create_log_at(
+        practice.id, &dt, &sets,
+        Some("Great session"),
+        Some("5 min jog"),
+        Some("Stretching"),
+    ).unwrap();
+
+    // Get the full entry
+    let entries = db.list_logs_all().unwrap();
+    assert_eq!(entries.len(), 1);
+    let entry = entries[0].clone();
+
+    // Delete the log
+    db.delete_log(log_id).unwrap();
+    assert_eq!(db.list_logs_all().unwrap().len(), 0);
+
+    // Restore the log
+    let restored_id = db.restore_log(&entry).unwrap();
+    assert_ne!(restored_id, log_id); // new ID
+
+    // Verify restored data
+    let restored_entries = db.list_logs_all().unwrap();
+    assert_eq!(restored_entries.len(), 1);
+    let restored = &restored_entries[0];
+    assert_eq!(restored.practice_name, "Bench Press");
+    assert_eq!(restored.log.logged_at, dt);
+    assert_eq!(restored.log.note, Some("Great session".to_string()));
+    assert_eq!(restored.log.warm_up, Some("5 min jog".to_string()));
+    assert_eq!(restored.log.cool_down, Some("Stretching".to_string()));
+    assert_eq!(restored.sets.len(), 3);
+    assert_eq!(restored.sets[0].data, SetData::Weighted { weight: 80.0, reps: 8 });
+    assert_eq!(restored.sets[1].data, SetData::Weighted { weight: 85.0, reps: 6 });
+    assert_eq!(restored.sets[2].data, SetData::Weighted { weight: 90.0, reps: 4 });
+}
+
+#[test]
+fn test_restore_quote() {
+    let db = Database::open_in_memory().unwrap();
+
+    let quote = db.create_quote("The pain you feel today is the strength you feel tomorrow").unwrap();
+    db.delete_quote(quote.id).unwrap();
+    assert!(db.list_quotes().unwrap().is_empty());
+
+    let restored = db.restore_quote(&quote).unwrap();
+    let quotes = db.list_quotes().unwrap();
+    assert_eq!(quotes.len(), 1);
+    assert_eq!(quotes[0].text, "The pain you feel today is the strength you feel tomorrow");
+    assert_ne!(restored.id, quote.id); // new ID
+}
+
+#[test]
+fn test_restore_goal_with_milestones() {
+    let db = Database::open_in_memory().unwrap();
+
+    let goal_id = db.create_goal("Run a marathon").unwrap();
+    let ms1_id = db.create_milestone(goal_id, "Run 5K").unwrap();
+    let _ms2_id = db.create_milestone(goal_id, "Run 10K").unwrap();
+
+    // Complete one milestone
+    db.toggle_milestone(ms1_id).unwrap();
+
+    // Get full goal data
+    let goals = db.list_goals().unwrap();
+    assert_eq!(goals.len(), 1);
+    let goal = goals[0].clone();
+    assert_eq!(goal.milestones.len(), 2);
+
+    // Delete the goal (cascades to milestones)
+    db.delete_goal(goal_id).unwrap();
+    assert!(db.list_goals().unwrap().is_empty());
+
+    // Restore
+    let restored_id = db.restore_goal(&goal).unwrap();
+    assert_ne!(restored_id, goal_id);
+
+    let restored_goals = db.list_goals().unwrap();
+    assert_eq!(restored_goals.len(), 1);
+    assert_eq!(restored_goals[0].title, "Run a marathon");
+    assert_eq!(restored_goals[0].milestones.len(), 2);
+
+    // Verify milestone titles exist
+    let ms_titles: Vec<&str> = restored_goals[0].milestones.iter().map(|m| m.title.as_str()).collect();
+    assert!(ms_titles.contains(&"Run 5K"));
+    assert!(ms_titles.contains(&"Run 10K"));
+}
+
+#[test]
+fn test_restore_milestone() {
+    let db = Database::open_in_memory().unwrap();
+
+    let goal_id = db.create_goal("Get stronger").unwrap();
+    let ms_id = db.create_milestone(goal_id, "Bench 100kg").unwrap();
+    db.create_milestone(goal_id, "Squat 120kg").unwrap();
+
+    // Get milestone data before delete
+    let goals = db.list_goals().unwrap();
+    let milestone = goals[0].milestones.iter().find(|m| m.id == ms_id).unwrap().clone();
+
+    // Delete one milestone
+    db.delete_milestone(ms_id).unwrap();
+    let goals = db.list_goals().unwrap();
+    assert_eq!(goals[0].milestones.len(), 1);
+
+    // Restore
+    db.restore_milestone(goal_id, &milestone).unwrap();
+    let goals = db.list_goals().unwrap();
+    assert_eq!(goals[0].milestones.len(), 2);
+    let ms_titles: Vec<&str> = goals[0].milestones.iter().map(|m| m.title.as_str()).collect();
+    assert!(ms_titles.contains(&"Bench 100kg"));
+    assert!(ms_titles.contains(&"Squat 120kg"));
 }

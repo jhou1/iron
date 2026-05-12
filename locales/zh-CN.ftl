@@ -167,6 +167,22 @@ key-no = 否
 key-hrv = HRV
 key-next = 下一步
 key-switch-field = 切换字段
+key-undo = 撤销
+key-help = 帮助
+
+# ── 状态消息 ──
+status-deleted-undo = 已删除。按 [u] 撤销
+status-restored = 已恢复
+status-save-error = 错误：{ $msg }
+status-delete-error = 删除失败：{ $msg }
+
+# ── 帮助 ──
+help-title = 快捷键
+
+# ── 其他界面 ──
+quotes-delete-confirm = 删除这条格言？
+practices-delete-cascade-warning = 此操作将永久删除所有日志。建议使用 [t] 切换为非活跃。
+terminal-too-small = 请调整终端大小（最小 { $w }×{ $h }）
 
 # ── 命令行 ──
 cli-export-about = 导出所有数据为 JSON

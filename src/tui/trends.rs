@@ -1,5 +1,5 @@
 use chrono::Datelike;
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::{Color, Style, Stylize},
@@ -15,7 +15,7 @@ use crate::i18n::{tr, tr_args};
 use crate::model::{LogEntry, Practice};
 use fluent_bundle::FluentValue;
 use super::widgets::sparkline::Sparkline;
-use super::{centered_area, highlight_row, Action, Screen, CONTENT_WIDTH};
+use super::{centered_area, highlight_row, render_help_overlay, Action, Screen, CONTENT_WIDTH};
 
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
@@ -31,6 +31,7 @@ pub struct TrendsScreen {
     practices: Vec<Practice>,
     filtered_indices: Vec<usize>,
     filter_text: String,
+    filter_cursor: usize,
     filtering: bool,
     selected: usize,
     phase: Phase,
@@ -38,6 +39,7 @@ pub struct TrendsScreen {
     days_window: i64,
     entries: Vec<LogEntry>,
     needs_refresh: bool,
+    show_help: bool,
 }
 
 impl TrendsScreen {
@@ -48,6 +50,7 @@ impl TrendsScreen {
             practices,
             filtered_indices,
             filter_text: String::new(),
+            filter_cursor: 0,
             filtering: false,
             selected: 0,
             phase: Phase::SelectPractice,
@@ -55,6 +58,7 @@ impl TrendsScreen {
             days_window: 90,
             entries: Vec::new(),
             needs_refresh: false,
+            show_help: false,
         })
     }
 
@@ -128,7 +132,8 @@ impl TrendsScreen {
 
         // Filter bar + column header
         let filter_display = if self.filtering {
-            format!(" /{}\u{2588}", self.filter_text)
+            let (before, after) = self.filter_text.split_at(self.filter_cursor);
+            format!(" /{}{}{}", before, "\u{2588}", after)
         } else if !self.filter_text.is_empty() {
             format!(" /{}", self.filter_text)
         } else {
@@ -191,23 +196,80 @@ impl TrendsScreen {
             Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::Gray)),
         ]);
         frame.render_widget(Paragraph::new(footer), chunks[3]);
+
+        // Help overlay
+        if self.show_help {
+            let bindings = &[
+                ("j/k", "Navigate"),
+                ("/", "Filter"),
+                ("Enter", "Select"),
+                ("?", "Help"),
+                ("Esc", "Back"),
+            ];
+            render_help_overlay(frame, area, bindings);
+        }
     }
 
     fn handle_select_practice(&mut self, key: KeyEvent) -> Action {
         if self.filtering {
             match key.code {
-                KeyCode::Esc => {
+                KeyCode::Esc | KeyCode::Enter => {
                     self.filtering = false;
                 }
-                KeyCode::Enter => {
-                    self.filtering = false;
+                KeyCode::Char('b') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    if self.filter_cursor > 0 {
+                        self.filter_cursor = self.filter_text[..self.filter_cursor]
+                            .char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+                    }
+                }
+                KeyCode::Left => {
+                    if self.filter_cursor > 0 {
+                        self.filter_cursor = self.filter_text[..self.filter_cursor]
+                            .char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+                    }
+                }
+                KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    if self.filter_cursor < self.filter_text.len() {
+                        self.filter_cursor = self.filter_text[self.filter_cursor..]
+                            .char_indices().nth(1).map(|(i, _)| self.filter_cursor + i)
+                            .unwrap_or(self.filter_text.len());
+                    }
+                }
+                KeyCode::Right => {
+                    if self.filter_cursor < self.filter_text.len() {
+                        self.filter_cursor = self.filter_text[self.filter_cursor..]
+                            .char_indices().nth(1).map(|(i, _)| self.filter_cursor + i)
+                            .unwrap_or(self.filter_text.len());
+                    }
+                }
+                KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    self.filter_cursor = 0;
+                }
+                KeyCode::Home => {
+                    self.filter_cursor = 0;
+                }
+                KeyCode::Char('e') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    self.filter_cursor = self.filter_text.len();
+                }
+                KeyCode::End => {
+                    self.filter_cursor = self.filter_text.len();
                 }
                 KeyCode::Backspace => {
-                    self.filter_text.pop();
+                    if self.filter_cursor > 0 {
+                        let prev = self.filter_text[..self.filter_cursor]
+                            .char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+                        self.filter_text.remove(prev);
+                        self.filter_cursor = prev;
+                        self.apply_filter();
+                    }
+                }
+                KeyCode::Char('k') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    self.filter_text.truncate(self.filter_cursor);
                     self.apply_filter();
                 }
                 KeyCode::Char(c) => {
-                    self.filter_text.push(c);
+                    self.filter_text.insert(self.filter_cursor, c);
+                    self.filter_cursor += c.len_utf8();
                     self.apply_filter();
                 }
                 _ => {}
@@ -219,6 +281,7 @@ impl TrendsScreen {
             KeyCode::Esc => Action::Navigate(Screen::Dashboard),
             KeyCode::Char('/') => {
                 self.filtering = true;
+                self.filter_cursor = self.filter_text.len();
                 Action::None
             }
             KeyCode::Char('j') | KeyCode::Down => {
@@ -243,6 +306,10 @@ impl TrendsScreen {
                     self.phase = Phase::ViewChart;
                     self.needs_refresh = true;
                 }
+                Action::None
+            }
+            KeyCode::Char('?') => {
+                self.show_help = !self.show_help;
                 Action::None
             }
             _ => Action::None,
@@ -270,7 +337,7 @@ impl TrendsScreen {
             None => return,
         };
 
-        let chart_height = (self.entries.len() as u16 * 3).max(4).min(20);
+        let chart_height = (self.entries.len() as u16 * 3).clamp(4, 20);
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
@@ -379,6 +446,17 @@ impl TrendsScreen {
             Span::styled(format!(" {}", tr("key-dashboard")), Style::default().fg(Color::Gray)),
         ]);
         frame.render_widget(Paragraph::new(footer), chunks[5]);
+
+        // Help overlay
+        if self.show_help {
+            let bindings = &[
+                ("h/l", "Adjust window"),
+                ("/", "Pick practice"),
+                ("?", "Help"),
+                ("Esc", "Back"),
+            ];
+            render_help_overlay(frame, area, bindings);
+        }
     }
 
     fn handle_view_chart(&mut self, key: KeyEvent) -> Action {
@@ -388,6 +466,7 @@ impl TrendsScreen {
                 // Go back to practice picker
                 self.phase = Phase::SelectPractice;
                 self.filter_text.clear();
+                self.filter_cursor = 0;
                 self.filtering = false;
                 self.selected = 0;
                 let filtered_indices = (0..self.practices.len()).collect();
@@ -411,6 +490,10 @@ impl TrendsScreen {
                     }
                     self.needs_refresh = true;
                 }
+                Action::None
+            }
+            KeyCode::Char('?') => {
+                self.show_help = !self.show_help;
                 Action::None
             }
             _ => Action::None,

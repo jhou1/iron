@@ -4,10 +4,13 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
+use fluent_bundle::FluentValue;
 use ratatui::prelude::*;
+use ratatui::widgets::Paragraph;
 use std::io::stdout;
 
 use crate::db::Database;
+use crate::i18n::tr_args;
 use crate::tui::{
     dashboard::DashboardScreen,
     goals::GoalsScreen,
@@ -33,8 +36,9 @@ fn run_app(
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     db: &Database,
 ) -> Result<()> {
+    let no_color = std::env::var("NO_COLOR").is_ok();
     let mut current_screen = Screen::Dashboard;
-    let mut dashboard = DashboardScreen::new(db)?;
+    let mut dashboard = DashboardScreen::new(db, no_color)?;
     let mut goals_screen = GoalsScreen::new(db)?;
     let mut log_entry = LogEntryScreen::new(db)?;
     let mut history = HistoryScreen::new(db)?;
@@ -42,13 +46,28 @@ fn run_app(
     let mut practices = PracticesScreen::new(db)?;
 
     loop {
-        terminal.draw(|frame| match current_screen {
-            Screen::Dashboard => dashboard.render(frame),
-            Screen::Goals => goals_screen.render(frame),
-            Screen::LogEntry => log_entry.render(frame),
-            Screen::History => history.render(frame),
-            Screen::Trends => trends.render(frame),
-            Screen::Practices => practices.render(frame),
+        terminal.draw(|frame| {
+            let area = frame.area();
+            if area.width < 80 || area.height < 24 {
+                let msg = tr_args("terminal-too-small", &[
+                    ("w", FluentValue::from(80)),
+                    ("h", FluentValue::from(24)),
+                ]);
+                let paragraph = Paragraph::new(msg)
+                    .alignment(Alignment::Center);
+                let y = area.height / 2;
+                let msg_area = Rect::new(area.x, y, area.width, 1);
+                frame.render_widget(paragraph, msg_area);
+                return;
+            }
+            match current_screen {
+                Screen::Dashboard => dashboard.render(frame),
+                Screen::Goals => goals_screen.render(frame),
+                Screen::LogEntry => log_entry.render(frame),
+                Screen::History => history.render(frame),
+                Screen::Trends => trends.render(frame),
+                Screen::Practices => practices.render(frame),
+            }
         })?;
 
         if let Event::Key(key) = event::read()? {

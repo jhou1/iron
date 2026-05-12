@@ -12,7 +12,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
 use crate::model::{Practice, PracticeType};
-use super::{centered_area, highlight_row, Action, Screen, CONTENT_WIDTH};
+use super::{centered_area, highlight_row, render_help_overlay, render_status_line, Action, Screen, StatusMessage, CONTENT_WIDTH};
 use fluent_bundle::FluentValue;
 
 const ACCENT: Color = Color::Cyan;
@@ -35,6 +35,8 @@ pub struct PracticesScreen {
     input: String,
     input_cursor: usize,
     type_selected: usize,
+    status_msg: StatusMessage,
+    show_help: bool,
 }
 
 impl PracticesScreen {
@@ -47,6 +49,8 @@ impl PracticesScreen {
             input: String::new(),
             input_cursor: 0,
             type_selected: 0,
+            status_msg: None,
+            show_help: false,
         })
     }
 
@@ -76,6 +80,7 @@ impl PracticesScreen {
                 Constraint::Length(2),             // title + header
                 Constraint::Length(list_height),   // practice list
                 Constraint::Length(action_height), // input/action area
+                Constraint::Length(1),             // status message
                 Constraint::Length(1),             // shortcuts
                 Constraint::Min(0),                // spacer
             ])
@@ -236,7 +241,7 @@ impl PracticesScreen {
                         Style::default().fg(RED),
                     )),
                     Line::from(Span::styled(
-                        tr("practices-delete-warning"),
+                        tr("practices-delete-cascade-warning"),
                         Style::default().fg(RED),
                     )),
                     Line::from(""),
@@ -249,6 +254,9 @@ impl PracticesScreen {
         if self.mode == Mode::AddType {
             highlight_row(frame, chunks[2], (self.type_selected + 1) as u16);
         }
+
+        // ── Status line ──
+        render_status_line(frame, chunks[3], &self.status_msg);
 
         // ── Shortcuts ──
         let shortcuts = match &self.mode {
@@ -263,6 +271,8 @@ impl PracticesScreen {
                 Span::styled(format!(" {}  ", tr("key-toggle")), Style::default().fg(Color::Gray)),
                 Span::styled("[d]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::Gray)),
+                Span::styled("[?]", Style::default().fg(ACCENT)),
+                Span::styled(format!(" {}  ", tr("key-help")), Style::default().fg(Color::Gray)),
                 Span::styled("[Esc]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::Gray)),
             ]),
@@ -287,10 +297,25 @@ impl PracticesScreen {
                 Span::styled(format!(" {}", tr("key-no")), Style::default().fg(Color::Gray)),
             ]),
         };
-        frame.render_widget(Paragraph::new(vec![shortcuts]), chunks[3]);
+        frame.render_widget(Paragraph::new(vec![shortcuts]), chunks[4]);
+
+        // ── Help overlay ──
+        if self.show_help {
+            let bindings = &[
+                ("j/k", "Navigate"),
+                ("a", "Add"),
+                ("e", "Edit"),
+                ("t", "Toggle active"),
+                ("d", "Delete"),
+                ("?", "Help"),
+                ("Esc", "Back"),
+            ];
+            render_help_overlay(frame, area, bindings);
+        }
     }
 
     pub fn handle_key(&mut self, key: KeyEvent, db: &Database) -> Action {
+        self.status_msg = None;
         match &self.mode {
             Mode::Browse => self.handle_browse(key, db),
             Mode::AddName => self.handle_add_name(key),
@@ -421,8 +446,12 @@ impl PracticesScreen {
             }
             KeyCode::Char('t') => {
                 if let Some(p) = self.practices.get(self.selected) {
-                    let _ = db.set_practice_active(p.id, !p.active);
-                    self.refresh(db);
+                    match db.set_practice_active(p.id, !p.active) {
+                        Ok(()) => self.refresh(db),
+                        Err(e) => {
+                            self.status_msg = Some((format!("Error: {}", e), true));
+                        }
+                    }
                 }
                 Action::None
             }
@@ -430,6 +459,10 @@ impl PracticesScreen {
                 if !self.practices.is_empty() {
                     self.mode = Mode::ConfirmDelete;
                 }
+                Action::None
+            }
+            KeyCode::Char('?') => {
+                self.show_help = !self.show_help;
                 Action::None
             }
             KeyCode::Esc => Action::Navigate(Screen::Dashboard),
@@ -471,9 +504,16 @@ impl PracticesScreen {
             }
             KeyCode::Enter => {
                 let pt = PracticeType::ALL[self.type_selected];
-                let _ = db.create_practice(self.input.trim(), pt);
-                self.refresh(db);
-                self.mode = Mode::Browse;
+                match db.create_practice(self.input.trim(), pt) {
+                    Ok(_) => {
+                        self.refresh(db);
+                        self.mode = Mode::Browse;
+                    }
+                    Err(e) => {
+                        self.status_msg = Some((format!("Error: {}", e), true));
+                        self.mode = Mode::Browse;
+                    }
+                }
                 Action::None
             }
             KeyCode::Esc => {
@@ -490,8 +530,12 @@ impl PracticesScreen {
                 if let Some(p) = self.practices.get(self.selected) {
                     let trimmed = self.input.trim();
                     if !trimmed.is_empty() {
-                        let _ = db.rename_practice(p.id, trimmed);
-                        self.refresh(db);
+                        match db.rename_practice(p.id, trimmed) {
+                            Ok(()) => self.refresh(db),
+                            Err(e) => {
+                                self.status_msg = Some((format!("Error: {}", e), true));
+                            }
+                        }
                     }
                 }
                 self.input.clear();
@@ -516,8 +560,12 @@ impl PracticesScreen {
         match key.code {
             KeyCode::Char('y') => {
                 if let Some(p) = self.practices.get(self.selected) {
-                    let _ = db.delete_practice(p.id);
-                    self.refresh(db);
+                    match db.delete_practice(p.id) {
+                        Ok(()) => self.refresh(db),
+                        Err(e) => {
+                            self.status_msg = Some((format!("Delete failed: {}", e), true));
+                        }
+                    }
                 }
                 self.mode = Mode::Browse;
                 Action::None

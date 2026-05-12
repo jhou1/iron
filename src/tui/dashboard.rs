@@ -13,7 +13,7 @@ use crate::i18n::{tr, tr_args};
 use crate::model::{Goal, LogEntry, Quote};
 use fluent_bundle::FluentValue;
 use super::widgets::heatmap::Heatmap;
-use super::{centered_area, highlight_row, Action, Screen, CONTENT_WIDTH};
+use super::{centered_area, highlight_row, render_help_overlay, render_status_line, Action, Screen, StatusMessage, CONTENT_WIDTH};
 
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
@@ -22,6 +22,7 @@ const GREEN: Color = Color::Green;
 enum DashboardMode {
     Normal,
     QuotesManage,
+    QuotesConfirmDelete,
     QuotesEdit,
     HrvInput,
 }
@@ -40,10 +41,14 @@ pub struct DashboardScreen {
     mode: DashboardMode,
     hrv_today: Option<i32>,
     hrv_input: String,
+    status_msg: StatusMessage,
+    show_help: bool,
+    last_deleted_quote: Option<Quote>,
+    no_color: bool,
 }
 
 impl DashboardScreen {
-    pub fn new(db: &Database) -> anyhow::Result<Self> {
+    pub fn new(db: &Database, no_color: bool) -> anyhow::Result<Self> {
         let heatmap_data = db.heatmap_counts(365)?;
         let recent_entries = db.list_logs_recent(7)?;
         let stats = db.aggregate_stats(7)?;
@@ -66,6 +71,10 @@ impl DashboardScreen {
             mode: DashboardMode::Normal,
             hrv_today,
             hrv_input: String::new(),
+            status_msg: None,
+            show_help: false,
+            last_deleted_quote: None,
+            no_color,
         })
     }
 
@@ -111,7 +120,7 @@ impl DashboardScreen {
         } as u16;
         let quote_height = quote_lines + 2;
 
-        // Main vertical layout: title | heatmap | quote | HRV | panes | footer | spacer
+        // Main vertical layout: title | heatmap | quote | HRV | panes | status | footer | spacer
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
@@ -120,8 +129,9 @@ impl DashboardScreen {
                 Constraint::Length(quote_height), // [2] daily quote box
                 Constraint::Length(3),            // [3] HRV row (with spacing)
                 Constraint::Length(pane_height),  // [4] split panes
-                Constraint::Length(1),            // [5] footer
-                Constraint::Min(0),              // [6] spacer absorbs excess at bottom
+                Constraint::Length(1),            // [5] status line
+                Constraint::Length(1),            // [6] footer
+                Constraint::Min(0),              // [7] spacer absorbs excess at bottom
             ])
             .split(area);
 
@@ -150,7 +160,7 @@ impl DashboardScreen {
         frame.render_widget(logo_paragraph, chunks[0]);
 
         // ── Heatmap ──
-        let heatmap = Heatmap::new(&self.heatmap_data, 52);
+        let heatmap = Heatmap::new(&self.heatmap_data, 52, self.no_color);
         frame.render_widget(heatmap, chunks[1]);
 
         // ── Daily quote (centered, rounded border) ──
@@ -205,6 +215,9 @@ impl DashboardScreen {
         self.render_recent_pane(frame, panes[0]);
         self.render_goals_pane(frame, panes[1]);
 
+        // ── Status line ──
+        render_status_line(frame, chunks[5], &self.status_msg);
+
         // ── Footer ──
         let footer_spans = if self.mode == DashboardMode::Normal {
             vec![
@@ -222,6 +235,8 @@ impl DashboardScreen {
                 Span::styled(format!(" {}  ", tr("key-quotes")), Style::default().fg(Color::Gray)),
                 Span::styled("[v]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}  ", tr("key-hrv")), Style::default().fg(Color::Gray)),
+                Span::styled("[?]", Style::default().fg(ACCENT)),
+                Span::styled(format!(" {}  ", tr("key-help")), Style::default().fg(Color::Gray)),
                 Span::styled("[q]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}", tr("key-quit")), Style::default().fg(Color::Gray)),
             ]
@@ -245,11 +260,28 @@ impl DashboardScreen {
             ]
         };
         let footer = Line::from(footer_spans);
-        frame.render_widget(Paragraph::new(footer), chunks[5]);
+        frame.render_widget(Paragraph::new(footer), chunks[6]);
 
         // ── Quotes modal overlay ──
-        if matches!(self.mode, DashboardMode::QuotesManage | DashboardMode::QuotesEdit) {
+        if matches!(self.mode, DashboardMode::QuotesManage | DashboardMode::QuotesEdit | DashboardMode::QuotesConfirmDelete) {
             self.render_quotes_modal(frame);
+        }
+
+        // ── Help overlay ──
+        if self.show_help {
+            let centered = centered_area(frame.area(), CONTENT_WIDTH);
+            let bindings = &[
+                ("l", "Log"),
+                ("h", "History"),
+                ("t", "Trends"),
+                ("e", "Practices"),
+                ("g", "Goals"),
+                ("Q", "Quotes"),
+                ("v", "HRV"),
+                ("?", "Help"),
+                ("q", "Quit"),
+            ];
+            render_help_overlay(frame, centered, bindings);
         }
     }
 
@@ -461,6 +493,15 @@ impl DashboardScreen {
                 Span::styled(&self.quotes_input[self.quotes_cursor..], Style::default().fg(GREEN)),
             ]);
             frame.render_widget(Paragraph::new(input_line), inner_chunks[1]);
+        } else if self.mode == DashboardMode::QuotesConfirmDelete {
+            let confirm_line = Line::from(vec![
+                Span::styled(format!("{} ", tr("quotes-delete-confirm")), Style::default().fg(Color::Red)),
+                Span::styled("[y]", Style::default().fg(ACCENT)),
+                Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::Gray)),
+                Span::styled("[any]", Style::default().fg(ACCENT)),
+                Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::Gray)),
+            ]);
+            frame.render_widget(Paragraph::new(confirm_line), inner_chunks[1]);
         } else {
             let shortcuts = Line::from(vec![
                 Span::styled("[a]", Style::default().fg(ACCENT)),
@@ -469,6 +510,8 @@ impl DashboardScreen {
                 Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::Gray)),
                 Span::styled("[d]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::Gray)),
+                Span::styled("[u]", Style::default().fg(ACCENT)),
+                Span::styled(format!(" {}  ", tr("key-undo")), Style::default().fg(Color::Gray)),
                 Span::styled("[Esc]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}", tr("key-close")), Style::default().fg(Color::Gray)),
             ]);
@@ -477,9 +520,11 @@ impl DashboardScreen {
     }
 
     pub fn handle_key(&mut self, key: KeyEvent, db: &Database) -> Action {
+        self.status_msg = None;
         match self.mode {
             DashboardMode::Normal => self.handle_normal(key),
             DashboardMode::QuotesManage => self.handle_quotes_manage(key, db),
+            DashboardMode::QuotesConfirmDelete => self.handle_quotes_confirm_delete(key, db),
             DashboardMode::QuotesEdit => self.handle_quotes_edit(key, db),
             DashboardMode::HrvInput => self.handle_hrv_input(key, db),
         }
@@ -588,14 +633,21 @@ impl DashboardScreen {
                 Action::None
             }
             KeyCode::Char('d') => {
-                if let Some(q) = self.quotes.get(self.quotes_selected) {
-                    let id = q.id;
-                    let _ = db.delete_quote(id);
-                    let _ = self.reload_quotes(db);
-                    if self.quotes.is_empty() {
-                        self.quotes_selected = 0;
-                    } else if self.quotes_selected >= self.quotes.len() {
-                        self.quotes_selected = self.quotes.len() - 1;
+                if !self.quotes.is_empty() {
+                    self.mode = DashboardMode::QuotesConfirmDelete;
+                }
+                Action::None
+            }
+            KeyCode::Char('u') => {
+                if let Some(quote) = self.last_deleted_quote.take() {
+                    match db.restore_quote(&quote) {
+                        Ok(_) => {
+                            let _ = self.reload_quotes(db);
+                            self.status_msg = Some((tr("status-restored"), false));
+                        }
+                        Err(e) => {
+                            self.status_msg = Some((tr_args("status-save-error", &[("msg", FluentValue::from(e.to_string()))]), true));
+                        }
                     }
                 }
                 Action::None
@@ -608,17 +660,50 @@ impl DashboardScreen {
         }
     }
 
+    fn handle_quotes_confirm_delete(&mut self, key: KeyEvent, db: &Database) -> Action {
+        if key.code == KeyCode::Char('y') {
+            if let Some(q) = self.quotes.get(self.quotes_selected) {
+                let quote_clone = q.clone();
+                let id = q.id;
+                match db.delete_quote(id) {
+                    Ok(()) => {
+                        self.last_deleted_quote = Some(quote_clone);
+                        self.status_msg = Some((tr("status-deleted-undo"), false));
+                    }
+                    Err(e) => {
+                        self.status_msg = Some((tr_args("status-delete-error", &[("msg", FluentValue::from(e.to_string()))]), true));
+                    }
+                }
+                let _ = self.reload_quotes(db);
+                if self.quotes.is_empty() {
+                    self.quotes_selected = 0;
+                } else if self.quotes_selected >= self.quotes.len() {
+                    self.quotes_selected = self.quotes.len() - 1;
+                }
+            }
+        }
+        self.mode = DashboardMode::QuotesManage;
+        Action::None
+    }
+
     fn handle_quotes_edit(&mut self, key: KeyEvent, db: &Database) -> Action {
         match key.code {
             KeyCode::Enter => {
                 let text = self.quotes_input.trim().to_string();
                 if !text.is_empty() {
-                    if let Some(id) = self.quotes_editing_id {
-                        let _ = db.update_quote(id, &text);
+                    let result = if let Some(id) = self.quotes_editing_id {
+                        db.update_quote(id, &text)
                     } else {
-                        let _ = db.create_quote(&text);
+                        db.create_quote(&text).map(|_| ())
+                    };
+                    match result {
+                        Ok(()) => {
+                            let _ = self.reload_quotes(db);
+                        }
+                        Err(e) => {
+                            self.status_msg = Some((tr_args("status-save-error", &[("msg", FluentValue::from(e.to_string()))]), true));
+                        }
                     }
-                    let _ = self.reload_quotes(db);
                 }
                 self.quotes_input.clear();
                 self.quotes_cursor = 0;
@@ -657,6 +742,10 @@ impl DashboardScreen {
                 self.mode = DashboardMode::HrvInput;
                 Action::None
             }
+            KeyCode::Char('?') => {
+                self.show_help = !self.show_help;
+                Action::None
+            }
             KeyCode::Char('q') => Action::Quit,
             _ => Action::None,
         }
@@ -668,8 +757,14 @@ impl DashboardScreen {
                 if let Ok(hrv) = self.hrv_input.parse::<i32>() {
                     if (0..=100).contains(&hrv) {
                         let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-                        let _ = db.set_daily_hrv(&today, hrv);
-                        self.hrv_today = Some(hrv);
+                        match db.set_daily_hrv(&today, hrv) {
+                            Ok(()) => {
+                                self.hrv_today = Some(hrv);
+                            }
+                            Err(e) => {
+                                self.status_msg = Some((tr_args("status-save-error", &[("msg", FluentValue::from(e.to_string()))]), true));
+                            }
+                        }
                         self.mode = DashboardMode::Normal;
                     }
                 }

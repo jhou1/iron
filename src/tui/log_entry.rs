@@ -13,7 +13,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
 use crate::model::{LogEntry, Practice, PracticeType, SetData};
-use super::{centered_area, highlight_row, Action, Screen, CONTENT_WIDTH};
+use super::{centered_area, highlight_row, render_help_overlay, render_status_line, Action, Screen, StatusMessage, CONTENT_WIDTH};
 use fluent_bundle::FluentValue;
 
 const ACCENT: Color = Color::Cyan;
@@ -56,6 +56,8 @@ pub struct LogEntryScreen {
     date_input: String,     // buffer for typing a new date
     date_input_cursor: usize,
     return_to: Screen,     // screen to return to on Esc or save
+    status_msg: StatusMessage,
+    show_help: bool,
 }
 
 impl LogEntryScreen {
@@ -92,6 +94,8 @@ impl LogEntryScreen {
             date_input: String::new(),
             date_input_cursor: 0,
             return_to: Screen::Dashboard,
+            status_msg: None,
+            show_help: false,
         })
     }
 
@@ -137,6 +141,8 @@ impl LogEntryScreen {
             date_input: String::new(),
             date_input_cursor: 0,
             return_to: Screen::History,
+            status_msg: None,
+            show_help: false,
         })
     }
 
@@ -150,6 +156,7 @@ impl LogEntryScreen {
     }
 
     pub fn handle_key(&mut self, key: KeyEvent, db: &Database) -> Action {
+        self.status_msg = None;
         match self.phase {
             Phase::SelectPractice => self.handle_select_practice(key),
             Phase::EnterSets => self.handle_enter_sets(key),
@@ -170,6 +177,7 @@ impl LogEntryScreen {
                 Constraint::Length(1),           // title
                 Constraint::Length(2),           // filter bar + column header
                 Constraint::Length(list_height), // list
+                Constraint::Length(1),           // status line
                 Constraint::Length(1),           // footer
                 Constraint::Min(0),              // spacer
             ])
@@ -249,6 +257,9 @@ impl LogEntryScreen {
             highlight_row(frame, chunks[2], self.selected as u16);
         }
 
+        // Status line
+        render_status_line(frame, chunks[3], &self.status_msg);
+
         // Footer
         let footer = Line::from(vec![
             Span::styled(" [j/k]", Style::default().fg(ACCENT)),
@@ -260,7 +271,19 @@ impl LogEntryScreen {
             Span::styled("[Esc]", Style::default().fg(ACCENT)),
             Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::Gray)),
         ]);
-        frame.render_widget(Paragraph::new(footer), chunks[3]);
+        frame.render_widget(Paragraph::new(footer), chunks[4]);
+
+        // Help overlay
+        if self.show_help {
+            let bindings = &[
+                ("j/k", "Navigate"),
+                ("/", "Filter"),
+                ("Enter", "Select"),
+                ("?", "Help"),
+                ("Esc", "Back"),
+            ];
+            render_help_overlay(frame, area, bindings);
+        }
     }
 
     fn handle_select_practice(&mut self, key: KeyEvent) -> Action {
@@ -366,6 +389,10 @@ impl LogEntryScreen {
                     self.active_field = 0;
                     self.date_confirmed = false;
                 }
+                Action::None
+            }
+            KeyCode::Char('?') => {
+                self.show_help = !self.show_help;
                 Action::None
             }
             _ => Action::None,
@@ -1029,6 +1056,7 @@ impl LogEntryScreen {
                 Constraint::Length(3), // summary
                 Constraint::Length(1), // spacer
                 Constraint::Length(3), // note input
+                Constraint::Length(1), // status line
                 Constraint::Length(1), // footer
                 Constraint::Min(0),   // spacer absorbs excess
             ])
@@ -1090,6 +1118,9 @@ impl LogEntryScreen {
         .block(note_block);
         frame.render_widget(note_paragraph, chunks[4]);
 
+        // Status line
+        render_status_line(frame, chunks[5], &self.status_msg);
+
         // Footer
         let footer = Line::from(vec![
             Span::styled(" [Enter]", Style::default().fg(ACCENT)),
@@ -1097,7 +1128,7 @@ impl LogEntryScreen {
             Span::styled("[Esc]", Style::default().fg(ACCENT)),
             Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::Gray)),
         ]);
-        frame.render_widget(Paragraph::new(footer), chunks[5]);
+        frame.render_widget(Paragraph::new(footer), chunks[6]);
     }
 
     fn handle_enter_note(&mut self, key: KeyEvent, db: &Database) -> Action {
@@ -1159,12 +1190,18 @@ impl LogEntryScreen {
                 let date = NaiveDate::parse_from_str(&self.log_date, "%Y-%m-%d")
                     .unwrap_or_else(|_| Local::now().date_naive());
                 let datetime = date.and_time(NaiveTime::from_hms_opt(12, 0, 0).unwrap());
-                if let Some(log_id) = self.editing_log_id {
-                    let _ = db.update_log(log_id, &self.sets, note, Some(&datetime), warm_up, cool_down);
+                let result = if let Some(log_id) = self.editing_log_id {
+                    db.update_log(log_id, &self.sets, note, Some(&datetime), warm_up, cool_down)
                 } else {
-                    let _ = db.create_log_at(practice.id, &datetime, &self.sets, note, warm_up, cool_down);
+                    db.create_log_at(practice.id, &datetime, &self.sets, note, warm_up, cool_down).map(|_| ())
+                };
+                match result {
+                    Ok(_) => Action::Navigate(self.return_to.clone()),
+                    Err(e) => {
+                        self.status_msg = Some((format!("Error: {}", e), true));
+                        Action::None
+                    }
                 }
-                Action::Navigate(self.return_to.clone())
             }
             KeyCode::Backspace => {
                 if self.note_cursor > 0 {

@@ -9,8 +9,8 @@ use ratatui::{
 
 use crate::db::Database;
 use crate::i18n::tr;
-use crate::model::Goal;
-use super::{centered_area, highlight_row, Action, Screen, CONTENT_WIDTH};
+use crate::model::{Goal, Milestone};
+use super::{centered_area, highlight_row, render_help_overlay, render_status_line, Action, Screen, StatusMessage, CONTENT_WIDTH};
 
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
@@ -44,6 +44,11 @@ enum GoalItem {
     Milestone(i64),
 }
 
+enum GoalUndoData {
+    Goal(Goal),
+    Milestone { goal_id: i64, milestone: Milestone },
+}
+
 pub struct GoalsScreen {
     goals: Vec<Goal>,
     selected: usize,
@@ -51,6 +56,9 @@ pub struct GoalsScreen {
     mode: Mode,
     input: String,
     cursor: usize,
+    status_msg: StatusMessage,
+    show_help: bool,
+    last_deleted: Option<GoalUndoData>,
 }
 
 impl GoalsScreen {
@@ -63,6 +71,9 @@ impl GoalsScreen {
             mode: Mode::Browse,
             input: String::new(),
             cursor: 0,
+            status_msg: None,
+            show_help: false,
+            last_deleted: None,
         })
     }
 
@@ -96,6 +107,17 @@ impl GoalsScreen {
     fn reload_goals(&mut self, db: &Database) -> anyhow::Result<()> {
         self.goals = db.list_goals()?;
         Ok(())
+    }
+
+    fn find_milestone(&self, id: i64) -> Option<(i64, Milestone)> {
+        for goal in &self.goals {
+            for ms in &goal.milestones {
+                if ms.id == id {
+                    return Some((goal.id, ms.clone()));
+                }
+            }
+        }
+        None
     }
 
     fn adjust_scroll(&mut self, visible_height: usize) {
@@ -210,8 +232,9 @@ impl GoalsScreen {
             .constraints([
                 Constraint::Length(2),  // [0] title + header
                 Constraint::Min(1),    // [1] goals list
-                Constraint::Length(1), // [2] footer
-                Constraint::Min(0),   // [3] spacer
+                Constraint::Length(1), // [2] status line
+                Constraint::Length(1), // [3] footer
+                Constraint::Min(0),   // [4] spacer
             ])
             .split(area);
 
@@ -300,10 +323,13 @@ impl GoalsScreen {
             }
 
             if is_selected && self.mode == Mode::ConfirmDelete {
-                lines.push(Line::from(Span::styled(
-                    format!("  {}", tr("dashboard-delete-confirm")),
-                    Style::default().fg(Color::Red),
-                )));
+                lines.push(Line::from(vec![
+                    Span::styled(format!("  {} ", tr("dashboard-delete-confirm")), Style::default().fg(Color::Red)),
+                    Span::styled("[y]", Style::default().fg(ACCENT)),
+                    Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::Gray)),
+                    Span::styled("[any]", Style::default().fg(ACCENT)),
+                    Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::Gray)),
+                ]));
             }
             idx += 1;
 
@@ -360,10 +386,13 @@ impl GoalsScreen {
                     ]));
                 }
                 if is_ms_selected && self.mode == Mode::ConfirmDelete {
-                    lines.push(Line::from(Span::styled(
-                        format!("    {}", tr("dashboard-delete-confirm")),
-                        Style::default().fg(Color::Red),
-                    )));
+                    lines.push(Line::from(vec![
+                        Span::styled(format!("    {} ", tr("dashboard-delete-confirm")), Style::default().fg(Color::Red)),
+                        Span::styled("[y]", Style::default().fg(ACCENT)),
+                        Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::Gray)),
+                        Span::styled("[any]", Style::default().fg(ACCENT)),
+                        Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::Gray)),
+                    ]));
                 }
                 idx += 1;
             }
@@ -416,6 +445,9 @@ impl GoalsScreen {
             }
         }
 
+        // ── Status line ──
+        render_status_line(frame, chunks[2], &self.status_msg);
+
         // ── Footer ──
         let footer_spans = if self.mode == Mode::Browse {
             vec![
@@ -431,6 +463,8 @@ impl GoalsScreen {
                 Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::Gray)),
                 Span::styled("[D]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}  ", tr("key-date")), Style::default().fg(Color::Gray)),
+                Span::styled("[?]", Style::default().fg(ACCENT)),
+                Span::styled(format!(" {}  ", tr("key-help")), Style::default().fg(Color::Gray)),
                 Span::styled("[Esc]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::Gray)),
             ]
@@ -443,13 +477,37 @@ impl GoalsScreen {
             ]
         };
         let footer = Line::from(footer_spans);
-        frame.render_widget(Paragraph::new(footer), chunks[2]);
+        frame.render_widget(Paragraph::new(footer), chunks[3]);
 
-        // Ignore chunks[3] (spacer)
+        // Ignore chunks[4] (spacer)
         let _ = visible_height;
+
+        // ── Help overlay ──
+        if self.show_help {
+            let bindings = &[
+                ("j/k", "Navigate"),
+                ("a", "Add goal"),
+                ("m", "Add milestone"),
+                ("e", "Edit"),
+                ("Space", "Toggle complete"),
+                ("D", "Edit date"),
+                ("d", "Delete"),
+                ("u", "Undo"),
+                ("?", "Help"),
+                ("Esc", "Back"),
+            ];
+            render_help_overlay(frame, area, bindings);
+        }
     }
 
     pub fn handle_key(&mut self, key: KeyEvent, db: &Database) -> Action {
+        self.status_msg = None;
+
+        if self.show_help {
+            self.show_help = false;
+            return Action::None;
+        }
+
         match self.mode {
             Mode::Browse => self.handle_browse(key, db),
             Mode::AddGoal => self.handle_add_goal(key, db),
@@ -518,11 +576,15 @@ impl GoalsScreen {
             KeyCode::Char(' ') => {
                 match self.selected_goal_item() {
                     Some(GoalItem::Goal(id)) => {
-                        let _ = db.toggle_goal(id);
+                        if let Err(e) = db.toggle_goal(id) {
+                            self.status_msg = Some((format!("Error: {}", e), true));
+                        }
                         let _ = self.reload_goals(db);
                     }
                     Some(GoalItem::Milestone(id)) => {
-                        let _ = db.toggle_milestone(id);
+                        if let Err(e) = db.toggle_milestone(id) {
+                            self.status_msg = Some((format!("Error: {}", e), true));
+                        }
                         let _ = self.reload_goals(db);
                     }
                     None => {}
@@ -551,6 +613,29 @@ impl GoalsScreen {
                 }
                 Action::None
             }
+            KeyCode::Char('u') => {
+                if let Some(undo_data) = self.last_deleted.take() {
+                    let result = match &undo_data {
+                        GoalUndoData::Goal(goal) => db.restore_goal(goal).map(|_| ()),
+                        GoalUndoData::Milestone { goal_id, milestone } => db.restore_milestone(*goal_id, milestone).map(|_| ()),
+                    };
+                    match result {
+                        Ok(()) => {
+                            let _ = self.reload_goals(db);
+                            self.status_msg = Some((tr("status-restored"), false));
+                        }
+                        Err(e) => {
+                            self.last_deleted = Some(undo_data);
+                            self.status_msg = Some((format!("Restore failed: {}", e), true));
+                        }
+                    }
+                }
+                Action::None
+            }
+            KeyCode::Char('?') => {
+                self.show_help = !self.show_help;
+                Action::None
+            }
             KeyCode::Esc => Action::Navigate(Screen::Dashboard),
             _ => Action::None,
         }
@@ -561,7 +646,9 @@ impl GoalsScreen {
             KeyCode::Enter => {
                 let title = self.input.trim().to_string();
                 if !title.is_empty() {
-                    let _ = db.create_goal(&title);
+                    if let Err(e) = db.create_goal(&title) {
+                        self.status_msg = Some((format!("Error: {}", e), true));
+                    }
                     let _ = self.reload_goals(db);
                 }
                 self.input.clear();
@@ -590,7 +677,9 @@ impl GoalsScreen {
                 let title = self.input.trim().to_string();
                 if !title.is_empty() {
                     if let Some(goal_id) = self.parent_goal_id() {
-                        let _ = db.create_milestone(goal_id, &title);
+                        if let Err(e) = db.create_milestone(goal_id, &title) {
+                            self.status_msg = Some((format!("Error: {}", e), true));
+                        }
                         let _ = self.reload_goals(db);
                     }
                 }
@@ -618,9 +707,12 @@ impl GoalsScreen {
                 let title = self.input.trim().to_string();
                 if !title.is_empty() {
                     if let Some(item) = self.selected_goal_item() {
-                        match item {
-                            GoalItem::Goal(id) => { let _ = db.update_goal(id, &title); }
-                            GoalItem::Milestone(id) => { let _ = db.update_milestone(id, &title); }
+                        let result = match item {
+                            GoalItem::Goal(id) => db.update_goal(id, &title),
+                            GoalItem::Milestone(id) => db.update_milestone(id, &title),
+                        };
+                        if let Err(e) = result {
+                            self.status_msg = Some((format!("Error: {}", e), true));
                         }
                         let _ = self.reload_goals(db);
                     }
@@ -649,9 +741,12 @@ impl GoalsScreen {
                 if let Ok(date) = chrono::NaiveDate::parse_from_str(&self.input, "%Y-%m-%d") {
                     let completed_at = date.and_hms_opt(0, 0, 0).unwrap();
                     if let Some(item) = self.selected_goal_item() {
-                        match item {
-                            GoalItem::Goal(id) => { let _ = db.set_goal_completed_at(id, &completed_at); }
-                            GoalItem::Milestone(id) => { let _ = db.set_milestone_completed_at(id, &completed_at); }
+                        let result = match item {
+                            GoalItem::Goal(id) => db.set_goal_completed_at(id, &completed_at),
+                            GoalItem::Milestone(id) => db.set_milestone_completed_at(id, &completed_at),
+                        };
+                        if let Err(e) = result {
+                            self.status_msg = Some((format!("Error: {}", e), true));
                         }
                         let _ = self.reload_goals(db);
                     }
@@ -679,8 +774,32 @@ impl GoalsScreen {
             KeyCode::Char('y') => {
                 if let Some(item) = self.selected_goal_item() {
                     match item {
-                        GoalItem::Goal(id) => { let _ = db.delete_goal(id); }
-                        GoalItem::Milestone(id) => { let _ = db.delete_milestone(id); }
+                        GoalItem::Goal(id) => {
+                            if let Some(goal) = self.goals.iter().find(|g| g.id == id).cloned() {
+                                match db.delete_goal(id) {
+                                    Ok(()) => {
+                                        self.last_deleted = Some(GoalUndoData::Goal(goal));
+                                        self.status_msg = Some((tr("status-deleted-undo"), false));
+                                    }
+                                    Err(e) => {
+                                        self.status_msg = Some((format!("Delete failed: {}", e), true));
+                                    }
+                                }
+                            }
+                        }
+                        GoalItem::Milestone(id) => {
+                            if let Some((goal_id, milestone)) = self.find_milestone(id) {
+                                match db.delete_milestone(id) {
+                                    Ok(()) => {
+                                        self.last_deleted = Some(GoalUndoData::Milestone { goal_id, milestone });
+                                        self.status_msg = Some((tr("status-deleted-undo"), false));
+                                    }
+                                    Err(e) => {
+                                        self.status_msg = Some((format!("Delete failed: {}", e), true));
+                                    }
+                                }
+                            }
+                        }
                     }
                     let _ = self.reload_goals(db);
                     let items = self.goal_items();

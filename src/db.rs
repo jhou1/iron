@@ -308,6 +308,18 @@ impl Database {
         Ok(())
     }
 
+    pub fn restore_log(&self, entry: &LogEntry) -> Result<i64> {
+        let sets: Vec<SetData> = entry.sets.iter().map(|s| s.data.clone()).collect();
+        self.create_log_at(
+            entry.log.practice_id,
+            &entry.log.logged_at,
+            &sets,
+            entry.log.note.as_deref(),
+            entry.log.warm_up.as_deref(),
+            entry.log.cool_down.as_deref(),
+        )
+    }
+
     fn insert_sets(&self, log_id: i64, sets: &[SetData]) -> Result<()> {
         let mut stmt = self.conn.prepare(
             "INSERT INTO sets (log_id, set_number, weight, reps, distance, duration)
@@ -737,6 +749,22 @@ impl Database {
         Ok(())
     }
 
+    pub fn restore_goal(&self, goal: &Goal) -> Result<i64> {
+        let goal_id = self.create_goal(&goal.title)?;
+        // Restore completion state if it was completed
+        if goal.completed {
+            self.toggle_goal(goal_id)?;
+        }
+        // Restore milestones
+        for ms in &goal.milestones {
+            let ms_id = self.create_milestone(goal_id, &ms.title)?;
+            if ms.completed {
+                self.toggle_milestone(ms_id)?;
+            }
+        }
+        Ok(goal_id)
+    }
+
     pub fn toggle_goal(&self, id: i64) -> Result<()> {
         self.conn.execute(
             "UPDATE goals SET completed = CASE WHEN completed = 0 THEN 1 ELSE 0 END, \
@@ -803,6 +831,14 @@ impl Database {
         Ok(())
     }
 
+    pub fn restore_milestone(&self, goal_id: i64, milestone: &Milestone) -> Result<i64> {
+        let ms_id = self.create_milestone(goal_id, &milestone.title)?;
+        if milestone.completed {
+            self.toggle_milestone(ms_id)?;
+        }
+        Ok(ms_id)
+    }
+
     // ── Quote CRUD ────────────────────────────────────────────────────
 
     pub fn create_quote(&self, text: &str) -> Result<Quote> {
@@ -846,6 +882,10 @@ impl Database {
     pub fn delete_quote(&self, id: i64) -> Result<()> {
         self.conn.execute("DELETE FROM quotes WHERE id = ?1", params![id])?;
         Ok(())
+    }
+
+    pub fn restore_quote(&self, quote: &Quote) -> Result<Quote> {
+        self.create_quote(&quote.text)
     }
 
     // ── Daily Metrics CRUD ───────────────────────────────────────────

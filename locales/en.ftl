@@ -167,6 +167,22 @@ key-no = No
 key-hrv = HRV
 key-next = Next
 key-switch-field = Switch field
+key-undo = Undo
+key-help = Help
+
+# ── Status Messages ──
+status-deleted-undo = Deleted. Press [u] to undo
+status-restored = Restored
+status-save-error = Error: { $msg }
+status-delete-error = Delete failed: { $msg }
+
+# ── Help ──
+help-title = Keyboard Shortcuts
+
+# ── Additional UI ──
+quotes-delete-confirm = Delete this quote?
+practices-delete-cascade-warning = This PERMANENTLY removes all logs. Consider [t] toggle inactive.
+terminal-too-small = Please resize terminal (min { $w }×{ $h })
 
 # ── CLI ──
 cli-export-about = Export all data to JSON
