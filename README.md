@@ -176,6 +176,51 @@ Record your morning Heart Rate Variability score on the Dashboard.
 - Today's HRV is displayed inline on the Dashboard
 - HRV data is included in JSON export/import for long-term analysis
 
+### Quick Log (LLM-powered)
+
+Press `w` on the Dashboard to open Quick Log — write training notes in natural shorthand and let an LLM parse them into structured logs.
+
+**Example shorthand:**
+
+```
+DL 60kg 5/5/5
+Pull-ups 10/8/6
+Run 5km
+```
+
+**Workflow:**
+
+1. Type your training notes in the left pane (one practice per line or multi-line blocks)
+2. Press `Ctrl+S` to send to the LLM for parsing
+3. Review parsed results in the right pane (matched practices show in green, unmatched in red)
+4. Press `a` to add abbreviations for shortcuts (e.g., `DL` → `Deadlift`)
+5. Press `D` to change the log date (defaults to today)
+6. Press `Enter` to save all logs to the database
+7. Press `Esc` to return to Dashboard
+
+**Configuration:**
+
+Create `~/.iron/config.toml` with your LLM settings:
+
+```toml
+# For local Ollama
+[llm]
+endpoint = "http://localhost:11434/v1"
+model = "llama3.2:3b"
+
+# For OpenAI
+[llm]
+endpoint = "https://api.openai.com/v1"
+api_key = "sk-..."
+model = "gpt-4o-mini"
+```
+
+The endpoint must implement the OpenAI Chat Completions API format (`/chat/completions`). The `api_key` is optional (not needed for Ollama).
+
+**Abbreviations:**
+
+Press `[a]` from the Dashboard to manage your abbreviation dictionary. Abbreviations help the LLM understand your shortcuts (e.g., `DL` = `Deadlift`, `BP` = `Bench Press`). You can also add abbreviations on-the-fly from the Quick Log preview pane by pressing `a`.
+
 ## Practice Types
 
 | Type | UI Label | You Enter | Tracked Metric |
@@ -194,9 +239,11 @@ Units are fixed: **kg**, **km**, **minutes**.
 | Key | Action |
 |---|---|
 | `l` | Log a practice |
+| `w` | Quick Log (LLM-powered) |
 | `h` | View history |
 | `t` | View trends |
 | `e` | Manage practices |
+| `a` | Manage abbreviations |
 | `g` | Goals mode |
 | `Q` | Manage quotes |
 | `v` | Record/edit today's HRV |
@@ -265,6 +312,28 @@ Units are fixed: **kg**, **km**, **minutes**.
 | `e` or `Enter` | Edit quote |
 | `d` | Delete quote |
 | `Esc` | Close manager |
+
+### Quick Log
+
+| Key | Action |
+|---|---|
+| `Ctrl+S` | Parse notes with LLM |
+| `Enter` | New line (input) / Save all logs (preview) |
+| `Up/Down` | Navigate lines (input) / Navigate results (preview) |
+| `D` | Change log date |
+| `a` | Add abbreviation (preview only) |
+| `?` | Toggle help overlay |
+| `Esc` | Back to Dashboard |
+
+### Abbreviations
+
+| Key | Action |
+|---|---|
+| `j/k` | Navigate |
+| `a` | Add abbreviation |
+| `e` or `Enter` | Edit abbreviation |
+| `d` | Delete abbreviation |
+| `Esc` | Back to Dashboard |
 
 ## Data Backup
 
