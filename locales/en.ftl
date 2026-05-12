@@ -183,6 +183,17 @@ status-delete-error = Delete failed: { $msg }
 # ── Help ──
 help-title = Keyboard Shortcuts
 
+# ── Abbreviations ──
+abbreviations-title = Abbreviations
+abbreviations-col-short = Short
+abbreviations-col-full = Full Name
+abbreviations-no-items = No abbreviations — press [a] to add one
+abbreviations-enter-short = Enter abbreviation (e.g., DL):
+abbreviations-enter-full = Enter full name (e.g., Deadlift):
+abbreviations-edit-short = Edit abbreviation:
+abbreviations-edit-full = Edit full name:
+abbreviations-delete-confirm = Delete { $short }?
+
 # ── Additional UI ──
 quotes-delete-confirm = Delete this quote?
 practices-delete-cascade-warning = This PERMANENTLY removes all logs. Consider [t] toggle inactive.

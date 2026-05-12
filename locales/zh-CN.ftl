@@ -183,6 +183,17 @@ status-delete-error = 删除失败：{ $msg }
 # ── 帮助 ──
 help-title = 快捷键
 
+# ── 缩写词典 ──
+abbreviations-title = 缩写词典
+abbreviations-col-short = 缩写
+abbreviations-col-full = 全称
+abbreviations-no-items = 暂无缩写 — 按 [a] 添加
+abbreviations-enter-short = 输入缩写（例如 DL）：
+abbreviations-enter-full = 输入全称（例如 Deadlift）：
+abbreviations-edit-short = 编辑缩写：
+abbreviations-edit-full = 编辑全称：
+abbreviations-delete-confirm = 删除 { $short }？
+
 # ── 其他界面 ──
 quotes-delete-confirm = 删除这条格言？
 practices-delete-cascade-warning = 此操作将永久删除所有日志。建议使用 [t] 切换为非活跃。
