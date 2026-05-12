@@ -199,6 +199,22 @@ quotes-delete-confirm = Delete this quote?
 practices-delete-cascade-warning = This PERMANENTLY removes all logs. Consider [t] toggle inactive.
 terminal-too-small = Please resize terminal (min { $w }×{ $h })
 
+# ── Quick Log ──
+quicklog-title = Quick Log
+quicklog-input-title = Input
+quicklog-preview-title = Preview
+quicklog-date = Date
+quicklog-no-config = Configure LLM in ~/.iron/config.toml
+quicklog-parsing = Parsing with LLM...
+quicklog-no-results = No results
+quicklog-unmatched-warning = ✗ marks unknown practices — create them first or fix the text
+quicklog-unmatched-error = Cannot save: some practice names don't match
+quicklog-key-parse = Parse
+quicklog-key-save = Save all
+quicklog-key-remove = Remove
+quicklog-key-abbr = Abbreviations
+quicklog-key-edit = Back to edit
+
 # ── CLI ──
 cli-export-about = Export all data to JSON
 cli-import-about = Import data from JSON

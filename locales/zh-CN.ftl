@@ -199,6 +199,22 @@ quotes-delete-confirm = 删除这条格言？
 practices-delete-cascade-warning = 此操作将永久删除所有日志。建议使用 [t] 切换为非活跃。
 terminal-too-small = 请调整终端大小（最小 { $w }×{ $h }）
 
+# ── 快速记录 ──
+quicklog-title = 快速记录
+quicklog-input-title = 输入
+quicklog-preview-title = 预览
+quicklog-date = 日期
+quicklog-no-config = 请在 ~/.iron/config.toml 中配置 LLM
+quicklog-parsing = 正在通过 LLM 解析...
+quicklog-no-results = 无结果
+quicklog-unmatched-warning = ✗ 标记未知练习 — 请先创建或修正文本
+quicklog-unmatched-error = 无法保存：部分练习名称未匹配
+quicklog-key-parse = 解析
+quicklog-key-save = 全部保存
+quicklog-key-remove = 移除
+quicklog-key-abbr = 缩写词典
+quicklog-key-edit = 返回编辑
+
 # ── 命令行 ──
 cli-export-about = 导出所有数据为 JSON
 cli-import-about = 从 JSON 导入数据
