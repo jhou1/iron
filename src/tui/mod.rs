@@ -1,8 +1,10 @@
+pub mod abbreviations;
 pub mod dashboard;
 pub mod goals;
 pub mod history;
 pub mod log_entry;
 pub mod practices;
+pub mod quick_log;
 pub mod quotes;
 pub mod trends;
 pub mod widgets;
@@ -97,6 +99,8 @@ pub enum Screen {
     Trends,
     Practices,
     Goals,
+    QuickLog,
+    Abbreviations,
 }
 
 pub enum Action {
