@@ -54,6 +54,8 @@ dashboard-quit-confirm = 退出 iron？
 
 # ── 目标 ──
 goals-title = 目标
+goals-no-milestones = 暂无里程碑 — 按 [a] 添加
+goals-press-enter = 按 [Enter] 管理里程碑
 
 # ── 记录条目 ──
 log-select-practice = 选择练习项目

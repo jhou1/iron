@@ -54,6 +54,8 @@ dashboard-quit-confirm = Quit iron?
 
 # ── Goals ──
 goals-title = Goals
+goals-no-milestones = No milestones — press [a] to add one
+goals-press-enter = Press [Enter] to manage milestones
 
 # ── Log Entry ──
 log-select-practice = Select Practice
