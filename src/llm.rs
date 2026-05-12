@@ -4,7 +4,6 @@ use std::fmt;
 
 #[derive(Debug)]
 pub enum LlmError {
-    NoConfig,
     Network(String),
     Timeout,
     ParseError(String),
@@ -14,7 +13,6 @@ pub enum LlmError {
 impl fmt::Display for LlmError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            LlmError::NoConfig => write!(f, "Configure LLM in ~/.iron/config.toml"),
             LlmError::Network(e) => write!(f, "Network error: {}", e),
             LlmError::Timeout => write!(f, "Request timed out"),
             LlmError::ParseError(e) => write!(f, "Failed to parse LLM response: {}", e),
