@@ -127,12 +127,15 @@ Press `t` to see **progress charts**. Select a practice to view a sparkline bar 
 
 ### Managing Practices
 
-Press `e` to manage your practice inventory.
+Press `e` to manage your practice inventory. Each practice shows its name, type, and active/inactive status.
 
 - `a` — add a new practice
 - `Enter` — rename a practice
+- `t` — toggle a practice between active and inactive
 - `d` — delete a practice (removes all its logs and sets)
 - `Esc` — back to Dashboard
+
+Inactive practices are hidden from the log entry picker, history, trends, and dashboard statistics. They remain visible on the Practices screen and can be reactivated at any time by pressing `t` again.
 
 ### Goals
 
@@ -215,9 +218,10 @@ Units are fixed: **kg**, **km**, **minutes**.
 | Key | Action |
 |---|---|
 | `j/k` | Navigate |
-| `Enter` | Edit log |
+| `/` | Filter by practice name |
+| `e` | Edit log |
 | `d` | Delete log |
-| `Esc` | Back |
+| `Esc` | Clear filter / Back |
 
 ### Trends
 
@@ -235,6 +239,7 @@ Units are fixed: **kg**, **km**, **minutes**.
 | `j/k` | Navigate |
 | `a` | Add practice |
 | `Enter` | Edit name |
+| `t` | Toggle active/inactive |
 | `d` | Delete practice |
 | `Esc` | Back |
 
