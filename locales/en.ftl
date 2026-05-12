@@ -50,6 +50,7 @@ dashboard-hrv-label = HRV
 dashboard-hrv-edit-hint = [v] edit
 dashboard-hrv-record-hint = [v] record
 dashboard-hrv-input-hint = (0-100, Enter to save, Esc to cancel)
+dashboard-quit-confirm = Quit iron?
 
 # ── Goals ──
 goals-title = Goals

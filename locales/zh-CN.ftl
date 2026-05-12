@@ -50,6 +50,7 @@ dashboard-hrv-label = HRV
 dashboard-hrv-edit-hint = [v] 编辑
 dashboard-hrv-record-hint = [v] 记录
 dashboard-hrv-input-hint = (0-100, Enter 保存, Esc 取消)
+dashboard-quit-confirm = 退出 iron？
 
 # ── 目标 ──
 goals-title = 目标

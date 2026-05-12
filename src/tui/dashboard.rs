@@ -21,6 +21,7 @@ const GREEN: Color = Color::Green;
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum DashboardMode {
     Normal,
+    ConfirmQuit,
     QuotesManage,
     QuotesConfirmDelete,
     QuotesEdit,
@@ -219,7 +220,15 @@ impl DashboardScreen {
         render_status_line(frame, chunks[5], &self.status_msg);
 
         // ── Footer ──
-        let footer_spans = if self.mode == DashboardMode::Normal {
+        let footer_spans = if self.mode == DashboardMode::ConfirmQuit {
+            vec![
+                Span::styled(format!(" {} ", tr("dashboard-quit-confirm")), Style::default().fg(Color::Red)),
+                Span::styled("[y]", Style::default().fg(ACCENT)),
+                Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::Gray)),
+                Span::styled("[any]", Style::default().fg(ACCENT)),
+                Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::Gray)),
+            ]
+        } else if self.mode == DashboardMode::Normal {
             vec![
                 Span::styled(" [l]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}  ", tr("key-log")), Style::default().fg(Color::Gray)),
@@ -523,6 +532,14 @@ impl DashboardScreen {
         self.status_msg = None;
         match self.mode {
             DashboardMode::Normal => self.handle_normal(key),
+            DashboardMode::ConfirmQuit => {
+                if key.code == KeyCode::Char('y') {
+                    Action::Quit
+                } else {
+                    self.mode = DashboardMode::Normal;
+                    Action::None
+                }
+            }
             DashboardMode::QuotesManage => self.handle_quotes_manage(key, db),
             DashboardMode::QuotesConfirmDelete => self.handle_quotes_confirm_delete(key, db),
             DashboardMode::QuotesEdit => self.handle_quotes_edit(key, db),
@@ -746,7 +763,10 @@ impl DashboardScreen {
                 self.show_help = !self.show_help;
                 Action::None
             }
-            KeyCode::Char('q') => Action::Quit,
+            KeyCode::Char('q') => {
+                self.mode = DashboardMode::ConfirmQuit;
+                Action::None
+            }
             _ => Action::None,
         }
     }
