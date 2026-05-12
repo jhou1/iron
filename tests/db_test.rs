@@ -705,3 +705,52 @@ fn test_restore_milestone() {
     assert!(ms_titles.contains(&"Bench 100kg"));
     assert!(ms_titles.contains(&"Squat 120kg"));
 }
+
+#[test]
+fn test_abbreviation_crud() {
+    let db = Database::open_in_memory().unwrap();
+
+    let abbr = db.create_abbreviation("DL", "Deadlift").unwrap();
+    assert_eq!(abbr.short, "DL");
+    assert_eq!(abbr.full_name, "Deadlift");
+
+    let abbrs = db.list_abbreviations().unwrap();
+    assert_eq!(abbrs.len(), 1);
+    assert_eq!(abbrs[0].short, "DL");
+
+    db.update_abbreviation(abbr.id, "DL", "Dead Lift").unwrap();
+    let abbrs = db.list_abbreviations().unwrap();
+    assert_eq!(abbrs[0].full_name, "Dead Lift");
+
+    db.delete_abbreviation(abbr.id).unwrap();
+    let abbrs = db.list_abbreviations().unwrap();
+    assert!(abbrs.is_empty());
+}
+
+#[test]
+fn test_abbreviation_unique_constraint() {
+    let db = Database::open_in_memory().unwrap();
+    db.create_abbreviation("DL", "Deadlift").unwrap();
+    let result = db.create_abbreviation("DL", "Something else");
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_abbreviation_case_insensitive() {
+    let db = Database::open_in_memory().unwrap();
+    db.create_abbreviation("DL", "Deadlift").unwrap();
+    let result = db.create_abbreviation("dl", "Something else");
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_abbreviation_list_ordered() {
+    let db = Database::open_in_memory().unwrap();
+    db.create_abbreviation("KB SW", "Kettlebell Swing").unwrap();
+    db.create_abbreviation("BP", "Bench Press").unwrap();
+    db.create_abbreviation("DL", "Deadlift").unwrap();
+    let abbrs = db.list_abbreviations().unwrap();
+    assert_eq!(abbrs[0].short, "BP");
+    assert_eq!(abbrs[1].short, "DL");
+    assert_eq!(abbrs[2].short, "KB SW");
+}

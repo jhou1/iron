@@ -173,3 +173,18 @@ pub struct DailyMetrics {
     pub date: String,
     pub hrv: Option<i32>,
 }
+
+#[derive(Debug, Clone)]
+pub struct Abbreviation {
+    pub id: i64,
+    pub short: String,
+    pub full_name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ParsedLog {
+    pub practice_name: String,
+    pub sets: Vec<SetData>,
+    #[serde(default)]
+    pub matched: bool,
+}

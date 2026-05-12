@@ -3,7 +3,7 @@ use chrono::{Local, NaiveDateTime};
 use rusqlite::{params, Connection};
 use std::path::Path;
 
-use crate::model::{Goal, Log, LogEntry, Milestone, Practice, PracticeType, Quote, Set, SetData};
+use crate::model::{Abbreviation, Goal, Log, LogEntry, Milestone, Practice, PracticeType, Quote, Set, SetData};
 
 /// Aggregate statistics over a time period.
 pub struct AggregateStats {
@@ -114,6 +114,12 @@ impl Database {
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 date TEXT NOT NULL UNIQUE,
                 hrv INTEGER
+            );
+
+            CREATE TABLE IF NOT EXISTS abbreviations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                short TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                full_name TEXT NOT NULL
             );",
         )?;
 
@@ -925,5 +931,52 @@ impl Database {
             })?
             .collect::<std::result::Result<Vec<_>, _>>()?;
         Ok(metrics)
+    }
+
+    // ── Abbreviation CRUD ─────────────────────────────────────────
+
+    pub fn create_abbreviation(&self, short: &str, full_name: &str) -> Result<Abbreviation> {
+        self.conn.execute(
+            "INSERT INTO abbreviations (short, full_name) VALUES (?1, ?2)",
+            params![short, full_name],
+        )?;
+        let id = self.conn.last_insert_rowid();
+        Ok(Abbreviation {
+            id,
+            short: short.to_string(),
+            full_name: full_name.to_string(),
+        })
+    }
+
+    pub fn list_abbreviations(&self) -> Result<Vec<Abbreviation>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, short, full_name FROM abbreviations ORDER BY short")?;
+        let rows = stmt.query_map([], |row| {
+            Ok(Abbreviation {
+                id: row.get(0)?,
+                short: row.get(1)?,
+                full_name: row.get(2)?,
+            })
+        })?;
+        let mut abbrs = Vec::new();
+        for row in rows {
+            abbrs.push(row?);
+        }
+        Ok(abbrs)
+    }
+
+    pub fn update_abbreviation(&self, id: i64, short: &str, full_name: &str) -> Result<()> {
+        self.conn.execute(
+            "UPDATE abbreviations SET short = ?1, full_name = ?2 WHERE id = ?3",
+            params![short, full_name, id],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_abbreviation(&self, id: i64) -> Result<()> {
+        self.conn
+            .execute("DELETE FROM abbreviations WHERE id = ?1", params![id])?;
+        Ok(())
     }
 }
