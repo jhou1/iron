@@ -90,7 +90,14 @@ impl PracticesScreen {
 
         let name_header = tr("practices-col-name");
         let type_header = tr("practices-col-type");
+        let status_header = tr("practices-col-status");
         let header_padding = col_width.saturating_sub(name_header.width());
+        let type_col_width = self.practices.iter()
+            .map(|p| p.practice_type.label().width())
+            .max()
+            .unwrap_or(0)
+            .max(type_header.width()) + 2;
+        let type_header_padding = type_col_width.saturating_sub(type_header.width());
         let title_lines = vec![
             Line::from(Span::styled(
                 tr("practices-title"),
@@ -101,6 +108,8 @@ impl PracticesScreen {
                 Span::styled(&name_header, Style::default().fg(Color::DarkGray)),
                 Span::raw(" ".repeat(header_padding)),
                 Span::styled(&type_header, Style::default().fg(Color::DarkGray)),
+                Span::raw(" ".repeat(type_header_padding)),
+                Span::styled(&status_header, Style::default().fg(Color::DarkGray)),
             ]),
         ];
         frame.render_widget(Paragraph::new(title_lines), chunks[0]);
@@ -117,20 +126,32 @@ impl PracticesScreen {
                 .enumerate()
                 .map(|(i, p)| {
                     let marker = if i == self.selected { "> " } else { "  " };
-                    let name_style = if i == self.selected {
-                        Style::default().fg(GREEN).add_modifier(Modifier::BOLD)
+                    let (name_style, type_color, status_color) = if i == self.selected {
+                        if p.active {
+                            (Style::default().fg(GREEN).add_modifier(Modifier::BOLD), Color::Gray, GREEN)
+                        } else {
+                            (Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD), Color::DarkGray, Color::DarkGray)
+                        }
+                    } else if p.active {
+                        (Style::default().fg(Color::White), Color::Gray, GREEN)
                     } else {
-                        Style::default().fg(Color::White)
+                        (Style::default().fg(Color::DarkGray), Color::DarkGray, Color::DarkGray)
                     };
                     let padding = col_width.saturating_sub(p.name.width());
+                    let type_label = p.practice_type.label();
+                    let type_padding = type_col_width.saturating_sub(type_label.width());
+                    let status_text = if p.active {
+                        tr("practices-status-active")
+                    } else {
+                        tr("practices-status-inactive")
+                    };
                     Line::from(vec![
                         Span::styled(marker, name_style),
                         Span::styled(&p.name, name_style),
                         Span::raw(" ".repeat(padding)),
-                        Span::styled(
-                            p.practice_type.label(),
-                            Style::default().fg(Color::Gray),
-                        ),
+                        Span::styled(type_label, Style::default().fg(type_color)),
+                        Span::raw(" ".repeat(type_padding)),
+                        Span::styled(status_text, Style::default().fg(status_color)),
                     ])
                 })
                 .collect()
@@ -238,6 +259,8 @@ impl PracticesScreen {
                 Span::styled(format!(" {}  ", tr("key-add")), Style::default().fg(Color::Gray)),
                 Span::styled("[e]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::Gray)),
+                Span::styled("[t]", Style::default().fg(ACCENT)),
+                Span::styled(format!(" {}  ", tr("key-toggle")), Style::default().fg(Color::Gray)),
                 Span::styled("[d]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::Gray)),
                 Span::styled("[Esc]", Style::default().fg(ACCENT)),
@@ -269,7 +292,7 @@ impl PracticesScreen {
 
     pub fn handle_key(&mut self, key: KeyEvent, db: &Database) -> Action {
         match &self.mode {
-            Mode::Browse => self.handle_browse(key),
+            Mode::Browse => self.handle_browse(key, db),
             Mode::AddName => self.handle_add_name(key),
             Mode::AddType => self.handle_add_type(key, db),
             Mode::EditName => self.handle_edit_name(key, db),
@@ -364,7 +387,7 @@ impl PracticesScreen {
         }
     }
 
-    fn handle_browse(&mut self, key: KeyEvent) -> Action {
+    fn handle_browse(&mut self, key: KeyEvent, db: &Database) -> Action {
         match key.code {
             KeyCode::Char('j') | KeyCode::Down => {
                 if !self.practices.is_empty() {
@@ -393,6 +416,13 @@ impl PracticesScreen {
                     self.input = p.name.clone();
                     self.input_cursor = self.input.len();
                     self.mode = Mode::EditName;
+                }
+                Action::None
+            }
+            KeyCode::Char('t') => {
+                if let Some(p) = self.practices.get(self.selected) {
+                    let _ = db.set_practice_active(p.id, !p.active);
+                    self.refresh(db);
                 }
                 Action::None
             }

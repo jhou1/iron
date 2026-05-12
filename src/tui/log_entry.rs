@@ -60,7 +60,7 @@ pub struct LogEntryScreen {
 
 impl LogEntryScreen {
     pub fn new(db: &Database) -> anyhow::Result<Self> {
-        let practices = db.list_practices()?;
+        let practices = db.list_active_practices()?;
         let filtered_indices = (0..practices.len()).collect();
         let today = Local::now().format("%Y-%m-%d").to_string();
         Ok(Self {
@@ -96,7 +96,7 @@ impl LogEntryScreen {
     }
 
     pub fn from_existing(db: &Database, log_entry: &LogEntry) -> anyhow::Result<Self> {
-        let practices = db.list_practices()?;
+        let practices = db.list_active_practices()?;
         let filtered_indices = (0..practices.len()).collect();
         let practice = practices
             .iter()

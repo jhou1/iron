@@ -42,7 +42,7 @@ pub struct TrendsScreen {
 
 impl TrendsScreen {
     pub fn new(db: &Database) -> anyhow::Result<Self> {
-        let practices = db.list_practices()?;
+        let practices = db.list_active_practices()?;
         let filtered_indices = (0..practices.len()).collect();
         Ok(Self {
             practices,

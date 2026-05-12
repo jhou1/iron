@@ -123,6 +123,7 @@ impl Database {
         let _ = self.conn.execute("ALTER TABLE milestones ADD COLUMN completed_at TEXT", []);
         let _ = self.conn.execute("ALTER TABLE logs ADD COLUMN warm_up TEXT", []);
         let _ = self.conn.execute("ALTER TABLE logs ADD COLUMN cool_down TEXT", []);
+        let _ = self.conn.execute("ALTER TABLE practices ADD COLUMN active INTEGER NOT NULL DEFAULT 1", []);
 
         Ok(())
     }
@@ -141,13 +142,44 @@ impl Database {
             name: name.to_string(),
             practice_type,
             created_at: now,
+            active: true,
         })
     }
 
     pub fn list_practices(&self) -> Result<Vec<Practice>> {
         let mut stmt = self
             .conn
-            .prepare("SELECT id, name, practice_type, created_at FROM practices ORDER BY name")?;
+            .prepare("SELECT id, name, practice_type, created_at, active FROM practices ORDER BY name")?;
+        let rows = stmt.query_map([], |row| {
+            let pt_str: String = row.get(2)?;
+            let created_str: String = row.get(3)?;
+            let active: i32 = row.get(4)?;
+            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?, pt_str, created_str, active))
+        })?;
+
+        let mut practices = Vec::new();
+        for row in rows {
+            let (id, name, pt_str, created_str, active) = row?;
+            let practice_type: PracticeType = pt_str
+                .parse()
+                .map_err(|e: String| anyhow::anyhow!(e))?;
+            let created_at = NaiveDateTime::parse_from_str(&created_str, "%Y-%m-%d %H:%M:%S%.f")
+                .context("failed to parse created_at")?;
+            practices.push(Practice {
+                id,
+                name,
+                practice_type,
+                created_at,
+                active: active != 0,
+            });
+        }
+        Ok(practices)
+    }
+
+    pub fn list_active_practices(&self) -> Result<Vec<Practice>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, name, practice_type, created_at, active FROM practices WHERE active = 1 ORDER BY name")?;
         let rows = stmt.query_map([], |row| {
             let pt_str: String = row.get(2)?;
             let created_str: String = row.get(3)?;
@@ -167,9 +199,18 @@ impl Database {
                 name,
                 practice_type,
                 created_at,
+                active: true,
             });
         }
         Ok(practices)
+    }
+
+    pub fn set_practice_active(&self, id: i64, active: bool) -> Result<()> {
+        self.conn.execute(
+            "UPDATE practices SET active = ?1 WHERE id = ?2",
+            params![active as i32, id],
+        )?;
+        Ok(())
     }
 
     pub fn rename_practice(&self, id: i64, new_name: &str) -> Result<()> {
@@ -298,6 +339,7 @@ impl Database {
             "SELECT l.id, l.practice_id, l.logged_at, l.note, l.warm_up, l.cool_down, p.name, p.practice_type
              FROM logs l
              JOIN practices p ON l.practice_id = p.id
+             WHERE p.active = 1
              ORDER BY l.logged_at DESC",
         )?;
         let rows = stmt.query_map([], |row| {
@@ -345,7 +387,7 @@ impl Database {
             "SELECT l.id, l.practice_id, l.logged_at, l.note, l.warm_up, l.cool_down, p.name, p.practice_type
              FROM logs l
              JOIN practices p ON l.practice_id = p.id
-             WHERE l.logged_at >= ?1
+             WHERE l.logged_at >= ?1 AND p.active = 1
              ORDER BY l.logged_at DESC",
         )?;
         let rows = stmt.query_map(params![cutoff.to_string()], |row| {
@@ -439,9 +481,10 @@ impl Database {
     pub fn heatmap_counts(&self, days: i64) -> Result<Vec<(String, i64)>> {
         let cutoff = Local::now().naive_local() - chrono::Duration::days(days);
         let mut stmt = self.conn.prepare(
-            "SELECT substr(logged_at, 1, 10) AS day, COUNT(*) AS cnt
-             FROM logs
-             WHERE logged_at >= ?1
+            "SELECT substr(l.logged_at, 1, 10) AS day, COUNT(*) AS cnt
+             FROM logs l
+             JOIN practices p ON l.practice_id = p.id
+             WHERE l.logged_at >= ?1 AND p.active = 1
              GROUP BY day
              ORDER BY day",
         )?;
@@ -460,7 +503,7 @@ impl Database {
     pub fn aggregate_stats(&self, days: i64) -> Result<AggregateStats> {
         let cutoff = Local::now().naive_local() - chrono::Duration::days(days);
         let sessions: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM logs WHERE logged_at >= ?1",
+            "SELECT COUNT(*) FROM logs l JOIN practices p ON l.practice_id = p.id WHERE l.logged_at >= ?1 AND p.active = 1",
             params![cutoff.to_string()],
             |row| row.get(0),
         )?;
@@ -469,7 +512,8 @@ impl Database {
             "SELECT s.weight, s.reps, s.distance, s.duration
              FROM sets s
              JOIN logs l ON s.log_id = l.id
-             WHERE l.logged_at >= ?1",
+             JOIN practices p ON l.practice_id = p.id
+             WHERE l.logged_at >= ?1 AND p.active = 1",
         )?;
         let rows = stmt.query_map(params![cutoff.to_string()], |row| {
             Ok((

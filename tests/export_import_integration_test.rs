@@ -438,3 +438,29 @@ fn daily_metrics_survive_export_import() {
     assert_eq!(metrics[1].date, "2026-04-18");
     assert_eq!(metrics[1].hrv, Some(72));
 }
+
+#[test]
+fn inactive_practice_survives_export_import() {
+    let source = TestDb::new();
+    let db = &source.db;
+
+    let bench = db.create_practice("Bench Press", PracticeType::Weighted).unwrap();
+    db.create_practice("Pull-ups", PracticeType::Bodyweight).unwrap();
+    db.set_practice_active(bench.id, false).unwrap();
+
+    let t1 = dt("2026-05-01 10:00:00");
+    db.create_log_at(bench.id, &t1, &[SetData::Weighted { weight: 60.0, reps: 10 }], None, None, None).unwrap();
+
+    let export_path = source.export_path();
+    export_to_json(db, Some(export_path.clone())).unwrap();
+
+    let target = TestDb::new();
+    import_from_json(&target.db, &export_path).unwrap();
+
+    let practices = target.db.list_practices().unwrap();
+    assert_eq!(practices.len(), 2);
+    let bench_imported = practices.iter().find(|p| p.name == "Bench Press").unwrap();
+    assert!(!bench_imported.active);
+    let pullups_imported = practices.iter().find(|p| p.name == "Pull-ups").unwrap();
+    assert!(pullups_imported.active);
+}

@@ -24,6 +24,8 @@ pub struct ExportData {
     pub daily_metrics: Vec<ExportDailyMetrics>,
 }
 
+fn default_active() -> bool { true }
+
 #[derive(Serialize, Deserialize)]
 pub struct ExportPractice {
     pub id: i64,
@@ -31,6 +33,8 @@ pub struct ExportPractice {
     #[serde(rename = "type")]
     pub practice_type: PracticeType,
     pub created_at: String,
+    #[serde(default = "default_active")]
+    pub active: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -106,6 +110,7 @@ pub fn export_to_json(db: &Database, path: Option<PathBuf>) -> Result<()> {
             name: p.name.clone(),
             practice_type: p.practice_type,
             created_at: p.created_at.format("%Y-%m-%d").to_string(),
+            active: p.active,
         })
         .collect();
 
@@ -185,7 +190,7 @@ pub fn export_to_json(db: &Database, path: Option<PathBuf>) -> Result<()> {
         .collect();
 
     let data = ExportData {
-        version: 2,
+        version: 3,
         exported_at: Local::now().to_rfc3339(),
         practices: export_practices,
         logs: export_logs,
@@ -236,6 +241,9 @@ pub fn import_from_json(db: &Database, path: &Path) -> Result<usize> {
     for ep in &data.practices {
         if !practice_map.contains_key(&ep.name) {
             let created = db.create_practice(&ep.name, ep.practice_type)?;
+            if !ep.active {
+                db.set_practice_active(created.id, false)?;
+            }
             practice_map.insert(created.name.clone(), created.id);
         }
     }

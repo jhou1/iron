@@ -112,6 +112,9 @@ practices-select-type = Select type:
 practices-rename = Rename practice:
 practices-delete-confirm = Delete { $name }?
 practices-delete-warning = This removes all its logs.
+practices-col-status = Status
+practices-status-active = active
+practices-status-inactive = inactive
 
 # ── Practice type labels ──
 practice-type-weighted = weightxreps

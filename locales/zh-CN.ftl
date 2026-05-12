@@ -112,6 +112,9 @@ practices-select-type = 选择类型：
 practices-rename = 重命名练习：
 practices-delete-confirm = 删除 { $name }？
 practices-delete-warning = 这将删除其所有记录。
+practices-col-status = 状态
+practices-status-active = 启用
+practices-status-inactive = 停用
 
 # ── 练习类型标签 ──
 practice-type-weighted = 重量x次数

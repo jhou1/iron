@@ -504,3 +504,77 @@ fn list_daily_metrics() {
     assert_eq!(metrics[1].date, "2026-04-18");
     assert_eq!(metrics[1].hrv, Some(72));
 }
+
+#[test]
+fn toggle_practice_active() {
+    let db = Database::open_in_memory().unwrap();
+    let p = db.create_practice("Bench Press", PracticeType::Weighted).unwrap();
+    assert!(p.active);
+
+    db.set_practice_active(p.id, false).unwrap();
+    let practices = db.list_practices().unwrap();
+    assert!(!practices[0].active);
+
+    db.set_practice_active(p.id, true).unwrap();
+    let practices = db.list_practices().unwrap();
+    assert!(practices[0].active);
+}
+
+#[test]
+fn list_active_practices_filters_inactive() {
+    let db = Database::open_in_memory().unwrap();
+    let bench = db.create_practice("Bench Press", PracticeType::Weighted).unwrap();
+    db.create_practice("Pull-ups", PracticeType::Bodyweight).unwrap();
+
+    db.set_practice_active(bench.id, false).unwrap();
+
+    let all = db.list_practices().unwrap();
+    assert_eq!(all.len(), 2);
+
+    let active = db.list_active_practices().unwrap();
+    assert_eq!(active.len(), 1);
+    assert_eq!(active[0].name, "Pull-ups");
+}
+
+#[test]
+fn inactive_practice_hidden_from_logs() {
+    let db = Database::open_in_memory().unwrap();
+    let bench = db.create_practice("Bench Press", PracticeType::Weighted).unwrap();
+    let pullups = db.create_practice("Pull-ups", PracticeType::Bodyweight).unwrap();
+
+    db.create_log(bench.id, &[SetData::Weighted { weight: 60.0, reps: 10 }], None, None, None).unwrap();
+    db.create_log(pullups.id, &[SetData::Bodyweight { reps: 20 }], None, None, None).unwrap();
+
+    db.set_practice_active(bench.id, false).unwrap();
+
+    let all_logs = db.list_logs_all().unwrap();
+    assert_eq!(all_logs.len(), 1);
+    assert_eq!(all_logs[0].practice_name, "Pull-ups");
+
+    let recent = db.list_logs_recent(7).unwrap();
+    assert_eq!(recent.len(), 1);
+    assert_eq!(recent[0].practice_name, "Pull-ups");
+
+    let stats = db.aggregate_stats(7).unwrap();
+    assert_eq!(stats.sessions, 1);
+    assert!((stats.total_reps - 20.0).abs() < f64::EPSILON);
+    assert!((stats.total_volume - 0.0).abs() < f64::EPSILON);
+}
+
+#[test]
+fn inactive_practice_hidden_from_heatmap() {
+    let db = Database::open_in_memory().unwrap();
+    let bench = db.create_practice("Bench Press", PracticeType::Weighted).unwrap();
+    let pullups = db.create_practice("Pull-ups", PracticeType::Bodyweight).unwrap();
+
+    db.create_log(bench.id, &[SetData::Weighted { weight: 60.0, reps: 10 }], None, None, None).unwrap();
+    db.create_log(pullups.id, &[SetData::Bodyweight { reps: 20 }], None, None, None).unwrap();
+
+    db.set_practice_active(bench.id, false).unwrap();
+
+    let counts = db.heatmap_counts(30).unwrap();
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let today_count = counts.iter().find(|(d, _)| d == &today);
+    assert!(today_count.is_some());
+    assert_eq!(today_count.unwrap().1, 1);
+}

@@ -63,6 +63,7 @@ pub struct Practice {
     pub name: String,
     pub practice_type: PracticeType,
     pub created_at: NaiveDateTime,
+    pub active: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
