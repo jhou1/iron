@@ -1,4 +1,4 @@
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::{Color, Style, Stylize},
@@ -27,17 +27,25 @@ enum Mode {
 
 pub struct HistoryScreen {
     entries: Vec<LogEntry>,
+    filtered_indices: Vec<usize>,
+    filter_text: String,
+    filter_cursor: usize,
+    filtering: bool,
     selected: usize,
     mode: Mode,
-    /// Scroll offset for the list pane so the selected item stays visible.
     scroll_offset: usize,
 }
 
 impl HistoryScreen {
     pub fn new(db: &Database) -> anyhow::Result<Self> {
         let entries = db.list_logs_all()?;
+        let filtered_indices = (0..entries.len()).collect();
         Ok(Self {
             entries,
+            filtered_indices,
+            filter_text: String::new(),
+            filter_cursor: 0,
+            filtering: false,
             selected: 0,
             mode: Mode::Browse,
             scroll_offset: 0,
@@ -45,13 +53,27 @@ impl HistoryScreen {
     }
 
     pub fn selected_entry(&self) -> Option<&LogEntry> {
-        self.entries.get(self.selected)
+        self.filtered_indices.get(self.selected)
+            .and_then(|&idx| self.entries.get(idx))
+    }
+
+    fn apply_filter(&mut self) {
+        let lower = self.filter_text.to_lowercase();
+        self.filtered_indices = self.entries
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| e.practice_name.to_lowercase().contains(&lower))
+            .map(|(i, _)| i)
+            .collect();
+        self.selected = 0;
+        self.scroll_offset = 0;
     }
 
     pub fn render(&mut self, frame: &mut Frame) {
         let area = centered_area(frame.area(), CONTENT_WIDTH);
 
-        let max_name_len = self.entries.iter()
+        let max_name_len = self.filtered_indices.iter()
+            .filter_map(|&i| self.entries.get(i))
             .map(|e| e.practice_name.width())
             .max()
             .unwrap_or(0);
@@ -67,16 +89,29 @@ impl HistoryScreen {
             ])
             .split(area);
 
-        // ── Left: title + list + shortcuts ──
+        // ── Left: title + filter + list + shortcuts ──
         let left_chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(2),  // title + column headers
+                Constraint::Length(3),  // title + filter + column headers
                 Constraint::Min(1),    // scrollable list
                 Constraint::Length(1), // shortcuts
             ])
             .split(h_chunks[0]);
 
+        let filter_display = if self.filtering {
+            let (before, after) = self.filter_text.split_at(self.filter_cursor);
+            format!(" /{}{}{}", before, "\u{2588}", after)
+        } else if !self.filter_text.is_empty() {
+            format!(" /{}", self.filter_text)
+        } else {
+            format!(" {}", tr("log-press-filter"))
+        };
+        let filter_style = if self.filtering {
+            Style::default().fg(ACCENT)
+        } else {
+            Style::default().fg(Color::Gray)
+        };
         let date_header = tr("history-col-date");
         let practice_header = tr("history-col-practice");
         let volume_header = tr("history-col-volume");
@@ -86,6 +121,7 @@ impl HistoryScreen {
                 tr("history-title"),
                 Style::default().fg(Color::White).bold(),
             )),
+            Line::from(Span::styled(filter_display, filter_style)),
             Line::from(vec![
                 Span::styled("   ", Style::default().fg(Color::DarkGray)),
                 Span::styled(&date_header, Style::default().fg(Color::DarkGray)),
@@ -103,12 +139,15 @@ impl HistoryScreen {
 
         let shortcuts = {
             let navigate_text = format!(" {}  ", tr("key-navigate"));
+            let filter_text = format!(" {}  ", tr("key-filter"));
             let edit_text = format!(" {}  ", tr("key-edit"));
             let delete_text = format!(" {}  ", tr("key-delete"));
             let back_text = format!(" {}", tr("key-back"));
             Line::from(vec![
                 Span::styled(" [j/k]", Style::default().fg(ACCENT)),
                 Span::styled(navigate_text, Style::default().fg(Color::Gray)),
+                Span::styled("[/]", Style::default().fg(ACCENT)),
+                Span::styled(filter_text, Style::default().fg(Color::Gray)),
                 Span::styled("[e]", Style::default().fg(ACCENT)),
                 Span::styled(edit_text, Style::default().fg(Color::Gray)),
                 Span::styled("[d]", Style::default().fg(ACCENT)),
@@ -137,7 +176,7 @@ impl HistoryScreen {
     }
 
     fn render_list(&self, frame: &mut Frame, area: ratatui::layout::Rect, visible: usize, name_col: usize) {
-        if self.entries.is_empty() {
+        if self.filtered_indices.is_empty() {
             let no_entries_text = format!("  {}", tr("history-no-entries"));
             let empty = Paragraph::new(Line::from(Span::styled(
                 no_entries_text,
@@ -148,14 +187,15 @@ impl HistoryScreen {
         }
 
         let mut lines: Vec<Line> = Vec::new();
-        for (i, entry) in self.entries.iter().enumerate().skip(self.scroll_offset).take(visible) {
-            let marker = if i == self.selected { " > " } else { "   " };
+        for (fi, &entry_idx) in self.filtered_indices.iter().enumerate().skip(self.scroll_offset).take(visible) {
+            let entry = &self.entries[entry_idx];
+            let marker = if fi == self.selected { " > " } else { "   " };
             let date = entry.log.logged_at.format("%Y %b %d").to_string();
             let total = format!("{:.0}", entry.total_metric());
             let label = entry.metric_label();
             let name_padding = name_col.saturating_sub(entry.practice_name.width());
 
-            let style = if i == self.selected {
+            let style = if fi == self.selected {
                 Style::default().fg(GREEN).bold()
             } else {
                 Style::default().fg(Color::White)
@@ -171,7 +211,7 @@ impl HistoryScreen {
                 Span::styled(format!("{} {}", total, label), dim),
             ]));
 
-            if i == self.selected && self.mode == Mode::ConfirmDelete {
+            if fi == self.selected && self.mode == Mode::ConfirmDelete {
                 let confirm_text = format!("     {} ", tr("history-delete-confirm"));
                 lines.push(Line::from(vec![
                     Span::styled(confirm_text, Style::default().fg(Color::Red)),
@@ -185,7 +225,7 @@ impl HistoryScreen {
 
         frame.render_widget(Paragraph::new(lines), area);
 
-        if !self.entries.is_empty() && self.selected >= self.scroll_offset {
+        if !self.filtered_indices.is_empty() && self.selected >= self.scroll_offset {
             let row = (self.selected - self.scroll_offset) as u16;
             highlight_row(frame, area, row);
         }
@@ -299,15 +339,87 @@ impl HistoryScreen {
 
     pub fn handle_key(&mut self, key: KeyEvent, db: &Database) -> Action {
         match self.mode {
-            Mode::Browse => self.handle_browse(key, db),
+            Mode::Browse => {
+                if self.filtering {
+                    self.handle_filter_input(key);
+                    Action::None
+                } else {
+                    self.handle_browse(key, db)
+                }
+            }
             Mode::ConfirmDelete => self.handle_confirm_delete(key, db),
+        }
+    }
+
+    fn handle_filter_input(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc | KeyCode::Enter => {
+                self.filtering = false;
+            }
+            KeyCode::Char('b') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                if self.filter_cursor > 0 {
+                    self.filter_cursor = self.filter_text[..self.filter_cursor]
+                        .char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+                }
+            }
+            KeyCode::Left => {
+                if self.filter_cursor > 0 {
+                    self.filter_cursor = self.filter_text[..self.filter_cursor]
+                        .char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+                }
+            }
+            KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                if self.filter_cursor < self.filter_text.len() {
+                    self.filter_cursor = self.filter_text[self.filter_cursor..]
+                        .char_indices().nth(1).map(|(i, _)| self.filter_cursor + i)
+                        .unwrap_or(self.filter_text.len());
+                }
+            }
+            KeyCode::Right => {
+                if self.filter_cursor < self.filter_text.len() {
+                    self.filter_cursor = self.filter_text[self.filter_cursor..]
+                        .char_indices().nth(1).map(|(i, _)| self.filter_cursor + i)
+                        .unwrap_or(self.filter_text.len());
+                }
+            }
+            KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.filter_cursor = 0;
+            }
+            KeyCode::Home => {
+                self.filter_cursor = 0;
+            }
+            KeyCode::Char('e') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.filter_cursor = self.filter_text.len();
+            }
+            KeyCode::End => {
+                self.filter_cursor = self.filter_text.len();
+            }
+            KeyCode::Backspace => {
+                if self.filter_cursor > 0 {
+                    let prev = self.filter_text[..self.filter_cursor]
+                        .char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+                    self.filter_text.remove(prev);
+                    self.filter_cursor = prev;
+                    self.apply_filter();
+                }
+            }
+            KeyCode::Char('k') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.filter_text.truncate(self.filter_cursor);
+                self.apply_filter();
+            }
+            KeyCode::Char(c) => {
+                self.filter_text.insert(self.filter_cursor, c);
+                self.filter_cursor += c.len_utf8();
+                self.apply_filter();
+            }
+            _ => {}
         }
     }
 
     fn handle_browse(&mut self, key: KeyEvent, _db: &Database) -> Action {
         match key.code {
             KeyCode::Char('j') | KeyCode::Down => {
-                if !self.entries.is_empty() && self.selected < self.entries.len() - 1 {
+                if !self.filtered_indices.is_empty() && self.selected < self.filtered_indices.len() - 1 {
                     self.selected += 1;
                 }
                 Action::None
@@ -318,37 +430,52 @@ impl HistoryScreen {
                 }
                 Action::None
             }
+            KeyCode::Char('/') => {
+                self.filtering = true;
+                self.filter_text.clear();
+                self.filter_cursor = 0;
+                self.apply_filter();
+                Action::None
+            }
             KeyCode::Char('d') => {
-                if !self.entries.is_empty() {
+                if !self.filtered_indices.is_empty() {
                     self.mode = Mode::ConfirmDelete;
                 }
                 Action::None
             }
             KeyCode::Char('e') => {
-                if !self.entries.is_empty() {
+                if !self.filtered_indices.is_empty() {
                     return Action::Navigate(Screen::LogEntry);
                 }
                 Action::None
             }
-            KeyCode::Esc => Action::Navigate(Screen::Dashboard),
+            KeyCode::Esc => {
+                if !self.filter_text.is_empty() {
+                    self.filter_text.clear();
+                    self.filter_cursor = 0;
+                    self.apply_filter();
+                    Action::None
+                } else {
+                    Action::Navigate(Screen::Dashboard)
+                }
+            }
             _ => Action::None,
         }
     }
 
     fn handle_confirm_delete(&mut self, key: KeyEvent, db: &Database) -> Action {
         if key.code == KeyCode::Char('y') {
-            if let Some(entry) = self.entries.get(self.selected) {
+            if let Some(entry) = self.selected_entry() {
                 let log_id = entry.log.id;
                 let _ = db.delete_log(log_id);
-                // Re-fetch entries after deletion
                 if let Ok(entries) = db.list_logs_all() {
                     self.entries = entries;
                 }
-                // Adjust selected index
-                if self.selected >= self.entries.len() && !self.entries.is_empty() {
-                    self.selected = self.entries.len() - 1;
+                self.apply_filter();
+                if self.selected >= self.filtered_indices.len() && !self.filtered_indices.is_empty() {
+                    self.selected = self.filtered_indices.len() - 1;
                 }
-                if self.entries.is_empty() {
+                if self.filtered_indices.is_empty() {
                     self.selected = 0;
                 }
             }
