@@ -139,6 +139,7 @@ set-endurance = { $duration } min
 
 # ── Keyboard labels ──
 key-log = Log
+key-quick-log = Quick Log
 key-history = History
 key-trends = Trends
 key-practices = Practices

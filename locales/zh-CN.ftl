@@ -139,6 +139,7 @@ set-endurance = { $duration } 分钟
 
 # ── 按键标签 ──
 key-log = 记录
+key-quick-log = 快速记录
 key-history = 历史
 key-trends = 趋势
 key-practices = 练习项目

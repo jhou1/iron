@@ -232,6 +232,8 @@ impl DashboardScreen {
             vec![
                 Span::styled(" [l]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}  ", tr("key-log")), Style::default().fg(Color::Gray)),
+                Span::styled("[w]", Style::default().fg(ACCENT)),
+                Span::styled(format!(" {}  ", tr("key-quick-log")), Style::default().fg(Color::Gray)),
                 Span::styled("[h]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}  ", tr("key-history")), Style::default().fg(Color::Gray)),
                 Span::styled("[t]", Style::default().fg(ACCENT)),
@@ -749,6 +751,7 @@ impl DashboardScreen {
             KeyCode::Char('t') => Action::Navigate(Screen::Trends),
             KeyCode::Char('e') => Action::Navigate(Screen::Practices),
             KeyCode::Char('g') => Action::Navigate(Screen::Goals),
+            KeyCode::Char('w') => Action::Navigate(Screen::QuickLog),
             KeyCode::Char('Q') => {
                 self.quotes_selected = 0;
                 self.mode = DashboardMode::QuotesManage;
