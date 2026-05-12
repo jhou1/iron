@@ -5,6 +5,8 @@ mod app;
 mod db;
 mod export;
 mod i18n;
+mod config;
+mod llm;
 mod model;
 mod tui;
 
