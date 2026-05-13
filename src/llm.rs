@@ -150,7 +150,7 @@ pub fn call_llm(
     let url = format!("{}/chat/completions", config.endpoint.trim_end_matches('/'));
 
     let agent = ureq::Agent::config_builder()
-        .timeout_global(Some(std::time::Duration::from_secs(30)))
+        .timeout_global(Some(std::time::Duration::from_secs(config.timeout_secs())))
         .build()
         .new_agent();
 

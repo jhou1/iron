@@ -11,6 +11,13 @@ pub struct LlmConfig {
     pub endpoint: String,
     pub api_key: Option<String>,
     pub model: String,
+    pub timeout: Option<u64>,
+}
+
+impl LlmConfig {
+    pub fn timeout_secs(&self) -> u64 {
+        self.timeout.unwrap_or(120)
+    }
 }
 
 impl Config {
