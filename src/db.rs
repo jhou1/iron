@@ -14,6 +14,11 @@ pub struct AggregateStats {
     pub total_duration: f64,
 }
 
+// Type aliases for heatmap query results
+type DailyPracticeCounts = Vec<(String, Vec<(String, i64)>)>;
+type WeekdayPracticeCounts = Vec<(u32, Vec<(String, i64)>)>;
+type MonthlyPracticeCounts = Vec<(u32, Vec<(String, i64)>)>;
+
 pub struct Database {
     conn: Connection,
 }
@@ -982,7 +987,7 @@ impl Database {
 
     // ── Heatmap multi-view queries ────────────────────────────────────
 
-    pub fn daily_practice_counts(&self, days: i64) -> Result<Vec<(String, Vec<(String, i64)>)>> {
+    pub fn daily_practice_counts(&self, days: i64) -> Result<DailyPracticeCounts> {
         let cutoff = Local::now().naive_local() - chrono::Duration::days(days);
         let mut stmt = self.conn.prepare(
             "SELECT substr(l.logged_at, 1, 10) AS day, p.name, COUNT(*) AS cnt
@@ -1010,7 +1015,7 @@ impl Database {
         Ok(result)
     }
 
-    pub fn weekday_practice_counts(&self, days: i64) -> Result<Vec<(u32, Vec<(String, i64)>)>> {
+    pub fn weekday_practice_counts(&self, days: i64) -> Result<WeekdayPracticeCounts> {
         let cutoff = Local::now().naive_local() - chrono::Duration::days(days);
         let mut stmt = self.conn.prepare(
             "SELECT CAST(strftime('%w', substr(l.logged_at, 1, 10)) AS INTEGER) AS dow,
@@ -1039,7 +1044,7 @@ impl Database {
         Ok(result)
     }
 
-    pub fn monthly_practice_counts(&self, year: i32) -> Result<Vec<(u32, Vec<(String, i64)>)>> {
+    pub fn monthly_practice_counts(&self, year: i32) -> Result<MonthlyPracticeCounts> {
         let year_str = format!("{:04}", year);
         let mut stmt = self.conn.prepare(
             "SELECT CAST(substr(l.logged_at, 6, 2) AS INTEGER) AS mon,

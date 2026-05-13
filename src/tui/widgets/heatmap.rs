@@ -87,7 +87,6 @@ impl<'a> Widget for Heatmap<'a> {
         }
 
         // Render the heatmap cells
-        let cols_available = area.width.saturating_sub(label_width);
         let cell_width: u16 = 2;
 
         let month_names = [

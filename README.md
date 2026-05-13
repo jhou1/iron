@@ -4,7 +4,7 @@ A beautiful terminal UI for tracking your training records. Log practices set-by
 
 ## Features
 
-- GitHub-style **heatmap** showing your training consistency over the year
+- **Multi-view heatmap** showing your training consistency over the year (GitHub-style grid, daily chart, weekday bars, monthly bars)
 - **Set-by-set logging** — each set can have different weight/reps, with weight carry-forward
 - **Sparkline trend charts** per practice with avg, peak, and trend percentage
 - **14-day history** with inline set details and session notes
@@ -72,6 +72,32 @@ iron
 ```
 
 You'll land on the **Dashboard** — the home screen showing your training heatmap and today's stats.
+
+### Heatmap Views
+
+The Dashboard displays a multi-view heatmap at the top. Press `Tab` to cycle through four visualization modes:
+
+1. **Map** (default) — GitHub-style contribution grid showing the last year of training activity
+   - Each cell represents one day
+   - 5-level green gradient based on total volume/reps/distance/duration
+   - Empty cells indicate rest days
+
+2. **Chart** — Daily vertical bars for the last 90 days
+   - Each bar shows total volume for that day
+   - Stacked by practice (different colors per practice)
+   - Legend below shows practice names with their colors
+
+3. **Days** — Weekday horizontal bars (Monday–Sunday)
+   - Shows average volume per weekday across all history
+   - Stacked by practice
+   - Helps identify training patterns (e.g., "I usually train hardest on Thursdays")
+
+4. **Months** — Monthly horizontal bars (January–December)
+   - Shows total volume per month across all years
+   - Stacked by practice
+   - Useful for tracking seasonal training cycles
+
+All views use consistent practice colors from a 10-color palette. The legend at the bottom identifies each practice.
 
 ### First Time Setup
 
@@ -238,6 +264,7 @@ Units are fixed: **kg**, **km**, **minutes**.
 
 | Key | Action |
 |---|---|
+| `Tab` | Cycle heatmap view (Map/Chart/Days/Months) |
 | `l` | Log a practice |
 | `w` | Quick Log (LLM-powered) |
 | `h` | View history |
