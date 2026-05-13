@@ -612,6 +612,10 @@ impl DashboardScreen {
                 }
                 true
             }
+            KeyCode::Char('k') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.quotes_input.truncate(self.quotes_cursor);
+                true
+            }
             KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.quotes_input.insert(self.quotes_cursor, c);
                 self.quotes_cursor += c.len_utf8();

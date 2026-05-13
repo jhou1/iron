@@ -59,7 +59,9 @@ Nullable fields on `sets` — only the relevant ones are filled based on practic
 
 Vim-style throughout: `j/k` up/down, `h/l` left/right, `/` filter, `Esc` back, `Enter` confirm, `Ctrl+S` save log, `D` edit date, `d` delete, `q` quit.
 
-All text input fields use emacs-style cursor: `Ctrl+B`/Left back, `Ctrl+F`/Right forward, `Ctrl+A`/Home start, `Ctrl+E`/End end. Characters insert at cursor, not append.
+All text input fields use emacs-style cursor: `Ctrl+B`/Left back, `Ctrl+F`/Right forward, `Ctrl+A`/Home start, `Ctrl+E`/End end, `Ctrl+K` kill to end of line. Characters insert at cursor, not append.
+
+**Every text input field must support the full emacs keybinding set:** `Ctrl+B`, `Ctrl+F`, `Ctrl+A`, `Ctrl+E`, `Ctrl+K`, `Left`, `Right`, `Home`, `End`, `Backspace`. This is a hard constraint — no text input may be added without these bindings. Use the `handle_text_input()` pattern from `tui/practices.rs` or `tui/abbreviations.rs` for single-line fields.
 
 **Text input must never overflow its container.** All text input rendering must use `visible_input_spans()` from `tui/mod.rs` to horizontally scroll long text within the available width. Never render raw `text[..cursor]` + cursor + `text[cursor..]` spans without width clipping.
 
