@@ -181,10 +181,24 @@ pub struct Abbreviation {
     pub full_name: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct ParsedLog {
     pub practice_name: String,
     pub sets: Vec<SetData>,
-    #[serde(default)]
     pub matched: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RawParsedLog {
+    pub practice_name: String,
+    pub practice_type: Option<String>,
+    pub sets: Vec<RawSet>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RawSet {
+    pub weight: Option<f64>,
+    pub reps: Option<i32>,
+    pub distance: Option<f64>,
+    pub duration: Option<f64>,
 }

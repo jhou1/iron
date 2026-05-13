@@ -1,5 +1,5 @@
 use crate::config::LlmConfig;
-use crate::model::{Abbreviation, ParsedLog, Practice};
+use crate::model::{Abbreviation, ParsedLog, Practice, PracticeType, RawParsedLog, SetData};
 use std::fmt;
 
 #[derive(Debug)]
@@ -42,17 +42,18 @@ pub fn build_system_prompt(practices: &[Practice], abbreviations: &[Abbreviation
     }
 
     prompt.push_str(r#"
-Practice types determine set data format:
-- weighted: each set = {"Weighted": {"weight": <float>, "reps": <int>}}
-- bodyweight: each set = {"Bodyweight": {"reps": <int>}}
-- distance: each set = {"Distance": {"distance": <float>}}  (km)
-- endurance: each set = {"Endurance": {"duration": <float>}}  (minutes)
-
 Respond ONLY with a JSON array. Each element:
 {
   "practice_name": "<exact name from practice list>",
-  "sets": [<set data matching practice type>]
+  "practice_type": "<weighted|bodyweight|distance|endurance>",
+  "sets": [<set data>]
 }
+
+Set fields by practice type:
+- weighted: {"weight": <number>, "reps": <number>}
+- bodyweight: {"reps": <number>}
+- distance: {"distance": <number>}  (km)
+- endurance: {"duration": <number>}  (minutes)
 
 Rules:
 - Match practice names exactly from the list above
@@ -70,16 +71,62 @@ pub fn parse_llm_response(
     practices: &[Practice],
 ) -> Result<Vec<ParsedLog>, LlmError> {
     let json_str = extract_json(raw);
-    let mut parsed: Vec<ParsedLog> = serde_json::from_str(json_str)
+    let raw_logs: Vec<RawParsedLog> = serde_json::from_str(json_str)
         .map_err(|e| LlmError::ParseError(e.to_string()))?;
 
-    for entry in &mut parsed {
-        entry.matched = practices
+    let mut results = Vec::new();
+    for entry in raw_logs {
+        let matched_practice = practices
             .iter()
-            .any(|p| p.name.eq_ignore_ascii_case(&entry.practice_name));
+            .find(|p| p.name.eq_ignore_ascii_case(&entry.practice_name));
+
+        let practice_type = resolve_practice_type(&entry.practice_type, matched_practice);
+
+        let sets: Vec<SetData> = entry.sets.iter().filter_map(|raw_set| {
+            match practice_type {
+                Some(PracticeType::Weighted) => Some(SetData::Weighted {
+                    weight: raw_set.weight.unwrap_or(0.0),
+                    reps: raw_set.reps.unwrap_or(0),
+                }),
+                Some(PracticeType::Bodyweight) => Some(SetData::Bodyweight {
+                    reps: raw_set.reps.unwrap_or(0),
+                }),
+                Some(PracticeType::Distance) => Some(SetData::Distance {
+                    distance: raw_set.distance.unwrap_or(0.0),
+                }),
+                Some(PracticeType::Endurance) => Some(SetData::Endurance {
+                    duration: raw_set.duration.unwrap_or(0.0),
+                }),
+                None => match (raw_set.weight, raw_set.reps, raw_set.distance, raw_set.duration) {
+                    (Some(weight), Some(reps), _, _) => Some(SetData::Weighted { weight, reps }),
+                    (None, Some(reps), _, _) => Some(SetData::Bodyweight { reps }),
+                    (_, _, Some(distance), _) => Some(SetData::Distance { distance }),
+                    (_, _, _, Some(duration)) => Some(SetData::Endurance { duration }),
+                    _ => None,
+                }
+            }
+        }).collect();
+
+        results.push(ParsedLog {
+            practice_name: entry.practice_name,
+            sets,
+            matched: matched_practice.is_some(),
+        });
     }
 
-    Ok(parsed)
+    Ok(results)
+}
+
+fn resolve_practice_type(
+    raw_type: &Option<String>,
+    matched_practice: Option<&Practice>,
+) -> Option<PracticeType> {
+    if let Some(pt_str) = raw_type {
+        if let Ok(pt) = pt_str.parse::<PracticeType>() {
+            return Some(pt);
+        }
+    }
+    matched_practice.map(|p| p.practice_type)
 }
 
 fn extract_json(raw: &str) -> &str {
