@@ -24,10 +24,6 @@ heatmap-sep = 9月
 heatmap-oct = 10月
 heatmap-nov = 11月
 heatmap-dec = 12月
-heatmap-view-map = 热力图
-heatmap-view-chart = 日图
-heatmap-view-days = 周图
-heatmap-view-months = 月图
 
 # ── 仪表盘 ──
 dashboard-title = iron
@@ -177,7 +173,6 @@ key-next = 下一步
 key-switch-field = 切换字段
 key-undo = 撤销
 key-help = 帮助
-key-view = 切换视图
 
 # ── 状态消息 ──
 status-deleted-undo = 已删除。按 [u] 撤销

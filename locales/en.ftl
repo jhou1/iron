@@ -24,10 +24,6 @@ heatmap-sep = Sep
 heatmap-oct = Oct
 heatmap-nov = Nov
 heatmap-dec = Dec
-heatmap-view-map = Map
-heatmap-view-chart = Chart
-heatmap-view-days = Days
-heatmap-view-months = Months
 
 # ── Dashboard ──
 dashboard-title = iron
@@ -177,7 +173,6 @@ key-next = Next
 key-switch-field = Switch field
 key-undo = Undo
 key-help = Help
-key-view = View
 
 # ── Status Messages ──
 status-deleted-undo = Deleted. Press [u] to undo

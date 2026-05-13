@@ -8,16 +8,12 @@ use ratatui::{
 };
 use unicode_width::UnicodeWidthStr;
 
-use chrono::Datelike;
 
 use crate::db::{AggregateStats, Database};
 use crate::i18n::{tr, tr_args};
 use crate::model::{Goal, LogEntry, Quote};
 use fluent_bundle::FluentValue;
 use super::widgets::heatmap::Heatmap;
-use super::widgets::daily_chart::DailyChart;
-use super::widgets::weekday_chart::WeekdayChart;
-use super::widgets::monthly_chart::MonthlyChart;
 use super::{centered_area, highlight_row, render_help_overlay, render_status_line, Action, Screen, StatusMessage, CONTENT_WIDTH};
 
 const ACCENT: Color = Color::Cyan;
@@ -35,10 +31,6 @@ enum DashboardMode {
 
 pub struct DashboardScreen {
     heatmap_data: Vec<(String, i64)>,
-    daily_data: Vec<(String, Vec<(String, i64)>)>,
-    weekday_data: Vec<(u32, Vec<(String, i64)>)>,
-    monthly_data: Vec<(u32, Vec<(String, i64)>)>,
-    heatmap_view: usize,
     recent_entries: Vec<LogEntry>,
     stats: AggregateStats,
     quote: String,
@@ -60,9 +52,6 @@ pub struct DashboardScreen {
 impl DashboardScreen {
     pub fn new(db: &Database, no_color: bool) -> anyhow::Result<Self> {
         let heatmap_data = db.heatmap_counts(365)?;
-        let daily_data = db.daily_practice_counts(90)?;
-        let weekday_data = db.weekday_practice_counts(365)?;
-        let monthly_data = db.monthly_practice_counts(chrono::Local::now().year())?;
         let recent_entries = db.list_logs_recent(7)?;
         let stats = db.aggregate_stats(7)?;
         let quotes = db.list_quotes()?;
@@ -72,10 +61,6 @@ impl DashboardScreen {
         let hrv_today = db.get_daily_hrv(&today)?;
         Ok(Self {
             heatmap_data,
-            daily_data,
-            weekday_data,
-            monthly_data,
-            heatmap_view: 0,
             recent_entries,
             stats,
             quote,
@@ -97,9 +82,6 @@ impl DashboardScreen {
 
     pub fn refresh(&mut self, db: &Database) -> anyhow::Result<()> {
         self.heatmap_data = db.heatmap_counts(365)?;
-        self.daily_data = db.daily_practice_counts(90)?;
-        self.weekday_data = db.weekday_practice_counts(365)?;
-        self.monthly_data = db.monthly_practice_counts(chrono::Local::now().year())?;
         self.recent_entries = db.list_logs_recent(7)?;
         self.stats = db.aggregate_stats(7)?;
         self.quotes = db.list_quotes()?;
@@ -179,39 +161,9 @@ impl DashboardScreen {
         let logo_paragraph = Paragraph::new(logo_line).block(logo_block);
         frame.render_widget(logo_paragraph, chunks[0]);
 
-        // ── Visualization view ──
-        let view_names = [
-            tr("heatmap-view-map"),
-            tr("heatmap-view-chart"),
-            tr("heatmap-view-days"),
-            tr("heatmap-view-months"),
-        ];
-        let view_label = format!("[{}]", view_names[self.heatmap_view]);
-        let label_x = chunks[1].x + chunks[1].width.saturating_sub(view_label.len() as u16 + 1);
-        frame.render_widget(
-            Paragraph::new(Line::from(Span::styled(&view_label, Style::default().fg(Color::DarkGray)))),
-            Rect::new(label_x, chunks[1].y, view_label.len() as u16 + 1, 1),
-        );
-
-        match self.heatmap_view {
-            0 => {
-                let heatmap = Heatmap::new(&self.heatmap_data, 52, self.no_color);
-                frame.render_widget(heatmap, chunks[1]);
-            }
-            1 => {
-                let chart = DailyChart::new(&self.daily_data, self.no_color);
-                frame.render_widget(chart, chunks[1]);
-            }
-            2 => {
-                let chart = WeekdayChart::new(&self.weekday_data, self.no_color);
-                frame.render_widget(chart, chunks[1]);
-            }
-            3 => {
-                let chart = MonthlyChart::new(&self.monthly_data, self.no_color);
-                frame.render_widget(chart, chunks[1]);
-            }
-            _ => {}
-        }
+        // ── Heatmap ──
+        let heatmap = Heatmap::new(&self.heatmap_data, 52, self.no_color);
+        frame.render_widget(heatmap, chunks[1]);
 
         // ── Daily quote (centered, rounded border) ──
         let quote_block = Block::default()
@@ -279,9 +231,7 @@ impl DashboardScreen {
             ]
         } else if self.mode == DashboardMode::Normal {
             vec![
-                Span::styled(" [Tab]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-view")), Style::default().fg(Color::Gray)),
-                Span::styled("[l]", Style::default().fg(ACCENT)),
+                Span::styled(" [l]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}  ", tr("key-log")), Style::default().fg(Color::Gray)),
                 Span::styled("[w]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}  ", tr("key-quick-log")), Style::default().fg(Color::Gray)),
@@ -823,10 +773,6 @@ impl DashboardScreen {
             }
             KeyCode::Char('q') => {
                 self.mode = DashboardMode::ConfirmQuit;
-                Action::None
-            }
-            KeyCode::Tab => {
-                self.heatmap_view = (self.heatmap_view + 1) % 4;
                 Action::None
             }
             _ => Action::None,
