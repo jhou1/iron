@@ -19,14 +19,15 @@ fn paragraph_widgets_must_wrap_user_content() {
         "abbreviations.rs:218", // action area: short input lines with visible_input_spans
         "abbreviations.rs:252", // shortcuts bar (fixed text)
         // ── dashboard.rs ──
-        "dashboard.rs:160",     // logo (fixed text)
-        "dashboard.rs:172",     // quote line (already has .wrap on next line)
-        "dashboard.rs:208",     // HRV single value line
-        "dashboard.rs:274",     // footer shortcuts bar
-        "dashboard.rs:406",     // "press [a] to add" hint (fixed text)
-        "dashboard.rs:506",     // quotes edit input line (single line, bounded by modal)
-        "dashboard.rs:515",     // quotes delete confirm (fixed text)
-        "dashboard.rs:529",     // quotes modal shortcuts bar
+        "dashboard.rs:179",     // logo (fixed text)
+        "dashboard.rs:192",     // view label (single-line fixed UI element showing current view)
+        "dashboard.rs:221",     // quote line (already has .wrap on next line)
+        "dashboard.rs:257",     // HRV single value line
+        "dashboard.rs:325",     // footer shortcuts bar
+        "dashboard.rs:457",     // "press [a] to add" hint (fixed text)
+        "dashboard.rs:557",     // quotes edit input line (single line, bounded by modal)
+        "dashboard.rs:566",     // quotes delete confirm (fixed text)
+        "dashboard.rs:580",     // quotes modal shortcuts bar
         // ── goals.rs ──
         "goals.rs:221",         // title (fixed text)
         "goals.rs:312",         // goals list (already has .wrap on next line)
