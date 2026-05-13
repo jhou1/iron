@@ -61,6 +61,8 @@ Vim-style throughout: `j/k` up/down, `h/l` left/right, `/` filter, `Esc` back, `
 
 All text input fields use emacs-style cursor: `Ctrl+B`/Left back, `Ctrl+F`/Right forward, `Ctrl+A`/Home start, `Ctrl+E`/End end. Characters insert at cursor, not append.
 
+**Text input must never overflow its container.** All text input rendering must use `visible_input_spans()` from `tui/mod.rs` to horizontally scroll long text within the available width. Never render raw `text[..cursor]` + cursor + `text[cursor..]` spans without width clipping.
+
 ## Color Scheme
 
 Uses ANSI terminal colors (not hardcoded RGB) for theme compatibility:
@@ -144,7 +146,7 @@ When your changes create orphans:
 - Remove imports/variables/functions that YOUR changes made unused.
 - Don't remove pre-existing dead code unless asked.
 
-The test: Every changed line should trace directly to the user's request.
+The test: Every changed line should trace directly to the user's request. There should be no compiling error and warnings.
 
 ## 4. Goal-Driven Execution
 

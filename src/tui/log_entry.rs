@@ -13,7 +13,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
 use crate::model::{LogEntry, Practice, PracticeType, SetData};
-use super::{centered_area, highlight_row, render_help_overlay, render_status_line, Action, Screen, StatusMessage, CONTENT_WIDTH};
+use super::{centered_area, highlight_row, render_help_overlay, render_status_line, visible_input_spans, Action, Screen, StatusMessage, CONTENT_WIDTH};
 use fluent_bundle::FluentValue;
 
 const ACCENT: Color = Color::Cyan;
@@ -928,26 +928,28 @@ impl LogEntryScreen {
         // Warm-up input
         let wu_active = self.warmup_cooldown_active == 0;
         let wu_color = if wu_active { ACCENT } else { Color::White };
-        let (wu_before, wu_after) = self.warm_up.split_at(self.warm_up_cursor);
-        let warmup_line = Line::from(vec![
-            Span::styled(format!("  {}: ", tr("log-warmup-label")), Style::default().fg(Color::Gray)),
-            Span::styled(wu_before.to_string(), Style::default().fg(wu_color)),
-            if wu_active { Span::styled("\u{2588}", Style::default().fg(wu_color)) } else { Span::raw("") },
-            Span::styled(wu_after.to_string(), Style::default().fg(wu_color)),
-        ]);
-        frame.render_widget(Paragraph::new(warmup_line), chunks[2]);
+        let wu_label = format!("  {}: ", tr("log-warmup-label"));
+        let wu_prefix_w = wu_label.width() as u16;
+        let mut wu_spans = vec![Span::styled(wu_label, Style::default().fg(Color::Gray))];
+        if wu_active {
+            wu_spans.extend(visible_input_spans(&self.warm_up, self.warm_up_cursor, area.width, wu_prefix_w, wu_color));
+        } else {
+            wu_spans.push(Span::styled(&self.warm_up, Style::default().fg(wu_color)));
+        }
+        frame.render_widget(Paragraph::new(Line::from(wu_spans)), chunks[2]);
 
         // Cool-down input
         let cd_active = self.warmup_cooldown_active == 1;
         let cd_color = if cd_active { ACCENT } else { Color::White };
-        let (cd_before, cd_after) = self.cool_down.split_at(self.cool_down_cursor);
-        let cooldown_line = Line::from(vec![
-            Span::styled(format!("  {}: ", tr("log-cooldown-label")), Style::default().fg(Color::Gray)),
-            Span::styled(cd_before.to_string(), Style::default().fg(cd_color)),
-            if cd_active { Span::styled("\u{2588}", Style::default().fg(cd_color)) } else { Span::raw("") },
-            Span::styled(cd_after.to_string(), Style::default().fg(cd_color)),
-        ]);
-        frame.render_widget(Paragraph::new(cooldown_line), chunks[3]);
+        let cd_label = format!("  {}: ", tr("log-cooldown-label"));
+        let cd_prefix_w = cd_label.width() as u16;
+        let mut cd_spans = vec![Span::styled(cd_label, Style::default().fg(Color::Gray))];
+        if cd_active {
+            cd_spans.extend(visible_input_spans(&self.cool_down, self.cool_down_cursor, area.width, cd_prefix_w, cd_color));
+        } else {
+            cd_spans.push(Span::styled(&self.cool_down, Style::default().fg(cd_color)));
+        }
+        frame.render_widget(Paragraph::new(Line::from(cd_spans)), chunks[3]);
 
         let footer = Line::from(vec![
             Span::styled(" [Tab]", Style::default().fg(ACCENT)),
@@ -1108,13 +1110,9 @@ impl LogEntryScreen {
             ))
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::DarkGray));
-        let (before, after) = self.note.split_at(self.note_cursor);
-        let note_line = Line::from(vec![
-            Span::styled(before.to_string(), Style::default().fg(Color::White)),
-            Span::styled("\u{2588}", Style::default().fg(ACCENT)),
-            Span::styled(after.to_string(), Style::default().fg(Color::White)),
-        ]);
-        let note_paragraph = Paragraph::new(note_line)
+        let inner_width = chunks[4].width.saturating_sub(2);
+        let note_spans = visible_input_spans(&self.note, self.note_cursor, inner_width, 0, Color::White);
+        let note_paragraph = Paragraph::new(Line::from(note_spans))
         .block(note_block);
         frame.render_widget(note_paragraph, chunks[4]);
 

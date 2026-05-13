@@ -14,7 +14,7 @@ use crate::db::Database;
 use crate::i18n::tr;
 use crate::llm::{self, LlmError};
 use crate::model::{Abbreviation, ParsedLog, Practice, SetData};
-use super::{centered_area, render_help_overlay, render_status_line, Action, Screen, StatusMessage, CONTENT_WIDTH};
+use super::{centered_area, render_help_overlay, render_status_line, visible_input_spans, Action, Screen, StatusMessage, CONTENT_WIDTH};
 
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
@@ -184,14 +184,8 @@ impl QuickLogScreen {
         let mut lines: Vec<Line> = Vec::new();
         for (i, line_text) in self.input_lines.iter().enumerate() {
             if self.phase == Phase::Input && i == self.current_line {
-                // Show cursor on the current line
-                let before = &line_text[..self.cursor_pos];
-                let after = &line_text[self.cursor_pos..];
-                lines.push(Line::from(vec![
-                    Span::styled(before, text_style),
-                    Span::styled("\u{258F}", Style::default().fg(GREEN)),
-                    Span::styled(after, text_style),
-                ]));
+                let spans = visible_input_spans(line_text, self.cursor_pos, inner.width, 0, Color::White);
+                lines.push(Line::from(spans));
             } else {
                 lines.push(Line::from(Span::styled(line_text.as_str(), text_style)));
             }

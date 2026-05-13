@@ -12,7 +12,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
 use crate::model::Abbreviation;
-use super::{centered_area, highlight_row, render_help_overlay, render_status_line, Action, Screen, StatusMessage, CONTENT_WIDTH};
+use super::{centered_area, highlight_row, render_help_overlay, render_status_line, visible_input_spans, Action, Screen, StatusMessage, CONTENT_WIDTH};
 use fluent_bundle::FluentValue;
 
 const ACCENT: Color = Color::Cyan;
@@ -157,59 +157,47 @@ impl AbbreviationsScreen {
                 ]
             }
             Mode::AddShort => {
+                let mut spans = vec![Span::styled(" > ", Style::default().fg(GREEN))];
+                spans.extend(visible_input_spans(&self.short_input, self.short_cursor, area.width, 3, GREEN));
                 vec![
                     Line::from(Span::styled(
                         tr("abbreviations-enter-short"),
                         Style::default().fg(Color::White),
                     )),
-                    Line::from(vec![
-                        Span::styled(" > ", Style::default().fg(GREEN)),
-                        Span::styled(&self.short_input[..self.short_cursor], Style::default().fg(GREEN)),
-                        Span::styled("_", Style::default().fg(GREEN)),
-                        Span::styled(&self.short_input[self.short_cursor..], Style::default().fg(GREEN)),
-                    ]),
+                    Line::from(spans),
                 ]
             }
             Mode::AddFull => {
+                let mut spans = vec![Span::styled(" > ", Style::default().fg(GREEN))];
+                spans.extend(visible_input_spans(&self.full_input, self.full_cursor, area.width, 3, GREEN));
                 vec![
                     Line::from(Span::styled(
                         tr("abbreviations-enter-full"),
                         Style::default().fg(Color::White),
                     )),
-                    Line::from(vec![
-                        Span::styled(" > ", Style::default().fg(GREEN)),
-                        Span::styled(&self.full_input[..self.full_cursor], Style::default().fg(GREEN)),
-                        Span::styled("_", Style::default().fg(GREEN)),
-                        Span::styled(&self.full_input[self.full_cursor..], Style::default().fg(GREEN)),
-                    ]),
+                    Line::from(spans),
                 ]
             }
             Mode::EditShort => {
+                let mut spans = vec![Span::styled(" > ", Style::default().fg(GREEN))];
+                spans.extend(visible_input_spans(&self.short_input, self.short_cursor, area.width, 3, GREEN));
                 vec![
                     Line::from(Span::styled(
                         tr("abbreviations-edit-short"),
                         Style::default().fg(Color::White),
                     )),
-                    Line::from(vec![
-                        Span::styled(" > ", Style::default().fg(GREEN)),
-                        Span::styled(&self.short_input[..self.short_cursor], Style::default().fg(GREEN)),
-                        Span::styled("_", Style::default().fg(GREEN)),
-                        Span::styled(&self.short_input[self.short_cursor..], Style::default().fg(GREEN)),
-                    ]),
+                    Line::from(spans),
                 ]
             }
             Mode::EditFull => {
+                let mut spans = vec![Span::styled(" > ", Style::default().fg(GREEN))];
+                spans.extend(visible_input_spans(&self.full_input, self.full_cursor, area.width, 3, GREEN));
                 vec![
                     Line::from(Span::styled(
                         tr("abbreviations-edit-full"),
                         Style::default().fg(Color::White),
                     )),
-                    Line::from(vec![
-                        Span::styled(" > ", Style::default().fg(GREEN)),
-                        Span::styled(&self.full_input[..self.full_cursor], Style::default().fg(GREEN)),
-                        Span::styled("_", Style::default().fg(GREEN)),
-                        Span::styled(&self.full_input[self.full_cursor..], Style::default().fg(GREEN)),
-                    ]),
+                    Line::from(spans),
                 ]
             }
             Mode::ConfirmDelete => {

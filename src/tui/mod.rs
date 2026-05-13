@@ -39,6 +39,54 @@ pub fn highlight_row(frame: &mut Frame, area: Rect, row: u16) {
     }
 }
 
+pub fn visible_input_spans<'a>(
+    text: &'a str,
+    cursor: usize,
+    max_width: u16,
+    prefix_width: u16,
+    color: Color,
+) -> Vec<Span<'a>> {
+    use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+    let avail = (max_width.saturating_sub(prefix_width).saturating_sub(1)) as usize; // 1 for cursor char
+    let before = &text[..cursor];
+    let after = &text[cursor..];
+    let before_w = before.width();
+    if before_w + after.width() <= avail {
+        return vec![
+            Span::styled(before, Style::default().fg(color)),
+            Span::styled("_", Style::default().fg(color)),
+            Span::styled(after, Style::default().fg(color)),
+        ];
+    }
+    let scroll = before_w.saturating_sub(avail);
+    let mut visible_before = before;
+    let mut skipped = 0;
+    for (i, ch) in before.char_indices() {
+        skipped += ch.width().unwrap_or(0);
+        if skipped >= scroll {
+            visible_before = &before[i + ch.len_utf8()..];
+            break;
+        }
+    }
+    let remaining = avail.saturating_sub(visible_before.width());
+    let mut end = 0;
+    let mut used = 0;
+    for (i, ch) in after.char_indices() {
+        let w = ch.width().unwrap_or(0);
+        if used + w > remaining {
+            break;
+        }
+        used += w;
+        end = i + ch.len_utf8();
+    }
+    let visible_after = &after[..end];
+    vec![
+        Span::styled(visible_before, Style::default().fg(color)),
+        Span::styled("_", Style::default().fg(color)),
+        Span::styled(visible_after, Style::default().fg(color)),
+    ]
+}
+
 pub type StatusMessage = Option<(String, bool)>; // (message, is_error)
 
 pub fn render_status_line(frame: &mut Frame, area: Rect, status: &StatusMessage) {
