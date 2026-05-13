@@ -3,7 +3,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::Paragraph,
+    widgets::{Paragraph, Wrap},
     Frame,
 };
 
@@ -142,7 +142,7 @@ impl AbbreviationsScreen {
                 })
                 .collect()
         };
-        frame.render_widget(Paragraph::new(list_lines), chunks[1]);
+        frame.render_widget(Paragraph::new(list_lines).wrap(Wrap { trim: false }), chunks[1]);
 
         if !self.abbreviations.is_empty() {
             highlight_row(frame, chunks[1], self.selected as u16);

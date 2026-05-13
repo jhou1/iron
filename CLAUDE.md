@@ -65,6 +65,8 @@ All text input fields use emacs-style cursor: `Ctrl+B`/Left back, `Ctrl+F`/Right
 
 **Text input must never overflow its container.** All text input rendering must use `visible_input_spans()` from `tui/mod.rs` to horizontally scroll long text within the available width. Never render raw `text[..cursor]` + cursor + `text[cursor..]` spans without width clipping.
 
+**All text content must wrap within its container.** Every `Paragraph` that renders user-entered or variable-length text (notes, names, descriptions, quotes, warm-up/cool-down) must use `.wrap(Wrap { trim: false })`. Text must never overflow the right border of its container. Only fixed-width UI elements (footers, shortcuts bars, single-line labels) may omit `.wrap()`.
+
 ## Color Scheme
 
 Uses ANSI terminal colors (not hardcoded RGB) for theme compatibility:

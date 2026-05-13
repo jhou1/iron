@@ -3,7 +3,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Paragraph, Wrap},
     Frame,
 };
 
@@ -198,7 +198,7 @@ impl QuickLogScreen {
             )));
         }
 
-        frame.render_widget(Paragraph::new(lines), inner);
+        frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
     }
 
     fn render_preview_pane(&self, frame: &mut Frame, area: Rect) {
@@ -307,7 +307,7 @@ impl QuickLogScreen {
             .take(visible_height)
             .collect();
 
-        frame.render_widget(Paragraph::new(display_lines), area);
+        frame.render_widget(Paragraph::new(display_lines).wrap(Wrap { trim: false }), area);
     }
 
     fn build_shortcuts(&self) -> Line<'static> {

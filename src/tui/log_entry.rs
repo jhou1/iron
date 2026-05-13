@@ -4,7 +4,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Paragraph, Wrap},
     Frame,
 };
 
@@ -607,7 +607,7 @@ impl LogEntryScreen {
             ]));
         }
         if !meta_lines.is_empty() {
-            frame.render_widget(Paragraph::new(meta_lines), chunks[4]);
+            frame.render_widget(Paragraph::new(meta_lines).wrap(Wrap { trim: false }), chunks[4]);
         }
 
         // Footer

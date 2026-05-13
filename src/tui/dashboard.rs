@@ -381,7 +381,7 @@ impl DashboardScreen {
             }
         }
 
-        frame.render_widget(Paragraph::new(lines), inner);
+        frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
     }
 
     fn reload_quotes(&mut self, db: &Database) -> anyhow::Result<()> {
@@ -421,7 +421,7 @@ impl DashboardScreen {
             lines.push(dashboard_gauge_line(goal));
         }
 
-        frame.render_widget(Paragraph::new(lines), inner);
+        frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
     }
 
     fn render_quotes_modal(&self, frame: &mut Frame) {
@@ -487,7 +487,7 @@ impl DashboardScreen {
             .saturating_sub(list_area_height.saturating_sub(1)) as u16;
 
         frame.render_widget(
-            Paragraph::new(lines).scroll((scroll, 0)),
+            Paragraph::new(lines).wrap(Wrap { trim: false }).scroll((scroll, 0)),
             inner_chunks[0],
         );
 
