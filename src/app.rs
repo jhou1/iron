@@ -86,6 +86,9 @@ fn run_app(
             continue;
         }
         if let Event::Key(key) = event::read()? {
+            if key.kind != event::KeyEventKind::Press {
+                continue;
+            }
             if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
                 break;
             }
