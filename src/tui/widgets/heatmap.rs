@@ -21,10 +21,10 @@ impl<'a> Heatmap<'a> {
         Self { data, weeks, no_color }
     }
 
-    fn cell_bg_color(&self, count: i64) -> Color {
+    fn cell_color(&self, count: i64) -> Color {
         if self.no_color {
             match count {
-                0 => Color::Reset,
+                0 => Color::DarkGray,
                 1 => Color::DarkGray,
                 2 => Color::Gray,
                 _ => Color::White,
@@ -86,7 +86,7 @@ impl<'a> Widget for Heatmap<'a> {
         }
 
         // Render the heatmap cells
-        let cell_width: u16 = 3; // 2 colored spaces + 1 gap
+        let cell_width: u16 = 2; // 1 circle char + 1 space
 
         let month_names = [
             crate::i18n::tr("heatmap-jan"),
@@ -113,7 +113,7 @@ impl<'a> Widget for Heatmap<'a> {
             let month = week_monday.month();
 
             let x = area.x + label_width + week * cell_width;
-            if x + 2 >= area.x + area.width {
+            if x + 1 >= area.x + area.width {
                 break;
             }
 
@@ -135,10 +135,10 @@ impl<'a> Widget for Heatmap<'a> {
                 }
                 let date_str = date.format("%Y-%m-%d").to_string();
                 let count = counts.get(&date_str).copied().unwrap_or(0);
-                let bg = self.cell_bg_color(count);
+                let color = self.cell_color(count);
                 let y = grid_y + day;
-                if y < area.y + area.height && x + 2 <= area.x + area.width {
-                    buf.set_string(x, y, "  ", Style::default().bg(bg));
+                if y < area.y + area.height && x < area.x + area.width {
+                    buf.set_string(x, y, "\u{25CF}", Style::default().fg(color));
                 }
             }
         }
@@ -156,11 +156,11 @@ impl<'a> Widget for Heatmap<'a> {
             } else {
                 Line::from(vec![
                     Span::styled(format!("{} ", crate::i18n::tr("heatmap-less")), Style::default().fg(Color::Gray)),
-                    Span::styled("  ", Style::default().bg(Color::Indexed(236))), Span::raw(" "),
-                    Span::styled("  ", Style::default().bg(Color::Indexed(22))),  Span::raw(" "),
-                    Span::styled("  ", Style::default().bg(Color::Indexed(28))),  Span::raw(" "),
-                    Span::styled("  ", Style::default().bg(Color::Indexed(34))),  Span::raw(" "),
-                    Span::styled("  ", Style::default().bg(Color::Indexed(82))),
+                    Span::styled("\u{25CF}", Style::default().fg(Color::Indexed(236))), Span::raw(" "),
+                    Span::styled("\u{25CF}", Style::default().fg(Color::Indexed(22))),  Span::raw(" "),
+                    Span::styled("\u{25CF}", Style::default().fg(Color::Indexed(28))),  Span::raw(" "),
+                    Span::styled("\u{25CF}", Style::default().fg(Color::Indexed(34))),  Span::raw(" "),
+                    Span::styled("\u{25CF}", Style::default().fg(Color::Indexed(82))),
                     Span::styled(format!(" {}", crate::i18n::tr("heatmap-more")), Style::default().fg(Color::Gray)),
                 ])
             };
