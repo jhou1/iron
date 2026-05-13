@@ -979,4 +979,92 @@ impl Database {
             .execute("DELETE FROM abbreviations WHERE id = ?1", params![id])?;
         Ok(())
     }
+
+    // ── Heatmap multi-view queries ────────────────────────────────────
+
+    pub fn daily_practice_counts(&self, days: i64) -> Result<Vec<(String, Vec<(String, i64)>)>> {
+        let cutoff = Local::now().naive_local() - chrono::Duration::days(days);
+        let mut stmt = self.conn.prepare(
+            "SELECT substr(l.logged_at, 1, 10) AS day, p.name, COUNT(*) AS cnt
+             FROM logs l
+             JOIN practices p ON l.practice_id = p.id
+             WHERE l.logged_at >= ?1 AND p.active = 1
+             GROUP BY day, p.name
+             ORDER BY day, p.name",
+        )?;
+        let rows = stmt.query_map(params![cutoff.to_string()], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, i64>(2)?))
+        })?;
+
+        let mut result: Vec<(String, Vec<(String, i64)>)> = Vec::new();
+        for row in rows {
+            let (day, name, count) = row?;
+            if let Some(last) = result.last_mut() {
+                if last.0 == day {
+                    last.1.push((name, count));
+                    continue;
+                }
+            }
+            result.push((day, vec![(name, count)]));
+        }
+        Ok(result)
+    }
+
+    pub fn weekday_practice_counts(&self, days: i64) -> Result<Vec<(u32, Vec<(String, i64)>)>> {
+        let cutoff = Local::now().naive_local() - chrono::Duration::days(days);
+        let mut stmt = self.conn.prepare(
+            "SELECT CAST(strftime('%w', substr(l.logged_at, 1, 10)) AS INTEGER) AS dow,
+                    p.name, COUNT(*) AS cnt
+             FROM logs l
+             JOIN practices p ON l.practice_id = p.id
+             WHERE l.logged_at >= ?1 AND p.active = 1
+             GROUP BY dow, p.name
+             ORDER BY dow, cnt DESC",
+        )?;
+        let rows = stmt.query_map(params![cutoff.to_string()], |row| {
+            Ok((row.get::<_, u32>(0)?, row.get::<_, String>(1)?, row.get::<_, i64>(2)?))
+        })?;
+
+        let mut result: Vec<(u32, Vec<(String, i64)>)> = vec![];
+        for row in rows {
+            let (dow, name, count) = row?;
+            if let Some(last) = result.last_mut() {
+                if last.0 == dow {
+                    last.1.push((name, count));
+                    continue;
+                }
+            }
+            result.push((dow, vec![(name, count)]));
+        }
+        Ok(result)
+    }
+
+    pub fn monthly_practice_counts(&self, year: i32) -> Result<Vec<(u32, Vec<(String, i64)>)>> {
+        let year_str = format!("{:04}", year);
+        let mut stmt = self.conn.prepare(
+            "SELECT CAST(substr(l.logged_at, 6, 2) AS INTEGER) AS mon,
+                    p.name, COUNT(*) AS cnt
+             FROM logs l
+             JOIN practices p ON l.practice_id = p.id
+             WHERE substr(l.logged_at, 1, 4) = ?1 AND p.active = 1
+             GROUP BY mon, p.name
+             ORDER BY mon, cnt DESC",
+        )?;
+        let rows = stmt.query_map(params![year_str], |row| {
+            Ok((row.get::<_, u32>(0)?, row.get::<_, String>(1)?, row.get::<_, i64>(2)?))
+        })?;
+
+        let mut result: Vec<(u32, Vec<(String, i64)>)> = vec![];
+        for row in rows {
+            let (mon, name, count) = row?;
+            if let Some(last) = result.last_mut() {
+                if last.0 == mon {
+                    last.1.push((name, count));
+                    continue;
+                }
+            }
+            result.push((mon, vec![(name, count)]));
+        }
+        Ok(result)
+    }
 }
