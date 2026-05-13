@@ -69,9 +69,9 @@ fn paragraph_widgets_must_wrap_user_content() {
         // ── quick_log.rs ──
         "quick_log.rs:124",     // title (fixed text)
         "quick_log.rs:140",     // shortcuts bar (fixed text)
-        "quick_log.rs:220",     // "no config" message (fixed text, inside bordered block)
-        "quick_log.rs:235",     // spinner message (fixed text)
-        "quick_log.rs:249",     // "no results" message (fixed text)
+        "quick_log.rs:225",     // "no config" message (fixed text, inside bordered block)
+        "quick_log.rs:240",     // spinner message (fixed text)
+        "quick_log.rs:254",     // "no results" message (fixed text)
         // ── trends.rs ──
         "trends.rs:131",        // title (fixed text)
         "trends.rs:156",        // filter input (short, bounded)
