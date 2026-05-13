@@ -1,6 +1,7 @@
 pub mod heatmap;
 pub mod sparkline;
 pub mod weekday_chart;
+pub mod monthly_chart;
 
 use ratatui::style::Color;
 
