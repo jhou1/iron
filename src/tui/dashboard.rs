@@ -36,6 +36,9 @@ pub struct DashboardScreen {
     hrv_input: String,
     status_msg: StatusMessage,
     no_color: bool,
+    weekly_volume: f64,
+    training_days: usize,
+    consecutive_days: i64,
 }
 
 impl DashboardScreen {
@@ -47,6 +50,10 @@ impl DashboardScreen {
         let goals = db.list_goals()?;
         let today = chrono::Local::now().format("%Y-%m-%d").to_string();
         let hrv_today = db.get_daily_hrv(&today)?;
+        let stats = db.aggregate_stats(7).unwrap_or(crate::db::AggregateStats {
+            sessions: 0, total_volume: 0.0, total_reps: 0.0, total_distance: 0.0, total_duration: 0.0,
+        });
+        let (training_days, consecutive_days) = Self::compute_streak(&heatmap_data);
         Ok(Self {
             heatmap_data,
             recent_entries,
@@ -58,6 +65,9 @@ impl DashboardScreen {
             hrv_input: String::new(),
             status_msg: None,
             no_color,
+            weekly_volume: stats.total_volume,
+            training_days,
+            consecutive_days,
         })
     }
 
@@ -69,6 +79,13 @@ impl DashboardScreen {
         self.goals = db.list_goals()?;
         let today = chrono::Local::now().format("%Y-%m-%d").to_string();
         self.hrv_today = db.get_daily_hrv(&today)?;
+        let stats = db.aggregate_stats(7).unwrap_or(crate::db::AggregateStats {
+            sessions: 0, total_volume: 0.0, total_reps: 0.0, total_distance: 0.0, total_duration: 0.0,
+        });
+        let (td, cd) = Self::compute_streak(&self.heatmap_data);
+        self.weekly_volume = stats.total_volume;
+        self.training_days = td;
+        self.consecutive_days = cd;
         Ok(())
     }
 
@@ -84,7 +101,7 @@ impl DashboardScreen {
             let mut count = 0u16;
             let mut current_date = String::new();
             for entry in &self.recent_entries {
-                let dk = entry.log.logged_at.format("%b %d").to_string();
+                let dk = entry.log.logged_at.format("%Y-%m-%d").to_string();
                 if dk != current_date {
                     if !current_date.is_empty() {
                         count += 1; // blank separator
@@ -99,26 +116,6 @@ impl DashboardScreen {
         let recent_lines = (date_groups + 1).max(2); // +1 for title
         let pane_height = recent_lines.max(goals_lines).max(7);
 
-        // Calculate quote box height: content lines + 2 for borders
-        let quote_box_width = area.width.saturating_sub(4) as usize;
-        let (quote_text, quote_style) = if self.quote.is_empty() {
-            (
-                tr("dashboard-no-quotes"),
-                Style::default().fg(Color::DarkGray),
-            )
-        } else {
-            (
-                format!("> {}", &self.quote),
-                Style::default().fg(Color::White),
-            )
-        };
-        let quote_lines = if quote_box_width > 0 {
-            quote_text.chars().count().div_ceil(quote_box_width)
-        } else {
-            1
-        } as u16;
-        let quote_height = quote_lines + 2;
-
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
@@ -126,7 +123,7 @@ impl DashboardScreen {
                 Constraint::Length(1),            // [1] spacer
                 Constraint::Length(12),           // [2] heatmap
                 Constraint::Length(1),            // [3] spacer
-                Constraint::Length(quote_height), // [4] daily quote box
+                Constraint::Length(5),            // [4] training summary
                 Constraint::Length(1),            // [5] spacer
                 Constraint::Length(pane_height),  // [6] split panes
                 Constraint::Length(1),            // [7] status line
@@ -158,23 +155,8 @@ impl DashboardScreen {
         let heatmap = Heatmap::new(&self.heatmap_data, 52, self.no_color);
         frame.render_widget(heatmap, heatmap_inner);
 
-        // ── Daily quote ──
-        let quote_block = Block::default()
-            .title(Line::from(vec![
-                Span::styled("── ", Style::default().fg(BORDER_COLOR)),
-                Span::styled(tr("dashboard-quotes"), Style::default().fg(Color::White).bold()),
-                Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
-            ]))
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(BORDER_COLOR));
-        let quote_paragraph = Paragraph::new(Line::from(Span::styled(
-            quote_text.clone(),
-            quote_style,
-        )))
-        .block(quote_block)
-        .wrap(Wrap { trim: false })
-        .alignment(ratatui::layout::Alignment::Center);
-        frame.render_widget(quote_paragraph, chunks[4]);
+        // ── Training summary ──
+        self.render_summary(frame, chunks[4]);
 
         // ── Split panes ──
         let panes = Layout::default()
@@ -240,6 +222,72 @@ impl DashboardScreen {
 
     }
 
+    fn compute_streak(heatmap_data: &[(String, i64)]) -> (usize, i64) {
+        let today = chrono::Local::now().date_naive();
+        let cutoff_7 = (today - chrono::Duration::days(7)).format("%Y-%m-%d").to_string();
+        let training_days = heatmap_data.iter().filter(|(d, _)| d.as_str() > cutoff_7.as_str()).count();
+
+        let dates: std::collections::HashSet<&str> = heatmap_data.iter().map(|(d, _)| d.as_str()).collect();
+        let mut consecutive = 0i64;
+        let mut check = today;
+        while dates.contains(check.format("%Y-%m-%d").to_string().as_str()) {
+            consecutive += 1;
+            check -= chrono::Duration::days(1);
+        }
+        (training_days, consecutive)
+    }
+
+    fn render_summary(&self, frame: &mut Frame, area: Rect) {
+        let block = Block::default()
+            .title(Line::from(vec![
+                Span::styled("── ", Style::default().fg(BORDER_COLOR)),
+                Span::styled(tr("summary-title"), Style::default().fg(Color::White).bold()),
+                Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
+            ]))
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(BORDER_COLOR));
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+
+        let volume_tons = self.weekly_volume / 1000.0;
+        let volume_text = tr_args("summary-volume", &[("value", FluentValue::from(format!("{:.1}", volume_tons)))]);
+        let consecutive_text = tr_args("summary-consecutive", &[("days", FluentValue::from(self.consecutive_days))]);
+        let recovery_text = if let Some(hrv) = self.hrv_today {
+            tr_args("summary-recovery", &[("value", FluentValue::from(hrv as i64))])
+        } else {
+            tr("summary-recovery-na")
+        };
+        let frequency_text = tr_args("summary-frequency", &[("days", FluentValue::from(self.training_days as i64))]);
+
+        let sep = Span::styled("  ", Style::default());
+        let mut lines = vec![
+            Line::from(vec![
+                Span::styled(volume_text, Style::default().fg(Color::White)),
+                sep.clone(),
+                Span::styled(consecutive_text, Style::default().fg(Color::White)),
+                sep.clone(),
+                Span::styled(recovery_text, Style::default().fg(Color::White)),
+                sep,
+                Span::styled(frequency_text, Style::default().fg(Color::White)),
+            ]),
+        ];
+
+        if !self.quote.is_empty() {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                format!("> {}", self.quote),
+                Style::default().fg(Color::Yellow).italic(),
+            )));
+        }
+
+        frame.render_widget(
+            Paragraph::new(lines)
+                .wrap(Wrap { trim: false })
+                .alignment(ratatui::layout::Alignment::Center),
+            inner,
+        );
+    }
+
     fn render_recent_pane(&self, frame: &mut Frame, area: Rect) {
         let block = Block::default()
             .title(Line::from(vec![
@@ -269,7 +317,7 @@ impl DashboardScreen {
 
             let mut current_date = String::new();
             for entry in &self.recent_entries {
-                let date_key = entry.log.logged_at.format("%b %d").to_string();
+                let date_key = entry.log.logged_at.format("%Y-%m-%d").to_string();
                 if date_key != current_date {
                     if !current_date.is_empty() {
                         lines.push(Line::from(""));

@@ -201,7 +201,7 @@ abbreviations-edit-full = 编辑全称：
 abbreviations-delete-confirm = 删除 { $short }？
 
 # ── 训练概览 ──
-summary-title = 训练概览
+summary-title = 概览
 summary-volume = 本周：{ $value } 吨
 summary-consecutive = 连续训练：{ $days } 天
 summary-recovery = 恢复指数：{ $value }%

@@ -19,10 +19,9 @@ fn paragraph_widgets_must_wrap_user_content() {
         "abbreviations.rs:217",
         "abbreviations.rs:249",
         // ── dashboard.rs ──
-        "dashboard.rs:145",
-        "dashboard.rs:170",
-        "dashboard.rs:239",
-        "dashboard.rs:314",
+        "dashboard.rs:142",
+        "dashboard.rs:221",
+        "dashboard.rs:357",
         // ── goals.rs ──
         "goals.rs:214",
         "goals.rs:361",
@@ -50,9 +49,9 @@ fn paragraph_widgets_must_wrap_user_content() {
         "practices.rs:250",
         "practices.rs:296",
         // ── quotes_screen.rs ──
-        "quotes_screen.rs:148",
-        "quotes_screen.rs:221",
-        "quotes_screen.rs:250",
+        "quotes_screen.rs:113",
+        "quotes_screen.rs:186",
+        "quotes_screen.rs:215",
         // ── quick_log.rs ──
         "quick_log.rs:122",
         "quick_log.rs:142",
