@@ -4,16 +4,17 @@ A beautiful terminal UI for tracking your training records. Log practices set-by
 
 ## Features
 
-- **Multi-view heatmap** showing your training consistency over the year (GitHub-style grid, daily chart, weekday bars, monthly bars)
-- **Set-by-set logging** — each set can have different weight/reps, with weight carry-forward
+- **GitHub-style heatmap** showing your training consistency over the year
+- **Set-by-set logging** — all fields on one screen: sets, warm-up/cool-down, notes
 - **Sparkline trend charts** per practice with avg, peak, and trend percentage
-- **14-day history** with inline set details and session notes
-- **4 practice types**: weighted (weightxreps), bodyweight (reps), distance (km), endurance (min)
+- **Full history** with table-aligned columns and inline set details
+- **4 practice types**: Weight x Reps, Reps Only, Distance (km), Duration (min)
 - **Vim-style navigation** throughout (j/k, h/l, /, Esc, Enter)
-- **Goals and milestones** — set training targets and track progress
-- **Daily motivational quotes** on the Dashboard — add and manage quotes in the database
+- **Goals and milestones** with inline progress bars showing percentage
+- **Daily motivational quotes** on the Dashboard with a dedicated management screen
 - **Warm-up & cool-down notes** — optional text fields on each training log
 - **Daily HRV tracking** — record your morning HRV score (0-100) on the dashboard
+- **Quick Log** — natural language entry powered by LLM
 - **JSON export/import** for backup and data portability
 - Data stored locally in SQLite — single file, zero cloud dependencies
 
@@ -71,33 +72,18 @@ Launch the app:
 iron
 ```
 
-You'll land on the **Dashboard** — the home screen showing your training heatmap and today's stats.
+You'll land on the **Dashboard** — the home screen showing your training heatmap, recent activity grouped by date, active goals with progress bars, and a daily quote.
 
-### Heatmap Views
+### Dashboard Layout
 
-The Dashboard displays a multi-view heatmap at the top. Press `Tab` to cycle through four visualization modes:
+The Dashboard displays:
 
-1. **Map** (default) — GitHub-style contribution grid showing the last year of training activity
-   - Each cell represents one day
-   - 5-level green gradient based on total volume/reps/distance/duration
-   - Empty cells indicate rest days
-
-2. **Chart** — Daily vertical bars for the last 90 days
-   - Each bar shows total volume for that day
-   - Stacked by practice (different colors per practice)
-   - Legend below shows practice names with their colors
-
-3. **Days** — Weekday horizontal bars (Monday–Sunday)
-   - Shows average volume per weekday across all history
-   - Stacked by practice
-   - Helps identify training patterns (e.g., "I usually train hardest on Thursdays")
-
-4. **Months** — Monthly horizontal bars (January–December)
-   - Shows total volume per month across all years
-   - Stacked by practice
-   - Useful for tracking seasonal training cycles
-
-All views use consistent practice colors from a 10-color palette. The legend at the bottom identifies each practice.
+1. **Header** — `⚡ Iron Training Tracker`
+2. **Heatmap** — GitHub-style contribution grid in a bordered panel
+3. **Quote** — daily motivational quote (rotates automatically)
+4. **HRV** — today's Heart Rate Variability score
+5. **Recent** — last 7 days of training, grouped by date
+6. **Goals** — active goals with progress bars showing completion percentage
 
 ### First Time Setup
 
@@ -105,41 +91,46 @@ All views use consistent practice colors from a 10-color palette. The legend at 
 2. Press `a` to add a new practice
 3. Type a name (e.g., "Kettlebell Snatch") and press Enter
 4. Select the practice type with `j/k` and press Enter:
-   - **weightxreps** — for weighted exercises (tracks kg and reps)
-   - **reps** — for bodyweight exercises (tracks reps only)
-   - **distance** — for running, cycling, etc. (tracks km)
-   - **duration** — for holds, planks, etc. (tracks minutes)
+   - **Weight x Reps** — for weighted exercises (tracks kg and reps)
+   - **Reps Only** — for bodyweight exercises (tracks reps only)
+   - **Distance** — for running, cycling, etc. (tracks km)
+   - **Duration** — for holds, planks, etc. (tracks minutes)
 5. Press `Esc` to return to the Dashboard
 
 ### Logging a Practice
 
 1. Press `l` to open the **Log Entry** screen
 2. Type to filter practices, or use `j/k` to navigate, then press Enter
-3. Enter sets one at a time:
-   - For weighted: type weight, press Enter or Tab, type reps, press Enter
-   - Weight carries forward from the previous set — just press Enter to keep it
-   - For other types: type the value and press Enter
-4. Press `D` to change the log date (defaults to today, format: YYYY-MM-DD)
-5. Press `Ctrl+S` when done adding sets
-6. Optionally enter warm-up and cool-down notes (e.g., "5 min jump rope"), press Enter to skip
-7. Type an optional note (e.g., "Felt strong today") or press Enter to skip
-8. Press Enter to save
+3. All fields are on one screen — sets, warm-up/cool-down, and notes:
+   - **Sets section**: enter sets one at a time (weight carries forward for weighted practices)
+   - **Warm-up / Cool-down**: optional text fields
+   - **Note**: free-text area with automatic line wrapping
+4. Use `Tab` to move between sections (weight → reps → warm-up → cool-down → note)
+5. Press `D` to change the log date (defaults to today, format: YYYY-MM-DD)
+6. Press `Ctrl+S` to save from any section
 
 Example — logging kettlebell snatches:
 
 ```
-Set 1: 24kg x 10      (type 24, Enter, 10, Enter)
+Set 1: 24kg x 10      (type 24, Tab, 10, Enter)
 Set 2: 24kg x 9       (Enter to keep 24kg, 9, Enter)
-Set 3: 28kg x 8       (type 28, Enter, 8, Enter)
-Ctrl+S → type note → Enter
+Set 3: 28kg x 8       (type 28, Tab, 8, Enter)
+Tab to warm-up → Tab to note → Ctrl+S to save
 ```
 
 ### Viewing History
 
-Press `h` to see your **last 14 days** of training. Navigate with `j/k` to see set details for each log.
+Press `h` to see your training history. The screen is split into two panels:
 
-- `Enter` — edit a log (re-opens the set editor with existing data)
+- **Left**: table of all logs with aligned Date, Practice, and Volume columns (dates in YYYY-MM-DD format)
+- **Right**: detail panel showing sets, totals, warm-up/cool-down, and notes for the selected log
+
+Navigation:
+- `j/k` — navigate logs
+- `/` — filter by practice name
+- `e` — edit a log (re-opens the log entry screen with existing data)
 - `d` — delete a log (with confirmation)
+- `u` — undo last deletion
 - `Esc` — back to Dashboard
 
 ### Viewing Trends
@@ -153,11 +144,11 @@ Press `t` to see **progress charts**. Select a practice to view a sparkline bar 
 
 ### Managing Practices
 
-Press `e` to manage your practice inventory. Each practice shows its name, type, and active/inactive status.
+Press `e` to manage your practice inventory. Each practice shows its name, type, and a toggle switch for active/inactive status.
 
 - `a` — add a new practice
 - `Enter` — rename a practice
-- `t` — toggle a practice between active and inactive
+- `t` — toggle a practice between active and inactive (shown as ▰▱ / ▱▰)
 - `d` — delete a practice (removes all its logs and sets)
 - `Esc` — back to Dashboard
 
@@ -165,33 +156,29 @@ Inactive practices are hidden from the log entry picker, history, trends, and da
 
 ### Goals
 
-Press `g` on the Dashboard to enter Goals editing mode. Goals help you set training targets and track milestones toward them.
+Press `g` on the Dashboard to open the Goals screen. Goals help you set training targets and track milestones toward them.
+
+Each goal displays a progress bar with inline percentage (e.g., `▰▰▰▰▰▰25%▱▱▱▱▱▱  1/4`) based on milestone completion.
 
 - `a` — add a new goal
 - `m` — add a milestone to the selected goal
-- `Enter` — edit a goal or milestone title
+- `Enter` — edit a goal or milestone title, or open milestone list
 - `Space` — toggle completion status (goals and milestones)
 - `D` — edit completion date on a completed goal or milestone (format: YYYY-MM-DD)
 - `d` — delete a goal or milestone
 - `j/k` — navigate between goals and milestones
 - `Esc` — return to the Dashboard
 
-Completed goals and milestones display a checkmark with the completion date inline (e.g., `☑ First competition (Apr 15)`). Goals and milestones are stored in the database and included in JSON export/import.
+### Quotes
 
-### Daily Quote
+Press `Q` (uppercase) on the Dashboard to open the Quotes screen. A motivational quote rotates daily on the Dashboard.
 
-A motivational quote rotates daily on the Dashboard. The quote changes each day automatically based on the day of year.
-
-Press `Q` (uppercase) on the Dashboard to manage your quote library.
-
-Inside the Quotes manager:
 - `j/k` — navigate your quotes list
 - `a` — add a new quote
 - `e` or `Enter` — edit the selected quote
 - `d` — delete a quote
-- `Esc` — close the manager and return to Dashboard
-
-When no quotes exist, the Dashboard shows "No quotes yet — press Q to add one" in gray text. Quotes are stored in the SQLite database alongside all your training data.
+- `u` — undo last deletion
+- `Esc` — back to Dashboard
 
 ### HRV Tracking
 
@@ -245,16 +232,16 @@ The endpoint must implement the OpenAI Chat Completions API format (`/chat/compl
 
 **Abbreviations:**
 
-Press `[a]` from the Dashboard to manage your abbreviation dictionary. Abbreviations help the LLM understand your shortcuts (e.g., `DL` = `Deadlift`, `BP` = `Bench Press`). You can also add abbreviations on-the-fly from the Quick Log preview pane by pressing `a`.
+Press `a` from the Dashboard to manage your abbreviation dictionary. Abbreviations help the LLM understand your shortcuts (e.g., `DL` = `Deadlift`, `BP` = `Bench Press`). You can also add abbreviations on-the-fly from the Quick Log preview pane by pressing `a`.
 
 ## Practice Types
 
 | Type | UI Label | You Enter | Tracked Metric |
 |---|---|---|---|
-| Weighted | weightxreps | weight (kg) + reps per set | Volume (sum of weight x reps) |
-| Bodyweight | reps | reps per set | Total reps |
-| Distance | distance | distance (km) per set | Total distance |
-| Endurance | duration | duration (min) per set | Total duration |
+| Weighted | Weight x Reps | weight (kg) + reps per set | Volume (sum of weight x reps) |
+| Bodyweight | Reps Only | reps per set | Total reps |
+| Distance | Distance | distance (km) per set | Total distance |
+| Endurance | Duration | duration (min) per set | Total duration |
 
 Units are fixed: **kg**, **km**, **minutes**.
 
@@ -264,15 +251,14 @@ Units are fixed: **kg**, **km**, **minutes**.
 
 | Key | Action |
 |---|---|
-| `Tab` | Cycle heatmap view (Map/Chart/Days/Months) |
 | `l` | Log a practice |
 | `w` | Quick Log (LLM-powered) |
 | `h` | View history |
 | `t` | View trends |
 | `e` | Manage practices |
 | `a` | Manage abbreviations |
-| `g` | Goals mode |
-| `Q` | Manage quotes |
+| `g` | Goals |
+| `Q` | Quotes |
 | `v` | Record/edit today's HRV |
 | `q` | Quit |
 
@@ -280,11 +266,12 @@ Units are fixed: **kg**, **km**, **minutes**.
 
 | Key | Action |
 |---|---|
-| `Enter` | Add set / next field |
-| `Tab` | Switch field (weighted only) |
-| `Ctrl+S` | Finish sets, enter note |
+| `Tab` | Next field (weight → reps → warm-up → cool-down → note) |
+| `Shift+Tab` | Previous field |
+| `Enter` | Add set (in sets section) |
+| `Ctrl+S` | Save log (from any section) |
 | `D` | Change log date |
-| `d` | Delete last set (when fields empty) |
+| `Backspace` | Delete last set (when fields empty) |
 | `Esc` | Cancel |
 
 ### History
@@ -295,6 +282,7 @@ Units are fixed: **kg**, **km**, **minutes**.
 | `/` | Filter by practice name |
 | `e` | Edit log |
 | `d` | Delete log |
+| `u` | Undo last deletion |
 | `Esc` | Clear filter / Back |
 
 ### Trends
@@ -317,7 +305,7 @@ Units are fixed: **kg**, **km**, **minutes**.
 | `d` | Delete practice |
 | `Esc` | Back |
 
-### Goals Mode
+### Goals
 
 | Key | Action |
 |---|---|
@@ -330,7 +318,7 @@ Units are fixed: **kg**, **km**, **minutes**.
 | `d` | Delete goal/milestone |
 | `Esc` | Back to Dashboard |
 
-### Quotes Manager
+### Quotes
 
 | Key | Action |
 |---|---|
@@ -338,7 +326,8 @@ Units are fixed: **kg**, **km**, **minutes**.
 | `a` | Add quote |
 | `e` or `Enter` | Edit quote |
 | `d` | Delete quote |
-| `Esc` | Close manager |
+| `u` | Undo last deletion |
+| `Esc` | Back to Dashboard |
 
 ### Quick Log
 
@@ -349,7 +338,6 @@ Units are fixed: **kg**, **km**, **minutes**.
 | `Up/Down` | Navigate lines (input) / Navigate results (preview) |
 | `D` | Change log date |
 | `a` | Add abbreviation (preview only) |
-| `?` | Toggle help overlay |
 | `Esc` | Back to Dashboard |
 
 ### Abbreviations
@@ -361,6 +349,17 @@ Units are fixed: **kg**, **km**, **minutes**.
 | `e` or `Enter` | Edit abbreviation |
 | `d` | Delete abbreviation |
 | `Esc` | Back to Dashboard |
+
+### Text Input (all screens)
+
+| Key | Action |
+|---|---|
+| `Ctrl+B` or `Left` | Move cursor back |
+| `Ctrl+F` or `Right` | Move cursor forward |
+| `Ctrl+A` or `Home` | Move to start |
+| `Ctrl+E` or `End` | Move to end |
+| `Ctrl+K` | Delete to end of line |
+| `Backspace` | Delete before cursor |
 
 ## Data Backup
 
