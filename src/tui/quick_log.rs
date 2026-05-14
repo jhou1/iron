@@ -107,19 +107,23 @@ impl QuickLogScreen {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1),  // title
-                Constraint::Min(6),    // two panes
+                Constraint::Min(6),    // bordered block with two panes
                 Constraint::Length(1), // status message
                 Constraint::Length(1), // shortcuts
             ])
             .split(area);
 
-        // ── Title ──
-        let title = Line::from(Span::styled(
-            tr("quicklog-title"),
-            Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
-        ));
-        frame.render_widget(Paragraph::new(title), chunks[0]);
+        // ── Bordered block ──
+        let block = Block::default()
+            .title(Line::from(vec![
+                Span::styled("── ", Style::default().fg(BORDER_COLOR)),
+                Span::styled(tr("quicklog-title"), Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+                Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
+            ]))
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(BORDER_COLOR));
+        let inner = block.inner(chunks[0]);
+        frame.render_widget(block, chunks[0]);
 
         // ── Two panes side by side ──
         let panes = Layout::default()
@@ -129,17 +133,17 @@ impl QuickLogScreen {
                 Constraint::Length(1),
                 Constraint::Percentage(50),
             ])
-            .split(chunks[1]);
+            .split(inner);
 
         self.render_input_pane(frame, panes[0]);
         self.render_preview_pane(frame, panes[2]);
 
         // ── Status line ──
-        render_status_line(frame, chunks[2], &self.status_msg);
+        render_status_line(frame, chunks[1], &self.status_msg);
 
         // ── Shortcuts ──
         let shortcuts = self.build_shortcuts();
-        frame.render_widget(Paragraph::new(vec![shortcuts]), chunks[3]);
+        frame.render_widget(Paragraph::new(vec![shortcuts]), chunks[2]);
 
     }
 

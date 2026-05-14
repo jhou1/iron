@@ -50,11 +50,10 @@ fn paragraph_widgets_must_wrap_user_content() {
         "quotes_screen.rs:186",
         "quotes_screen.rs:215",
         // ── quick_log.rs ──
-        "quick_log.rs:122",
-        "quick_log.rs:142",
-        "quick_log.rs:202",
-        "quick_log.rs:217",
-        "quick_log.rs:231",
+        "quick_log.rs:146",
+        "quick_log.rs:206",
+        "quick_log.rs:221",
+        "quick_log.rs:235",
         // ── trends.rs ──
         "trends.rs:87",
         "trends.rs:115",
@@ -160,6 +159,7 @@ fn screens_must_have_bordered_blocks() {
         "history.rs",
         "practices.rs",
         "quotes_screen.rs",
+        "quick_log.rs",
     ];
 
     let mut missing = Vec::new();
