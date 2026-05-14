@@ -57,13 +57,12 @@ fn paragraph_widgets_must_wrap_user_content() {
         "quick_log.rs:217",
         "quick_log.rs:231",
         // ── trends.rs ──
-        "trends.rs:138",
-        "trends.rs:178",
-        "trends.rs:195",
-        "trends.rs:365",
-        "trends.rs:373",
-        "trends.rs:419",
-        "trends.rs:431",
+        "trends.rs:85",
+        "trends.rs:113",
+        "trends.rs:157",
+        "trends.rs:208",
+        "trends.rs:216",
+        "trends.rs:262",
     ].into_iter().collect();
 
     let tui_dir = Path::new("src/tui");
