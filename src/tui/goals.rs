@@ -1,6 +1,6 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Clear, Paragraph, Wrap},
@@ -253,6 +253,7 @@ impl GoalsScreen {
                 ]));
                 // Still show gauge below
                 lines.push(goal_gauge(goal));
+                lines.push(Line::default());
             } else if is_selected && self.mode == Mode::EditGoalDate {
                 // Show title
                 lines.push(Line::from(vec![
@@ -269,6 +270,7 @@ impl GoalsScreen {
                 ]));
                 // Gauge
                 lines.push(goal_gauge(goal));
+                lines.push(Line::default());
             } else if is_selected && self.mode == Mode::ConfirmDeleteGoal {
                 // Show goal normally first
                 lines.extend(render_goal_lines(goal, true));
@@ -276,9 +278,9 @@ impl GoalsScreen {
                 lines.push(Line::from(vec![
                     Span::styled(format!("  {} ", tr("dashboard-delete-confirm")), Style::default().fg(Color::Red)),
                     Span::styled("[y]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::Gray)),
+                    Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::DarkGray)),
                     Span::styled("[any]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::Gray)),
+                    Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::DarkGray)),
                 ]));
             } else {
                 lines.extend(render_goal_lines(goal, is_selected));
@@ -320,6 +322,80 @@ impl GoalsScreen {
             }
         }
 
+        // ── Floating detail popup (read-only in Browse, interactive in Modal) ──
+        if matches!(self.mode, Mode::Browse | Mode::Modal) {
+            let goal_idx = if self.mode == Mode::Modal { self.modal_goal_idx } else { self.selected };
+            if let Some(goal) = self.goals.get(goal_idx) {
+                let show_popup = self.mode == Mode::Modal || !goal.milestones.is_empty();
+                if show_popup {
+                    if let Some((visual_row, sel_rows)) = sel_visual {
+                        let scroll_offset = self.scroll as u16;
+                        let row_in_view = visual_row + sel_rows - scroll_offset;
+
+                        let popup_lines = if self.mode == Mode::Modal {
+                            self.build_modal_lines(goal)
+                        } else {
+                            let mut lines_out: Vec<Line> = Vec::new();
+                            lines_out.push(goal_gauge(goal));
+                            for ms in &goal.milestones {
+                                lines_out.push(render_milestone_line(ms, false));
+                            }
+                            lines_out
+                        };
+
+                        let popup_h = (popup_lines.len() as u16 + 2).min(list_area.height * 2 / 3).max(4);
+                        let popup_w = list_area.width.saturating_sub(8).max(30);
+                        let popup_x = list_area.x + 4;
+
+                        let below_y = list_area.y + row_in_view + 1;
+                        let popup_y = if below_y + popup_h > list_area.y + list_area.height {
+                            list_area.y + row_in_view.saturating_sub(popup_h + sel_rows - 1)
+                        } else {
+                            below_y
+                        };
+                        let popup_rect = Rect { x: popup_x, y: popup_y, width: popup_w, height: popup_h };
+
+                        let title = format!(" {} ", goal.title);
+                        let block = Block::default()
+                            .title(Span::styled(title, Style::default().fg(Color::White).bold()))
+                            .borders(Borders::ALL)
+                            .border_type(BorderType::Rounded)
+                            .border_style(Style::default().fg(BORDER_COLOR));
+
+                        let inner = block.inner(popup_rect);
+                        frame.render_widget(Clear, popup_rect);
+                        frame.render_widget(block, popup_rect);
+
+                        let modal_scroll = if self.mode == Mode::Modal { self.modal_scroll as u16 } else { 0 };
+                        frame.render_widget(
+                            Paragraph::new(popup_lines.clone()).scroll((modal_scroll, 0)).wrap(Wrap { trim: false }),
+                            inner,
+                        );
+
+                        // Highlight selected milestone in modal mode
+                        if self.mode == Mode::Modal && !goal.milestones.is_empty() && self.modal_mode != ModalMode::AddMilestone {
+                            let sel_line = (self.modal_selected + 1) as u16; // +1 for gauge line
+                            if sel_line >= modal_scroll && sel_line < modal_scroll + inner.height {
+                                highlight_row(frame, inner, sel_line - modal_scroll);
+                            }
+                        }
+
+                        // Render modal status inside popup if in modal mode
+                        if self.mode == Mode::Modal {
+                            if let Some((msg, is_error)) = &self.modal_status_msg {
+                                let color = if *is_error { Color::Red } else { Color::Green };
+                                let status_y = popup_rect.y + popup_rect.height;
+                                if status_y < list_area.y + list_area.height {
+                                    let status_rect = Rect { x: popup_x, y: status_y, width: popup_w, height: 1 };
+                                    frame.render_widget(Paragraph::new(Line::from(Span::styled(msg.as_str(), Style::default().fg(color)))), status_rect);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // ── Status line ──
         render_status_line(frame, chunks[2], &self.status_msg);
 
@@ -328,117 +404,64 @@ impl GoalsScreen {
             Mode::Browse => {
                 let mut spans = vec![
                     Span::styled(" [a]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}  ", tr("key-add-goal")), Style::default().fg(Color::Gray)),
+                    Span::styled(format!(" {}  ", tr("key-add-goal")), Style::default().fg(Color::DarkGray)),
                     Span::styled("[e]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::Gray)),
+                    Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::DarkGray)),
                     Span::styled("[Space]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}  ", tr("key-toggle")), Style::default().fg(Color::Gray)),
+                    Span::styled(format!(" {}  ", tr("key-toggle")), Style::default().fg(Color::DarkGray)),
                     Span::styled("[d]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::Gray)),
+                    Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::DarkGray)),
                 ];
                 if !self.goals.is_empty() {
                     spans.push(Span::styled("[Enter]", Style::default().fg(ACCENT)));
-                    spans.push(Span::styled(" Open  ", Style::default().fg(Color::Gray)));
+                    spans.push(Span::styled(format!(" {}  ", tr("key-milestone")), Style::default().fg(Color::DarkGray)));
                 }
                 spans.push(Span::styled("[Esc]", Style::default().fg(ACCENT)));
-                spans.push(Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::Gray)));
+                spans.push(Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::DarkGray)));
                 spans
             }
             Mode::Modal => {
-                // Footer is rendered inside the modal; main footer is empty
-                vec![]
+                let modal_footer: Vec<Span> = match self.modal_mode {
+                    ModalMode::Browse => vec![
+                        Span::styled(" [a]", Style::default().fg(ACCENT)),
+                        Span::styled(format!(" {}  ", tr("key-add")), Style::default().fg(Color::DarkGray)),
+                        Span::styled("[e]", Style::default().fg(ACCENT)),
+                        Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::DarkGray)),
+                        Span::styled("[Space]", Style::default().fg(ACCENT)),
+                        Span::styled(format!(" {}  ", tr("key-toggle")), Style::default().fg(Color::DarkGray)),
+                        Span::styled("[d]", Style::default().fg(ACCENT)),
+                        Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::DarkGray)),
+                        Span::styled("[D]", Style::default().fg(ACCENT)),
+                        Span::styled(format!(" {}  ", tr("key-date")), Style::default().fg(Color::DarkGray)),
+                        Span::styled("[Esc]", Style::default().fg(ACCENT)),
+                        Span::styled(format!(" {}", tr("key-close")), Style::default().fg(Color::DarkGray)),
+                    ],
+                    _ => vec![
+                        Span::styled(" [Enter]", Style::default().fg(ACCENT)),
+                        Span::styled(format!(" {}  ", tr("key-confirm")), Style::default().fg(Color::DarkGray)),
+                        Span::styled("[Esc]", Style::default().fg(ACCENT)),
+                        Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::DarkGray)),
+                    ],
+                };
+                modal_footer
             }
             _ => {
                 vec![
                     Span::styled(" [Enter]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}  ", tr("key-confirm")), Style::default().fg(Color::Gray)),
+                    Span::styled(format!(" {}  ", tr("key-confirm")), Style::default().fg(Color::DarkGray)),
                     Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::Gray)),
+                    Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::DarkGray)),
                 ]
             }
         };
         let footer = Line::from(footer_spans);
         frame.render_widget(Paragraph::new(footer), chunks[3]);
 
-        // ── Modal overlay ──
-        if self.mode == Mode::Modal {
-            self.render_modal(frame);
-        }
-
     }
 
-    fn render_modal(&self, frame: &mut Frame) {
-        let area = frame.area();
-        let goal = match self.goals.get(self.modal_goal_idx) {
-            Some(g) => g,
-            None => return,
-        };
-
-        let modal_width = (CONTENT_WIDTH - 10).min(area.width.saturating_sub(4));
-        let milestone_count = goal.milestones.len();
-        // Header (gauge): 1 line, separator: 1 line, milestones or empty msg: max lines, footer: 1 line
-        let content_lines = if milestone_count == 0 { 1 } else { milestone_count };
-        // Extra lines for input/confirm in add/edit/delete modes
-        let extra = match self.modal_mode {
-            ModalMode::AddMilestone | ModalMode::EditMilestoneDate | ModalMode::ConfirmDeleteMilestone => 1,
-            _ => 0,
-        };
-        let inner_height = 1 + 1 + content_lines + extra + 1 + 1; // gauge + sep + milestones + extra + status + footer
-        let modal_height = (inner_height as u16 + 2) // +2 for border
-            .min(area.height * 7 / 10)
-            .max(8);
-        let modal_x = area.x + (area.width.saturating_sub(modal_width)) / 2;
-        let modal_y = area.y + (area.height.saturating_sub(modal_height)) / 2;
-        let modal_rect = Rect {
-            x: modal_x,
-            y: modal_y,
-            width: modal_width,
-            height: modal_height,
-        };
-
-        frame.render_widget(Clear, modal_rect);
-
-        let title = format!(" {} ", goal.title);
-        let block = Block::default()
-            .title(Span::styled(title, Style::default().fg(Color::White).bold()))
-            .title_alignment(Alignment::Center)
-            .borders(Borders::ALL)
-            .border_type(BorderType::Rounded)
-            .border_style(Style::default().fg(BORDER_COLOR));
-
-        let inner = block.inner(modal_rect);
-        frame.render_widget(block, modal_rect);
-
-        let inner_chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(1), // [0] gauge
-                Constraint::Length(1), // [1] separator
-                Constraint::Min(1),   // [2] milestone list
-                Constraint::Length(1), // [3] status line
-                Constraint::Length(1), // [4] footer
-            ])
-            .split(inner);
-
-        // ── Gauge ──
-        frame.render_widget(
-            Paragraph::new(goal_gauge(goal)),
-            inner_chunks[0],
-        );
-
-        // ── Separator ──
-        let sep_width = inner_chunks[1].width as usize;
-        frame.render_widget(
-            Paragraph::new(Line::from(Span::styled(
-                "─".repeat(sep_width),
-                Style::default().fg(Color::DarkGray),
-            ))),
-            inner_chunks[1],
-        );
-
-        // ── Milestone list ──
-        let list_area = inner_chunks[2];
+    fn build_modal_lines(&self, goal: &Goal) -> Vec<Line<'static>> {
         let mut lines: Vec<Line> = Vec::new();
+        lines.push(goal_gauge(goal));
 
         if goal.milestones.is_empty() && self.modal_mode == ModalMode::Browse {
             lines.push(Line::from(Span::styled(
@@ -453,94 +476,53 @@ impl GoalsScreen {
             if is_sel && self.modal_mode == ModalMode::EditMilestone {
                 let check = if ms.completed { "✓ " } else { "⏳ " };
                 let check_color = if ms.completed { GREEN } else { Color::Yellow };
+                let before = self.input[..self.cursor].to_string();
+                let after = self.input[self.cursor..].to_string();
                 lines.push(Line::from(vec![
-                    Span::styled(check, Style::default().fg(check_color)),
-                    Span::styled(&self.input[..self.cursor], Style::default().fg(GREEN)),
+                    Span::styled(check.to_string(), Style::default().fg(check_color)),
+                    Span::styled(before, Style::default().fg(GREEN)),
                     Span::styled("\u{2588}", Style::default().fg(GREEN)),
-                    Span::styled(&self.input[self.cursor..], Style::default().fg(GREEN)),
+                    Span::styled(after, Style::default().fg(GREEN)),
                 ]));
             } else if is_sel && self.modal_mode == ModalMode::EditMilestoneDate {
                 lines.push(Line::from(vec![
-                    Span::styled("✓ ", Style::default().fg(GREEN)),
-                    Span::styled(&ms.title, Style::default().fg(GREEN)),
+                    Span::styled("✓ ".to_string(), Style::default().fg(GREEN)),
+                    Span::styled(ms.title.clone(), Style::default().fg(GREEN)),
                 ]));
+                let before = self.input[..self.cursor].to_string();
+                let after = self.input[self.cursor..].to_string();
                 lines.push(Line::from(vec![
                     Span::styled(format!("  {} ", tr("dashboard-date-prompt")), Style::default().fg(ACCENT)),
-                    Span::styled(&self.input[..self.cursor], Style::default().fg(GREEN)),
+                    Span::styled(before, Style::default().fg(GREEN)),
                     Span::styled("\u{2588}", Style::default().fg(GREEN)),
-                    Span::styled(&self.input[self.cursor..], Style::default().fg(GREEN)),
+                    Span::styled(after, Style::default().fg(GREEN)),
                 ]));
             } else if is_sel && self.modal_mode == ModalMode::ConfirmDeleteMilestone {
                 lines.push(render_milestone_line(ms, true));
                 lines.push(Line::from(vec![
                     Span::styled(format!("  {} ", tr("dashboard-delete-confirm")), Style::default().fg(Color::Red)),
                     Span::styled("[y]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::Gray)),
+                    Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::DarkGray)),
                     Span::styled("[any]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::Gray)),
+                    Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::DarkGray)),
                 ]));
             } else {
                 lines.push(render_milestone_line(ms, is_sel));
             }
         }
 
-        // Add milestone input at end of list
         if self.modal_mode == ModalMode::AddMilestone {
+            let before = self.input[..self.cursor].to_string();
+            let after = self.input[self.cursor..].to_string();
             lines.push(Line::from(vec![
                 Span::styled("⏳ ", Style::default().fg(Color::Yellow)),
-                Span::styled(&self.input[..self.cursor], Style::default().fg(GREEN)),
+                Span::styled(before, Style::default().fg(GREEN)),
                 Span::styled("\u{2588}", Style::default().fg(GREEN)),
-                Span::styled(&self.input[self.cursor..], Style::default().fg(GREEN)),
+                Span::styled(after, Style::default().fg(GREEN)),
             ]));
         }
 
-        let list_height = list_area.height as usize;
-        let scroll = self.modal_scroll as u16;
-
-        frame.render_widget(
-            Paragraph::new(lines.clone()).scroll((scroll, 0)),
-            list_area,
-        );
-
-        // Highlight selected milestone
-        if !goal.milestones.is_empty() && self.modal_mode != ModalMode::AddMilestone {
-            // Each milestone is 1 line, so selected line = selected index
-            let sel_line = self.modal_selected;
-            let visible_row = sel_line.saturating_sub(self.modal_scroll);
-            if visible_row < list_height {
-                highlight_row(frame, list_area, visible_row as u16);
-            }
-        }
-
-        // ── Status line ──
-        render_status_line(frame, inner_chunks[3], &self.modal_status_msg);
-
-        // ── Footer ──
-        let footer_spans = match self.modal_mode {
-            ModalMode::Browse => vec![
-                Span::styled("[a]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-add")), Style::default().fg(Color::Gray)),
-                Span::styled("[e]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::Gray)),
-                Span::styled("[Space]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-toggle")), Style::default().fg(Color::Gray)),
-                Span::styled("[d]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::Gray)),
-                Span::styled("[D]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-date")), Style::default().fg(Color::Gray)),
-                Span::styled("[u]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-undo")), Style::default().fg(Color::Gray)),
-                Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}", tr("key-close")), Style::default().fg(Color::Gray)),
-            ],
-            _ => vec![
-                Span::styled("[Enter]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-confirm")), Style::default().fg(Color::Gray)),
-                Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::Gray)),
-            ],
-        };
-        frame.render_widget(Paragraph::new(Line::from(footer_spans)), inner_chunks[4]);
+        lines
     }
 
     // ── Key handling ──
@@ -1036,6 +1018,7 @@ fn render_goal_lines(goal: &Goal, is_selected: bool) -> Vec<Line<'static>> {
         ]));
     }
     result.push(goal_gauge(goal));
+    result.push(Line::default());
     result
 }
 
@@ -1068,5 +1051,8 @@ fn goal_gauge(goal: &Goal) -> Line<'static> {
     let ratio = goal_gauge_ratio(goal);
     let done = goal.milestones.iter().filter(|m| m.completed).count();
     let total = goal.milestones.len();
-    render_gauge_line(ratio, done, total, 16, 4)
+    let mut line = render_gauge_line(ratio, done, total, 16, 4);
+    let pct = (ratio * 100.0).round() as u32;
+    line.spans.push(Span::styled(format!("  {}%", pct), Style::default().fg(Color::Gray)));
+    line
 }

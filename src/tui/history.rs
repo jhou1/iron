@@ -163,22 +163,22 @@ impl HistoryScreen {
             let delete_text = format!(" {}  ", tr("key-delete"));
             let mut spans = vec![
                 Span::styled(" [j/k]", Style::default().fg(ACCENT)),
-                Span::styled(navigate_text, Style::default().fg(Color::Gray)),
+                Span::styled(navigate_text, Style::default().fg(Color::DarkGray)),
                 Span::styled("[/]", Style::default().fg(ACCENT)),
-                Span::styled(filter_text, Style::default().fg(Color::Gray)),
+                Span::styled(filter_text, Style::default().fg(Color::DarkGray)),
                 Span::styled("[e]", Style::default().fg(ACCENT)),
-                Span::styled(edit_text, Style::default().fg(Color::Gray)),
+                Span::styled(edit_text, Style::default().fg(Color::DarkGray)),
                 Span::styled("[d]", Style::default().fg(ACCENT)),
-                Span::styled(delete_text, Style::default().fg(Color::Gray)),
+                Span::styled(delete_text, Style::default().fg(Color::DarkGray)),
             ];
             if self.last_deleted.is_some() {
                 let undo_text = format!(" {}  ", tr("key-undo"));
                 spans.push(Span::styled("[u]", Style::default().fg(ACCENT)));
-                spans.push(Span::styled(undo_text, Style::default().fg(Color::Gray)));
+                spans.push(Span::styled(undo_text, Style::default().fg(Color::DarkGray)));
             }
             let back_text = format!(" {}", tr("key-back"));
             spans.push(Span::styled("[Esc]", Style::default().fg(ACCENT)));
-            spans.push(Span::styled(back_text, Style::default().fg(Color::Gray)));
+            spans.push(Span::styled(back_text, Style::default().fg(Color::DarkGray)));
             Line::from(spans)
         };
         render_status_line(frame, v_chunks[2], &self.status_msg);
@@ -267,9 +267,9 @@ impl HistoryScreen {
                     Cell::from(Line::from(vec![
                         Span::styled(format!("{} ", tr("history-delete-confirm")), Style::default().fg(Color::Red)),
                         Span::styled("[y]", Style::default().fg(ACCENT)),
-                        Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::Gray)),
+                        Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::DarkGray)),
                         Span::styled("[any]", Style::default().fg(ACCENT)),
-                        Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::Gray)),
+                        Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::DarkGray)),
                     ])),
                     Cell::from(""),
                 ]));

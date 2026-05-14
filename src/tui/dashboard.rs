@@ -315,7 +315,7 @@ impl DashboardScreen {
                 .unwrap_or(0);
             let name_col = max_name + 2;
             let max_total_w = self.recent_entries.iter()
-                .map(|e| format!("{:.1}", e.total_metric()).len())
+                .map(|e| format!("{:.0}", e.total_metric()).len())
                 .max()
                 .unwrap_or(0);
             let max_label_w = self.recent_entries.iter()
@@ -336,7 +336,7 @@ impl DashboardScreen {
                     )));
                     current_date = date_key;
                 }
-                let total = format!("{:.1}", entry.total_metric());
+                let total = format!("{:.0}", entry.total_metric());
                 let label = entry.metric_label();
                 let name_pad = name_col.saturating_sub(entry.practice_name.width());
                 let num_pad = max_total_w.saturating_sub(total.len());
@@ -377,25 +377,31 @@ impl DashboardScreen {
             return;
         }
 
-        let mut lines: Vec<Line> = Vec::new();
+        let mut y = inner.y;
         for goal in &active_goals {
-            lines.push(Line::from(Span::styled(
+            if y >= inner.y + inner.height { break; }
+            let title_rect = Rect { x: inner.x, y, width: inner.width, height: 1 };
+            frame.render_widget(Paragraph::new(Line::from(Span::styled(
                 goal.title.clone(),
                 Style::default().fg(Color::White).bold(),
-            )));
+            ))).wrap(Wrap { trim: false }), title_rect);
+            y += 1;
+
+            if y >= inner.y + inner.height { break; }
             let milestones = &goal.milestones;
             let ratio = if milestones.is_empty() {
                 if goal.completed { 1.0 } else { 0.0 }
             } else {
                 milestones.iter().filter(|m| m.completed).count() as f64 / milestones.len() as f64
             };
-            let done = milestones.iter().filter(|m| m.completed).count();
-            let total = milestones.len();
-            let bar_width = (inner.width as usize).saturating_sub(18).max(4);
-            lines.push(render_gauge_line(ratio, done, total, bar_width, 4));
+            let pct = (ratio * 100.0).round() as u32;
+            let gauge_rect = Rect { x: inner.x, y, width: inner.width, height: 1 };
+            let bar_width = (inner.width as usize).saturating_sub(7);
+            let mut gauge_line = render_gauge_line(ratio, 0, 0, bar_width, 0);
+            gauge_line.spans.push(Span::styled(format!("  {}%", pct), Style::default().fg(Color::Gray)));
+            frame.render_widget(Paragraph::new(gauge_line), gauge_rect);
+            y += 2;
         }
-
-        frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
     }
 
     pub fn handle_key(&mut self, key: KeyEvent, db: &Database) -> Action {

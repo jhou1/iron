@@ -22,13 +22,11 @@ fn paragraph_widgets_must_wrap_user_content() {
         "dashboard.rs:142",
         "dashboard.rs:221",
         "dashboard.rs:372",
+        "dashboard.rs:402", // gauge bar: width-controlled, cannot overflow
         // ── goals.rs ──
         "goals.rs:214",
-        "goals.rs:361",
-        "goals.rs:425",
-        "goals.rs:432",
-        "goals.rs:501",
-        "goals.rs:543",
+        "goals.rs:390",
+        "goals.rs:458",
         // ── history.rs ──
         "history.rs:123",
         "history.rs:185",
@@ -43,7 +41,7 @@ fn paragraph_widgets_must_wrap_user_content() {
         "log_entry.rs:570",
         "log_entry.rs:617",
         // ── mod.rs ──
-        "mod.rs:102",
+        "mod.rs:104",
         // ── practices.rs ──
         "practices.rs:168",
         "practices.rs:250",

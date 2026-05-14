@@ -184,13 +184,13 @@ impl TrendsScreen {
         // Footer
         let footer = Line::from(vec![
             Span::styled(" [j/k]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}  ", tr("key-navigate")), Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}  ", tr("key-navigate")), Style::default().fg(Color::DarkGray)),
             Span::styled("[/]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}  ", tr("key-filter")), Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}  ", tr("key-filter")), Style::default().fg(Color::DarkGray)),
             Span::styled("[Enter]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}  ", tr("key-select")), Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}  ", tr("key-select")), Style::default().fg(Color::DarkGray)),
             Span::styled("[Esc]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::DarkGray)),
         ]);
         frame.render_widget(Paragraph::new(footer), chunks[2]);
 
@@ -422,11 +422,11 @@ impl TrendsScreen {
         // Footer
         let footer = Line::from(vec![
             Span::styled(" [h/l]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}  ", tr("key-window")), Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}  ", tr("key-window")), Style::default().fg(Color::DarkGray)),
             Span::styled("[/]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}  ", tr("key-pick-practice")), Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}  ", tr("key-pick-practice")), Style::default().fg(Color::DarkGray)),
             Span::styled("[Esc]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}", tr("key-dashboard")), Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}", tr("key-dashboard")), Style::default().fg(Color::DarkGray)),
         ]);
         frame.render_widget(Paragraph::new(footer), chunks[1]);
 

@@ -99,6 +99,7 @@ Integration tests use file-based SQLite databases via `TestDb` helper (creates t
 - Database errors in TUI handlers are currently swallowed with `let _ =` (known limitation).
 - `PracticeType::label()` returns the UI-facing name (weightxreps/reps/distance/duration). `Display` impl returns the storage name (weighted/bodyweight/distance/endurance).
 - Everytime a feature is added or modified, update the README.md to provide proper user instruction.
+- When a screen's rendering is updated (progress bars, goal display, etc.), update the dashboard if it renders the same data to keep styles consistent.
 - Everytime fixing a bug, increment the patch version by 1
 
 ## Spec & Plan

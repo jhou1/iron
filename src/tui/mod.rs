@@ -21,7 +21,7 @@ use ratatui::{
 const HIGHLIGHT_BG: Color = Color::Rgb(204, 163, 0);
 const HIGHLIGHT_FG: Color = Color::Black;
 pub const BORDER_COLOR: Color = Color::DarkGray;
-pub const GAUGE_FILL: Color = Color::Rgb(242, 146, 29);
+pub const GAUGE_FILL: Color = Color::Green;
 pub const GAUGE_EMPTY: Color = Color::Indexed(240);
 pub const CONTENT_WIDTH: u16 = 3 + 52 * 2;
 
@@ -40,7 +40,9 @@ pub fn highlight_row(frame: &mut Frame, area: Rect, row: u16) {
     for x in area.x..area.x + area.width {
         if let Some(cell) = buf.cell_mut(Position { x, y }) {
             cell.set_bg(HIGHLIGHT_BG);
-            cell.set_fg(HIGHLIGHT_FG);
+            if cell.symbol() != "\u{2588}" {
+                cell.set_fg(HIGHLIGHT_FG);
+            }
         }
     }
 }
@@ -123,39 +125,13 @@ pub enum Action {
     Quit,
 }
 
-pub fn render_gauge_line<'a>(ratio: f64, done: usize, total: usize, bar_width: usize, indent: usize) -> Line<'a> {
-    let pct = (ratio * 100.0).round() as u32;
+pub fn render_gauge_line<'a>(ratio: f64, _done: usize, _total: usize, bar_width: usize, indent: usize) -> Line<'a> {
     let filled = (ratio * bar_width as f64).round() as usize;
     let empty = bar_width - filled;
-    let pct_text = format!("{}%", pct);
-    let pct_len = pct_text.len();
-    let suffix = format!("  {}/{}", done, total);
 
-    let mut spans = vec![Span::raw(" ".repeat(indent))];
-
-    if bar_width >= pct_len + 2 {
-        let center = bar_width / 2 - pct_len / 2;
-        let left_end = center;
-        let right_start = center + pct_len;
-
-        let left_filled = filled.min(left_end);
-        let left_empty = left_end - left_filled;
-        spans.push(Span::styled("\u{25B0}".repeat(left_filled), Style::default().fg(GAUGE_FILL)));
-        spans.push(Span::styled("\u{25B1}".repeat(left_empty), Style::default().fg(GAUGE_EMPTY)));
-
-        let pct_color = if filled > center { GAUGE_FILL } else { Color::Gray };
-        spans.push(Span::styled(pct_text, Style::default().fg(pct_color)));
-
-        let right_total = bar_width - right_start;
-        let right_filled = filled.saturating_sub(right_start);
-        let right_empty = right_total - right_filled;
-        spans.push(Span::styled("\u{25B0}".repeat(right_filled), Style::default().fg(GAUGE_FILL)));
-        spans.push(Span::styled("\u{25B1}".repeat(right_empty), Style::default().fg(GAUGE_EMPTY)));
-    } else {
-        spans.push(Span::styled("\u{25B0}".repeat(filled), Style::default().fg(GAUGE_FILL)));
-        spans.push(Span::styled("\u{25B1}".repeat(empty), Style::default().fg(GAUGE_EMPTY)));
-    }
-
-    spans.push(Span::styled(suffix, Style::default().fg(Color::Gray)));
-    Line::from(spans)
+    Line::from(vec![
+        Span::raw(" ".repeat(indent)),
+        Span::styled("\u{2588}".repeat(filled), Style::default().fg(GAUGE_FILL)),
+        Span::styled("\u{2588}".repeat(empty), Style::default().fg(GAUGE_EMPTY)),
+    ])
 }
