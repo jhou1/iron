@@ -12,7 +12,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
 use crate::model::{LogEntry, SetData};
-use super::{centered_area, highlight_row, render_status_line, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH, TABLE_HEADER_BG};
+use super::{centered_area, highlight_row, render_status_line, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH};
 use fluent_bundle::FluentValue;
 
 const ACCENT: Color = Color::Cyan;
@@ -198,13 +198,13 @@ impl HistoryScreen {
             return;
         }
 
-        let hdr_style = Style::default().fg(Color::White).bg(TABLE_HEADER_BG).bold();
+        let hdr_style = Style::default().fg(Color::White).bold();
         let header = Row::new(vec![
             Cell::from(""),
             Cell::from(Span::styled(tr("history-col-date"), hdr_style)),
             Cell::from(Span::styled(tr("history-col-practice"), hdr_style)),
             Cell::from(Span::styled(tr("history-col-volume"), hdr_style)),
-        ]).style(Style::default().bg(TABLE_HEADER_BG));
+        ]);
 
         let mut rows: Vec<Row> = Vec::new();
         for (fi, &entry_idx) in self.filtered_indices.iter().enumerate().skip(self.scroll_offset).take(visible) {
@@ -287,7 +287,7 @@ impl HistoryScreen {
         let block = Block::default()
             .title(Line::from(vec![
                 Span::styled("── ", Style::default().fg(BORDER_COLOR)),
-                Span::styled(title_text, Style::default().fg(ACCENT).bold()),
+                Span::styled(title_text, Style::default().fg(Color::White).bold()),
                 Span::styled("──", Style::default().fg(BORDER_COLOR)),
             ]))
             .borders(Borders::ALL)
@@ -353,30 +353,36 @@ impl HistoryScreen {
         if let Some(warm_up) = &entry.log.warm_up {
             lines.push(Line::from(""));
             lines.push(Line::from(Span::styled(
-                format!("  {}", tr_args("history-warmup", &[
-                    ("text", FluentValue::from(warm_up.clone())),
-                ])),
+                format!("  {}:", tr("log-warmup-label")),
                 Style::default().fg(Color::Gray),
+            )));
+            lines.push(Line::from(Span::styled(
+                format!("  {}", warm_up),
+                Style::default().fg(Color::White),
             )));
         }
 
         if let Some(cool_down) = &entry.log.cool_down {
             lines.push(Line::from(Span::styled(
-                format!("  {}", tr_args("history-cooldown", &[
-                    ("text", FluentValue::from(cool_down.clone())),
-                ])),
+                format!("  {}:", tr("log-cooldown-label")),
                 Style::default().fg(Color::Gray),
+            )));
+            lines.push(Line::from(Span::styled(
+                format!("  {}", cool_down),
+                Style::default().fg(Color::White),
             )));
         }
 
         if let Some(note) = &entry.log.note {
             lines.push(Line::from(""));
-            let note_label = tr_args("history-note", &[
-                ("note", FluentValue::from(note.clone())),
-            ]);
-            lines.push(Line::from(vec![
-                Span::styled(format!("  {}", note_label), Style::default().fg(Color::White)),
-            ]));
+            lines.push(Line::from(Span::styled(
+                format!("  {}", tr("log-note-label")),
+                Style::default().fg(Color::Gray),
+            )));
+            lines.push(Line::from(Span::styled(
+                format!("  {}", note),
+                Style::default().fg(Color::White),
+            )));
         }
 
         let paragraph = Paragraph::new(lines).block(block).wrap(Wrap { trim: false });

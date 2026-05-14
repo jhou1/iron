@@ -12,7 +12,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
 use crate::model::{Practice, PracticeType};
-use super::{centered_area, highlight_row, render_status_line, visible_input_spans, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH, TABLE_HEADER_BG};
+use super::{centered_area, highlight_row, render_status_line, visible_input_spans, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH};
 use fluent_bundle::FluentValue;
 
 const ACCENT: Color = Color::Cyan;
@@ -110,12 +110,11 @@ impl PracticesScreen {
         let inner = block.inner(chunks[0]);
         frame.render_widget(block, chunks[0]);
 
-        let hdr_style = Style::default().fg(Color::White).bg(TABLE_HEADER_BG).add_modifier(Modifier::BOLD);
-        let hdr_bg = Style::default().bg(TABLE_HEADER_BG);
+        let hdr_style = Style::default().fg(Color::White).add_modifier(Modifier::BOLD);
         let header_line = Line::from(vec![
-            Span::styled("  ", hdr_bg),
+            Span::raw("  "),
             Span::styled(&name_header, hdr_style),
-            Span::styled(" ".repeat(header_padding), hdr_bg),
+            Span::raw(" ".repeat(header_padding)),
             Span::styled(&type_header, hdr_style),
         ]);
 

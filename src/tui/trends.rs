@@ -15,7 +15,7 @@ use crate::i18n::{tr, tr_args};
 use crate::model::{LogEntry, Practice};
 use fluent_bundle::FluentValue;
 use super::widgets::sparkline::Sparkline;
-use super::{centered_area, highlight_row, Action, Screen, BORDER_COLOR, CONTENT_WIDTH, TABLE_HEADER_BG};
+use super::{centered_area, highlight_row, Action, Screen, BORDER_COLOR, CONTENT_WIDTH};
 
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
@@ -149,13 +149,12 @@ impl TrendsScreen {
         let inner = block.inner(chunks[1]);
         frame.render_widget(block, chunks[1]);
 
-        let hdr_style = Style::default().fg(Color::White).bg(TABLE_HEADER_BG).bold();
-        let hdr_bg = Style::default().bg(TABLE_HEADER_BG);
+        let hdr_style = Style::default().fg(Color::White).bold();
         let mut all_lines = vec![
             Line::from(vec![
-                Span::styled("  ", hdr_bg),
+                Span::raw("  "),
                 Span::styled(&name_header, hdr_style),
-                Span::styled(" ".repeat(header_padding), hdr_bg),
+                Span::raw(" ".repeat(header_padding)),
                 Span::styled(&type_header, hdr_style),
             ]),
         ];

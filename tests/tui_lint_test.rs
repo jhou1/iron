@@ -19,11 +19,10 @@ fn paragraph_widgets_must_wrap_user_content() {
         "abbreviations.rs:216",
         "abbreviations.rs:248",
         // ── dashboard.rs ──
-        "dashboard.rs:145",
-        "dashboard.rs:166",
-        "dashboard.rs:202",
-        "dashboard.rs:255",
-        "dashboard.rs:330",
+        "dashboard.rs:143",
+        "dashboard.rs:164",
+        "dashboard.rs:222",
+        "dashboard.rs:297",
         // ── goals.rs ──
         "goals.rs:214",
         "goals.rs:361",
@@ -45,11 +44,11 @@ fn paragraph_widgets_must_wrap_user_content() {
         "log_entry.rs:569",
         "log_entry.rs:616",
         // ── mod.rs ──
-        "mod.rs:101",
+        "mod.rs:102",
         // ── practices.rs ──
-        "practices.rs:168",
-        "practices.rs:250",
-        "practices.rs:296",
+        "practices.rs:167",
+        "practices.rs:249",
+        "practices.rs:295",
         // ── quotes_screen.rs ──
         "quotes_screen.rs:112",
         "quotes_screen.rs:185",
@@ -62,12 +61,12 @@ fn paragraph_widgets_must_wrap_user_content() {
         "quick_log.rs:227",
         // ── trends.rs ──
         "trends.rs:138",
-        "trends.rs:179",
-        "trends.rs:196",
-        "trends.rs:366",
-        "trends.rs:374",
-        "trends.rs:420",
-        "trends.rs:432",
+        "trends.rs:178",
+        "trends.rs:195",
+        "trends.rs:365",
+        "trends.rs:373",
+        "trends.rs:419",
+        "trends.rs:431",
     ].into_iter().collect();
 
     let tui_dir = Path::new("src/tui");

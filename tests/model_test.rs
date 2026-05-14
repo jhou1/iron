@@ -29,7 +29,7 @@ fn set_data_metric_weighted() {
     init();
     let set = SetData::Weighted { weight: 24.0, reps: 10 };
     assert_eq!(set.metric_value(), 240.0);
-    assert_eq!(set.metric_label(), "kg vol");
+    assert_eq!(set.metric_label(), "kg");
 }
 
 #[test]

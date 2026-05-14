@@ -3,7 +3,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Paragraph, Wrap},
+    widgets::{Block, Borders, Paragraph, Wrap},
     Frame,
 };
 use unicode_width::UnicodeWidthStr;
@@ -17,7 +17,6 @@ use super::widgets::heatmap::Heatmap;
 use super::{centered_area, render_gauge_line, render_status_line, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH};
 
 const ACCENT: Color = Color::Cyan;
-const GREEN: Color = Color::Green;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum DashboardMode {
@@ -109,8 +108,8 @@ impl DashboardScreen {
             )
         } else {
             (
-                format!("\"{}\"", &self.quote),
-                Style::default().fg(Color::Yellow),
+                format!("> {}", &self.quote),
+                Style::default().fg(Color::White),
             )
         };
         let quote_lines = if quote_box_width > 0 {
@@ -120,18 +119,17 @@ impl DashboardScreen {
         } as u16;
         let quote_height = quote_lines + 2;
 
-        // Main vertical layout: title | heatmap | quote | HRV | panes | status | footer | spacer
+        // Main vertical layout: title | heatmap | quote | panes | status | footer | spacer
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(1),            // [0] logo header
                 Constraint::Length(12),           // [1] heatmap (with border + title)
                 Constraint::Length(quote_height), // [2] daily quote box
-                Constraint::Length(3),            // [3] HRV row (with spacing)
-                Constraint::Length(pane_height),  // [4] split panes
-                Constraint::Length(1),            // [5] status line
-                Constraint::Length(1),            // [6] footer
-                Constraint::Min(0),              // [7] spacer absorbs excess at bottom
+                Constraint::Length(pane_height),  // [3] split panes
+                Constraint::Length(1),            // [4] status line
+                Constraint::Length(1),            // [5] footer
+                Constraint::Min(0),              // [6] spacer absorbs excess at bottom
             ])
             .split(area);
 
@@ -158,10 +156,14 @@ impl DashboardScreen {
         let heatmap = Heatmap::new(&self.heatmap_data, 52, self.no_color);
         frame.render_widget(heatmap, heatmap_inner);
 
-        // ── Daily quote (centered, rounded border) ──
+        // ── Daily quote ──
         let quote_block = Block::default()
+            .title(Line::from(vec![
+                Span::styled("── ", Style::default().fg(BORDER_COLOR)),
+                Span::styled(tr("dashboard-quotes"), Style::default().fg(Color::White).bold()),
+                Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
+            ]))
             .borders(Borders::ALL)
-            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(BORDER_COLOR));
         let quote_paragraph = Paragraph::new(Line::from(Span::styled(
             quote_text.clone(),
@@ -172,46 +174,17 @@ impl DashboardScreen {
         .alignment(ratatui::layout::Alignment::Center);
         frame.render_widget(quote_paragraph, chunks[2]);
 
-        // ── HRV row (centered in 3-line area) ──
-        let hrv_area = Rect {
-            x: chunks[3].x,
-            y: chunks[3].y + 1,
-            width: chunks[3].width,
-            height: 1,
-        };
-        let hrv_line = if self.mode == DashboardMode::HrvInput {
-            Line::from(vec![
-                Span::styled(format!(" {}: ", tr("dashboard-hrv-label")), Style::default().fg(Color::Gray)),
-                Span::styled(&self.hrv_input, Style::default().fg(ACCENT)),
-                Span::styled("\u{2588}", Style::default().fg(ACCENT)),
-                Span::styled(format!("  {}", tr("dashboard-hrv-input-hint")), Style::default().fg(Color::Gray)),
-            ])
-        } else if let Some(hrv) = self.hrv_today {
-            Line::from(vec![
-                Span::styled(format!(" {}: ", tr("dashboard-hrv-label")), Style::default().fg(Color::Gray)),
-                Span::styled(format!("{}", hrv), Style::default().fg(GREEN)),
-                Span::styled(format!("  {}", tr("dashboard-hrv-edit-hint")), Style::default().fg(Color::DarkGray)),
-            ])
-        } else {
-            Line::from(vec![
-                Span::styled(format!(" {}: ", tr("dashboard-hrv-label")), Style::default().fg(Color::Gray)),
-                Span::styled("--", Style::default().fg(Color::DarkGray)),
-                Span::styled(format!("  {}", tr("dashboard-hrv-record-hint")), Style::default().fg(Color::DarkGray)),
-            ])
-        };
-        frame.render_widget(Paragraph::new(hrv_line), hrv_area);
-
         // ── Split panes ──
         let panes = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-            .split(chunks[4]);
+            .split(chunks[3]);
 
         self.render_recent_pane(frame, panes[0]);
         self.render_goals_pane(frame, panes[1]);
 
         // ── Status line ──
-        render_status_line(frame, chunks[5], &self.status_msg);
+        render_status_line(frame, chunks[4], &self.status_msg);
 
         // ── Footer ──
         let footer_spans = if self.mode == DashboardMode::ConfirmQuit {
@@ -238,8 +211,6 @@ impl DashboardScreen {
                 Span::styled(format!(" {}  ", tr("key-goals")), Style::default().fg(Color::Gray)),
                 Span::styled("[Q]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}  ", tr("key-quotes")), Style::default().fg(Color::Gray)),
-                Span::styled("[v]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-hrv")), Style::default().fg(Color::Gray)),
                 Span::styled("[q]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}", tr("key-quit")), Style::default().fg(Color::Gray)),
             ]
@@ -252,7 +223,7 @@ impl DashboardScreen {
             ]
         };
         let footer = Line::from(footer_spans);
-        frame.render_widget(Paragraph::new(footer), chunks[6]);
+        frame.render_widget(Paragraph::new(footer), chunks[5]);
 
     }
 

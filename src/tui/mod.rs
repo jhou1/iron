@@ -18,11 +18,11 @@ use ratatui::{
     Frame,
 };
 
-const HIGHLIGHT_BG: Color = Color::DarkGray;
+const HIGHLIGHT_BG: Color = Color::Rgb(204, 163, 0);
+const HIGHLIGHT_FG: Color = Color::Black;
 pub const BORDER_COLOR: Color = Color::Rgb(204, 163, 0);
 pub const GAUGE_FILL: Color = Color::Rgb(242, 146, 29);
 pub const GAUGE_EMPTY: Color = Color::Indexed(240);
-pub const TABLE_HEADER_BG: Color = Color::Rgb(30, 50, 100);
 pub const CONTENT_WIDTH: u16 = 3 + 52 * 2;
 
 pub fn centered_area(full: Rect, max_width: u16) -> Rect {
@@ -40,6 +40,7 @@ pub fn highlight_row(frame: &mut Frame, area: Rect, row: u16) {
     for x in area.x..area.x + area.width {
         if let Some(cell) = buf.cell_mut(Position { x, y }) {
             cell.set_bg(HIGHLIGHT_BG);
+            cell.set_fg(HIGHLIGHT_FG);
         }
     }
 }

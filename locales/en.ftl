@@ -128,7 +128,7 @@ practice-type-distance = Distance
 practice-type-endurance = Duration
 
 # ── Metric labels ──
-metric-kg-vol = kg vol
+metric-kg-vol = kg
 metric-reps = reps
 metric-km = km
 metric-min = min
