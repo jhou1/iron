@@ -771,7 +771,7 @@ dependencies = [
 
 [[package]]
 name = "iron"
-version = "2.7.4"
+version = "2.7.9"
 dependencies = [
  "anyhow",
  "chrono",

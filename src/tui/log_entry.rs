@@ -165,24 +165,16 @@ impl LogEntryScreen {
     fn render_select_practice(&self, frame: &mut Frame) {
         let area = centered_area(frame.area(), CONTENT_WIDTH);
 
-        let list_height = (self.filtered_indices.len() as u16).max(1);
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1),           // title
-                Constraint::Length(2),           // filter bar + column header
-                Constraint::Length(list_height), // list
-                Constraint::Length(1),           // status line
-                Constraint::Length(1),           // footer
-                Constraint::Min(0),              // spacer
+                Constraint::Length(1),  // filter bar
+                Constraint::Min(1),    // bordered list
+                Constraint::Length(1), // status line
+                Constraint::Length(1), // footer
+                Constraint::Min(0),    // spacer
             ])
             .split(area);
-
-        let title = Line::from(Span::styled(
-            format!(" {}", tr("log-select-practice")),
-            Style::default().fg(ACCENT).bold(),
-        ));
-        frame.render_widget(Paragraph::new(title), chunks[0]);
 
         let max_name_len = self.practices.iter()
             .map(|p| p.name.width())
@@ -190,6 +182,7 @@ impl LogEntryScreen {
             .unwrap_or(0);
         let col_width = max_name_len + 4;
 
+        // Filter bar
         let filter_display = if self.filtering {
             let (before, after) = self.filter_text.split_at(self.filter_cursor);
             format!(" /{}{}{}", before, "\u{2588}", after)
@@ -203,11 +196,25 @@ impl LogEntryScreen {
         } else {
             Style::default().fg(Color::Gray)
         };
+        frame.render_widget(Paragraph::new(Line::from(Span::styled(filter_display, filter_style))), chunks[0]);
+
+        // Bordered list
+        let block = Block::default()
+            .title(Line::from(vec![
+                Span::styled("── ", Style::default().fg(BORDER_COLOR)),
+                Span::styled(tr("log-select-practice"), Style::default().fg(Color::White).bold()),
+                Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
+            ]))
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(BORDER_COLOR));
+        let inner = block.inner(chunks[1]);
+        frame.render_widget(block, chunks[1]);
+
         let name_header = tr("practices-col-name");
         let type_header = tr("practices-col-type");
         let header_padding = col_width.saturating_sub(name_header.width());
-        let filter_lines = vec![
-            Line::from(Span::styled(filter_display, filter_style)),
+
+        let mut all_lines = vec![
             Line::from(vec![
                 Span::styled("  ", Style::default().fg(Color::DarkGray)),
                 Span::styled(&name_header, Style::default().fg(Color::DarkGray)),
@@ -215,40 +222,33 @@ impl LogEntryScreen {
                 Span::styled(&type_header, Style::default().fg(Color::DarkGray)),
             ]),
         ];
-        frame.render_widget(Paragraph::new(filter_lines), chunks[1]);
 
-        let lines: Vec<Line> = self
-            .filtered_indices
-            .iter()
-            .enumerate()
-            .map(|(i, &idx)| {
-                let practice = &self.practices[idx];
-                let marker = if i == self.selected { "> " } else { "  " };
-                let name_style = if i == self.selected {
-                    Style::default().fg(Color::White).bold()
-                } else {
-                    Style::default().fg(Color::White)
-                };
-                let padding = col_width.saturating_sub(practice.name.width());
-                Line::from(vec![
-                    Span::styled(marker, name_style),
-                    Span::styled(&practice.name, name_style),
-                    Span::raw(" ".repeat(padding)),
-                    Span::styled(
-                        practice.practice_type.label(),
-                        Style::default().fg(Color::Gray),
-                    ),
-                ])
-            })
-            .collect();
-        let list = Paragraph::new(lines);
-        frame.render_widget(list, chunks[2]);
+        for (i, &idx) in self.filtered_indices.iter().enumerate() {
+            let practice = &self.practices[idx];
+            let marker = if i == self.selected { "> " } else { "  " };
+            let name_style = if i == self.selected {
+                Style::default().fg(Color::White).bold()
+            } else {
+                Style::default().fg(Color::White)
+            };
+            let padding = col_width.saturating_sub(practice.name.width());
+            all_lines.push(Line::from(vec![
+                Span::styled(marker, name_style),
+                Span::styled(&practice.name, name_style),
+                Span::raw(" ".repeat(padding)),
+                Span::styled(
+                    practice.practice_type.label(),
+                    Style::default().fg(Color::Gray),
+                ),
+            ]));
+        }
+        frame.render_widget(Paragraph::new(all_lines), inner);
 
         if !self.filtered_indices.is_empty() {
-            highlight_row(frame, chunks[2], self.selected as u16);
+            highlight_row(frame, inner, self.selected as u16 + 1); // +1 for header
         }
 
-        render_status_line(frame, chunks[3], &self.status_msg);
+        render_status_line(frame, chunks[2], &self.status_msg);
 
         let footer = Line::from(vec![
             Span::styled(" [j/k]", Style::default().fg(ACCENT)),
@@ -260,7 +260,7 @@ impl LogEntryScreen {
             Span::styled("[Esc]", Style::default().fg(ACCENT)),
             Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::DarkGray)),
         ]);
-        frame.render_widget(Paragraph::new(footer), chunks[4]);
+        frame.render_widget(Paragraph::new(footer), chunks[3]);
     }
 
     fn handle_select_practice(&mut self, key: KeyEvent) -> Action {

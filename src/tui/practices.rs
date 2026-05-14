@@ -265,7 +265,7 @@ impl PracticesScreen {
                 Span::styled(format!(" {}  ", tr("key-add")), Style::default().fg(Color::DarkGray)),
                 Span::styled("[e]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::DarkGray)),
-                Span::styled("[t]", Style::default().fg(ACCENT)),
+                Span::styled("[Space]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}  ", tr("key-toggle")), Style::default().fg(Color::DarkGray)),
                 Span::styled("[d]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::DarkGray)),
@@ -427,7 +427,7 @@ impl PracticesScreen {
                 }
                 Action::None
             }
-            KeyCode::Char('t') => {
+            KeyCode::Char(' ') => {
                 if let Some(p) = self.practices.get(self.selected) {
                     match db.set_practice_active(p.id, !p.active) {
                         Ok(()) => self.refresh(db),

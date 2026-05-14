@@ -31,9 +31,8 @@ fn paragraph_widgets_must_wrap_user_content() {
         "history.rs:185",
         "history.rs:217",
         // ── log_entry.rs ──
-        "log_entry.rs:185",
-        "log_entry.rs:218",
-        "log_entry.rs:244",
+        "log_entry.rs:199",
+        "log_entry.rs:245",
         "log_entry.rs:263",
         "log_entry.rs:434",
         "log_entry.rs:534",
@@ -160,6 +159,7 @@ fn screens_must_have_bordered_blocks() {
         "practices.rs",
         "quotes_screen.rs",
         "quick_log.rs",
+        "log_entry.rs",
     ];
 
     let mut missing = Vec::new();
