@@ -21,7 +21,7 @@ fn paragraph_widgets_must_wrap_user_content() {
         // ── dashboard.rs ──
         "dashboard.rs:142",
         "dashboard.rs:221",
-        "dashboard.rs:357",
+        "dashboard.rs:372",
         // ── goals.rs ──
         "goals.rs:214",
         "goals.rs:361",
@@ -30,9 +30,9 @@ fn paragraph_widgets_must_wrap_user_content() {
         "goals.rs:501",
         "goals.rs:543",
         // ── history.rs ──
-        "history.rs:115",
-        "history.rs:161",
-        "history.rs:193",
+        "history.rs:125",
+        "history.rs:171",
+        "history.rs:203",
         // ── log_entry.rs ──
         "log_entry.rs:185",
         "log_entry.rs:218",

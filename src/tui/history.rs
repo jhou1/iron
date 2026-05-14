@@ -83,7 +83,17 @@ impl HistoryScreen {
         let name_col_w = (max_name_len + 2) as u16;
         let marker_w: u16 = 2;     // "> " or "  "
         let date_col_w: u16 = 11;  // "2026-05-12" + 1 padding
-        let vol_col_w: u16 = 16;
+        let max_total_w = self.filtered_indices.iter()
+            .filter_map(|&i| self.entries.get(i))
+            .map(|e| format!("{:.0}", e.total_metric()).len())
+            .max()
+            .unwrap_or(4);
+        let max_label_w = self.filtered_indices.iter()
+            .filter_map(|&i| self.entries.get(i))
+            .map(|e| e.metric_label().width())
+            .max()
+            .unwrap_or(2);
+        let vol_col_w = (max_total_w + 1 + max_label_w + 1) as u16;
         let border_w: u16 = 2;
         let list_width = marker_w + date_col_w + name_col_w + vol_col_w + border_w;
 
@@ -126,7 +136,7 @@ impl HistoryScreen {
 
         let list_height = h_chunks[0].height as usize;
         self.adjust_scroll(list_height.saturating_sub(3)); // -2 for border, -1 for header row
-        self.render_list(frame, h_chunks[0], list_height.saturating_sub(3), marker_w, name_col_w, date_col_w, vol_col_w);
+        self.render_list(frame, h_chunks[0], list_height.saturating_sub(3), marker_w, name_col_w, date_col_w, vol_col_w, max_total_w, max_label_w);
 
         // ── Right: detail panel ──
         self.render_detail(frame, h_chunks[1]);
@@ -176,7 +186,7 @@ impl HistoryScreen {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn render_list(&self, frame: &mut Frame, area: ratatui::layout::Rect, visible: usize, marker_w: u16, name_col_w: u16, date_col_w: u16, vol_col_w: u16) {
+    fn render_list(&self, frame: &mut Frame, area: ratatui::layout::Rect, visible: usize, marker_w: u16, name_col_w: u16, date_col_w: u16, vol_col_w: u16, max_total_w: usize, max_label_w: usize) {
         let block = Block::default()
             .title(Line::from(vec![
                 Span::styled("── ", Style::default().fg(BORDER_COLOR)),
@@ -230,7 +240,10 @@ impl HistoryScreen {
                 Cell::from(Span::styled(marker, style)),
                 Cell::from(Span::styled(date, dim)),
                 Cell::from(Span::styled(entry.practice_name.clone(), style)),
-                Cell::from(Span::styled(format!("{} {}", total, label), dim)),
+                Cell::from(Span::styled(
+                    format!("{:>w$} {}{}", total, label, " ".repeat(max_label_w.saturating_sub(label.width())), w = max_total_w),
+                    dim,
+                )),
             ]));
 
             if fi == self.selected && self.mode == Mode::ConfirmDelete {

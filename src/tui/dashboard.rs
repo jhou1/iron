@@ -314,6 +314,14 @@ impl DashboardScreen {
                 .max()
                 .unwrap_or(0);
             let name_col = max_name + 2;
+            let max_total_w = self.recent_entries.iter()
+                .map(|e| format!("{:.1}", e.total_metric()).len())
+                .max()
+                .unwrap_or(0);
+            let max_label_w = self.recent_entries.iter()
+                .map(|e| e.metric_label().width())
+                .max()
+                .unwrap_or(0);
 
             let mut current_date = String::new();
             for entry in &self.recent_entries {
@@ -330,12 +338,14 @@ impl DashboardScreen {
                 }
                 let total = format!("{:.1}", entry.total_metric());
                 let label = entry.metric_label();
-                let padding = name_col.saturating_sub(entry.practice_name.width());
+                let name_pad = name_col.saturating_sub(entry.practice_name.width());
+                let num_pad = max_total_w.saturating_sub(total.len());
+                let label_pad = max_label_w.saturating_sub(label.width());
                 lines.push(Line::from(vec![
                     Span::raw("    "),
                     Span::styled(&entry.practice_name, Style::default().fg(Color::Gray)),
-                    Span::raw(" ".repeat(padding)),
-                    Span::styled(format!("{} {}", total, label), Style::default().fg(Color::Gray)),
+                    Span::raw(" ".repeat(name_pad + num_pad)),
+                    Span::styled(format!("{} {}{}", total, label, " ".repeat(label_pad)), Style::default().fg(Color::Gray)),
                 ]));
             }
         }

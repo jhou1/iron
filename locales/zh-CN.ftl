@@ -128,7 +128,7 @@ practice-type-distance = 距离
 practice-type-endurance = 耐力
 
 # ── 指标标签 ──
-metric-kg-vol = 公斤量
+metric-kg-vol = 公斤
 metric-reps = 次
 metric-km = 公里
 metric-min = 分钟
