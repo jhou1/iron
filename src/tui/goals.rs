@@ -10,7 +10,7 @@ use ratatui::{
 use crate::db::Database;
 use crate::i18n::tr;
 use crate::model::{Goal, Milestone};
-use super::{centered_area, highlight_row, render_help_overlay, render_status_line, Action, Screen, StatusMessage, CONTENT_WIDTH};
+use super::{centered_area, highlight_row, render_gauge_line, render_status_line, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH};
 
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
@@ -21,11 +21,6 @@ fn goal_gauge_ratio(goal: &Goal) -> f64 {
     }
     let done = goal.milestones.iter().filter(|m| m.completed).count();
     done as f64 / goal.milestones.len() as f64
-}
-
-fn goal_gauge_label(goal: &Goal) -> String {
-    let done = goal.milestones.iter().filter(|m| m.completed).count();
-    format!("{}/{}", done, goal.milestones.len())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -60,7 +55,6 @@ pub struct GoalsScreen {
     input: String,
     cursor: usize,
     status_msg: StatusMessage,
-    show_help: bool,
     last_deleted: Option<GoalUndoData>,
     // Modal state
     modal_goal_idx: usize,
@@ -82,7 +76,6 @@ impl GoalsScreen {
             input: String::new(),
             cursor: 0,
             status_msg: None,
-            show_help: false,
             last_deleted: None,
             modal_goal_idx: 0,
             modal_selected: 0,
@@ -259,7 +252,7 @@ impl GoalsScreen {
                     Span::styled(&self.input[self.cursor..], Style::default().fg(GREEN)),
                 ]));
                 // Still show gauge below
-                lines.push(render_gauge_line(goal, GREEN));
+                lines.push(goal_gauge(goal));
             } else if is_selected && self.mode == Mode::EditGoalDate {
                 // Show title
                 lines.push(Line::from(vec![
@@ -275,7 +268,7 @@ impl GoalsScreen {
                     Span::styled(&self.input[self.cursor..], Style::default().fg(GREEN)),
                 ]));
                 // Gauge
-                lines.push(render_gauge_line(goal, Color::DarkGray));
+                lines.push(goal_gauge(goal));
             } else if is_selected && self.mode == Mode::ConfirmDeleteGoal {
                 // Show goal normally first
                 lines.extend(render_goal_lines(goal, true));
@@ -347,8 +340,6 @@ impl GoalsScreen {
                     spans.push(Span::styled("[Enter]", Style::default().fg(ACCENT)));
                     spans.push(Span::styled(" Open  ", Style::default().fg(Color::Gray)));
                 }
-                spans.push(Span::styled("[?]", Style::default().fg(ACCENT)));
-                spans.push(Span::styled(format!(" {}  ", tr("key-help")), Style::default().fg(Color::Gray)));
                 spans.push(Span::styled("[Esc]", Style::default().fg(ACCENT)));
                 spans.push(Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::Gray)));
                 spans
@@ -374,36 +365,6 @@ impl GoalsScreen {
             self.render_modal(frame);
         }
 
-        // ── Help overlay ──
-        if self.show_help {
-            let bindings = if self.mode == Mode::Modal {
-                vec![
-                    ("j/k", "Navigate"),
-                    ("a", "Add milestone"),
-                    ("e", "Edit"),
-                    ("Space", "Toggle complete"),
-                    ("D", "Edit date"),
-                    ("d", "Delete"),
-                    ("u", "Undo"),
-                    ("?", "Help"),
-                    ("Esc", "Close"),
-                ]
-            } else {
-                vec![
-                    ("j/k", "Navigate"),
-                    ("a", "Add goal"),
-                    ("e", "Edit"),
-                    ("Space", "Toggle complete"),
-                    ("D", "Edit date"),
-                    ("d", "Delete"),
-                    ("u", "Undo"),
-                    ("Enter", "Open milestones"),
-                    ("?", "Help"),
-                    ("Esc", "Back"),
-                ]
-            };
-            render_help_overlay(frame, area, &bindings);
-        }
     }
 
     fn render_modal(&self, frame: &mut Frame) {
@@ -443,7 +404,7 @@ impl GoalsScreen {
             .title_alignment(Alignment::Center)
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
-            .border_style(Style::default().fg(Color::DarkGray));
+            .border_style(Style::default().fg(BORDER_COLOR));
 
         let inner = block.inner(modal_rect);
         frame.render_widget(block, modal_rect);
@@ -461,7 +422,7 @@ impl GoalsScreen {
 
         // ── Gauge ──
         frame.render_widget(
-            Paragraph::new(render_gauge_line(goal, GREEN)),
+            Paragraph::new(goal_gauge(goal)),
             inner_chunks[0],
         );
 
@@ -569,8 +530,6 @@ impl GoalsScreen {
                 Span::styled(format!(" {}  ", tr("key-date")), Style::default().fg(Color::Gray)),
                 Span::styled("[u]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}  ", tr("key-undo")), Style::default().fg(Color::Gray)),
-                Span::styled("[?]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-help")), Style::default().fg(Color::Gray)),
                 Span::styled("[Esc]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}", tr("key-close")), Style::default().fg(Color::Gray)),
             ],
@@ -589,11 +548,6 @@ impl GoalsScreen {
     pub fn handle_key(&mut self, key: KeyEvent, db: &Database) -> Action {
         if self.mode != Mode::Modal {
             self.status_msg = None;
-        }
-
-        if self.show_help {
-            self.show_help = false;
-            return Action::None;
         }
 
         match self.mode {
@@ -690,10 +644,6 @@ impl GoalsScreen {
                         }
                     }
                 }
-                Action::None
-            }
-            KeyCode::Char('?') => {
-                self.show_help = !self.show_help;
                 Action::None
             }
             KeyCode::Esc => Action::Navigate(Screen::Dashboard),
@@ -824,11 +774,6 @@ impl GoalsScreen {
     fn handle_modal(&mut self, key: KeyEvent, db: &Database) -> Action {
         self.modal_status_msg = None;
 
-        if self.show_help {
-            self.show_help = false;
-            return Action::None;
-        }
-
         match self.modal_mode {
             ModalMode::Browse => self.handle_modal_browse(key, db),
             ModalMode::AddMilestone => self.handle_modal_add_milestone(key, db),
@@ -923,10 +868,6 @@ impl GoalsScreen {
                         }
                     }
                 }
-                Action::None
-            }
-            KeyCode::Char('?') => {
-                self.show_help = !self.show_help;
                 Action::None
             }
             KeyCode::Esc => {
@@ -1072,54 +1013,49 @@ impl GoalsScreen {
 
 fn render_goal_lines(goal: &Goal, is_selected: bool) -> Vec<Line<'static>> {
     let mut result = Vec::new();
+    let marker = if is_selected { "» " } else { "  " };
+    let style = if is_selected {
+        Style::default().fg(Color::White).bold()
+    } else {
+        Style::default().fg(Color::White)
+    };
     if goal.completed {
         let date_str = goal.completed_at
             .map(|dt| format!(" ({})", dt.format("%Y-%m-%d")))
             .unwrap_or_default();
-        let marker = if is_selected { "» " } else { "  " };
-        let style = if is_selected { Style::default().fg(GREEN) } else { Style::default().fg(Color::Gray) };
         result.push(Line::from(vec![
             Span::styled(marker, style),
             Span::styled("✓ ", Style::default().fg(GREEN)),
             Span::styled(format!("{}{}", goal.title, date_str), style),
         ]));
-        result.push(render_gauge_line(goal, Color::DarkGray));
     } else {
-        let marker = if is_selected { "» " } else { "  " };
-        let style = if is_selected {
-            Style::default().fg(GREEN).bold()
-        } else {
-            Style::default().fg(GREEN)
-        };
         result.push(Line::from(vec![
             Span::styled(marker, style),
             Span::styled("⏳ ", Style::default().fg(Color::Yellow)),
             Span::styled(goal.title.clone(), style),
         ]));
-        result.push(render_gauge_line(goal, GREEN));
     }
+    result.push(goal_gauge(goal));
     result
 }
 
 fn render_milestone_line(ms: &Milestone, is_selected: bool) -> Line<'static> {
+    let marker = if is_selected { "» " } else { "  " };
+    let style = if is_selected {
+        Style::default().fg(Color::White).bold()
+    } else {
+        Style::default().fg(Color::White)
+    };
     if ms.completed {
         let date_str = ms.completed_at
             .map(|dt| format!(" ({})", dt.format("%Y-%m-%d")))
             .unwrap_or_default();
-        let marker = if is_selected { "» " } else { "  " };
-        let style = if is_selected { Style::default().fg(GREEN) } else { Style::default().fg(Color::Gray) };
         Line::from(vec![
             Span::styled(marker, style),
             Span::styled("✓ ", Style::default().fg(GREEN)),
             Span::styled(format!("{}{}", ms.title, date_str), style),
         ])
     } else {
-        let marker = if is_selected { "» " } else { "  " };
-        let style = if is_selected {
-            Style::default().fg(GREEN).bold()
-        } else {
-            Style::default().fg(GREEN)
-        };
         Line::from(vec![
             Span::styled(marker, style),
             Span::styled("⏳ ", Style::default().fg(Color::Yellow)),
@@ -1128,16 +1064,9 @@ fn render_milestone_line(ms: &Milestone, is_selected: bool) -> Line<'static> {
     }
 }
 
-fn render_gauge_line(goal: &Goal, fill_color: Color) -> Line<'static> {
-    const BAR_WIDTH: usize = 16;
+fn goal_gauge(goal: &Goal) -> Line<'static> {
     let ratio = goal_gauge_ratio(goal);
-    let filled = (ratio * BAR_WIDTH as f64).round() as usize;
-    let empty = BAR_WIDTH - filled;
-    let label = goal_gauge_label(goal);
-    Line::from(vec![
-        Span::raw("    "),
-        Span::styled("█".repeat(filled), Style::default().fg(fill_color)),
-        Span::styled("░".repeat(empty), Style::default().fg(Color::DarkGray)),
-        Span::styled(format!("  {}", label), Style::default().fg(Color::Gray)),
-    ])
+    let done = goal.milestones.iter().filter(|m| m.completed).count();
+    let total = goal.milestones.len();
+    render_gauge_line(ratio, done, total, 16, 4)
 }

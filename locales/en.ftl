@@ -27,9 +27,11 @@ heatmap-dec = Dec
 
 # ── Dashboard ──
 dashboard-title = iron
-dashboard-logo-text = Iron
+dashboard-logo-text = Iron Training Tracker
 dashboard-last-14-days = Last 14 Days
 dashboard-last-7-days = Last 7 Days
+dashboard-recent-title = Recent
+dashboard-heatmap-title = Heatmap
 dashboard-goals = Goals
 dashboard-quotes = Quotes
 dashboard-no-quotes = No quotes yet — press Q to add one
@@ -120,10 +122,10 @@ practices-status-active = active
 practices-status-inactive = inactive
 
 # ── Practice type labels ──
-practice-type-weighted = weightxreps
-practice-type-bodyweight = reps
-practice-type-distance = distance
-practice-type-endurance = duration
+practice-type-weighted = Weight x Reps
+practice-type-bodyweight = Reps Only
+practice-type-distance = Distance
+practice-type-endurance = Duration
 
 # ── Metric labels ──
 metric-kg-vol = kg vol

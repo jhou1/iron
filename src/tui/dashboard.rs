@@ -1,20 +1,20 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, Paragraph, Wrap},
+    widgets::{Block, BorderType, Borders, Paragraph, Wrap},
     Frame,
 };
 use unicode_width::UnicodeWidthStr;
 
 
-use crate::db::{AggregateStats, Database};
+use crate::db::Database;
 use crate::i18n::{tr, tr_args};
 use crate::model::{Goal, LogEntry, Quote};
 use fluent_bundle::FluentValue;
 use super::widgets::heatmap::Heatmap;
-use super::{centered_area, highlight_row, render_help_overlay, render_status_line, Action, Screen, StatusMessage, CONTENT_WIDTH};
+use super::{centered_area, render_gauge_line, render_status_line, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH};
 
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
@@ -23,29 +23,19 @@ const GREEN: Color = Color::Green;
 enum DashboardMode {
     Normal,
     ConfirmQuit,
-    QuotesManage,
-    QuotesConfirmDelete,
-    QuotesEdit,
     HrvInput,
 }
 
 pub struct DashboardScreen {
     heatmap_data: Vec<(String, i64)>,
     recent_entries: Vec<LogEntry>,
-    stats: AggregateStats,
     quote: String,
     goals: Vec<Goal>,
     quotes: Vec<Quote>,
-    quotes_selected: usize,
-    quotes_input: String,
-    quotes_cursor: usize,
-    quotes_editing_id: Option<i64>,
     mode: DashboardMode,
     hrv_today: Option<i32>,
     hrv_input: String,
     status_msg: StatusMessage,
-    show_help: bool,
-    last_deleted_quote: Option<Quote>,
     no_color: bool,
 }
 
@@ -53,7 +43,6 @@ impl DashboardScreen {
     pub fn new(db: &Database, no_color: bool) -> anyhow::Result<Self> {
         let heatmap_data = db.heatmap_counts(365)?;
         let recent_entries = db.list_logs_recent(7)?;
-        let stats = db.aggregate_stats(7)?;
         let quotes = db.list_quotes()?;
         let quote = super::quotes::pick_random_quote(&quotes);
         let goals = db.list_goals()?;
@@ -62,20 +51,13 @@ impl DashboardScreen {
         Ok(Self {
             heatmap_data,
             recent_entries,
-            stats,
             quote,
             goals,
             quotes,
-            quotes_selected: 0,
-            quotes_input: String::new(),
-            quotes_cursor: 0,
-            quotes_editing_id: None,
             mode: DashboardMode::Normal,
             hrv_today,
             hrv_input: String::new(),
             status_msg: None,
-            show_help: false,
-            last_deleted_quote: None,
             no_color,
         })
     }
@@ -83,7 +65,6 @@ impl DashboardScreen {
     pub fn refresh(&mut self, db: &Database) -> anyhow::Result<()> {
         self.heatmap_data = db.heatmap_counts(365)?;
         self.recent_entries = db.list_logs_recent(7)?;
-        self.stats = db.aggregate_stats(7)?;
         self.quotes = db.list_quotes()?;
         self.quote = super::quotes::pick_random_quote(&self.quotes);
         self.goals = db.list_goals()?;
@@ -95,12 +76,29 @@ impl DashboardScreen {
     pub fn render(&self, frame: &mut Frame) {
         let area = centered_area(frame.area(), CONTENT_WIDTH);
 
-        // Pane height adapts to content — each active goal = 2 lines (title + gauge)
+        // Pane height adapts to content
         let active_goal_count = self.goals.iter().filter(|g| !g.completed).count() as u16;
-        let goals_lines: u16 = (active_goal_count * 2).max(1);
-        let pane_height = (self.recent_entries.len() as u16 + 4)
-            .max(goals_lines + 2)
-            .max(7);
+        let goals_lines: u16 = (active_goal_count * 2 + 1).max(2);
+
+        // Recent pane: 1 title + per-group (1 date header + N entries + 1 blank separator)
+        let date_groups = {
+            let mut count = 0u16;
+            let mut current_date = String::new();
+            for entry in &self.recent_entries {
+                let dk = entry.log.logged_at.format("%b %d").to_string();
+                if dk != current_date {
+                    if !current_date.is_empty() {
+                        count += 1; // blank separator
+                    }
+                    count += 1; // date header
+                    current_date = dk;
+                }
+                count += 1; // entry line
+            }
+            count
+        };
+        let recent_lines = (date_groups + 1).max(2); // +1 for title
+        let pane_height = recent_lines.max(goals_lines).max(7);
 
         // Calculate quote box height: content lines + 2 for borders
         let quote_box_width = area.width.saturating_sub(4) as usize;
@@ -126,8 +124,8 @@ impl DashboardScreen {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(3),            // [0] logo header (separator + title + separator)
-                Constraint::Length(10),           // [1] heatmap
+                Constraint::Length(1),            // [0] logo header
+                Constraint::Length(12),           // [1] heatmap (with border + title)
                 Constraint::Length(quote_height), // [2] daily quote box
                 Constraint::Length(3),            // [3] HRV row (with spacing)
                 Constraint::Length(pane_height),  // [4] split panes
@@ -137,39 +135,34 @@ impl DashboardScreen {
             ])
             .split(area);
 
-        // ── Logo header (rounded border box) ──
+        // ── Logo header (single line) ──
         let logo_text = tr("dashboard-logo-text");
-        let version = format!("v{}", env!("CARGO_PKG_VERSION"));
-        let inner_width = chunks[0].width.saturating_sub(2);
         let logo_line = Line::from(vec![
-            Span::styled(logo_text.clone(), Style::default().fg(ACCENT).bold()),
-            Span::styled(
-                format!(
-                    "{} {}",
-                    " ".repeat(inner_width.saturating_sub(
-                        logo_text.width() as u16 + version.len() as u16 + 1
-                    ) as usize),
-                    version
-                ),
-                Style::default().fg(Color::Gray),
-            ),
+            Span::styled("── ", Style::default().fg(BORDER_COLOR)),
+            Span::styled("\u{26a1} ", Style::default().fg(Color::Yellow)),
+            Span::styled(logo_text, Style::default().fg(Color::Yellow).bold()),
         ]);
-        let logo_block = Block::default()
-            .borders(Borders::ALL)
-            .border_type(BorderType::Rounded)
-            .border_style(Style::default().fg(Color::DarkGray));
-        let logo_paragraph = Paragraph::new(logo_line).block(logo_block);
-        frame.render_widget(logo_paragraph, chunks[0]);
+        frame.render_widget(Paragraph::new(logo_line), chunks[0]);
 
         // ── Heatmap ──
+        let heatmap_block = Block::default()
+            .title(Line::from(vec![
+                Span::styled("── ", Style::default().fg(BORDER_COLOR)),
+                Span::styled(tr("dashboard-heatmap-title"), Style::default().fg(Color::White).bold()),
+                Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
+            ]))
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(BORDER_COLOR));
+        let heatmap_inner = heatmap_block.inner(chunks[1]);
+        frame.render_widget(heatmap_block, chunks[1]);
         let heatmap = Heatmap::new(&self.heatmap_data, 52, self.no_color);
-        frame.render_widget(heatmap, chunks[1]);
+        frame.render_widget(heatmap, heatmap_inner);
 
         // ── Daily quote (centered, rounded border) ──
         let quote_block = Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
-            .border_style(Style::default().fg(Color::DarkGray));
+            .border_style(Style::default().fg(BORDER_COLOR));
         let quote_paragraph = Paragraph::new(Line::from(Span::styled(
             quote_text.clone(),
             quote_style,
@@ -247,21 +240,8 @@ impl DashboardScreen {
                 Span::styled(format!(" {}  ", tr("key-quotes")), Style::default().fg(Color::Gray)),
                 Span::styled("[v]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}  ", tr("key-hrv")), Style::default().fg(Color::Gray)),
-                Span::styled("[?]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-help")), Style::default().fg(Color::Gray)),
                 Span::styled("[q]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}", tr("key-quit")), Style::default().fg(Color::Gray)),
-            ]
-        } else if self.mode == DashboardMode::QuotesManage {
-            vec![
-                Span::styled(" [a]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-add")), Style::default().fg(Color::Gray)),
-                Span::styled("[e]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::Gray)),
-                Span::styled("[d]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::Gray)),
-                Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}", tr("key-close")), Style::default().fg(Color::Gray)),
             ]
         } else {
             vec![
@@ -274,88 +254,23 @@ impl DashboardScreen {
         let footer = Line::from(footer_spans);
         frame.render_widget(Paragraph::new(footer), chunks[6]);
 
-        // ── Quotes modal overlay ──
-        if matches!(self.mode, DashboardMode::QuotesManage | DashboardMode::QuotesEdit | DashboardMode::QuotesConfirmDelete) {
-            self.render_quotes_modal(frame);
-        }
-
-        // ── Help overlay ──
-        if self.show_help {
-            let centered = centered_area(frame.area(), CONTENT_WIDTH);
-            let bindings = &[
-                ("l", "Log"),
-                ("h", "History"),
-                ("t", "Trends"),
-                ("e", "Practices"),
-                ("g", "Goals"),
-                ("Q", "Quotes"),
-                ("v", "HRV"),
-                ("?", "Help"),
-                ("q", "Quit"),
-            ];
-            render_help_overlay(frame, centered, bindings);
-        }
     }
 
     fn render_recent_pane(&self, frame: &mut Frame, area: Rect) {
         let block = Block::default()
-            .title(Span::styled(tr("dashboard-last-7-days"), Style::default().fg(Color::White).bold()))
+            .title(Line::from(vec![
+                Span::styled("── ", Style::default().fg(BORDER_COLOR)),
+                Span::styled(tr("dashboard-recent-title"), Style::default().fg(Color::White).bold()),
+                Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
+            ]))
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::DarkGray));
+            .border_style(Style::default().fg(BORDER_COLOR));
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
 
         let mut lines: Vec<Line> = Vec::new();
 
-        // Summary line
-        let mut parts: Vec<Span> = Vec::new();
-        parts.push(Span::styled(
-            tr_args("dashboard-sessions", &[("count", FluentValue::from(self.stats.sessions))]),
-            Style::default().fg(GREEN),
-        ));
-        if self.stats.total_volume > 0.0 {
-            parts.push(Span::styled(" · ", Style::default().fg(Color::DarkGray)));
-            let formatted = format!("{:.0}", self.stats.total_volume);
-            parts.push(Span::styled(
-                tr_args("dashboard-total-volume", &[("value", FluentValue::from(formatted))]),
-                Style::default().fg(GREEN),
-            ));
-        }
-        if self.stats.total_reps > 0.0 {
-            parts.push(Span::styled(" · ", Style::default().fg(Color::DarkGray)));
-            let formatted = format!("{:.0}", self.stats.total_reps);
-            parts.push(Span::styled(
-                tr_args("dashboard-total-reps", &[("value", FluentValue::from(formatted))]),
-                Style::default().fg(GREEN),
-            ));
-        }
-        if self.stats.total_distance > 0.0 {
-            parts.push(Span::styled(" · ", Style::default().fg(Color::DarkGray)));
-            let formatted = format!("{:.1}", self.stats.total_distance);
-            parts.push(Span::styled(
-                tr_args("dashboard-total-distance", &[("value", FluentValue::from(formatted))]),
-                Style::default().fg(GREEN),
-            ));
-        }
-        if self.stats.total_duration > 0.0 {
-            parts.push(Span::styled(" · ", Style::default().fg(Color::DarkGray)));
-            let formatted = format!("{:.0}", self.stats.total_duration);
-            parts.push(Span::styled(
-                tr_args("dashboard-total-duration", &[("value", FluentValue::from(formatted))]),
-                Style::default().fg(GREEN),
-            ));
-        }
-        lines.push(Line::from(parts));
-
-        // Separator
-        let sep_width = inner.width as usize;
-        lines.push(Line::from(Span::styled(
-            "─".repeat(sep_width),
-            Style::default().fg(Color::DarkGray),
-        )));
-
-        // Entry list (table layout)
         if self.recent_entries.is_empty() {
             lines.push(Line::from(Span::styled(
                 tr("dashboard-no-entries"),
@@ -368,14 +283,25 @@ impl DashboardScreen {
                 .unwrap_or(0);
             let name_col = max_name + 2;
 
+            let mut current_date = String::new();
             for entry in &self.recent_entries {
-                let date = entry.log.logged_at.format("%b %d").to_string();
-                let total = format!("{:.0}", entry.total_metric());
+                let date_key = entry.log.logged_at.format("%b %d").to_string();
+                if date_key != current_date {
+                    if !current_date.is_empty() {
+                        lines.push(Line::from(""));
+                    }
+                    lines.push(Line::from(Span::styled(
+                        date_key.clone(),
+                        Style::default().fg(Color::White).bold(),
+                    )));
+                    current_date = date_key;
+                }
+                let total = format!("{:.1}", entry.total_metric());
                 let label = entry.metric_label();
                 let padding = name_col.saturating_sub(entry.practice_name.width());
                 lines.push(Line::from(vec![
-                    Span::styled(format!("{} ", date), Style::default().fg(Color::Gray)),
-                    Span::styled(&entry.practice_name, Style::default().fg(GREEN)),
+                    Span::raw("    "),
+                    Span::styled(&entry.practice_name, Style::default().fg(Color::Gray)),
                     Span::raw(" ".repeat(padding)),
                     Span::styled(format!("{} {}", total, label), Style::default().fg(Color::Gray)),
                 ]));
@@ -385,22 +311,19 @@ impl DashboardScreen {
         frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
     }
 
-    fn reload_quotes(&mut self, db: &Database) -> anyhow::Result<()> {
-        self.quotes = db.list_quotes()?;
-        self.quote = super::quotes::pick_random_quote(&self.quotes);
-        Ok(())
-    }
-
     fn render_goals_pane(&self, frame: &mut Frame, area: Rect) {
         let block = Block::default()
-            .title(Span::styled(tr("dashboard-goals"), Style::default().fg(Color::White).bold()))
+            .title(Line::from(vec![
+                Span::styled("── ", Style::default().fg(BORDER_COLOR)),
+                Span::styled(tr("dashboard-goals"), Style::default().fg(Color::White).bold()),
+                Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
+            ]))
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::DarkGray));
+            .border_style(Style::default().fg(BORDER_COLOR));
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
 
-        // Show only active (uncompleted) goals, read-only
         let active_goals: Vec<&Goal> = self.goals.iter().filter(|g| !g.completed).collect();
 
         if active_goals.is_empty() {
@@ -414,121 +337,23 @@ impl DashboardScreen {
 
         let mut lines: Vec<Line> = Vec::new();
         for goal in &active_goals {
-            lines.push(Line::from(vec![
-                Span::styled("  ", Style::default()),
-                Span::styled("\u{231b} ", Style::default().fg(Color::Yellow)),
-                Span::styled(&goal.title, Style::default().fg(GREEN)),
-            ]));
-            lines.push(dashboard_gauge_line(goal));
+            lines.push(Line::from(Span::styled(
+                goal.title.clone(),
+                Style::default().fg(Color::White).bold(),
+            )));
+            let milestones = &goal.milestones;
+            let ratio = if milestones.is_empty() {
+                if goal.completed { 1.0 } else { 0.0 }
+            } else {
+                milestones.iter().filter(|m| m.completed).count() as f64 / milestones.len() as f64
+            };
+            let done = milestones.iter().filter(|m| m.completed).count();
+            let total = milestones.len();
+            let bar_width = (inner.width as usize).saturating_sub(18).max(4);
+            lines.push(render_gauge_line(ratio, done, total, bar_width, 4));
         }
 
         frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
-    }
-
-    fn render_quotes_modal(&self, frame: &mut Frame) {
-        let area = frame.area();
-
-        let modal_width = area.width.saturating_sub(4).min(CONTENT_WIDTH);
-        let list_height = (self.quotes.len() as u16).max(1);
-        let modal_height = (list_height + 4).min(area.height.saturating_sub(4)).max(6);
-        let modal_x = area.x + (area.width.saturating_sub(modal_width)) / 2;
-        let modal_y = area.y + (area.height.saturating_sub(modal_height)) / 2;
-        let modal_rect = Rect {
-            x: modal_x,
-            y: modal_y,
-            width: modal_width,
-            height: modal_height,
-        };
-
-        frame.render_widget(Clear, modal_rect);
-
-        let title = format!(" {} ", tr_args("dashboard-quotes-count", &[("count", FluentValue::from(self.quotes.len()))]));
-        let block = Block::default()
-            .title(Span::styled(title, Style::default().fg(Color::White).bold()))
-            .borders(Borders::ALL)
-            .border_type(BorderType::Rounded)
-            .border_style(Style::default().fg(ACCENT));
-
-        let inner = block.inner(modal_rect);
-        frame.render_widget(block, modal_rect);
-
-        let inner_chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Min(1), Constraint::Length(1)])
-            .split(inner);
-
-        let mut lines: Vec<Line> = Vec::new();
-        if self.quotes.is_empty() {
-            lines.push(Line::from(Span::styled(
-                tr("dashboard-no-quotes-modal"),
-                Style::default().fg(Color::DarkGray),
-            )));
-        } else {
-            for (i, q) in self.quotes.iter().enumerate() {
-                let is_sel = i == self.quotes_selected;
-                let prefix = if is_sel { "> " } else { "  " };
-                let style = if is_sel {
-                    Style::default().fg(GREEN).bold()
-                } else {
-                    Style::default().fg(Color::White)
-                };
-                let max_text = inner_chunks[0].width.saturating_sub(2) as usize;
-                let display = if q.text.chars().count() > max_text {
-                    let truncated: String = q.text.chars().take(max_text.saturating_sub(1)).collect();
-                    format!("{}{}…", prefix, truncated)
-                } else {
-                    format!("{}{}", prefix, q.text)
-                };
-                lines.push(Line::from(Span::styled(display, style)));
-            }
-        }
-
-        let list_area_height = inner_chunks[0].height as usize;
-        let scroll = self.quotes_selected
-            .saturating_sub(list_area_height.saturating_sub(1)) as u16;
-
-        frame.render_widget(
-            Paragraph::new(lines).wrap(Wrap { trim: false }).scroll((scroll, 0)),
-            inner_chunks[0],
-        );
-
-        if !self.quotes.is_empty() {
-            let visible_row = self.quotes_selected.saturating_sub(scroll as usize);
-            highlight_row(frame, inner_chunks[0], visible_row as u16);
-        }
-
-        if self.mode == DashboardMode::QuotesEdit {
-            let input_line = Line::from(vec![
-                Span::styled("> ", Style::default().fg(ACCENT)),
-                Span::styled(&self.quotes_input[..self.quotes_cursor], Style::default().fg(GREEN)),
-                Span::styled("█", Style::default().fg(GREEN)),
-                Span::styled(&self.quotes_input[self.quotes_cursor..], Style::default().fg(GREEN)),
-            ]);
-            frame.render_widget(Paragraph::new(input_line), inner_chunks[1]);
-        } else if self.mode == DashboardMode::QuotesConfirmDelete {
-            let confirm_line = Line::from(vec![
-                Span::styled(format!("{} ", tr("quotes-delete-confirm")), Style::default().fg(Color::Red)),
-                Span::styled("[y]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::Gray)),
-                Span::styled("[any]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::Gray)),
-            ]);
-            frame.render_widget(Paragraph::new(confirm_line), inner_chunks[1]);
-        } else {
-            let shortcuts = Line::from(vec![
-                Span::styled("[a]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-add")), Style::default().fg(Color::Gray)),
-                Span::styled("[e]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::Gray)),
-                Span::styled("[d]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::Gray)),
-                Span::styled("[u]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-undo")), Style::default().fg(Color::Gray)),
-                Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}", tr("key-close")), Style::default().fg(Color::Gray)),
-            ]);
-            frame.render_widget(Paragraph::new(shortcuts), inner_chunks[1]);
-        }
     }
 
     pub fn handle_key(&mut self, key: KeyEvent, db: &Database) -> Action {
@@ -543,209 +368,7 @@ impl DashboardScreen {
                     Action::None
                 }
             }
-            DashboardMode::QuotesManage => self.handle_quotes_manage(key, db),
-            DashboardMode::QuotesConfirmDelete => self.handle_quotes_confirm_delete(key, db),
-            DashboardMode::QuotesEdit => self.handle_quotes_edit(key, db),
             DashboardMode::HrvInput => self.handle_hrv_input(key, db),
-        }
-    }
-
-    fn handle_quotes_text_input(&mut self, key: KeyEvent) -> bool {
-        match key.code {
-            KeyCode::Char('b') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                if self.quotes_cursor > 0 {
-                    let prev = self.quotes_input[..self.quotes_cursor]
-                        .char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
-                    self.quotes_cursor = prev;
-                }
-                true
-            }
-            KeyCode::Left => {
-                if self.quotes_cursor > 0 {
-                    let prev = self.quotes_input[..self.quotes_cursor]
-                        .char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
-                    self.quotes_cursor = prev;
-                }
-                true
-            }
-            KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                if self.quotes_cursor < self.quotes_input.len() {
-                    let next = self.quotes_input[self.quotes_cursor..]
-                        .char_indices().nth(1)
-                        .map(|(i, _)| self.quotes_cursor + i)
-                        .unwrap_or(self.quotes_input.len());
-                    self.quotes_cursor = next;
-                }
-                true
-            }
-            KeyCode::Right => {
-                if self.quotes_cursor < self.quotes_input.len() {
-                    let next = self.quotes_input[self.quotes_cursor..]
-                        .char_indices().nth(1)
-                        .map(|(i, _)| self.quotes_cursor + i)
-                        .unwrap_or(self.quotes_input.len());
-                    self.quotes_cursor = next;
-                }
-                true
-            }
-            KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.quotes_cursor = 0;
-                true
-            }
-            KeyCode::Home => {
-                self.quotes_cursor = 0;
-                true
-            }
-            KeyCode::Char('e') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.quotes_cursor = self.quotes_input.len();
-                true
-            }
-            KeyCode::End => {
-                self.quotes_cursor = self.quotes_input.len();
-                true
-            }
-            KeyCode::Backspace => {
-                if self.quotes_cursor > 0 {
-                    let prev = self.quotes_input[..self.quotes_cursor]
-                        .char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
-                    self.quotes_input.remove(prev);
-                    self.quotes_cursor = prev;
-                }
-                true
-            }
-            KeyCode::Char('k') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.quotes_input.truncate(self.quotes_cursor);
-                true
-            }
-            KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.quotes_input.insert(self.quotes_cursor, c);
-                self.quotes_cursor += c.len_utf8();
-                true
-            }
-            _ => false,
-        }
-    }
-
-    fn handle_quotes_manage(&mut self, key: KeyEvent, db: &Database) -> Action {
-        match key.code {
-            KeyCode::Char('j') | KeyCode::Down => {
-                if !self.quotes.is_empty() && self.quotes_selected < self.quotes.len() - 1 {
-                    self.quotes_selected += 1;
-                }
-                Action::None
-            }
-            KeyCode::Char('k') | KeyCode::Up => {
-                if self.quotes_selected > 0 {
-                    self.quotes_selected -= 1;
-                }
-                Action::None
-            }
-            KeyCode::Char('a') => {
-                self.quotes_input.clear();
-                self.quotes_cursor = 0;
-                self.quotes_editing_id = None;
-                self.mode = DashboardMode::QuotesEdit;
-                Action::None
-            }
-            KeyCode::Char('e') | KeyCode::Enter => {
-                if let Some(q) = self.quotes.get(self.quotes_selected) {
-                    self.quotes_input = q.text.clone();
-                    self.quotes_cursor = self.quotes_input.len();
-                    self.quotes_editing_id = Some(q.id);
-                    self.mode = DashboardMode::QuotesEdit;
-                }
-                Action::None
-            }
-            KeyCode::Char('d') => {
-                if !self.quotes.is_empty() {
-                    self.mode = DashboardMode::QuotesConfirmDelete;
-                }
-                Action::None
-            }
-            KeyCode::Char('u') => {
-                if let Some(quote) = self.last_deleted_quote.take() {
-                    match db.restore_quote(&quote) {
-                        Ok(_) => {
-                            let _ = self.reload_quotes(db);
-                            self.status_msg = Some((tr("status-restored"), false));
-                        }
-                        Err(e) => {
-                            self.status_msg = Some((tr_args("status-save-error", &[("msg", FluentValue::from(e.to_string()))]), true));
-                        }
-                    }
-                }
-                Action::None
-            }
-            KeyCode::Esc => {
-                self.mode = DashboardMode::Normal;
-                Action::None
-            }
-            _ => Action::None,
-        }
-    }
-
-    fn handle_quotes_confirm_delete(&mut self, key: KeyEvent, db: &Database) -> Action {
-        if key.code == KeyCode::Char('y') {
-            if let Some(q) = self.quotes.get(self.quotes_selected) {
-                let quote_clone = q.clone();
-                let id = q.id;
-                match db.delete_quote(id) {
-                    Ok(()) => {
-                        self.last_deleted_quote = Some(quote_clone);
-                        self.status_msg = Some((tr("status-deleted-undo"), false));
-                    }
-                    Err(e) => {
-                        self.status_msg = Some((tr_args("status-delete-error", &[("msg", FluentValue::from(e.to_string()))]), true));
-                    }
-                }
-                let _ = self.reload_quotes(db);
-                if self.quotes.is_empty() {
-                    self.quotes_selected = 0;
-                } else if self.quotes_selected >= self.quotes.len() {
-                    self.quotes_selected = self.quotes.len() - 1;
-                }
-            }
-        }
-        self.mode = DashboardMode::QuotesManage;
-        Action::None
-    }
-
-    fn handle_quotes_edit(&mut self, key: KeyEvent, db: &Database) -> Action {
-        match key.code {
-            KeyCode::Enter => {
-                let text = self.quotes_input.trim().to_string();
-                if !text.is_empty() {
-                    let result = if let Some(id) = self.quotes_editing_id {
-                        db.update_quote(id, &text)
-                    } else {
-                        db.create_quote(&text).map(|_| ())
-                    };
-                    match result {
-                        Ok(()) => {
-                            let _ = self.reload_quotes(db);
-                        }
-                        Err(e) => {
-                            self.status_msg = Some((tr_args("status-save-error", &[("msg", FluentValue::from(e.to_string()))]), true));
-                        }
-                    }
-                }
-                self.quotes_input.clear();
-                self.quotes_cursor = 0;
-                self.quotes_editing_id = None;
-                self.mode = DashboardMode::QuotesManage;
-                Action::None
-            }
-            KeyCode::Esc => {
-                self.quotes_input.clear();
-                self.quotes_cursor = 0;
-                self.quotes_editing_id = None;
-                self.mode = DashboardMode::QuotesManage;
-                Action::None
-            }
-            _ => {
-                self.handle_quotes_text_input(key);
-                Action::None
-            }
         }
     }
 
@@ -757,18 +380,10 @@ impl DashboardScreen {
             KeyCode::Char('e') => Action::Navigate(Screen::Practices),
             KeyCode::Char('g') => Action::Navigate(Screen::Goals),
             KeyCode::Char('w') => Action::Navigate(Screen::QuickLog),
-            KeyCode::Char('Q') => {
-                self.quotes_selected = 0;
-                self.mode = DashboardMode::QuotesManage;
-                Action::None
-            }
+            KeyCode::Char('Q') => Action::Navigate(Screen::Quotes),
             KeyCode::Char('v') => {
                 self.hrv_input = self.hrv_today.map(|v| v.to_string()).unwrap_or_default();
                 self.mode = DashboardMode::HrvInput;
-                Action::None
-            }
-            KeyCode::Char('?') => {
-                self.show_help = !self.show_help;
                 Action::None
             }
             KeyCode::Char('q') => {
@@ -817,22 +432,3 @@ impl DashboardScreen {
 
 }
 
-fn dashboard_gauge_line(goal: &Goal) -> Line<'static> {
-    const BAR_WIDTH: usize = 12;
-    let milestones = &goal.milestones;
-    let ratio = if milestones.is_empty() {
-        if goal.completed { 1.0 } else { 0.0 }
-    } else {
-        milestones.iter().filter(|m| m.completed).count() as f64 / milestones.len() as f64
-    };
-    let done = milestones.iter().filter(|m| m.completed).count();
-    let total = milestones.len();
-    let filled = (ratio * BAR_WIDTH as f64).round() as usize;
-    let empty = BAR_WIDTH - filled;
-    Line::from(vec![
-        Span::raw("    "),
-        Span::styled("█".repeat(filled), Style::default().fg(Color::Green)),
-        Span::styled("░".repeat(empty), Style::default().fg(Color::DarkGray)),
-        Span::styled(format!("  {}/{}", done, total), Style::default().fg(Color::Gray)),
-    ])
-}

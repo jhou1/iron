@@ -14,7 +14,7 @@ use crate::db::Database;
 use crate::i18n::tr;
 use crate::llm::{self, LlmError};
 use crate::model::{Abbreviation, ParsedLog, Practice, SetData};
-use super::{centered_area, render_help_overlay, render_status_line, Action, Screen, StatusMessage, CONTENT_WIDTH};
+use super::{centered_area, render_status_line, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH};
 
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
@@ -43,7 +43,6 @@ pub struct QuickLogScreen {
     scroll_offset: usize,
     phase: Phase,
     status_msg: StatusMessage,
-    show_help: bool,
     log_date: String,
     spinner_frame: usize,
 }
@@ -66,7 +65,6 @@ impl QuickLogScreen {
             scroll_offset: 0,
             phase: Phase::Input,
             status_msg: None,
-            show_help: false,
             log_date,
             spinner_frame: 0,
         })
@@ -139,38 +137,13 @@ impl QuickLogScreen {
         let shortcuts = self.build_shortcuts();
         frame.render_widget(Paragraph::new(vec![shortcuts]), chunks[3]);
 
-        // ── Help overlay ──
-        if self.show_help {
-            let bindings = match self.phase {
-                Phase::Input => vec![
-                    ("Ctrl+S", "Parse with LLM"),
-                    ("Enter", "New line"),
-                    ("Up/Down", "Move between lines"),
-                    ("?", "Help"),
-                    ("Esc", "Back"),
-                ],
-                Phase::Parsing => vec![
-                    ("Esc", "Cancel"),
-                ],
-                Phase::Preview => vec![
-                    ("j/k", "Navigate"),
-                    ("d", "Remove entry"),
-                    ("Enter/Ctrl+S", "Save all"),
-                    ("a", "Abbreviations"),
-                    ("Esc", "Back to edit"),
-                    ("?", "Help"),
-                ],
-            };
-            let bindings_refs: Vec<(&str, &str)> = bindings.iter().map(|(a, b)| (*a, *b)).collect();
-            render_help_overlay(frame, area, &bindings_refs);
-        }
     }
 
     fn render_input_pane(&self, frame: &mut Frame, area: Rect) {
         let block = Block::default()
             .title(format!(" {} ", tr("quicklog-input-title")))
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::DarkGray));
+            .border_style(Style::default().fg(BORDER_COLOR));
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
@@ -210,7 +183,7 @@ impl QuickLogScreen {
         let block = Block::default()
             .title(format!(" {} ", tr("quicklog-preview-title")))
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::DarkGray));
+            .border_style(Style::default().fg(BORDER_COLOR));
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
@@ -263,7 +236,7 @@ impl QuickLogScreen {
             let marker = if result.matched { "\u{2713}" } else { "\u{2717}" };
             let marker_color = if result.matched { GREEN } else { RED };
             let name_color = if result.matched {
-                if is_selected { GREEN } else { Color::White }
+                Color::White
             } else {
                 YELLOW
             };
@@ -334,11 +307,6 @@ impl QuickLogScreen {
                         format!(" {}  ", tr("quicklog-key-parse")),
                         Style::default().fg(Color::Gray),
                     ),
-                    Span::styled("[?]", Style::default().fg(ACCENT)),
-                    Span::styled(
-                        format!(" {}  ", tr("key-help")),
-                        Style::default().fg(Color::Gray),
-                    ),
                     Span::styled("[Esc]", Style::default().fg(ACCENT)),
                     Span::styled(
                         format!(" {}", tr("key-back")),
@@ -348,11 +316,6 @@ impl QuickLogScreen {
                 if self.llm_config.is_none() {
                     spans.clear();
                     spans.push(Span::styled(" ", Style::default()));
-                    spans.push(Span::styled("[?]", Style::default().fg(ACCENT)));
-                    spans.push(Span::styled(
-                        format!(" {}  ", tr("key-help")),
-                        Style::default().fg(Color::Gray),
-                    ));
                     spans.push(Span::styled("[Esc]", Style::default().fg(ACCENT)));
                     spans.push(Span::styled(
                         format!(" {}", tr("key-back")),
@@ -423,17 +386,8 @@ impl QuickLogScreen {
                 self.start_llm_parse();
                 Action::None
             }
-            KeyCode::Char('?') => {
-                self.show_help = !self.show_help;
-                Action::None
-            }
             KeyCode::Esc => {
-                if self.show_help {
-                    self.show_help = false;
-                    Action::None
-                } else {
-                    Action::Navigate(Screen::Dashboard)
-                }
+                Action::Navigate(Screen::Dashboard)
             }
             KeyCode::Enter => {
                 // Insert new line
@@ -600,17 +554,9 @@ impl QuickLogScreen {
                 self.save_all(db)
             }
             KeyCode::Char('a') => Action::Navigate(Screen::Abbreviations),
-            KeyCode::Char('?') => {
-                self.show_help = !self.show_help;
-                Action::None
-            }
             KeyCode::Esc => {
-                if self.show_help {
-                    self.show_help = false;
-                } else {
-                    self.phase = Phase::Input;
-                    self.parsed_results.clear();
-                }
+                self.phase = Phase::Input;
+                self.parsed_results.clear();
                 Action::None
             }
             _ => Action::None,

@@ -6,6 +6,7 @@ use std::path::Path;
 use crate::model::{Abbreviation, Goal, Log, LogEntry, Milestone, Practice, PracticeType, Quote, Set, SetData};
 
 /// Aggregate statistics over a time period.
+#[allow(dead_code)]
 pub struct AggregateStats {
     pub sessions: i64,
     pub total_volume: f64,
@@ -519,6 +520,7 @@ impl Database {
     }
 
     /// Returns aggregate statistics over the last `days` days.
+    #[allow(dead_code)]
     pub fn aggregate_stats(&self, days: i64) -> Result<AggregateStats> {
         let cutoff = Local::now().naive_local() - chrono::Duration::days(days);
         let sessions: i64 = self.conn.query_row(

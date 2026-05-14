@@ -3,7 +3,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap},
+    widgets::{Block, Borders, Cell, Paragraph, Row, Table, Wrap},
     Frame,
 };
 
@@ -12,12 +12,11 @@ use unicode_width::UnicodeWidthStr;
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
 use crate::model::{LogEntry, SetData};
-use super::{centered_area, highlight_row, render_help_overlay, render_status_line, Action, Screen, StatusMessage, CONTENT_WIDTH};
+use super::{centered_area, highlight_row, render_status_line, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH, TABLE_HEADER_BG};
 use fluent_bundle::FluentValue;
 
-const GREEN: Color = Color::Green;
 const ACCENT: Color = Color::Cyan;
-const NOTE_COLOR: Color = Color::Yellow;
+
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Mode {
@@ -35,7 +34,6 @@ pub struct HistoryScreen {
     mode: Mode,
     scroll_offset: usize,
     status_msg: StatusMessage,
-    show_help: bool,
     last_deleted: Option<LogEntry>,
 }
 
@@ -53,7 +51,6 @@ impl HistoryScreen {
             mode: Mode::Browse,
             scroll_offset: 0,
             status_msg: None,
-            show_help: false,
             last_deleted: None,
         })
     }
@@ -82,30 +79,26 @@ impl HistoryScreen {
             .filter_map(|&i| self.entries.get(i))
             .map(|e| e.practice_name.width())
             .max()
-            .unwrap_or(0);
-        let name_col = max_name_len + 2;
-        let list_width = (3 + 13 + 2 + name_col + 16) as u16;
+            .unwrap_or(4);
+        let name_col_w = (max_name_len + 2) as u16;
+        let marker_w: u16 = 2;     // "> " or "  "
+        let date_col_w: u16 = 11;  // "2026-05-12" + 1 padding
+        let vol_col_w: u16 = 16;
+        let border_w: u16 = 2;
+        let list_width = marker_w + date_col_w + name_col_w + vol_col_w + border_w;
 
-        // Horizontal split: list (left) | detail panel (right)
-        let h_chunks = Layout::default()
-            .direction(Direction::Horizontal)
+        // Vertical split: filter | main content (list + detail) | status | shortcuts
+        let v_chunks = Layout::default()
+            .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(list_width),
-                Constraint::Min(20),
+                Constraint::Length(1),  // [0] filter
+                Constraint::Min(1),    // [1] main content area (list + detail side by side)
+                Constraint::Length(1), // [2] status line
+                Constraint::Length(1), // [3] shortcuts
             ])
             .split(area);
 
-        // ── Left: title + filter + list + status + shortcuts ──
-        let left_chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(3),  // title + filter + column headers
-                Constraint::Min(1),    // scrollable list
-                Constraint::Length(1), // status line
-                Constraint::Length(1), // shortcuts
-            ])
-            .split(h_chunks[0]);
-
+        // Filter bar
         let filter_display = if self.filtering {
             let (before, after) = self.filter_text.split_at(self.filter_cursor);
             format!(" /{}{}{}", before, "\u{2588}", after)
@@ -119,31 +112,26 @@ impl HistoryScreen {
         } else {
             Style::default().fg(Color::Gray)
         };
-        let date_header = tr("history-col-date");
-        let practice_header = tr("history-col-practice");
-        let volume_header = tr("history-col-volume");
-        let header_name_padding = name_col.saturating_sub(practice_header.width());
-        let title_lines = vec![
-            Line::from(Span::styled(
-                tr("history-title"),
-                Style::default().fg(Color::White).bold(),
-            )),
-            Line::from(Span::styled(filter_display, filter_style)),
-            Line::from(vec![
-                Span::styled("   ", Style::default().fg(Color::DarkGray)),
-                Span::styled(&date_header, Style::default().fg(Color::DarkGray)),
-                Span::raw("  "),
-                Span::styled(&practice_header, Style::default().fg(Color::DarkGray)),
-                Span::raw(" ".repeat(header_name_padding)),
-                Span::styled(&volume_header, Style::default().fg(Color::DarkGray)),
-            ]),
-        ];
-        frame.render_widget(Paragraph::new(title_lines), left_chunks[0]);
+        let filter_line = Paragraph::new(Line::from(Span::styled(filter_display, filter_style)));
+        frame.render_widget(filter_line, v_chunks[0]);
 
-        let list_height = left_chunks[1].height as usize;
-        self.adjust_scroll(list_height);
-        self.render_list(frame, left_chunks[1], list_height, name_col);
+        // Horizontal split within main content: list (left) | detail (right)
+        let h_chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(list_width),
+                Constraint::Min(20),
+            ])
+            .split(v_chunks[1]);
 
+        let list_height = h_chunks[0].height as usize;
+        self.adjust_scroll(list_height.saturating_sub(3)); // -2 for border, -1 for header row
+        self.render_list(frame, h_chunks[0], list_height.saturating_sub(3), marker_w, name_col_w, date_col_w, vol_col_w);
+
+        // ── Right: detail panel ──
+        self.render_detail(frame, h_chunks[1]);
+
+        // Status + shortcuts
         let shortcuts = {
             let navigate_text = format!(" {}  ", tr("key-navigate"));
             let filter_text = format!(" {}  ", tr("key-filter"));
@@ -164,33 +152,14 @@ impl HistoryScreen {
                 spans.push(Span::styled("[u]", Style::default().fg(ACCENT)));
                 spans.push(Span::styled(undo_text, Style::default().fg(Color::Gray)));
             }
-            let help_text = format!(" {}  ", tr("key-help"));
-            spans.push(Span::styled("[?]", Style::default().fg(ACCENT)));
-            spans.push(Span::styled(help_text, Style::default().fg(Color::Gray)));
             let back_text = format!(" {}", tr("key-back"));
             spans.push(Span::styled("[Esc]", Style::default().fg(ACCENT)));
             spans.push(Span::styled(back_text, Style::default().fg(Color::Gray)));
             Line::from(spans)
         };
-        render_status_line(frame, left_chunks[2], &self.status_msg);
-        frame.render_widget(Paragraph::new(shortcuts), left_chunks[3]);
+        render_status_line(frame, v_chunks[2], &self.status_msg);
+        frame.render_widget(Paragraph::new(shortcuts), v_chunks[3]);
 
-        // ── Right: detail panel ──
-        self.render_detail(frame, h_chunks[1]);
-
-        // ── Help overlay ──
-        if self.show_help {
-            let bindings = &[
-                ("j/k", "Navigate"),
-                ("/", "Filter"),
-                ("e", "Edit"),
-                ("d", "Delete"),
-                ("u", "Undo"),
-                ("?", "Help"),
-                ("Esc", "Back"),
-            ];
-            render_help_overlay(frame, area, bindings);
-        }
     }
 
     /// Adjusts scroll_offset so the selected item is visible within the given height.
@@ -206,77 +175,123 @@ impl HistoryScreen {
         }
     }
 
-    fn render_list(&self, frame: &mut Frame, area: ratatui::layout::Rect, visible: usize, name_col: usize) {
+    #[allow(clippy::too_many_arguments)]
+    fn render_list(&self, frame: &mut Frame, area: ratatui::layout::Rect, visible: usize, marker_w: u16, name_col_w: u16, date_col_w: u16, vol_col_w: u16) {
+        let block = Block::default()
+            .title(Line::from(vec![
+                Span::styled("── ", Style::default().fg(BORDER_COLOR)),
+                Span::styled(tr("history-title"), Style::default().fg(Color::White).bold()),
+                Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
+            ]))
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(BORDER_COLOR));
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+
         if self.filtered_indices.is_empty() {
             let no_entries_text = format!("  {}", tr("history-no-entries"));
             let empty = Paragraph::new(Line::from(Span::styled(
                 no_entries_text,
                 Style::default().fg(Color::Gray),
             )));
-            frame.render_widget(empty, area);
+            frame.render_widget(empty, inner);
             return;
         }
 
-        let mut lines: Vec<Line> = Vec::new();
+        let hdr_style = Style::default().fg(Color::White).bg(TABLE_HEADER_BG).bold();
+        let header = Row::new(vec![
+            Cell::from(""),
+            Cell::from(Span::styled(tr("history-col-date"), hdr_style)),
+            Cell::from(Span::styled(tr("history-col-practice"), hdr_style)),
+            Cell::from(Span::styled(tr("history-col-volume"), hdr_style)),
+        ]).style(Style::default().bg(TABLE_HEADER_BG));
+
+        let mut rows: Vec<Row> = Vec::new();
         for (fi, &entry_idx) in self.filtered_indices.iter().enumerate().skip(self.scroll_offset).take(visible) {
             let entry = &self.entries[entry_idx];
-            let marker = if fi == self.selected { " > " } else { "   " };
-            let date = entry.log.logged_at.format("%Y %b %d").to_string();
+            let date = entry.log.logged_at.format("%Y-%m-%d").to_string();
             let total = format!("{:.0}", entry.total_metric());
             let label = entry.metric_label();
-            let name_padding = name_col.saturating_sub(entry.practice_name.width());
 
             let style = if fi == self.selected {
-                Style::default().fg(GREEN).bold()
+                Style::default().fg(Color::White).bold()
             } else {
                 Style::default().fg(Color::White)
             };
-            let dim = Style::default().fg(Color::Gray);
+            let dim = if fi == self.selected {
+                Style::default().fg(Color::White)
+            } else {
+                Style::default().fg(Color::Gray)
+            };
 
-            lines.push(Line::from(vec![
-                Span::styled(marker, style),
-                Span::styled(date, dim),
-                Span::raw("  "),
-                Span::styled(&entry.practice_name, style),
-                Span::raw(" ".repeat(name_padding)),
-                Span::styled(format!("{} {}", total, label), dim),
+            let marker = if fi == self.selected { ">" } else { " " };
+
+            rows.push(Row::new(vec![
+                Cell::from(Span::styled(marker, style)),
+                Cell::from(Span::styled(date, dim)),
+                Cell::from(Span::styled(entry.practice_name.clone(), style)),
+                Cell::from(Span::styled(format!("{} {}", total, label), dim)),
             ]));
 
             if fi == self.selected && self.mode == Mode::ConfirmDelete {
-                let confirm_text = format!("     {} ", tr("history-delete-confirm"));
-                lines.push(Line::from(vec![
-                    Span::styled(confirm_text, Style::default().fg(Color::Red)),
-                    Span::styled("[y]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::Gray)),
-                    Span::styled("[any]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::Gray)),
+                rows.push(Row::new(vec![
+                    Cell::from(""),
+                    Cell::from(""),
+                    Cell::from(Line::from(vec![
+                        Span::styled(format!("{} ", tr("history-delete-confirm")), Style::default().fg(Color::Red)),
+                        Span::styled("[y]", Style::default().fg(ACCENT)),
+                        Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::Gray)),
+                        Span::styled("[any]", Style::default().fg(ACCENT)),
+                        Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::Gray)),
+                    ])),
+                    Cell::from(""),
                 ]));
             }
         }
 
-        frame.render_widget(Paragraph::new(lines), area);
+        let table = Table::new(
+            rows,
+            [
+                Constraint::Length(marker_w),
+                Constraint::Length(date_col_w),
+                Constraint::Length(name_col_w),
+                Constraint::Length(vol_col_w),
+            ],
+        )
+        .header(header);
+
+        frame.render_widget(table, inner);
 
         if !self.filtered_indices.is_empty() && self.selected >= self.scroll_offset {
-            let row = (self.selected - self.scroll_offset) as u16;
-            highlight_row(frame, area, row);
+            let row = (self.selected - self.scroll_offset) as u16 + 1; // +1 for header row
+            highlight_row(frame, inner, row);
         }
     }
 
     fn render_detail(&self, frame: &mut Frame, area: ratatui::layout::Rect) {
         let Some(entry) = self.selected_entry() else {
             let block = Block::default()
-                .borders(Borders::LEFT)
-                .border_style(Style::default().fg(Color::DarkGray));
+                .title(Line::from(vec![
+                    Span::styled("── ", Style::default().fg(BORDER_COLOR)),
+                    Span::styled("Detail", Style::default().fg(Color::White).bold()),
+                    Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
+                ]))
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(BORDER_COLOR));
             frame.render_widget(block, area);
             return;
         };
 
-        let title = format!(" {} — {} ", entry.practice_name,
-            entry.log.logged_at.format("%Y %b %d"));
+        let title_text = format!(" {} — {} ", entry.practice_name,
+            entry.log.logged_at.format("%Y-%m-%d"));
         let block = Block::default()
-            .title(Span::styled(title, Style::default().fg(ACCENT)))
-            .borders(Borders::LEFT)
-            .border_style(Style::default().fg(Color::DarkGray));
+            .title(Line::from(vec![
+                Span::styled("── ", Style::default().fg(BORDER_COLOR)),
+                Span::styled(title_text, Style::default().fg(ACCENT).bold()),
+                Span::styled("──", Style::default().fg(BORDER_COLOR)),
+            ]))
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(BORDER_COLOR));
 
         let mut lines: Vec<Line> = Vec::new();
         lines.push(Line::from(""));
@@ -331,7 +346,7 @@ impl HistoryScreen {
                     ("vol", FluentValue::from(total_vol)),
                     ("vol_label", FluentValue::from(vol_label)),
                 ])),
-                Style::default().fg(Color::Green),
+                Style::default().fg(Color::White),
             )));
         }
 
@@ -356,12 +371,12 @@ impl HistoryScreen {
 
         if let Some(note) = &entry.log.note {
             lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled(
-                format!("  {}", tr_args("history-note", &[
-                    ("note", FluentValue::from(note.clone())),
-                ])),
-                Style::default().fg(NOTE_COLOR),
-            )));
+            let note_label = tr_args("history-note", &[
+                ("note", FluentValue::from(note.clone())),
+            ]);
+            lines.push(Line::from(vec![
+                Span::styled(format!("  {}", note_label), Style::default().fg(Color::White)),
+            ]));
         }
 
         let paragraph = Paragraph::new(lines).block(block).wrap(Wrap { trim: false });
@@ -499,15 +514,8 @@ impl HistoryScreen {
                 }
                 Action::None
             }
-            KeyCode::Char('?') => {
-                self.show_help = !self.show_help;
-                Action::None
-            }
             KeyCode::Esc => {
-                if self.show_help {
-                    self.show_help = false;
-                    Action::None
-                } else if !self.filter_text.is_empty() {
+                if !self.filter_text.is_empty() {
                     self.filter_text.clear();
                     self.filter_cursor = 0;
                     self.apply_filter();

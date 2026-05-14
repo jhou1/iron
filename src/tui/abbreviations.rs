@@ -12,7 +12,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
 use crate::model::Abbreviation;
-use super::{centered_area, highlight_row, render_help_overlay, render_status_line, visible_input_spans, Action, Screen, StatusMessage, CONTENT_WIDTH};
+use super::{centered_area, highlight_row, render_status_line, visible_input_spans, Action, Screen, StatusMessage, CONTENT_WIDTH};
 use fluent_bundle::FluentValue;
 
 const ACCENT: Color = Color::Cyan;
@@ -39,7 +39,6 @@ pub struct AbbreviationsScreen {
     full_cursor: usize,
     editing_id: Option<i64>,
     status_msg: StatusMessage,
-    show_help: bool,
 }
 
 impl AbbreviationsScreen {
@@ -55,7 +54,6 @@ impl AbbreviationsScreen {
             full_cursor: 0,
             editing_id: None,
             status_msg: None,
-            show_help: false,
         })
     }
 
@@ -128,7 +126,7 @@ impl AbbreviationsScreen {
                 .map(|(i, a)| {
                     let marker = if i == self.selected { "> " } else { "  " };
                     let style = if i == self.selected {
-                        Style::default().fg(GREEN).add_modifier(Modifier::BOLD)
+                        Style::default().fg(Color::White).add_modifier(Modifier::BOLD)
                     } else {
                         Style::default().fg(Color::White)
                     };
@@ -231,8 +229,6 @@ impl AbbreviationsScreen {
                 Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::Gray)),
                 Span::styled("[d]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::Gray)),
-                Span::styled("[?]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-help")), Style::default().fg(Color::Gray)),
                 Span::styled("[Esc]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::Gray)),
             ]),
@@ -251,18 +247,6 @@ impl AbbreviationsScreen {
         };
         frame.render_widget(Paragraph::new(vec![shortcuts]), chunks[4]);
 
-        // ── Help overlay ──
-        if self.show_help {
-            let bindings = &[
-                ("j/k", "Navigate"),
-                ("a", "Add"),
-                ("e", "Edit"),
-                ("d", "Delete"),
-                ("?", "Help"),
-                ("Esc", "Back"),
-            ];
-            render_help_overlay(frame, area, bindings);
-        }
     }
 
     pub fn handle_key(&mut self, key: KeyEvent, db: &Database) -> Action {
@@ -404,10 +388,6 @@ impl AbbreviationsScreen {
                 if !self.abbreviations.is_empty() {
                     self.mode = Mode::ConfirmDelete;
                 }
-                Action::None
-            }
-            KeyCode::Char('?') => {
-                self.show_help = !self.show_help;
                 Action::None
             }
             KeyCode::Esc => Action::Navigate(Screen::QuickLog),

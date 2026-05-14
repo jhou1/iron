@@ -3,7 +3,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::Paragraph,
+    widgets::{Block, Borders, Paragraph},
     Frame,
 };
 
@@ -12,7 +12,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
 use crate::model::{Practice, PracticeType};
-use super::{centered_area, highlight_row, render_help_overlay, render_status_line, visible_input_spans, Action, Screen, StatusMessage, CONTENT_WIDTH};
+use super::{centered_area, highlight_row, render_status_line, visible_input_spans, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH, TABLE_HEADER_BG};
 use fluent_bundle::FluentValue;
 
 const ACCENT: Color = Color::Cyan;
@@ -36,7 +36,6 @@ pub struct PracticesScreen {
     input_cursor: usize,
     type_selected: usize,
     status_msg: StatusMessage,
-    show_help: bool,
 }
 
 impl PracticesScreen {
@@ -50,7 +49,6 @@ impl PracticesScreen {
             input_cursor: 0,
             type_selected: 0,
             status_msg: None,
-            show_help: false,
         })
     }
 
@@ -77,16 +75,15 @@ impl PracticesScreen {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(2),             // title + header
-                Constraint::Length(list_height),   // practice list
-                Constraint::Length(action_height), // input/action area
-                Constraint::Length(1),             // status message
-                Constraint::Length(1),             // shortcuts
-                Constraint::Min(0),                // spacer
+                Constraint::Length(list_height + 3), // bordered block: title/header row + list + border
+                Constraint::Length(action_height),   // input/action area
+                Constraint::Length(1),               // status message
+                Constraint::Length(1),               // shortcuts
+                Constraint::Min(0),                  // spacer
             ])
             .split(area);
 
-        // ── Title + header ──
+        // ── Bordered practice list ──
         let max_name_len = self.practices.iter()
             .map(|p| p.name.width())
             .max()
@@ -95,76 +92,83 @@ impl PracticesScreen {
 
         let name_header = tr("practices-col-name");
         let type_header = tr("practices-col-type");
-        let status_header = tr("practices-col-status");
         let header_padding = col_width.saturating_sub(name_header.width());
         let type_col_width = self.practices.iter()
             .map(|p| p.practice_type.label().width())
             .max()
             .unwrap_or(0)
             .max(type_header.width()) + 2;
-        let type_header_padding = type_col_width.saturating_sub(type_header.width());
-        let title_lines = vec![
-            Line::from(Span::styled(
-                tr("practices-title"),
-                Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
-            )),
-            Line::from(vec![
-                Span::styled("  ", Style::default().fg(Color::DarkGray)),
-                Span::styled(&name_header, Style::default().fg(Color::DarkGray)),
-                Span::raw(" ".repeat(header_padding)),
-                Span::styled(&type_header, Style::default().fg(Color::DarkGray)),
-                Span::raw(" ".repeat(type_header_padding)),
-                Span::styled(&status_header, Style::default().fg(Color::DarkGray)),
-            ]),
-        ];
-        frame.render_widget(Paragraph::new(title_lines), chunks[0]);
 
-        // ── Practice list ──
-        let list_lines: Vec<Line> = if self.practices.is_empty() {
-            vec![Line::from(Span::styled(
+        let block = Block::default()
+            .title(Line::from(vec![
+                Span::styled("── ", Style::default().fg(BORDER_COLOR)),
+                Span::styled(tr("practices-title"), Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+                Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
+            ]))
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(BORDER_COLOR));
+        let inner = block.inner(chunks[0]);
+        frame.render_widget(block, chunks[0]);
+
+        let hdr_style = Style::default().fg(Color::White).bg(TABLE_HEADER_BG).add_modifier(Modifier::BOLD);
+        let hdr_bg = Style::default().bg(TABLE_HEADER_BG);
+        let header_line = Line::from(vec![
+            Span::styled("  ", hdr_bg),
+            Span::styled(&name_header, hdr_style),
+            Span::styled(" ".repeat(header_padding), hdr_bg),
+            Span::styled(&type_header, hdr_style),
+        ]);
+
+        let mut all_lines = vec![header_line];
+
+        if self.practices.is_empty() {
+            all_lines.push(Line::from(Span::styled(
                 tr("practices-no-items"),
                 Style::default().fg(Color::Gray),
-            ))]
+            )));
         } else {
-            self.practices
-                .iter()
-                .enumerate()
-                .map(|(i, p)| {
-                    let marker = if i == self.selected { "> " } else { "  " };
-                    let (name_style, type_color, status_color) = if i == self.selected {
-                        if p.active {
-                            (Style::default().fg(GREEN).add_modifier(Modifier::BOLD), Color::Gray, GREEN)
-                        } else {
-                            (Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD), Color::DarkGray, Color::DarkGray)
-                        }
-                    } else if p.active {
-                        (Style::default().fg(Color::White), Color::Gray, GREEN)
+            for (i, p) in self.practices.iter().enumerate() {
+                let marker = if i == self.selected { "> " } else { "  " };
+                let (name_style, type_color) = if i == self.selected {
+                    if p.active {
+                        (Style::default().fg(Color::White).add_modifier(Modifier::BOLD), Color::Gray)
                     } else {
-                        (Style::default().fg(Color::DarkGray), Color::DarkGray, Color::DarkGray)
-                    };
-                    let padding = col_width.saturating_sub(p.name.width());
-                    let type_label = p.practice_type.label();
-                    let type_padding = type_col_width.saturating_sub(type_label.width());
-                    let status_text = if p.active {
-                        tr("practices-status-active")
-                    } else {
-                        tr("practices-status-inactive")
-                    };
-                    Line::from(vec![
-                        Span::styled(marker, name_style),
-                        Span::styled(&p.name, name_style),
-                        Span::raw(" ".repeat(padding)),
-                        Span::styled(type_label, Style::default().fg(type_color)),
-                        Span::raw(" ".repeat(type_padding)),
-                        Span::styled(status_text, Style::default().fg(status_color)),
-                    ])
-                })
-                .collect()
-        };
-        frame.render_widget(Paragraph::new(list_lines), chunks[1]);
+                        (Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD), Color::DarkGray)
+                    }
+                } else if p.active {
+                    (Style::default().fg(Color::White), Color::Gray)
+                } else {
+                    (Style::default().fg(Color::DarkGray), Color::DarkGray)
+                };
+                let padding = col_width.saturating_sub(p.name.width());
+                let type_label = p.practice_type.label();
+                let type_padding = type_col_width.saturating_sub(type_label.width());
+                let toggle = if p.active {
+                    vec![
+                        Span::styled("\u{25B0}", Style::default().fg(GREEN)),
+                        Span::styled("\u{25B1}", Style::default().fg(Color::DarkGray)),
+                    ]
+                } else {
+                    vec![
+                        Span::styled("\u{25B1}", Style::default().fg(Color::DarkGray)),
+                        Span::styled("\u{25B0}", Style::default().fg(Color::DarkGray)),
+                    ]
+                };
+                let mut spans = vec![
+                    Span::styled(marker, name_style),
+                    Span::styled(&p.name, name_style),
+                    Span::raw(" ".repeat(padding)),
+                    Span::styled(type_label, Style::default().fg(type_color)),
+                    Span::raw(" ".repeat(type_padding)),
+                ];
+                spans.extend(toggle);
+                all_lines.push(Line::from(spans));
+            }
+        }
+        frame.render_widget(Paragraph::new(all_lines), inner);
 
         if !self.practices.is_empty() {
-            highlight_row(frame, chunks[1], self.selected as u16);
+            highlight_row(frame, inner, self.selected as u16 + 1); // +1 for header row
         }
 
         // ── Input/action area ──
@@ -198,7 +202,7 @@ impl PracticesScreen {
                 for (i, pt) in PracticeType::ALL.iter().enumerate() {
                     let marker = if i == self.type_selected { "> " } else { "  " };
                     let style = if i == self.type_selected {
-                        Style::default().fg(GREEN).add_modifier(Modifier::BOLD)
+                        Style::default().fg(Color::White).add_modifier(Modifier::BOLD)
                     } else {
                         Style::default().fg(Color::Gray)
                     };
@@ -243,14 +247,14 @@ impl PracticesScreen {
                 ]
             }
         };
-        frame.render_widget(Paragraph::new(action_lines), chunks[2]);
+        frame.render_widget(Paragraph::new(action_lines), chunks[1]);
 
         if self.mode == Mode::AddType {
-            highlight_row(frame, chunks[2], (self.type_selected + 1) as u16);
+            highlight_row(frame, chunks[1], (self.type_selected + 1) as u16);
         }
 
         // ── Status line ──
-        render_status_line(frame, chunks[3], &self.status_msg);
+        render_status_line(frame, chunks[2], &self.status_msg);
 
         // ── Shortcuts ──
         let shortcuts = match &self.mode {
@@ -265,8 +269,6 @@ impl PracticesScreen {
                 Span::styled(format!(" {}  ", tr("key-toggle")), Style::default().fg(Color::Gray)),
                 Span::styled("[d]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::Gray)),
-                Span::styled("[?]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-help")), Style::default().fg(Color::Gray)),
                 Span::styled("[Esc]", Style::default().fg(ACCENT)),
                 Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::Gray)),
             ]),
@@ -291,21 +293,8 @@ impl PracticesScreen {
                 Span::styled(format!(" {}", tr("key-no")), Style::default().fg(Color::Gray)),
             ]),
         };
-        frame.render_widget(Paragraph::new(vec![shortcuts]), chunks[4]);
+        frame.render_widget(Paragraph::new(vec![shortcuts]), chunks[3]);
 
-        // ── Help overlay ──
-        if self.show_help {
-            let bindings = &[
-                ("j/k", "Navigate"),
-                ("a", "Add"),
-                ("e", "Edit"),
-                ("t", "Toggle active"),
-                ("d", "Delete"),
-                ("?", "Help"),
-                ("Esc", "Back"),
-            ];
-            render_help_overlay(frame, area, bindings);
-        }
     }
 
     pub fn handle_key(&mut self, key: KeyEvent, db: &Database) -> Action {
@@ -453,10 +442,6 @@ impl PracticesScreen {
                 if !self.practices.is_empty() {
                     self.mode = Mode::ConfirmDelete;
                 }
-                Action::None
-            }
-            KeyCode::Char('?') => {
-                self.show_help = !self.show_help;
                 Action::None
             }
             KeyCode::Esc => Action::Navigate(Screen::Dashboard),

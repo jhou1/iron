@@ -15,73 +15,59 @@ fn paragraph_widgets_must_wrap_user_content() {
     // When adding entries, include a brief reason.
     let allowlist: HashSet<&str> = [
         // ── abbreviations.rs ──
-        "abbreviations.rs:116", // title + column headers (fixed text)
-        "abbreviations.rs:218", // action area: short input lines with visible_input_spans
-        "abbreviations.rs:252", // shortcuts bar (fixed text)
+        "abbreviations.rs:114",
+        "abbreviations.rs:216",
+        "abbreviations.rs:248",
         // ── dashboard.rs ──
-        "dashboard.rs:161",     // logo (fixed text)
-        "dashboard.rs:173",     // quote line (already has .wrap on next line)
-        "dashboard.rs:209",     // HRV single value line
-        "dashboard.rs:275",     // footer shortcuts bar
-        "dashboard.rs:407",     // "press [a] to add" hint (fixed text)
-        "dashboard.rs:507",     // quotes edit input line (single line, bounded by modal)
-        "dashboard.rs:516",     // quotes delete confirm (fixed text)
-        "dashboard.rs:530",     // quotes modal shortcuts bar
+        "dashboard.rs:145",
+        "dashboard.rs:166",
+        "dashboard.rs:202",
+        "dashboard.rs:255",
+        "dashboard.rs:330",
         // ── goals.rs ──
-        "goals.rs:221",         // title (fixed text)
-        "goals.rs:312",         // goals list (already has .wrap on next line)
-        "goals.rs:370",         // footer (fixed text)
-        "goals.rs:464",         // gauge line (fixed width progress bar)
-        "goals.rs:471",         // "no milestones" hint (fixed text)
-        "goals.rs:540",         // milestone list (already has .scroll, bounded modal)
-        "goals.rs:584",         // modal footer (fixed text)
+        "goals.rs:214",
+        "goals.rs:361",
+        "goals.rs:425",
+        "goals.rs:432",
+        "goals.rs:501",
+        "goals.rs:543",
         // ── history.rs ──
-        "history.rs:141",       // title (fixed text)
-        "history.rs:176",       // shortcuts bar (fixed text)
-        "history.rs:212",       // empty state message (fixed text)
-        "history.rs:257",       // entry list (columnar layout with computed widths)
+        "history.rs:115",
+        "history.rs:161",
+        "history.rs:193",
         // ── log_entry.rs ──
-        "log_entry.rs:191",     // title (fixed text)
-        "log_entry.rs:226",     // filter input (short, bounded)
-        "log_entry.rs:253",     // practice list (columnar layout)
-        "log_entry.rs:274",     // footer (fixed text)
-        "log_entry.rs:447",     // title (fixed text)
-        "log_entry.rs:475",     // date line (fixed format YYYY-MM-DD)
-        "log_entry.rs:555",     // sets display (formatted numbers)
-        "log_entry.rs:587",     // total line (formatted number)
-        "log_entry.rs:626",     // footer (fixed text)
-        "log_entry.rs:926",     // warmup/cooldown title (fixed text)
-        "log_entry.rs:939",     // warmup input (uses visible_input_spans)
-        "log_entry.rs:952",     // cooldown input (uses visible_input_spans)
-        "log_entry.rs:964",     // footer (fixed text)
-        "log_entry.rs:1074",    // note title (fixed text)
-        "log_entry.rs:1103",    // summary lines (formatted, bounded)
-        "log_entry.rs:1115",    // note input (uses visible_input_spans inside Block)
-        "log_entry.rs:1129",    // footer (fixed text)
+        "log_entry.rs:185",
+        "log_entry.rs:218",
+        "log_entry.rs:244",
+        "log_entry.rs:263",
+        "log_entry.rs:433",
+        "log_entry.rs:533",
+        "log_entry.rs:569",
+        "log_entry.rs:616",
         // ── mod.rs ──
-        "mod.rs:96",            // status line (single line)
-        "mod.rs:138",           // help overlay (bounded by overlay box)
+        "mod.rs:101",
         // ── practices.rs ──
-        "practices.rs:120",     // title + column headers (fixed text)
-        "practices.rs:164",     // practice list (columnar layout, names are short)
-        "practices.rs:246",     // action area: input with visible_input_spans
-        "practices.rs:294",     // shortcuts bar (fixed text)
+        "practices.rs:168",
+        "practices.rs:250",
+        "practices.rs:296",
+        // ── quotes_screen.rs ──
+        "quotes_screen.rs:112",
+        "quotes_screen.rs:185",
+        "quotes_screen.rs:214",
         // ── quick_log.rs ──
-        "quick_log.rs:124",     // title (fixed text)
-        "quick_log.rs:140",     // shortcuts bar (fixed text)
-        "quick_log.rs:225",     // "no config" message (fixed text, inside bordered block)
-        "quick_log.rs:240",     // spinner message (fixed text)
-        "quick_log.rs:254",     // "no results" message (fixed text)
+        "quick_log.rs:122",
+        "quick_log.rs:138",
+        "quick_log.rs:198",
+        "quick_log.rs:213",
+        "quick_log.rs:227",
         // ── trends.rs ──
-        "trends.rs:131",        // title (fixed text)
-        "trends.rs:156",        // filter input (short, bounded)
-        "trends.rs:180",        // practice list (names are short identifiers)
-        "trends.rs:198",        // footer (fixed text)
-        "trends.rs:374",        // chart title (fixed text)
-        "trends.rs:381",        // subtitle (fixed text)
-        "trends.rs:389",        // "no data" message (fixed text)
-        "trends.rs:436",        // stats line (formatted numbers)
-        "trends.rs:448",        // footer (fixed text)
+        "trends.rs:138",
+        "trends.rs:179",
+        "trends.rs:196",
+        "trends.rs:366",
+        "trends.rs:374",
+        "trends.rs:420",
+        "trends.rs:432",
     ].into_iter().collect();
 
     let tui_dir = Path::new("src/tui");

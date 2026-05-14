@@ -4,7 +4,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::Paragraph,
+    widgets::{Block, Borders, Paragraph},
     Frame,
 };
 
@@ -15,7 +15,7 @@ use crate::i18n::{tr, tr_args};
 use crate::model::{LogEntry, Practice};
 use fluent_bundle::FluentValue;
 use super::widgets::sparkline::Sparkline;
-use super::{centered_area, highlight_row, render_help_overlay, Action, Screen, CONTENT_WIDTH};
+use super::{centered_area, highlight_row, Action, Screen, BORDER_COLOR, CONTENT_WIDTH, TABLE_HEADER_BG};
 
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
@@ -39,7 +39,6 @@ pub struct TrendsScreen {
     days_window: i64,
     entries: Vec<LogEntry>,
     needs_refresh: bool,
-    show_help: bool,
 }
 
 impl TrendsScreen {
@@ -58,7 +57,6 @@ impl TrendsScreen {
             days_window: 90,
             entries: Vec::new(),
             needs_refresh: false,
-            show_help: false,
         })
     }
 
@@ -106,15 +104,13 @@ impl TrendsScreen {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1),           // title
-                Constraint::Length(2),           // filter bar
-                Constraint::Length(list_height), // list
-                Constraint::Length(1),           // footer
-                Constraint::Min(0),              // spacer
+                Constraint::Length(1),                // filter bar
+                Constraint::Length(list_height + 3),  // bordered block (header + list + borders)
+                Constraint::Length(1),                // footer
+                Constraint::Min(0),                   // spacer
             ])
             .split(area);
 
-        // Title + header
         let max_name_len = self.practices.iter()
             .map(|p| p.name.width())
             .max()
@@ -124,13 +120,8 @@ impl TrendsScreen {
         let name_header = tr("practices-col-name");
         let type_header = tr("practices-col-type");
         let header_padding = col_width.saturating_sub(name_header.width());
-        let title = Line::from(Span::styled(
-            format!(" {}", tr("trends-title")),
-            Style::default().fg(ACCENT).bold(),
-        ));
-        frame.render_widget(Paragraph::new(title), chunks[0]);
 
-        // Filter bar + column header
+        // Filter bar
         let filter_display = if self.filtering {
             let (before, after) = self.filter_text.split_at(self.filter_cursor);
             format!(" /{}{}{}", before, "\u{2588}", after)
@@ -144,44 +135,51 @@ impl TrendsScreen {
         } else {
             Style::default().fg(Color::Gray)
         };
-        let filter_lines = vec![
-            Line::from(Span::styled(filter_display, filter_style)),
+        frame.render_widget(Paragraph::new(Line::from(Span::styled(filter_display, filter_style))), chunks[0]);
+
+        // Bordered list
+        let block = Block::default()
+            .title(Line::from(vec![
+                Span::styled("── ", Style::default().fg(BORDER_COLOR)),
+                Span::styled(tr("trends-title"), Style::default().fg(Color::White).bold()),
+                Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
+            ]))
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(BORDER_COLOR));
+        let inner = block.inner(chunks[1]);
+        frame.render_widget(block, chunks[1]);
+
+        let hdr_style = Style::default().fg(Color::White).bg(TABLE_HEADER_BG).bold();
+        let hdr_bg = Style::default().bg(TABLE_HEADER_BG);
+        let mut all_lines = vec![
             Line::from(vec![
-                Span::styled("  ", Style::default().fg(Color::DarkGray)),
-                Span::styled(&name_header, Style::default().fg(Color::DarkGray)),
-                Span::raw(" ".repeat(header_padding)),
-                Span::styled(&type_header, Style::default().fg(Color::DarkGray)),
+                Span::styled("  ", hdr_bg),
+                Span::styled(&name_header, hdr_style),
+                Span::styled(" ".repeat(header_padding), hdr_bg),
+                Span::styled(&type_header, hdr_style),
             ]),
         ];
-        frame.render_widget(Paragraph::new(filter_lines), chunks[1]);
 
-        // Practice list
-        let lines: Vec<Line> = self
-            .filtered_indices
-            .iter()
-            .enumerate()
-            .map(|(i, &idx)| {
-                let practice = &self.practices[idx];
-                let marker = if i == self.selected { "> " } else { "  " };
-                let name_style = if i == self.selected {
-                    Style::default().fg(GREEN).bold()
-                } else {
-                    Style::default().fg(Color::White)
-                };
-                let padding = col_width.saturating_sub(practice.name.width());
-                Line::from(vec![
-                    Span::styled(marker, name_style),
-                    Span::styled(&practice.name, name_style),
-                    Span::raw(" ".repeat(padding)),
-                    Span::styled(practice.practice_type.label(), Style::default().fg(Color::Gray)),
-                ])
-            })
-            .collect();
-        let list = Paragraph::new(lines);
-        frame.render_widget(list, chunks[2]);
+        for (i, &idx) in self.filtered_indices.iter().enumerate() {
+            let practice = &self.practices[idx];
+            let marker = if i == self.selected { "> " } else { "  " };
+            let name_style = if i == self.selected {
+                Style::default().fg(Color::White).bold()
+            } else {
+                Style::default().fg(Color::White)
+            };
+            let padding = col_width.saturating_sub(practice.name.width());
+            all_lines.push(Line::from(vec![
+                Span::styled(marker, name_style),
+                Span::styled(&practice.name, name_style),
+                Span::raw(" ".repeat(padding)),
+                Span::styled(practice.practice_type.label(), Style::default().fg(Color::Gray)),
+            ]));
+        }
+        frame.render_widget(Paragraph::new(all_lines), inner);
 
         if !self.filtered_indices.is_empty() {
-            highlight_row(frame, chunks[2], self.selected as u16);
+            highlight_row(frame, inner, self.selected as u16 + 1); // +1 for header
         }
 
         // Footer
@@ -195,19 +193,8 @@ impl TrendsScreen {
             Span::styled("[Esc]", Style::default().fg(ACCENT)),
             Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::Gray)),
         ]);
-        frame.render_widget(Paragraph::new(footer), chunks[3]);
+        frame.render_widget(Paragraph::new(footer), chunks[2]);
 
-        // Help overlay
-        if self.show_help {
-            let bindings = &[
-                ("j/k", "Navigate"),
-                ("/", "Filter"),
-                ("Enter", "Select"),
-                ("?", "Help"),
-                ("Esc", "Back"),
-            ];
-            render_help_overlay(frame, area, bindings);
-        }
     }
 
     fn handle_select_practice(&mut self, key: KeyEvent) -> Action {
@@ -308,10 +295,6 @@ impl TrendsScreen {
                 }
                 Action::None
             }
-            KeyCode::Char('?') => {
-                self.show_help = !self.show_help;
-                Action::None
-            }
             _ => Action::None,
         }
     }
@@ -341,44 +324,46 @@ impl TrendsScreen {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1),            // title
-                Constraint::Length(1),            // subtitle
-                Constraint::Length(1),            // spacer
-                Constraint::Length(chart_height), // chart
-                Constraint::Length(1),            // stats
-                Constraint::Length(1),            // footer
-                Constraint::Min(0),               // spacer
+                Constraint::Length(chart_height + 4), // bordered block (title + subtitle + chart + stats + borders)
+                Constraint::Length(1),                // footer
+                Constraint::Min(0),                   // spacer
             ])
             .split(area);
 
-        // Title: practice name + metric label + practice type
+        // Bordered chart block
         let metric_label = self
             .entries
             .first()
             .map(|e| e.metric_label())
             .unwrap_or_else(|| "\u{2014}".to_string());
-        let title = Line::from(vec![
-            Span::styled(
-                format!(" {} ", practice.name),
-                Style::default().fg(ACCENT).bold(),
-            ),
-            Span::styled(
-                format!("({}) ", metric_label),
-                Style::default().fg(Color::White),
-            ),
-            Span::styled(
-                format!("[{}]", practice.practice_type.label()),
-                Style::default().fg(Color::Gray),
-            ),
-        ]);
-        frame.render_widget(Paragraph::new(title), chunks[0]);
+        let block_title = format!(" {} ({}) [{}] ", practice.name, metric_label, practice.practice_type.label());
+        let block = Block::default()
+            .title(Line::from(vec![
+                Span::styled("── ", Style::default().fg(BORDER_COLOR)),
+                Span::styled(&block_title, Style::default().fg(ACCENT).bold()),
+                Span::styled("──", Style::default().fg(BORDER_COLOR)),
+            ]))
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(BORDER_COLOR));
+        let inner = block.inner(chunks[0]);
+        frame.render_widget(block, chunks[0]);
+
+        // Inner layout: subtitle | chart | stats
+        let inner_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1),            // subtitle
+                Constraint::Min(1),              // chart
+                Constraint::Length(1),            // stats
+            ])
+            .split(inner);
 
         // Subtitle
         let subtitle = Line::from(Span::styled(
             format!(" {}", tr_args("trends-last-days", &[("days", FluentValue::from(self.days_window as f64))])),
             Style::default().fg(Color::Gray),
         ));
-        frame.render_widget(Paragraph::new(subtitle), chunks[1]);
+        frame.render_widget(Paragraph::new(subtitle), inner_chunks[0]);
 
         // Chart
         if self.entries.is_empty() {
@@ -386,7 +371,7 @@ impl TrendsScreen {
                 format!("  {}", tr("trends-no-data")),
                 Style::default().fg(Color::Gray),
             ));
-            frame.render_widget(Paragraph::new(msg), chunks[3]);
+            frame.render_widget(Paragraph::new(msg), inner_chunks[1]);
         } else {
             let chart_data: Vec<(String, f64)> = self
                 .entries
@@ -398,7 +383,6 @@ impl TrendsScreen {
                         || e.log.logged_at.month()
                             != self.entries[i - 1].log.logged_at.month()
                     {
-                        // First entry or month boundary — day on row 1, month on row 2
                         let month = e.log.logged_at.format("%b").to_string();
                         format!("{}\n{}", day, month)
                     } else {
@@ -408,7 +392,7 @@ impl TrendsScreen {
                 })
                 .collect();
             let sparkline = Sparkline::new(chart_data);
-            frame.render_widget(sparkline, chunks[3]);
+            frame.render_widget(sparkline, inner_chunks[1]);
         }
 
         // Stats
@@ -433,7 +417,7 @@ impl TrendsScreen {
                     Style::default().fg(trend_color),
                 ),
             ]);
-            frame.render_widget(Paragraph::new(stats_line), chunks[4]);
+            frame.render_widget(Paragraph::new(stats_line), inner_chunks[2]);
         }
 
         // Footer
@@ -445,18 +429,8 @@ impl TrendsScreen {
             Span::styled("[Esc]", Style::default().fg(ACCENT)),
             Span::styled(format!(" {}", tr("key-dashboard")), Style::default().fg(Color::Gray)),
         ]);
-        frame.render_widget(Paragraph::new(footer), chunks[5]);
+        frame.render_widget(Paragraph::new(footer), chunks[1]);
 
-        // Help overlay
-        if self.show_help {
-            let bindings = &[
-                ("h/l", "Adjust window"),
-                ("/", "Pick practice"),
-                ("?", "Help"),
-                ("Esc", "Back"),
-            ];
-            render_help_overlay(frame, area, bindings);
-        }
     }
 
     fn handle_view_chart(&mut self, key: KeyEvent) -> Action {
@@ -490,10 +464,6 @@ impl TrendsScreen {
                     }
                     self.needs_refresh = true;
                 }
-                Action::None
-            }
-            KeyCode::Char('?') => {
-                self.show_help = !self.show_help;
                 Action::None
             }
             _ => Action::None,

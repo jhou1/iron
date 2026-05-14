@@ -21,6 +21,7 @@ use crate::tui::{
     log_entry::LogEntryScreen,
     practices::PracticesScreen,
     quick_log::QuickLogScreen,
+    quotes_screen::QuotesScreen,
     trends::TrendsScreen,
     Action, Screen,
 };
@@ -51,6 +52,7 @@ fn run_app(
     let config = Config::load();
     let mut quick_log = QuickLogScreen::new(db, &config.llm)?;
     let mut abbreviations = AbbreviationsScreen::new(db)?;
+    let mut quotes_screen = QuotesScreen::new(db)?;
 
     loop {
         terminal.draw(|frame| {
@@ -76,6 +78,7 @@ fn run_app(
                 Screen::Practices => practices.render(frame),
                 Screen::QuickLog => quick_log.render(frame),
                 Screen::Abbreviations => abbreviations.render(frame),
+                Screen::Quotes => quotes_screen.render(frame),
             }
         })?;
 
@@ -106,6 +109,7 @@ fn run_app(
                 Screen::Practices => practices.handle_key(key, db),
                 Screen::QuickLog => quick_log.handle_key(key, db),
                 Screen::Abbreviations => abbreviations.handle_key(key, db),
+                Screen::Quotes => quotes_screen.handle_key(key, db),
             };
 
             if let Screen::QuickLog = current_screen {
@@ -141,6 +145,9 @@ fn run_app(
                         }
                         Screen::Abbreviations => {
                             abbreviations = AbbreviationsScreen::new(db)?;
+                        }
+                        Screen::Quotes => {
+                            quotes_screen = QuotesScreen::new(db)?;
                         }
                     }
                     current_screen = screen;

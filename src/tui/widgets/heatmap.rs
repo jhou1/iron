@@ -31,7 +31,7 @@ impl<'a> Heatmap<'a> {
             }
         } else {
             match count {
-                0 => Color::Indexed(236),  // dark gray
+                0 => Color::Indexed(240),  // visible gray on dark terminals
                 1 => Color::Indexed(22),   // dark green
                 2 => Color::Indexed(28),   // medium green
                 3 => Color::Indexed(34),   // bright green
@@ -156,7 +156,7 @@ impl<'a> Widget for Heatmap<'a> {
             } else {
                 Line::from(vec![
                     Span::styled(format!("{} ", crate::i18n::tr("heatmap-less")), Style::default().fg(Color::Gray)),
-                    Span::styled("\u{25CF}", Style::default().fg(Color::Indexed(236))), Span::raw(" "),
+                    Span::styled("\u{25CF}", Style::default().fg(Color::Indexed(240))), Span::raw(" "),
                     Span::styled("\u{25CF}", Style::default().fg(Color::Indexed(22))),  Span::raw(" "),
                     Span::styled("\u{25CF}", Style::default().fg(Color::Indexed(28))),  Span::raw(" "),
                     Span::styled("\u{25CF}", Style::default().fg(Color::Indexed(34))),  Span::raw(" "),
