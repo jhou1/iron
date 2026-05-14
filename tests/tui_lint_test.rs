@@ -15,14 +15,14 @@ fn paragraph_widgets_must_wrap_user_content() {
     // When adding entries, include a brief reason.
     let allowlist: HashSet<&str> = [
         // ── abbreviations.rs ──
-        "abbreviations.rs:114",
-        "abbreviations.rs:216",
-        "abbreviations.rs:248",
+        "abbreviations.rs:115",
+        "abbreviations.rs:217",
+        "abbreviations.rs:249",
         // ── dashboard.rs ──
-        "dashboard.rs:143",
-        "dashboard.rs:164",
-        "dashboard.rs:222",
-        "dashboard.rs:297",
+        "dashboard.rs:145",
+        "dashboard.rs:170",
+        "dashboard.rs:239",
+        "dashboard.rs:314",
         // ── goals.rs ──
         "goals.rs:214",
         "goals.rs:361",
@@ -39,26 +39,26 @@ fn paragraph_widgets_must_wrap_user_content() {
         "log_entry.rs:218",
         "log_entry.rs:244",
         "log_entry.rs:263",
-        "log_entry.rs:433",
-        "log_entry.rs:533",
-        "log_entry.rs:569",
-        "log_entry.rs:616",
+        "log_entry.rs:434",
+        "log_entry.rs:534",
+        "log_entry.rs:570",
+        "log_entry.rs:617",
         // ── mod.rs ──
         "mod.rs:102",
         // ── practices.rs ──
-        "practices.rs:167",
-        "practices.rs:249",
-        "practices.rs:295",
+        "practices.rs:168",
+        "practices.rs:250",
+        "practices.rs:296",
         // ── quotes_screen.rs ──
-        "quotes_screen.rs:112",
-        "quotes_screen.rs:185",
-        "quotes_screen.rs:214",
+        "quotes_screen.rs:148",
+        "quotes_screen.rs:221",
+        "quotes_screen.rs:250",
         // ── quick_log.rs ──
         "quick_log.rs:122",
-        "quick_log.rs:138",
-        "quick_log.rs:198",
-        "quick_log.rs:213",
-        "quick_log.rs:227",
+        "quick_log.rs:142",
+        "quick_log.rs:202",
+        "quick_log.rs:217",
+        "quick_log.rs:231",
         // ── trends.rs ──
         "trends.rs:138",
         "trends.rs:178",

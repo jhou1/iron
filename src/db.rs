@@ -520,7 +520,6 @@ impl Database {
     }
 
     /// Returns aggregate statistics over the last `days` days.
-    #[allow(dead_code)]
     pub fn aggregate_stats(&self, days: i64) -> Result<AggregateStats> {
         let cutoff = Local::now().naive_local() - chrono::Duration::days(days);
         let sessions: i64 = self.conn.query_row(

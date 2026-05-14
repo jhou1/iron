@@ -82,6 +82,7 @@ impl AbbreviationsScreen {
             .constraints([
                 Constraint::Length(2),             // title + header
                 Constraint::Length(list_height),   // abbreviation list
+                Constraint::Length(1),             // spacer
                 Constraint::Length(action_height), // input/action area
                 Constraint::Length(1),             // status message
                 Constraint::Length(1),             // shortcuts
@@ -213,39 +214,39 @@ impl AbbreviationsScreen {
                 ]
             }
         };
-        frame.render_widget(Paragraph::new(action_lines), chunks[2]);
+        frame.render_widget(Paragraph::new(action_lines), chunks[3]);
 
         // ── Status line ──
-        render_status_line(frame, chunks[3], &self.status_msg);
+        render_status_line(frame, chunks[4], &self.status_msg);
 
         // ── Shortcuts ──
         let shortcuts = match &self.mode {
             Mode::Browse => Line::from(vec![
                 Span::styled(" [j/k]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-navigate")), Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-navigate")), Style::default().fg(Color::DarkGray)),
                 Span::styled("[a]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-add")), Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-add")), Style::default().fg(Color::DarkGray)),
                 Span::styled("[e]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::DarkGray)),
                 Span::styled("[d]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::DarkGray)),
                 Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::DarkGray)),
             ]),
             Mode::AddShort | Mode::AddFull | Mode::EditShort | Mode::EditFull => Line::from(vec![
                 Span::styled(" [Enter]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-confirm")), Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-confirm")), Style::default().fg(Color::DarkGray)),
                 Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::DarkGray)),
             ]),
             Mode::ConfirmDelete => Line::from(vec![
                 Span::styled(" [y]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::DarkGray)),
                 Span::styled("[n]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}", tr("key-no")), Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}", tr("key-no")), Style::default().fg(Color::DarkGray)),
             ]),
         };
-        frame.render_widget(Paragraph::new(vec![shortcuts]), chunks[4]);
+        frame.render_widget(Paragraph::new(vec![shortcuts]), chunks[5]);
 
     }
 

@@ -148,6 +148,10 @@ key-practices = Practices
 key-goals = Goals
 key-quotes = Quotes
 key-quit = Quit
+footer-group-log = Log
+footer-group-review = Review
+footer-group-manage = Manage
+footer-group-system = System
 key-navigate = Navigate
 key-filter = Filter
 key-select = Select
@@ -195,6 +199,14 @@ abbreviations-enter-full = Enter full name (e.g., Deadlift):
 abbreviations-edit-short = Edit abbreviation:
 abbreviations-edit-full = Edit full name:
 abbreviations-delete-confirm = Delete { $short }?
+
+# ── Training Summary ──
+summary-title = Summary
+summary-volume = This Week: { $value } t
+summary-consecutive = Streak: { $days } days
+summary-recovery = Recovery: { $value }%
+summary-recovery-na = Recovery: —
+summary-frequency = Frequency: { $days }/7
 
 # ── Additional UI ──
 quotes-delete-confirm = Delete this quote?

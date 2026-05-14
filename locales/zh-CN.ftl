@@ -30,8 +30,8 @@ dashboard-title = iron
 dashboard-logo-text = 训练日志
 dashboard-last-14-days = 最近 14 天
 dashboard-last-7-days = 最近 7 天
-dashboard-recent-title = Recent
-dashboard-heatmap-title = Heatmap
+dashboard-recent-title = 最近
+dashboard-heatmap-title = 热力图
 dashboard-goals = 目标
 dashboard-quotes = 语录
 dashboard-no-quotes = 还没有语录 - 按 Q 添加
@@ -148,6 +148,10 @@ key-practices = 练习项目
 key-goals = 目标
 key-quotes = 语录
 key-quit = 退出
+footer-group-log = 记录
+footer-group-review = 分析
+footer-group-manage = 管理
+footer-group-system = 系统
 key-navigate = 导航
 key-filter = 过滤
 key-select = 选择
@@ -195,6 +199,14 @@ abbreviations-enter-full = 输入全称（例如 Deadlift）：
 abbreviations-edit-short = 编辑缩写：
 abbreviations-edit-full = 编辑全称：
 abbreviations-delete-confirm = 删除 { $short }？
+
+# ── 训练概览 ──
+summary-title = 训练概览
+summary-volume = 本周：{ $value } 吨
+summary-consecutive = 连续训练：{ $days } 天
+summary-recovery = 恢复指数：{ $value }%
+summary-recovery-na = 恢复指数：—
+summary-frequency = 训练频率：{ $days }/7
 
 # ── 其他界面 ──
 quotes-delete-confirm = 删除这条格言？

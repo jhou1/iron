@@ -124,11 +124,15 @@ impl QuickLogScreen {
         // ── Two panes side by side ──
         let panes = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .constraints([
+                Constraint::Percentage(50),
+                Constraint::Length(1),
+                Constraint::Percentage(50),
+            ])
             .split(chunks[1]);
 
         self.render_input_pane(frame, panes[0]);
-        self.render_preview_pane(frame, panes[1]);
+        self.render_preview_pane(frame, panes[2]);
 
         // ── Status line ──
         render_status_line(frame, chunks[2], &self.status_msg);
@@ -305,12 +309,12 @@ impl QuickLogScreen {
                     Span::styled("[Ctrl+S]", Style::default().fg(ACCENT)),
                     Span::styled(
                         format!(" {}  ", tr("quicklog-key-parse")),
-                        Style::default().fg(Color::Gray),
+                        Style::default().fg(Color::DarkGray),
                     ),
                     Span::styled("[Esc]", Style::default().fg(ACCENT)),
                     Span::styled(
                         format!(" {}", tr("key-back")),
-                        Style::default().fg(Color::Gray),
+                        Style::default().fg(Color::DarkGray),
                     ),
                 ];
                 if self.llm_config.is_none() {
@@ -319,7 +323,7 @@ impl QuickLogScreen {
                     spans.push(Span::styled("[Esc]", Style::default().fg(ACCENT)));
                     spans.push(Span::styled(
                         format!(" {}", tr("key-back")),
-                        Style::default().fg(Color::Gray),
+                        Style::default().fg(Color::DarkGray),
                     ));
                 }
                 Line::from(spans)
@@ -328,7 +332,7 @@ impl QuickLogScreen {
                 Span::styled(" [Esc]", Style::default().fg(ACCENT)),
                 Span::styled(
                     format!(" {}", tr("key-cancel")),
-                    Style::default().fg(Color::Gray),
+                    Style::default().fg(Color::DarkGray),
                 ),
             ]),
             Phase::Preview => Line::from(vec![
@@ -345,27 +349,27 @@ impl QuickLogScreen {
                 Span::styled("[j/k]", Style::default().fg(ACCENT)),
                 Span::styled(
                     format!(" {}  ", tr("key-navigate")),
-                    Style::default().fg(Color::Gray),
+                    Style::default().fg(Color::DarkGray),
                 ),
                 Span::styled("[d]", Style::default().fg(ACCENT)),
                 Span::styled(
                     format!(" {}  ", tr("quicklog-key-remove")),
-                    Style::default().fg(Color::Gray),
+                    Style::default().fg(Color::DarkGray),
                 ),
                 Span::styled("[Enter]", Style::default().fg(ACCENT)),
                 Span::styled(
                     format!(" {}  ", tr("quicklog-key-save")),
-                    Style::default().fg(Color::Gray),
+                    Style::default().fg(Color::DarkGray),
                 ),
                 Span::styled("[a]", Style::default().fg(ACCENT)),
                 Span::styled(
                     format!(" {}  ", tr("quicklog-key-abbr")),
-                    Style::default().fg(Color::Gray),
+                    Style::default().fg(Color::DarkGray),
                 ),
                 Span::styled("[Esc]", Style::default().fg(ACCENT)),
                 Span::styled(
                     format!(" {}", tr("quicklog-key-edit")),
-                    Style::default().fg(Color::Gray),
+                    Style::default().fg(Color::DarkGray),
                 ),
             ]),
         }

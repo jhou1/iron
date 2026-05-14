@@ -252,13 +252,13 @@ impl LogEntryScreen {
 
         let footer = Line::from(vec![
             Span::styled(" [j/k]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}  ", tr("key-navigate")), Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}  ", tr("key-navigate")), Style::default().fg(Color::DarkGray)),
             Span::styled("[/]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}  ", tr("key-filter")), Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}  ", tr("key-filter")), Style::default().fg(Color::DarkGray)),
             Span::styled("[Enter]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}  ", tr("key-select")), Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}  ", tr("key-select")), Style::default().fg(Color::DarkGray)),
             Span::styled("[Esc]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::DarkGray)),
         ]);
         frame.render_widget(Paragraph::new(footer), chunks[4]);
     }
@@ -396,11 +396,12 @@ impl LogEntryScreen {
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(3),                    // [0] date section (border)
-                Constraint::Length(sets_content_lines + 2), // [1] sets section (border)
-                Constraint::Length(4),                    // [2] warm-up/cool-down section (border)
-                Constraint::Min(3),                      // [3] note section (border, grows)
-                Constraint::Length(1),                    // [4] status line
-                Constraint::Length(1),                    // [5] footer
+                Constraint::Length(1),                    // [1] spacer
+                Constraint::Length(sets_content_lines + 2), // [2] sets section (border)
+                Constraint::Length(4),                    // [3] warm-up/cool-down section (border)
+                Constraint::Min(3),                      // [4] note section (border, grows)
+                Constraint::Length(1),                    // [5] status line
+                Constraint::Length(1),                    // [6] footer
             ])
             .split(area);
 
@@ -438,8 +439,8 @@ impl LogEntryScreen {
             .title(Span::styled(" Sets ", Style::default().fg(Color::White).bold()))
             .borders(Borders::ALL)
             .border_style(Style::default().fg(sets_border_color));
-        let sets_inner = sets_block.inner(chunks[1]);
-        frame.render_widget(sets_block, chunks[1]);
+        let sets_inner = sets_block.inner(chunks[2]);
+        frame.render_widget(sets_block, chunks[2]);
 
         let mut sets_lines: Vec<Line> = Vec::new();
         for (i, set) in self.sets.iter().enumerate() {
@@ -537,8 +538,8 @@ impl LogEntryScreen {
         let wucd_block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(wucd_border_color));
-        let wucd_inner = wucd_block.inner(chunks[2]);
-        frame.render_widget(wucd_block, chunks[2]);
+        let wucd_inner = wucd_block.inner(chunks[3]);
+        frame.render_widget(wucd_block, chunks[3]);
 
         let wu_active = self.focus == FocusSection::WarmUp;
         let wu_color = if wu_active { ACCENT } else { Color::White };
@@ -577,8 +578,8 @@ impl LogEntryScreen {
             ))
             .borders(Borders::ALL)
             .border_style(Style::default().fg(note_border_color));
-        let note_inner = note_block.inner(chunks[3]);
-        frame.render_widget(note_block, chunks[3]);
+        let note_inner = note_block.inner(chunks[4]);
+        frame.render_widget(note_block, chunks[4]);
 
         if self.focus == FocusSection::Note {
             let before = &self.note[..self.note_cursor];
@@ -598,22 +599,22 @@ impl LogEntryScreen {
         }
 
         // ── Status line ──
-        render_status_line(frame, chunks[4], &self.status_msg);
+        render_status_line(frame, chunks[5], &self.status_msg);
 
         // ── Footer ──
         let footer = Line::from(vec![
             Span::styled(" [Tab]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}  ", tr("key-next")), Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}  ", tr("key-next")), Style::default().fg(Color::DarkGray)),
             Span::styled("[Enter]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}  ", tr("key-add-set")), Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}  ", tr("key-add-set")), Style::default().fg(Color::DarkGray)),
             Span::styled("[Ctrl+S]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}  ", tr("key-save")), Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}  ", tr("key-save")), Style::default().fg(Color::DarkGray)),
             Span::styled("[D]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}  ", tr("key-date")), Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}  ", tr("key-date")), Style::default().fg(Color::DarkGray)),
             Span::styled("[Esc]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::Gray)),
+            Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::DarkGray)),
         ]);
-        frame.render_widget(Paragraph::new(footer), chunks[5]);
+        frame.render_widget(Paragraph::new(footer), chunks[6]);
     }
 
     fn handle_enter_log(&mut self, key: KeyEvent, db: &Database) -> Action {

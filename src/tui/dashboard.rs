@@ -119,17 +119,19 @@ impl DashboardScreen {
         } as u16;
         let quote_height = quote_lines + 2;
 
-        // Main vertical layout: title | heatmap | quote | panes | status | footer | spacer
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(1),            // [0] logo header
-                Constraint::Length(12),           // [1] heatmap (with border + title)
-                Constraint::Length(quote_height), // [2] daily quote box
-                Constraint::Length(pane_height),  // [3] split panes
-                Constraint::Length(1),            // [4] status line
-                Constraint::Length(1),            // [5] footer
-                Constraint::Min(0),              // [6] spacer absorbs excess at bottom
+                Constraint::Length(1),            // [1] spacer
+                Constraint::Length(12),           // [2] heatmap
+                Constraint::Length(1),            // [3] spacer
+                Constraint::Length(quote_height), // [4] daily quote box
+                Constraint::Length(1),            // [5] spacer
+                Constraint::Length(pane_height),  // [6] split panes
+                Constraint::Length(1),            // [7] status line
+                Constraint::Length(4),            // [8] footer (4 lines)
+                Constraint::Min(0),              // [9] spacer
             ])
             .split(area);
 
@@ -151,8 +153,8 @@ impl DashboardScreen {
             ]))
             .borders(Borders::ALL)
             .border_style(Style::default().fg(BORDER_COLOR));
-        let heatmap_inner = heatmap_block.inner(chunks[1]);
-        frame.render_widget(heatmap_block, chunks[1]);
+        let heatmap_inner = heatmap_block.inner(chunks[2]);
+        frame.render_widget(heatmap_block, chunks[2]);
         let heatmap = Heatmap::new(&self.heatmap_data, 52, self.no_color);
         frame.render_widget(heatmap, heatmap_inner);
 
@@ -172,58 +174,69 @@ impl DashboardScreen {
         .block(quote_block)
         .wrap(Wrap { trim: false })
         .alignment(ratatui::layout::Alignment::Center);
-        frame.render_widget(quote_paragraph, chunks[2]);
+        frame.render_widget(quote_paragraph, chunks[4]);
 
         // ── Split panes ──
         let panes = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-            .split(chunks[3]);
+            .split(chunks[6]);
 
         self.render_recent_pane(frame, panes[0]);
         self.render_goals_pane(frame, panes[1]);
 
         // ── Status line ──
-        render_status_line(frame, chunks[4], &self.status_msg);
+        render_status_line(frame, chunks[7], &self.status_msg);
 
         // ── Footer ──
-        let footer_spans = if self.mode == DashboardMode::ConfirmQuit {
-            vec![
+        let footer_lines: Vec<Line> = if self.mode == DashboardMode::ConfirmQuit {
+            vec![Line::from(vec![
                 Span::styled(format!(" {} ", tr("dashboard-quit-confirm")), Style::default().fg(Color::Red)),
                 Span::styled("[y]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::DarkGray)),
                 Span::styled("[any]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::Gray)),
-            ]
+                Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::DarkGray)),
+            ])]
         } else if self.mode == DashboardMode::Normal {
             vec![
-                Span::styled(" [l]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-log")), Style::default().fg(Color::Gray)),
-                Span::styled("[w]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-quick-log")), Style::default().fg(Color::Gray)),
-                Span::styled("[h]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-history")), Style::default().fg(Color::Gray)),
-                Span::styled("[t]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-trends")), Style::default().fg(Color::Gray)),
-                Span::styled("[e]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-practices")), Style::default().fg(Color::Gray)),
-                Span::styled("[g]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-goals")), Style::default().fg(Color::Gray)),
-                Span::styled("[Q]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-quotes")), Style::default().fg(Color::Gray)),
-                Span::styled("[q]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}", tr("key-quit")), Style::default().fg(Color::Gray)),
+                Line::from(vec![
+                    Span::styled(format!(" {}: ", tr("footer-group-log")), Style::default().fg(Color::DarkGray)),
+                    Span::styled("[l]", Style::default().fg(ACCENT)),
+                    Span::styled(format!("{} ", tr("key-log")), Style::default().fg(Color::DarkGray)),
+                    Span::styled("[w]", Style::default().fg(ACCENT)),
+                    Span::styled(tr("key-quick-log"), Style::default().fg(Color::DarkGray)),
+                ]),
+                Line::from(vec![
+                    Span::styled(format!(" {}: ", tr("footer-group-review")), Style::default().fg(Color::DarkGray)),
+                    Span::styled("[h]", Style::default().fg(ACCENT)),
+                    Span::styled(format!("{} ", tr("key-history")), Style::default().fg(Color::DarkGray)),
+                    Span::styled("[t]", Style::default().fg(ACCENT)),
+                    Span::styled(tr("key-trends"), Style::default().fg(Color::DarkGray)),
+                ]),
+                Line::from(vec![
+                    Span::styled(format!(" {}: ", tr("footer-group-manage")), Style::default().fg(Color::DarkGray)),
+                    Span::styled("[e]", Style::default().fg(ACCENT)),
+                    Span::styled(format!("{} ", tr("key-practices")), Style::default().fg(Color::DarkGray)),
+                    Span::styled("[g]", Style::default().fg(ACCENT)),
+                    Span::styled(format!("{} ", tr("key-goals")), Style::default().fg(Color::DarkGray)),
+                    Span::styled("[Q]", Style::default().fg(ACCENT)),
+                    Span::styled(tr("key-quotes"), Style::default().fg(Color::DarkGray)),
+                ]),
+                Line::from(vec![
+                    Span::styled(format!(" {}: ", tr("footer-group-system")), Style::default().fg(Color::DarkGray)),
+                    Span::styled("[q]", Style::default().fg(ACCENT)),
+                    Span::styled(tr("key-quit"), Style::default().fg(Color::DarkGray)),
+                ]),
             ]
         } else {
-            vec![
+            vec![Line::from(vec![
                 Span::styled(" [Enter]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-confirm")), Style::default().fg(Color::Gray)),
+                Span::styled(format!(" {}  ", tr("key-confirm")), Style::default().fg(Color::DarkGray)),
                 Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::Gray)),
-            ]
+                Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::DarkGray)),
+            ])]
         };
-        let footer = Line::from(footer_spans);
-        frame.render_widget(Paragraph::new(footer), chunks[5]);
+        frame.render_widget(Paragraph::new(footer_lines), chunks[8]);
 
     }
 

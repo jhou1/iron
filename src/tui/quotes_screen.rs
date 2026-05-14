@@ -8,8 +8,10 @@ use ratatui::{
 };
 
 use crate::db::Database;
-use crate::i18n::tr;
+use crate::i18n::{tr, tr_args};
 use crate::model::Quote;
+use crate::tui::quotes::pick_random_quote;
+use fluent_bundle::FluentValue;
 use super::{centered_area, highlight_row, render_status_line, visible_input_spans, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH};
 
 const ACCENT: Color = Color::Cyan;
@@ -33,12 +35,41 @@ pub struct QuotesScreen {
     editing_id: Option<i64>,
     status_msg: StatusMessage,
     last_deleted: Option<Quote>,
+    weekly_volume: f64,
+    training_days: usize,
+    consecutive_days: i64,
+    hrv: Option<i32>,
+    featured_quote: String,
 }
 
 impl QuotesScreen {
     pub fn new(db: &Database) -> anyhow::Result<Self> {
         let quotes = db.list_quotes()?;
+        let stats = db.aggregate_stats(7).unwrap_or(crate::db::AggregateStats {
+            sessions: 0, total_volume: 0.0, total_reps: 0.0, total_distance: 0.0, total_duration: 0.0,
+        });
+        let training_days = db.heatmap_counts(7).unwrap_or_default().len();
+
+        let heatmap_90 = db.heatmap_counts(90).unwrap_or_default();
+        let training_dates: std::collections::HashSet<String> =
+            heatmap_90.iter().map(|(d, _)| d.clone()).collect();
+        let mut consecutive_days = 0i64;
+        let mut check = chrono::Local::now().date_naive();
+        while training_dates.contains(&check.format("%Y-%m-%d").to_string()) {
+            consecutive_days += 1;
+            check -= chrono::Duration::days(1);
+        }
+
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        let hrv = db.get_daily_hrv(&today).unwrap_or(None);
+        let featured_quote = pick_random_quote(&quotes);
+
         Ok(Self {
+            weekly_volume: stats.total_volume,
+            training_days,
+            consecutive_days,
+            hrv,
+            featured_quote,
             quotes,
             selected: 0,
             scroll_offset: 0,
@@ -85,13 +116,18 @@ impl QuotesScreen {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Min(4),                // bordered list
+                Constraint::Length(11),             // summary pane
+                Constraint::Length(1),              // spacer
+                Constraint::Min(4),                // quote list
                 Constraint::Length(action_height),  // input/action area
                 Constraint::Length(1),              // status message
                 Constraint::Length(1),              // shortcuts
                 Constraint::Min(0),                 // spacer
             ])
             .split(area);
+
+        // ── Training summary ──
+        self.render_summary(frame, chunks[0]);
 
         // ── Bordered quote list ──
         let block = Block::default()
@@ -102,8 +138,8 @@ impl QuotesScreen {
             ]))
             .borders(Borders::ALL)
             .border_style(Style::default().fg(BORDER_COLOR));
-        let inner = block.inner(chunks[0]);
-        frame.render_widget(block, chunks[0]);
+        let inner = block.inner(chunks[2]);
+        frame.render_widget(block, chunks[2]);
 
         let visible = inner.height as usize;
         self.adjust_scroll(visible);
@@ -159,9 +195,9 @@ impl QuotesScreen {
                         Line::from(""),
                         Line::from(vec![
                             Span::styled(" [Enter]", Style::default().fg(ACCENT)),
-                            Span::styled(format!(" {}  ", tr("key-confirm")), Style::default().fg(Color::Gray)),
+                            Span::styled(format!(" {}  ", tr("key-confirm")), Style::default().fg(Color::DarkGray)),
                             Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                            Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::Gray)),
+                            Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::DarkGray)),
                         ]),
                     ]
                 }
@@ -174,45 +210,86 @@ impl QuotesScreen {
                         Line::from(""),
                         Line::from(vec![
                             Span::styled(" [y]", Style::default().fg(ACCENT)),
-                            Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::Gray)),
+                            Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::DarkGray)),
                             Span::styled("[any]", Style::default().fg(ACCENT)),
-                            Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::Gray)),
+                            Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::DarkGray)),
                         ]),
                     ]
                 }
                 Mode::Browse => vec![],
             };
-            frame.render_widget(Paragraph::new(action_lines), chunks[1]);
+            frame.render_widget(Paragraph::new(action_lines), chunks[3]);
         }
 
         // ── Status line ──
-        render_status_line(frame, chunks[2], &self.status_msg);
+        render_status_line(frame, chunks[4], &self.status_msg);
 
         // ── Shortcuts ──
         let shortcuts = match &self.mode {
             Mode::Browse => {
                 let mut spans = vec![
                     Span::styled(" [j/k]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}  ", tr("key-navigate")), Style::default().fg(Color::Gray)),
+                    Span::styled(format!(" {}  ", tr("key-navigate")), Style::default().fg(Color::DarkGray)),
                     Span::styled("[a]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}  ", tr("key-add")), Style::default().fg(Color::Gray)),
+                    Span::styled(format!(" {}  ", tr("key-add")), Style::default().fg(Color::DarkGray)),
                     Span::styled("[e]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::Gray)),
+                    Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::DarkGray)),
                     Span::styled("[d]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::Gray)),
+                    Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::DarkGray)),
                 ];
                 if self.last_deleted.is_some() {
                     spans.push(Span::styled("[u]", Style::default().fg(ACCENT)));
-                    spans.push(Span::styled(format!(" {}  ", tr("key-undo")), Style::default().fg(Color::Gray)));
+                    spans.push(Span::styled(format!(" {}  ", tr("key-undo")), Style::default().fg(Color::DarkGray)));
                 }
                 spans.push(Span::styled("[Esc]", Style::default().fg(ACCENT)));
-                spans.push(Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::Gray)));
+                spans.push(Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::DarkGray)));
                 Line::from(spans)
             }
             _ => Line::from(""),
         };
-        frame.render_widget(Paragraph::new(vec![shortcuts]), chunks[3]);
+        frame.render_widget(Paragraph::new(vec![shortcuts]), chunks[5]);
 
+    }
+
+    fn render_summary(&self, frame: &mut Frame, area: ratatui::layout::Rect) {
+        let block = Block::default()
+            .title(Line::from(vec![
+                Span::styled("── ", Style::default().fg(BORDER_COLOR)),
+                Span::styled(tr("summary-title"), Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+                Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
+            ]))
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(BORDER_COLOR));
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+
+        let volume_tons = self.weekly_volume / 1000.0;
+        let volume_text = tr_args("summary-volume", &[("value", FluentValue::from(format!("{:.1}", volume_tons)))]);
+        let consecutive_text = tr_args("summary-consecutive", &[("days", FluentValue::from(self.consecutive_days))]);
+        let recovery_text = if let Some(hrv) = self.hrv {
+            tr_args("summary-recovery", &[("value", FluentValue::from(hrv as i64))])
+        } else {
+            tr("summary-recovery-na")
+        };
+        let frequency_text = tr_args("summary-frequency", &[("days", FluentValue::from(self.training_days as i64))]);
+
+        let mut lines = vec![
+            Line::from(""),
+            Line::from(Span::styled(format!("  {}", volume_text), Style::default().fg(Color::White))),
+            Line::from(Span::styled(format!("  {}", consecutive_text), Style::default().fg(Color::White))),
+            Line::from(Span::styled(format!("  {}", recovery_text), Style::default().fg(Color::White))),
+            Line::from(Span::styled(format!("  {}", frequency_text), Style::default().fg(Color::White))),
+        ];
+
+        if !self.featured_quote.is_empty() {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                format!("  > {}", self.featured_quote),
+                Style::default().fg(Color::Yellow).add_modifier(Modifier::ITALIC),
+            )));
+        }
+
+        frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
     }
 
     pub fn handle_key(&mut self, key: KeyEvent, db: &Database) -> Action {

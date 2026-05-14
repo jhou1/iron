@@ -20,7 +20,7 @@ use ratatui::{
 
 const HIGHLIGHT_BG: Color = Color::Rgb(204, 163, 0);
 const HIGHLIGHT_FG: Color = Color::Black;
-pub const BORDER_COLOR: Color = Color::Rgb(204, 163, 0);
+pub const BORDER_COLOR: Color = Color::DarkGray;
 pub const GAUGE_FILL: Color = Color::Rgb(242, 146, 29);
 pub const GAUGE_EMPTY: Color = Color::Indexed(240);
 pub const CONTENT_WIDTH: u16 = 3 + 52 * 2;
