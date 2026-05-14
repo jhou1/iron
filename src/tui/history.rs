@@ -3,7 +3,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Cell, Paragraph, Row, Table, Wrap},
+    widgets::{Block, BorderType, Borders, Cell, Clear, Paragraph, Row, Table, Wrap},
     Frame,
 };
 
@@ -94,8 +94,6 @@ impl HistoryScreen {
             .max()
             .unwrap_or(2);
         let vol_col_w = (max_total_w + 1 + max_label_w + 1) as u16;
-        let border_w: u16 = 2;
-        let list_width = marker_w + date_col_w + name_col_w + vol_col_w + border_w;
 
         // Vertical split: filter | main content (list + detail) | status | shortcuts
         let v_chunks = Layout::default()
@@ -125,21 +123,37 @@ impl HistoryScreen {
         let filter_line = Paragraph::new(Line::from(Span::styled(filter_display, filter_style)));
         frame.render_widget(filter_line, v_chunks[0]);
 
-        // Horizontal split within main content: list (left) | detail (right)
-        let h_chunks = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Length(list_width),
-                Constraint::Min(20),
-            ])
-            .split(v_chunks[1]);
+        let list_area = v_chunks[1];
+        let list_height = list_area.height as usize;
+        self.adjust_scroll(list_height.saturating_sub(3));
+        self.render_list(frame, list_area, list_height.saturating_sub(3), marker_w, name_col_w, date_col_w, vol_col_w, max_total_w, max_label_w);
 
-        let list_height = h_chunks[0].height as usize;
-        self.adjust_scroll(list_height.saturating_sub(3)); // -2 for border, -1 for header row
-        self.render_list(frame, h_chunks[0], list_height.saturating_sub(3), marker_w, name_col_w, date_col_w, vol_col_w, max_total_w, max_label_w);
+        // ── Floating detail popup ──
+        if let Some(entry) = self.selected_entry().cloned() {
+            let row_in_list = (self.selected - self.scroll_offset) as u16 + 1; // +1 for header
+            let popup_content = self.build_detail_lines(&entry);
+            let popup_h = (popup_content.len() as u16 + 2).min(list_area.height / 2).max(4);
+            let popup_w = list_area.width.saturating_sub(8).max(30);
+            let popup_x = list_area.x + 4;
 
-        // ── Right: detail panel ──
-        self.render_detail(frame, h_chunks[1]);
+            // Position below selected row; flip above if near bottom
+            let below_y = list_area.y + row_in_list + 2; // +2: border + 1 space below
+            let popup_y = if below_y + popup_h > list_area.y + list_area.height {
+                list_area.y + row_in_list.saturating_sub(popup_h)
+            } else {
+                below_y
+            };
+            let popup_rect = ratatui::layout::Rect { x: popup_x, y: popup_y, width: popup_w, height: popup_h };
+
+            let title_text = format!(" {} — {} ", entry.practice_name, entry.log.logged_at.format("%Y-%m-%d"));
+            let block = Block::default()
+                .title(Span::styled(title_text, Style::default().fg(Color::White).bold()))
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(BORDER_COLOR));
+            frame.render_widget(Clear, popup_rect);
+            frame.render_widget(Paragraph::new(popup_content).block(block).wrap(Wrap { trim: false }), popup_rect);
+        }
 
         // Status + shortcuts
         let shortcuts = {
@@ -281,40 +295,15 @@ impl HistoryScreen {
         }
     }
 
-    fn render_detail(&self, frame: &mut Frame, area: ratatui::layout::Rect) {
-        let Some(entry) = self.selected_entry() else {
-            let block = Block::default()
-                .title(Line::from(vec![
-                    Span::styled("── ", Style::default().fg(BORDER_COLOR)),
-                    Span::styled("Detail", Style::default().fg(Color::White).bold()),
-                    Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
-                ]))
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(BORDER_COLOR));
-            frame.render_widget(block, area);
-            return;
-        };
-
-        let title_text = format!(" {} — {} ", entry.practice_name,
-            entry.log.logged_at.format("%Y-%m-%d"));
-        let block = Block::default()
-            .title(Line::from(vec![
-                Span::styled("── ", Style::default().fg(BORDER_COLOR)),
-                Span::styled(title_text, Style::default().fg(Color::White).bold()),
-                Span::styled("──", Style::default().fg(BORDER_COLOR)),
-            ]))
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(BORDER_COLOR));
-
+    fn build_detail_lines(&self, entry: &LogEntry) -> Vec<Line<'static>> {
         let mut lines: Vec<Line> = Vec::new();
-        lines.push(Line::from(""));
 
         let mut total_reps = 0.0;
         for set in &entry.sets {
             let detail = match &set.data {
                 SetData::Weighted { weight, reps } => {
                     total_reps += *reps as f64;
-                    format!("  {}", tr_args("history-set-weighted", &[
+                    format!(" {}", tr_args("history-set-weighted", &[
                         ("number", FluentValue::from(set.set_number as f64)),
                         ("weight", FluentValue::from(*weight)),
                         ("reps", FluentValue::from(*reps as f64)),
@@ -322,84 +311,54 @@ impl HistoryScreen {
                 }
                 SetData::Bodyweight { reps } => {
                     total_reps += *reps as f64;
-                    format!("  {}", tr_args("history-set-bodyweight", &[
+                    format!(" {}", tr_args("history-set-bodyweight", &[
                         ("number", FluentValue::from(set.set_number as f64)),
                         ("reps", FluentValue::from(*reps as f64)),
                     ]))
                 }
                 SetData::Distance { distance } => {
-                    format!("  {}", tr_args("history-set-distance", &[
+                    format!(" {}", tr_args("history-set-distance", &[
                         ("number", FluentValue::from(set.set_number as f64)),
                         ("distance", FluentValue::from(*distance)),
                     ]))
                 }
                 SetData::Endurance { duration } => {
-                    format!("  {}", tr_args("history-set-endurance", &[
+                    format!(" {}", tr_args("history-set-endurance", &[
                         ("number", FluentValue::from(set.set_number as f64)),
                         ("duration", FluentValue::from(*duration)),
                     ]))
                 }
             };
-            lines.push(Line::from(Span::styled(
-                detail,
-                Style::default().fg(Color::White),
-            )));
+            lines.push(Line::from(Span::styled(detail, Style::default().fg(Color::White))));
         }
 
-        // Summary line: total reps + volume for weighted training
         if matches!(entry.practice_type, crate::model::PracticeType::Weighted | crate::model::PracticeType::Bodyweight) && total_reps > 0.0 {
             lines.push(Line::from(""));
             let total_vol = entry.total_metric();
             let vol_label = entry.metric_label();
             let reps_label = tr("metric-reps");
             lines.push(Line::from(Span::styled(
-                format!("  {}", tr_args("history-summary", &[
+                format!(" {}", tr_args("history-summary", &[
                     ("reps", FluentValue::from(total_reps)),
                     ("reps_label", FluentValue::from(reps_label)),
                     ("vol", FluentValue::from(total_vol)),
                     ("vol_label", FluentValue::from(vol_label)),
                 ])),
-                Style::default().fg(Color::White),
+                Style::default().fg(Color::Gray),
             )));
         }
 
         if let Some(warm_up) = &entry.log.warm_up {
-            lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled(
-                format!("  {}:", tr("log-warmup-label")),
-                Style::default().fg(Color::Gray),
-            )));
-            lines.push(Line::from(Span::styled(
-                format!("  {}", warm_up),
-                Style::default().fg(Color::White),
-            )));
+            lines.push(Line::from(Span::styled(format!(" {}: {}", tr("log-warmup-label"), warm_up), Style::default().fg(Color::Gray))));
         }
-
         if let Some(cool_down) = &entry.log.cool_down {
-            lines.push(Line::from(Span::styled(
-                format!("  {}:", tr("log-cooldown-label")),
-                Style::default().fg(Color::Gray),
-            )));
-            lines.push(Line::from(Span::styled(
-                format!("  {}", cool_down),
-                Style::default().fg(Color::White),
-            )));
+            lines.push(Line::from(Span::styled(format!(" {}: {}", tr("log-cooldown-label"), cool_down), Style::default().fg(Color::Gray))));
         }
-
         if let Some(note) = &entry.log.note {
-            lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled(
-                format!("  {}", tr("log-note-label")),
-                Style::default().fg(Color::Gray),
-            )));
-            lines.push(Line::from(Span::styled(
-                format!("  {}", note),
-                Style::default().fg(Color::White),
-            )));
+            lines.push(Line::from(Span::styled(format!(" {}: {}", tr("log-note-label"), note), Style::default().fg(Color::Gray))));
         }
 
-        let paragraph = Paragraph::new(lines).block(block).wrap(Wrap { trim: false });
-        frame.render_widget(paragraph, area);
+        lines
     }
 
     pub fn handle_key(&mut self, key: KeyEvent, db: &Database) -> Action {

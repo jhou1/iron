@@ -30,9 +30,9 @@ fn paragraph_widgets_must_wrap_user_content() {
         "goals.rs:501",
         "goals.rs:543",
         // ── history.rs ──
-        "history.rs:125",
-        "history.rs:171",
-        "history.rs:203",
+        "history.rs:123",
+        "history.rs:185",
+        "history.rs:217",
         // ── log_entry.rs ──
         "log_entry.rs:185",
         "log_entry.rs:218",
