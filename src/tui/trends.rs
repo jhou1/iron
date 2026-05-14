@@ -29,6 +29,7 @@ pub struct TrendsScreen {
     filtering: bool,
     selected: usize,
     scroll: usize,
+    list_height: usize,
     chosen_practice: Option<Practice>,
     days_window: i64,
     entries: Vec<LogEntry>,
@@ -48,6 +49,7 @@ impl TrendsScreen {
             filtering: false,
             selected: 0,
             scroll: 0,
+            list_height: 0,
             chosen_practice: chosen,
             days_window: 90,
             entries: Vec::new(),
@@ -55,7 +57,7 @@ impl TrendsScreen {
         })
     }
 
-    pub fn render(&self, frame: &mut Frame) {
+    pub fn render(&mut self, frame: &mut Frame) {
         let area = centered_area(frame.area(), CONTENT_WIDTH);
 
         let chunks = Layout::default()
@@ -85,7 +87,7 @@ impl TrendsScreen {
         frame.render_widget(Paragraph::new(footer), chunks[3]);
     }
 
-    fn render_practice_list(&self, frame: &mut Frame, filter_area: ratatui::layout::Rect, list_area: ratatui::layout::Rect) {
+    fn render_practice_list(&mut self, frame: &mut Frame, filter_area: ratatui::layout::Rect, list_area: ratatui::layout::Rect) {
         let max_name_len = self.practices.iter()
             .map(|p| p.name.width())
             .max()
@@ -135,6 +137,7 @@ impl TrendsScreen {
         ];
 
         let visible_rows = inner.height.saturating_sub(1) as usize; // -1 for header
+        self.list_height = visible_rows;
         let end = (self.scroll + visible_rows).min(self.filtered_indices.len());
 
         for i in self.scroll..end {
@@ -340,6 +343,7 @@ impl TrendsScreen {
             KeyCode::Char('j') | KeyCode::Down => {
                 if !self.filtered_indices.is_empty() {
                     self.selected = (self.selected + 1) % self.filtered_indices.len();
+                    self.adjust_scroll();
                     self.sync_chosen();
                 }
                 Action::None
@@ -351,6 +355,7 @@ impl TrendsScreen {
                     } else {
                         self.selected - 1
                     };
+                    self.adjust_scroll();
                     self.sync_chosen();
                 }
                 Action::None
@@ -373,6 +378,14 @@ impl TrendsScreen {
                 Action::None
             }
             _ => Action::None,
+        }
+    }
+
+    fn adjust_scroll(&mut self) {
+        if self.selected < self.scroll {
+            self.scroll = self.selected;
+        } else if self.selected >= self.scroll + self.list_height {
+            self.scroll = self.selected + 1 - self.list_height;
         }
     }
 
@@ -444,5 +457,90 @@ impl TrendsScreen {
         };
 
         (avg, peak, trend_pct)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::PracticeType;
+
+    fn make_screen(count: usize, list_height: usize) -> TrendsScreen {
+        let practices: Vec<Practice> = (0..count)
+            .map(|i| Practice {
+                id: i as i64 + 1,
+                name: format!("Practice {}", i + 1),
+                practice_type: PracticeType::Weighted,
+                created_at: chrono::NaiveDateTime::default(),
+                active: true,
+            })
+            .collect();
+        let filtered_indices = (0..count).collect();
+        TrendsScreen {
+            practices,
+            filtered_indices,
+            filter_text: String::new(),
+            filter_cursor: 0,
+            filtering: false,
+            selected: 0,
+            scroll: 0,
+            list_height,
+            chosen_practice: None,
+            days_window: 90,
+            entries: Vec::new(),
+            needs_refresh: false,
+        }
+    }
+
+    #[test]
+    fn scroll_follows_selection_down() {
+        let mut s = make_screen(20, 5);
+        // Select last visible item — no scroll needed
+        s.selected = 4;
+        s.adjust_scroll();
+        assert_eq!(s.scroll, 0);
+
+        // One past the viewport
+        s.selected = 5;
+        s.adjust_scroll();
+        assert_eq!(s.scroll, 1);
+    }
+
+    #[test]
+    fn scroll_follows_selection_up() {
+        let mut s = make_screen(20, 5);
+        s.selected = 10;
+        s.scroll = 10;
+        // Move up above scroll
+        s.selected = 8;
+        s.adjust_scroll();
+        assert_eq!(s.scroll, 8);
+    }
+
+    #[test]
+    fn scroll_stays_at_zero_when_all_fit() {
+        let mut s = make_screen(5, 10);
+        s.selected = 4;
+        s.adjust_scroll();
+        assert_eq!(s.scroll, 0);
+    }
+
+    #[test]
+    fn scroll_wraps_to_top() {
+        let mut s = make_screen(20, 5);
+        s.selected = 19;
+        s.scroll = 15;
+        // Wrap to top
+        s.selected = 0;
+        s.adjust_scroll();
+        assert_eq!(s.scroll, 0);
+    }
+
+    #[test]
+    fn scroll_last_item_visible() {
+        let mut s = make_screen(20, 5);
+        s.selected = 19;
+        s.adjust_scroll();
+        assert_eq!(s.scroll, 15);
     }
 }

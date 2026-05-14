@@ -51,6 +51,7 @@ pub struct GoalsScreen {
     goals: Vec<Goal>,
     selected: usize,
     scroll: usize,
+    list_height: u16,
     mode: Mode,
     input: String,
     cursor: usize,
@@ -72,6 +73,7 @@ impl GoalsScreen {
             goals,
             selected: 0,
             scroll: 0,
+            list_height: 0,
             mode: Mode::Browse,
             input: String::new(),
             cursor: 0,
@@ -89,6 +91,17 @@ impl GoalsScreen {
     fn reload_goals(&mut self, db: &Database) -> anyhow::Result<()> {
         self.goals = db.list_goals()?;
         Ok(())
+    }
+
+    fn adjust_scroll(&mut self) {
+        let lines_per_goal: usize = 3; // title + gauge + spacer
+        let sel_top = self.selected * lines_per_goal;
+        let sel_bottom = sel_top + 2; // title + gauge (don't need spacer visible)
+        if sel_top < self.scroll {
+            self.scroll = sel_top;
+        } else if sel_bottom > self.scroll + self.list_height as usize {
+            self.scroll = sel_bottom.saturating_sub(self.list_height as usize);
+        }
     }
 
     #[allow(dead_code)]
@@ -192,29 +205,31 @@ impl GoalsScreen {
 
     // ── Rendering ──
 
-    pub fn render(&self, frame: &mut Frame) {
+    pub fn render(&mut self, frame: &mut Frame) {
         let area = centered_area(frame.area(), CONTENT_WIDTH);
 
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(2),  // [0] title + header
-                Constraint::Min(1),    // [1] goals list
-                Constraint::Length(1), // [2] status line
-                Constraint::Length(1), // [3] footer
-                Constraint::Min(0),   // [4] spacer
+                Constraint::Min(1),    // [0] goals list (bordered)
+                Constraint::Length(1), // [1] status line
+                Constraint::Length(1), // [2] footer
+                Constraint::Min(0),   // [3] spacer
             ])
             .split(area);
 
-        // ── Title ──
-        let title = Line::from(Span::styled(
-            tr("goals-title"),
-            Style::default().fg(Color::White).bold(),
-        ));
-        frame.render_widget(Paragraph::new(vec![title, Line::default()]), chunks[0]);
-
-        // ── Goals list ──
-        let list_area = chunks[1];
+        // ── Goals list (bordered) ──
+        let block = Block::default()
+            .title(Line::from(vec![
+                Span::styled("── ", Style::default().fg(BORDER_COLOR)),
+                Span::styled(tr("goals-title"), Style::default().fg(Color::White).bold()),
+                Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
+            ]))
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(BORDER_COLOR));
+        let list_area = block.inner(chunks[0]);
+        frame.render_widget(block, chunks[0]);
+        self.list_height = list_area.height;
 
         let mut lines: Vec<Line> = Vec::new();
         let mut sel_line_idx: Option<usize> = None;
@@ -397,7 +412,7 @@ impl GoalsScreen {
         }
 
         // ── Status line ──
-        render_status_line(frame, chunks[2], &self.status_msg);
+        render_status_line(frame, chunks[1], &self.status_msg);
 
         // ── Footer ──
         let footer_spans = match self.mode {
@@ -455,7 +470,7 @@ impl GoalsScreen {
             }
         };
         let footer = Line::from(footer_spans);
-        frame.render_widget(Paragraph::new(footer), chunks[3]);
+        frame.render_widget(Paragraph::new(footer), chunks[2]);
 
     }
 
@@ -549,12 +564,14 @@ impl GoalsScreen {
             KeyCode::Char('j') | KeyCode::Down => {
                 if goal_count > 0 && self.selected < goal_count - 1 {
                     self.selected += 1;
+                    self.adjust_scroll();
                 }
                 Action::None
             }
             KeyCode::Char('k') | KeyCode::Up => {
                 if self.selected > 0 {
                     self.selected -= 1;
+                    self.adjust_scroll();
                 }
                 Action::None
             }
@@ -1055,4 +1072,91 @@ fn goal_gauge(goal: &Goal) -> Line<'static> {
     let pct = (ratio * 100.0).round() as u32;
     line.spans.push(Span::styled(format!("  {}%", pct), Style::default().fg(Color::Gray)));
     line
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_screen(goal_count: usize, list_height: u16) -> GoalsScreen {
+        let goals: Vec<Goal> = (0..goal_count)
+            .map(|i| Goal {
+                id: i as i64 + 1,
+                title: format!("Goal {}", i + 1),
+                completed: false,
+                position: i as i32,
+                created_at: chrono::NaiveDateTime::default(),
+                completed_at: None,
+                milestones: vec![],
+            })
+            .collect();
+        GoalsScreen {
+            goals,
+            selected: 0,
+            scroll: 0,
+            list_height,
+            mode: Mode::Browse,
+            input: String::new(),
+            cursor: 0,
+            status_msg: None,
+            last_deleted: None,
+            modal_goal_idx: 0,
+            modal_selected: 0,
+            modal_scroll: 0,
+            modal_mode: ModalMode::Browse,
+            modal_status_msg: None,
+            modal_last_deleted: None,
+        }
+    }
+
+    #[test]
+    fn scroll_follows_selection_down() {
+        // 10 goals, each 3 lines; viewport fits 9 lines (3 goals)
+        let mut s = make_screen(10, 9);
+        // Move down to goal 3 (index 2) — still visible, no scroll
+        s.selected = 2;
+        s.adjust_scroll();
+        assert_eq!(s.scroll, 0);
+
+        // Move down to goal 4 (index 3) — bottom at line 11, viewport 9
+        s.selected = 3;
+        s.adjust_scroll();
+        assert!(s.scroll > 0, "scroll should advance when selected goes below viewport");
+        // sel_bottom = 3*3 + 2 = 11, scroll = 11 - 9 = 2
+        assert_eq!(s.scroll, 2);
+    }
+
+    #[test]
+    fn scroll_follows_selection_up() {
+        let mut s = make_screen(10, 9);
+        s.selected = 5;
+        s.scroll = 12; // scrolled past goal 5
+        s.adjust_scroll();
+        // sel_top = 5*3 = 15, which is >= scroll=12, sel_bottom = 17 > 12+9=21? no. 17 < 21.
+        // Actually sel_top=15 >= scroll=12 and sel_bottom=17 <= 12+9=21, so no change needed.
+        // Let me pick a case where scroll is too far:
+        s.selected = 1;
+        s.scroll = 10;
+        s.adjust_scroll();
+        // sel_top = 3, scroll should snap to 3
+        assert_eq!(s.scroll, 3);
+    }
+
+    #[test]
+    fn scroll_stays_at_zero_when_all_fit() {
+        // 3 goals, 9-line viewport — all fit
+        let mut s = make_screen(3, 9);
+        s.selected = 2;
+        s.adjust_scroll();
+        assert_eq!(s.scroll, 0);
+    }
+
+    #[test]
+    fn scroll_last_goal_visible() {
+        let mut s = make_screen(10, 9);
+        s.selected = 9;
+        s.adjust_scroll();
+        // sel_bottom = 9*3 + 2 = 29, scroll = 29 - 9 = 20
+        assert_eq!(s.scroll, 20);
+    }
 }

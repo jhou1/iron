@@ -24,9 +24,8 @@ fn paragraph_widgets_must_wrap_user_content() {
         "dashboard.rs:372",
         "dashboard.rs:402", // gauge bar: width-controlled, cannot overflow
         // ── goals.rs ──
-        "goals.rs:214",
-        "goals.rs:390",
-        "goals.rs:458",
+        "goals.rs:405",
+        "goals.rs:473",
         // ── history.rs ──
         "history.rs:123",
         "history.rs:185",
@@ -57,12 +56,12 @@ fn paragraph_widgets_must_wrap_user_content() {
         "quick_log.rs:217",
         "quick_log.rs:231",
         // ── trends.rs ──
-        "trends.rs:85",
-        "trends.rs:113",
-        "trends.rs:157",
-        "trends.rs:208",
-        "trends.rs:216",
-        "trends.rs:262",
+        "trends.rs:87",
+        "trends.rs:115",
+        "trends.rs:160",
+        "trends.rs:211",
+        "trends.rs:219",
+        "trends.rs:265",
     ].into_iter().collect();
 
     let tui_dir = Path::new("src/tui");
@@ -147,4 +146,35 @@ fn paragraph_widgets_must_wrap_user_content() {
         ));
     }
     assert!(msg.is_empty(), "\n{}", msg);
+}
+
+/// Ensures that main content screens use bordered blocks for visual consistency.
+/// Every screen that displays a primary list or content area should wrap it in
+/// a Block with Borders::ALL.
+#[test]
+fn screens_must_have_bordered_blocks() {
+    let tui_dir = Path::new("src/tui");
+    let required_screens = [
+        "goals.rs",
+        "trends.rs",
+        "history.rs",
+        "practices.rs",
+        "quotes_screen.rs",
+    ];
+
+    let mut missing = Vec::new();
+    for filename in &required_screens {
+        let path = tui_dir.join(filename);
+        let source = std::fs::read_to_string(&path)
+            .unwrap_or_else(|_| panic!("failed to read {}", path.display()));
+        if !source.contains(".borders(Borders::ALL)") {
+            missing.push(format!("  {} — missing .borders(Borders::ALL)", filename));
+        }
+    }
+
+    assert!(
+        missing.is_empty(),
+        "\nScreens missing bordered blocks for visual consistency:\n{}\n",
+        missing.join("\n")
+    );
 }

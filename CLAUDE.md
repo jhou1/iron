@@ -153,6 +153,9 @@ When your changes create orphans:
 
 The test: Every changed line should trace directly to the user's request. There should be no compiling error and warnings.
 
+When update CLAUDE.md
+- after you added new feature that is different from CLAUDE.md, update CLAUDE.md to reconcile.
+
 ## 4. Goal-Driven Execution
 
 **Define success criteria. Loop until verified.**

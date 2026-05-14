@@ -206,7 +206,7 @@ impl DashboardScreen {
                 ]),
                 Line::from(vec![
                     Span::styled(format!(" {}: ", tr("footer-group-system")), Style::default().fg(Color::DarkGray)),
-                    Span::styled("[q]", Style::default().fg(ACCENT)),
+                    Span::styled("[Esc]", Style::default().fg(ACCENT)),
                     Span::styled(tr("key-quit"), Style::default().fg(Color::DarkGray)),
                 ]),
             ]
@@ -434,7 +434,7 @@ impl DashboardScreen {
                 self.mode = DashboardMode::HrvInput;
                 Action::None
             }
-            KeyCode::Char('q') => {
+            KeyCode::Esc => {
                 self.mode = DashboardMode::ConfirmQuit;
                 Action::None
             }
