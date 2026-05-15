@@ -2,7 +2,7 @@ use chrono::{Local, NaiveDate, NaiveTime};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Direction, Layout},
-    style::{Color, Style, Stylize},
+    style::{Color, Modifier, Style, Stylize},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame,
@@ -54,6 +54,8 @@ pub struct LogEntryScreen {
     cool_down: String,
     cool_down_cursor: usize,
     focus: FocusSection,
+    selected_set: Option<usize>,
+    editing_set: Option<usize>,
     editing_log_id: Option<i64>,
     log_date: String,
     editing_date: bool,
@@ -90,6 +92,8 @@ impl LogEntryScreen {
             cool_down: String::new(),
             cool_down_cursor: 0,
             focus: FocusSection::Sets,
+            selected_set: None,
+            editing_set: None,
             editing_log_id: None,
             log_date: today,
             editing_date: false,
@@ -135,6 +139,8 @@ impl LogEntryScreen {
             cool_down_cursor: cool_down.len(),
             cool_down,
             focus: FocusSection::Sets,
+            selected_set: None,
+            editing_set: None,
             editing_log_id: Some(log_entry.log.id),
             log_date,
             editing_date: false,
@@ -364,6 +370,8 @@ impl LogEntryScreen {
                     self.field2.clear();
                     self.field2_cursor = 0;
                     self.active_field = 0;
+                    self.selected_set = None;
+                    self.editing_set = None;
                     self.focus = FocusSection::Sets;
                 }
                 Action::None
@@ -448,12 +456,29 @@ impl LogEntryScreen {
                 ("number", FluentValue::from((i + 1) as f64)),
                 ("data", FluentValue::from(format_set_data(set))),
             ]);
-            sets_lines.push(Line::from(Span::styled(text, Style::default().fg(Color::White))));
+            let is_selected = self.selected_set == Some(i) && self.editing_set != Some(i);
+            let is_editing = self.editing_set == Some(i);
+            let style = if is_editing {
+                Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+            } else if is_selected {
+                Style::default().fg(ACCENT)
+            } else {
+                Style::default().fg(Color::White)
+            };
+            let marker = if is_selected || is_editing { "> " } else { "  " };
+            sets_lines.push(Line::from(vec![
+                Span::styled(marker, style),
+                Span::styled(text, style),
+            ]));
         }
 
         // Current input fields
         if self.focus == FocusSection::Sets {
-            let set_num = self.sets.len() + 1;
+            let input_label = if let Some(idx) = self.editing_set {
+                format!("Edit Set {}: ", idx + 1)
+            } else {
+                format!("Set {}: ", self.sets.len() + 1)
+            };
             match practice.practice_type {
                 PracticeType::Weighted => {
                     let (f1_before, f1_after) = self.field1.split_at(self.field1_cursor);
@@ -461,7 +486,7 @@ impl LogEntryScreen {
                     let f1_style = if self.active_field == 0 { ACCENT } else { Color::White };
                     let f2_style = if self.active_field == 1 { ACCENT } else { Color::White };
                     sets_lines.push(Line::from(vec![
-                        Span::styled(format!("Set {}: ", set_num), Style::default().fg(Color::White)),
+                        Span::styled(input_label, Style::default().fg(Color::White)),
                         Span::styled(format!("{} ", tr("log-weight-label")), Style::default().fg(Color::Gray)),
                         Span::styled(f1_before, Style::default().fg(f1_style)),
                         if self.active_field == 0 { Span::styled("\u{2588}", Style::default().fg(ACCENT)) } else { Span::raw("") },
@@ -475,7 +500,7 @@ impl LogEntryScreen {
                 PracticeType::Bodyweight => {
                     let (f1_before, f1_after) = self.field1.split_at(self.field1_cursor);
                     sets_lines.push(Line::from(vec![
-                        Span::styled(format!("Set {}: ", set_num), Style::default().fg(Color::White)),
+                        Span::styled(input_label, Style::default().fg(Color::White)),
                         Span::styled(format!("{} ", tr("log-reps-label")), Style::default().fg(Color::Gray)),
                         Span::styled(f1_before, Style::default().fg(ACCENT)),
                         Span::styled("\u{2588}", Style::default().fg(ACCENT)),
@@ -485,7 +510,7 @@ impl LogEntryScreen {
                 PracticeType::Distance => {
                     let (f1_before, f1_after) = self.field1.split_at(self.field1_cursor);
                     sets_lines.push(Line::from(vec![
-                        Span::styled(format!("Set {}: ", set_num), Style::default().fg(Color::White)),
+                        Span::styled(input_label, Style::default().fg(Color::White)),
                         Span::styled(format!("{} ", tr("log-distance-label")), Style::default().fg(Color::Gray)),
                         Span::styled(f1_before, Style::default().fg(ACCENT)),
                         Span::styled("\u{2588}", Style::default().fg(ACCENT)),
@@ -495,7 +520,7 @@ impl LogEntryScreen {
                 PracticeType::Endurance => {
                     let (f1_before, f1_after) = self.field1.split_at(self.field1_cursor);
                     sets_lines.push(Line::from(vec![
-                        Span::styled(format!("Set {}: ", set_num), Style::default().fg(Color::White)),
+                        Span::styled(input_label, Style::default().fg(Color::White)),
                         Span::styled(format!("{} ", tr("log-duration-label")), Style::default().fg(Color::Gray)),
                         Span::styled(f1_before, Style::default().fg(ACCENT)),
                         Span::styled("\u{2588}", Style::default().fg(ACCENT)),
@@ -602,11 +627,21 @@ impl LogEntryScreen {
         render_status_line(frame, chunks[5], &self.status_msg);
 
         // ── Footer ──
-        let footer = Line::from(vec![
+        let mut footer_spans = vec![
             Span::styled(" [Tab]", Style::default().fg(ACCENT)),
             Span::styled(format!(" {}  ", tr("key-next")), Style::default().fg(Color::DarkGray)),
             Span::styled("[Enter]", Style::default().fg(ACCENT)),
             Span::styled(format!(" {}  ", tr("key-add-set")), Style::default().fg(Color::DarkGray)),
+        ];
+        if self.focus == FocusSection::Sets && !self.sets.is_empty() {
+            footer_spans.push(Span::styled("[j/k]", Style::default().fg(ACCENT)));
+            footer_spans.push(Span::styled(format!(" {}  ", tr("key-navigate")), Style::default().fg(Color::DarkGray)));
+            footer_spans.push(Span::styled("[d]", Style::default().fg(ACCENT)));
+            footer_spans.push(Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::DarkGray)));
+            footer_spans.push(Span::styled("[e]", Style::default().fg(ACCENT)));
+            footer_spans.push(Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::DarkGray)));
+        }
+        footer_spans.extend(vec![
             Span::styled("[Ctrl+S]", Style::default().fg(ACCENT)),
             Span::styled(format!(" {}  ", tr("key-save")), Style::default().fg(Color::DarkGray)),
             Span::styled("[D]", Style::default().fg(ACCENT)),
@@ -614,7 +649,7 @@ impl LogEntryScreen {
             Span::styled("[Esc]", Style::default().fg(ACCENT)),
             Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::DarkGray)),
         ]);
-        frame.render_widget(Paragraph::new(footer), chunks[6]);
+        frame.render_widget(Paragraph::new(Line::from(footer_spans)), chunks[6]);
     }
 
     fn handle_enter_log(&mut self, key: KeyEvent, db: &Database) -> Action {
@@ -631,6 +666,23 @@ impl LogEntryScreen {
                 return self.save_log(db);
             }
             return Action::None;
+        }
+
+        // When editing a set, restrict navigation keys within Sets section
+        if self.editing_set.is_some() && self.focus == FocusSection::Sets {
+            if key.code == KeyCode::Esc {
+                self.cancel_edit();
+                return Action::None;
+            }
+            if key.code == KeyCode::Tab || key.code == KeyCode::BackTab {
+                self.cancel_edit();
+                // fall through to normal Tab handling
+            } else if key.code == KeyCode::Char('D') && !key.modifiers.contains(KeyModifiers::CONTROL) {
+                self.cancel_edit();
+                // fall through to normal D handling
+            } else {
+                return self.handle_sets_input(key, is_weighted);
+            }
         }
 
         // D — edit date from sets section
@@ -710,8 +762,45 @@ impl LogEntryScreen {
         }
     }
 
+    fn cancel_edit(&mut self) {
+        self.editing_set = None;
+        self.field1.clear();
+        self.field1_cursor = 0;
+        self.field2.clear();
+        self.field2_cursor = 0;
+        self.active_field = 0;
+    }
+
     fn handle_sets_input(&mut self, key: KeyEvent, is_weighted: bool) -> Action {
         let has_two_fields = is_weighted;
+        let n = self.sets.len();
+
+        // Set navigation with j/k (only when not editing a set)
+        if self.editing_set.is_none() {
+            match key.code {
+                KeyCode::Char('j') | KeyCode::Down => {
+                    if n > 0 {
+                        self.selected_set = if let Some(i) = self.selected_set {
+                            if i + 1 < n { Some(i + 1) } else { None }
+                        } else {
+                            Some(0)
+                        };
+                    }
+                    return Action::None;
+                }
+                KeyCode::Char('k') | KeyCode::Up => {
+                    if n > 0 {
+                        self.selected_set = if let Some(i) = self.selected_set {
+                            if i > 0 { Some(i - 1) } else { None }
+                        } else {
+                            Some(n - 1)
+                        };
+                    }
+                    return Action::None;
+                }
+                _ => {}
+            }
+        }
 
         // Ctrl+K – delete from cursor to end
         if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('k') {
@@ -772,7 +861,7 @@ impl LogEntryScreen {
 
         match key.code {
             KeyCode::Enter => {
-                if has_two_fields && self.active_field == 0 {
+                if has_two_fields && self.active_field == 0 && self.editing_set.is_none() {
                     self.active_field = 1;
                 } else {
                     self.commit_set();
@@ -780,13 +869,72 @@ impl LogEntryScreen {
                 Action::None
             }
             KeyCode::Backspace => {
-                if text.is_empty() && both_fields_empty && !self.sets.is_empty() {
-                    self.sets.pop();
+                if text.is_empty() && !self.sets.is_empty() {
+                    if let Some(idx) = self.selected_set {
+                        // Selected set + empty active field = delete it
+                        self.sets.remove(idx);
+                        self.selected_set = if self.sets.is_empty() {
+                            None
+                        } else if idx >= self.sets.len() {
+                            Some(self.sets.len() - 1)
+                        } else {
+                            Some(idx)
+                        };
+                    } else if both_fields_empty {
+                        self.sets.pop();
+                    }
                 } else if *cursor > 0 {
                     let prev = text[..*cursor].char_indices().next_back()
                         .map(|(i, _)| i).unwrap_or(0);
                     text.remove(prev);
                     *cursor = prev;
+                }
+                Action::None
+            }
+            KeyCode::Char('d') if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                if let Some(idx) = self.selected_set {
+                    self.sets.remove(idx);
+                    self.selected_set = if self.sets.is_empty() {
+                        None
+                    } else if idx >= self.sets.len() {
+                        Some(self.sets.len() - 1)
+                    } else {
+                        Some(idx)
+                    };
+                }
+                Action::None
+            }
+            KeyCode::Char('e') if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                if let Some(idx) = self.selected_set {
+                    self.editing_set = Some(idx);
+                    let set = &self.sets[idx];
+                    match set {
+                        SetData::Weighted { weight, reps } => {
+                            self.field1 = format!("{:.1}", weight).trim_end_matches(".0").to_string();
+                            if self.field1.ends_with(".0") {
+                                self.field1 = format!("{:.0}", weight);
+                            }
+                            self.field2 = reps.to_string();
+                        }
+                        SetData::Bodyweight { reps } => {
+                            self.field1 = reps.to_string();
+                        }
+                        SetData::Distance { distance } => {
+                            self.field1 = format!("{:.1}", distance).trim_end_matches(".0").to_string();
+                            if self.field1.ends_with(".0") {
+                                self.field1 = format!("{:.0}", distance);
+                            }
+                        }
+                        SetData::Endurance { duration } => {
+                            self.field1 = format!("{:.1}", duration).trim_end_matches(".0").to_string();
+                            if self.field1.ends_with(".0") {
+                                self.field1 = format!("{:.0}", duration);
+                            }
+                        }
+                    }
+                    self.field1_cursor = self.field1.len();
+                    self.field2_cursor = self.field2.len();
+                    self.active_field = 0;
                 }
                 Action::None
             }
@@ -970,7 +1118,12 @@ impl LogEntryScreen {
         };
 
         if let Some(data) = set_data {
-            self.sets.push(data);
+            if let Some(idx) = self.editing_set {
+                self.sets[idx] = data;
+                self.editing_set = None;
+            } else {
+                self.sets.push(data);
+            }
             if practice.practice_type == PracticeType::Weighted {
                 self.field2.clear();
                 self.field2_cursor = 0;
@@ -1040,5 +1193,213 @@ fn metric_label_for_type(pt: &PracticeType) -> String {
         PracticeType::Bodyweight => tr("metric-reps"),
         PracticeType::Distance => tr("metric-km"),
         PracticeType::Endurance => tr("metric-min"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+    use crate::db::Database;
+
+    fn test_db() -> (Database, tempfile::TempDir) {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let db = Database::open(dir.path().join("test.db").as_ref()).expect("open db");
+        (db, dir)
+    }
+
+    fn key(code: KeyCode) -> KeyEvent {
+        KeyEvent {
+            code,
+            modifiers: KeyModifiers::empty(),
+            kind: KeyEventKind::Press,
+            state: crossterm::event::KeyEventState::empty(),
+        }
+    }
+
+    fn ctrl_key(c: char) -> KeyEvent {
+        KeyEvent {
+            code: KeyCode::Char(c),
+            modifiers: KeyModifiers::CONTROL,
+            kind: KeyEventKind::Press,
+            state: crossterm::event::KeyEventState::empty(),
+        }
+    }
+
+    fn char_key(c: char) -> KeyEvent {
+        KeyEvent {
+            code: KeyCode::Char(c),
+            modifiers: KeyModifiers::empty(),
+            kind: KeyEventKind::Press,
+            state: crossterm::event::KeyEventState::empty(),
+        }
+    }
+
+    #[test]
+    fn sets_cursor_movement_works() {
+        let (db, _dir) = test_db();
+        db.create_practice("Bench", PracticeType::Weighted).unwrap();
+
+        let mut screen = LogEntryScreen::new(&db).unwrap();
+        // Select practice -> EnterLog phase
+        screen.handle_key(key(KeyCode::Enter), &db);
+
+        // Type weight
+        screen.handle_key(char_key('5'), &db);
+        screen.handle_key(char_key('0'), &db);
+        assert_eq!(screen.field1, "50");
+        assert_eq!(screen.field1_cursor, 2);
+
+        // Tab to reps field
+        screen.handle_key(key(KeyCode::Tab), &db);
+        assert_eq!(screen.active_field, 1);
+
+        // Type reps
+        screen.handle_key(char_key('1'), &db);
+        screen.handle_key(char_key('0'), &db);
+        assert_eq!(screen.field2, "10");
+        assert_eq!(screen.field2_cursor, 2);
+
+        // Left moves cursor back
+        screen.handle_key(key(KeyCode::Left), &db);
+        assert_eq!(screen.field2_cursor, 1);
+        screen.handle_key(key(KeyCode::Left), &db);
+        assert_eq!(screen.field2_cursor, 0);
+        screen.handle_key(key(KeyCode::Left), &db);
+        assert_eq!(screen.field2_cursor, 0); // clamped
+
+        // Right moves cursor forward
+        screen.handle_key(key(KeyCode::Right), &db);
+        assert_eq!(screen.field2_cursor, 1);
+        screen.handle_key(key(KeyCode::Right), &db);
+        assert_eq!(screen.field2_cursor, 2);
+        screen.handle_key(key(KeyCode::Right), &db);
+        assert_eq!(screen.field2_cursor, 2); // clamped
+
+        // Ctrl+A to start
+        screen.handle_key(ctrl_key('a'), &db);
+        assert_eq!(screen.field2_cursor, 0);
+
+        // Ctrl+E to end
+        screen.handle_key(ctrl_key('e'), &db);
+        assert_eq!(screen.field2_cursor, 2);
+    }
+
+    #[test]
+    fn sets_navigation_and_delete_works() {
+        let (db, _dir) = test_db();
+        db.create_practice("Bench", PracticeType::Weighted).unwrap();
+
+        let mut screen = LogEntryScreen::new(&db).unwrap();
+        screen.handle_key(key(KeyCode::Enter), &db);
+
+        // Add first set: weight then reps
+        screen.handle_key(char_key('5'), &db);
+        screen.handle_key(char_key('0'), &db);
+        screen.handle_key(key(KeyCode::Tab), &db);
+        screen.handle_key(char_key('1'), &db);
+        screen.handle_key(char_key('0'), &db);
+        screen.handle_key(key(KeyCode::Enter), &db);
+        // Add 2 more sets (field1 retains weight, active_field stays at 1)
+        for _ in 0..2 {
+            screen.handle_key(char_key('1'), &db);
+            screen.handle_key(char_key('0'), &db);
+            screen.handle_key(key(KeyCode::Enter), &db);
+        }
+        assert_eq!(screen.sets.len(), 3);
+        assert!(screen.selected_set.is_none());
+
+        // k selects last set (index 2)
+        screen.handle_key(char_key('k'), &db);
+        assert_eq!(screen.selected_set, Some(2));
+
+        // k moves up to set 1 (index 1)
+        screen.handle_key(char_key('k'), &db);
+        assert_eq!(screen.selected_set, Some(1));
+
+        // k moves up to set 0
+        screen.handle_key(char_key('k'), &db);
+        assert_eq!(screen.selected_set, Some(0));
+
+        // k from first set goes back to input line
+        screen.handle_key(char_key('k'), &db);
+        assert!(screen.selected_set.is_none());
+
+        // j from input goes to first set
+        screen.handle_key(char_key('j'), &db);
+        assert_eq!(screen.selected_set, Some(0));
+
+        // j moves down through sets
+        screen.handle_key(char_key('j'), &db);
+        assert_eq!(screen.selected_set, Some(1));
+        screen.handle_key(char_key('j'), &db);
+        assert_eq!(screen.selected_set, Some(2));
+
+        // j from last set goes to input line
+        screen.handle_key(char_key('j'), &db);
+        assert!(screen.selected_set.is_none());
+
+        // Select set 1 and delete it
+        screen.handle_key(char_key('k'), &db); // to set 2
+        screen.handle_key(char_key('k'), &db); // to set 1
+        screen.handle_key(char_key('d'), &db);
+        assert_eq!(screen.sets.len(), 2);
+        // After delete, should still point to valid set
+        assert_eq!(screen.selected_set, Some(1));
+
+        // Backspace with empty fields and set selected deletes selected set
+        screen.handle_key(char_key('k'), &db); // to set 0
+        assert_eq!(screen.selected_set, Some(0));
+        screen.handle_key(key(KeyCode::Backspace), &db);
+        assert_eq!(screen.sets.len(), 1);
+        assert_eq!(screen.selected_set, Some(0));
+    }
+
+    #[test]
+    fn sets_edit_works() {
+        let (db, _dir) = test_db();
+        db.create_practice("Bench", PracticeType::Weighted).unwrap();
+
+        let mut screen = LogEntryScreen::new(&db).unwrap();
+        screen.handle_key(key(KeyCode::Enter), &db);
+
+        // Add a set: 50kg x 10 reps
+        screen.handle_key(char_key('5'), &db);
+        screen.handle_key(char_key('0'), &db);
+        screen.handle_key(key(KeyCode::Tab), &db);
+        screen.handle_key(char_key('1'), &db);
+        screen.handle_key(char_key('0'), &db);
+        screen.handle_key(key(KeyCode::Enter), &db);
+        assert_eq!(screen.sets.len(), 1);
+        assert!(matches!(screen.sets[0], SetData::Weighted { weight: 50.0, reps: 10 }));
+
+        // Select the set and edit it
+        screen.handle_key(char_key('k'), &db);
+        assert_eq!(screen.selected_set, Some(0));
+        screen.handle_key(char_key('e'), &db);
+        assert_eq!(screen.editing_set, Some(0));
+        assert_eq!(screen.field1, "50");
+        assert_eq!(screen.field2, "10");
+        assert_eq!(screen.active_field, 0);
+
+        // Change weight to 55 (go to start, clear, then type)
+        screen.handle_key(ctrl_key('a'), &db);
+        screen.handle_key(ctrl_key('k'), &db);
+        screen.handle_key(char_key('5'), &db);
+        screen.handle_key(char_key('5'), &db);
+        screen.handle_key(key(KeyCode::Enter), &db); // move to reps
+        assert_eq!(screen.active_field, 1);
+        screen.handle_key(key(KeyCode::Enter), &db); // save edit
+        assert!(screen.editing_set.is_none());
+        assert_eq!(screen.sets.len(), 1);
+        assert!(matches!(screen.sets[0], SetData::Weighted { weight: 55.0, reps: 10 }));
+
+        // selected_set stays at 0 after edit; press e again then cancel with Esc
+        assert_eq!(screen.selected_set, Some(0));
+        screen.handle_key(char_key('e'), &db);
+        assert_eq!(screen.editing_set, Some(0));
+        screen.handle_key(key(KeyCode::Esc), &db);
+        assert!(screen.editing_set.is_none());
+        assert!(screen.field1.is_empty());
     }
 }

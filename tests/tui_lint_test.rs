@@ -31,13 +31,13 @@ fn paragraph_widgets_must_wrap_user_content() {
         "history.rs:185",
         "history.rs:217",
         // ── log_entry.rs ──
-        "log_entry.rs:199",
-        "log_entry.rs:245",
-        "log_entry.rs:263",
-        "log_entry.rs:434",
-        "log_entry.rs:534",
-        "log_entry.rs:570",
-        "log_entry.rs:617",
+        "log_entry.rs:205", // filter bar: single-line, width-controlled
+        "log_entry.rs:251", // practice list: fixed-width rows
+        "log_entry.rs:269", // footer: fixed-width shortcuts
+        "log_entry.rs:442", // date line: single-line, fixed width
+        "log_entry.rs:559", // sets list: structured single-line entries
+        "log_entry.rs:595", // warm-up/cool-down: single-line display
+        "log_entry.rs:652", // footer: fixed-width shortcuts
         // ── mod.rs ──
         "mod.rs:104",
         // ── practices.rs ──

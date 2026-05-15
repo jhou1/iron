@@ -108,6 +108,7 @@ The Dashboard displays:
 4. Use `Tab` to move between sections (weight → reps → warm-up → cool-down → note)
 5. Press `D` to change the log date (defaults to today, format: YYYY-MM-DD)
 6. Press `Ctrl+S` to save from any section
+7. **Edit or delete existing sets**: press `j/k` to navigate committed sets, `e` to edit a set, `d` to delete it
 
 Example — logging kettlebell snatches:
 
