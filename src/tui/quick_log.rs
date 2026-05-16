@@ -3,7 +3,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap},
+    widgets::{Block, Borders, Padding, Paragraph, Wrap},
     Frame,
 };
 
@@ -121,6 +121,7 @@ impl QuickLogScreen {
                 Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
             ]))
             .borders(Borders::ALL)
+            .padding(Padding::uniform(1))
             .border_style(Style::default().fg(BORDER_COLOR));
         let inner = block.inner(chunks[0]);
         frame.render_widget(block, chunks[0]);
@@ -151,6 +152,7 @@ impl QuickLogScreen {
         let block = Block::default()
             .title(format!(" {} ", tr("quicklog-input-title")))
             .borders(Borders::ALL)
+            .padding(Padding::uniform(1))
             .border_style(Style::default().fg(BORDER_COLOR));
 
         let inner = block.inner(area);
@@ -191,6 +193,7 @@ impl QuickLogScreen {
         let block = Block::default()
             .title(format!(" {} ", tr("quicklog-preview-title")))
             .borders(Borders::ALL)
+            .padding(Padding::uniform(1))
             .border_style(Style::default().fg(BORDER_COLOR));
 
         let inner = block.inner(area);

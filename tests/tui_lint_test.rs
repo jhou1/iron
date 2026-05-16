@@ -20,46 +20,46 @@ fn paragraph_widgets_must_wrap_user_content() {
         "abbreviations.rs:249",
         // ── dashboard.rs ──
         "dashboard.rs:142",
-        "dashboard.rs:221",
-        "dashboard.rs:372",
-        "dashboard.rs:402", // gauge bar: width-controlled, cannot overflow
+        "dashboard.rs:222",
+        "dashboard.rs:376",
+        "dashboard.rs:406", // gauge bar: width-controlled, cannot overflow
         // ── goals.rs ──
-        "goals.rs:405",
-        "goals.rs:473",
+        "goals.rs:407",
+        "goals.rs:475",
         // ── history.rs ──
         "history.rs:123",
-        "history.rs:185",
-        "history.rs:217",
+        "history.rs:186",
+        "history.rs:219",
         // ── log_entry.rs ──
         "log_entry.rs:205", // filter bar: single-line, width-controlled
-        "log_entry.rs:251", // practice list: fixed-width rows
-        "log_entry.rs:269", // footer: fixed-width shortcuts
-        "log_entry.rs:442", // date line: single-line, fixed width
-        "log_entry.rs:559", // sets list: structured single-line entries
-        "log_entry.rs:595", // warm-up/cool-down: single-line display
-        "log_entry.rs:652", // footer: fixed-width shortcuts
+        "log_entry.rs:252", // practice list: fixed-width rows
+        "log_entry.rs:270", // footer: fixed-width shortcuts
+        "log_entry.rs:444", // date line: single-line, fixed width
+        "log_entry.rs:562", // sets list: structured single-line entries
+        "log_entry.rs:599", // warm-up/cool-down: single-line display
+        "log_entry.rs:657", // footer: fixed-width shortcuts
         // ── mod.rs ──
         "mod.rs:104",
         // ── practices.rs ──
-        "practices.rs:168",
-        "practices.rs:250",
-        "practices.rs:296",
+        "practices.rs:169",
+        "practices.rs:251",
+        "practices.rs:297",
         // ── quotes_screen.rs ──
-        "quotes_screen.rs:113",
-        "quotes_screen.rs:186",
-        "quotes_screen.rs:215",
+        "quotes_screen.rs:114",
+        "quotes_screen.rs:187",
+        "quotes_screen.rs:216",
         // ── quick_log.rs ──
-        "quick_log.rs:146",
-        "quick_log.rs:206",
-        "quick_log.rs:221",
-        "quick_log.rs:235",
+        "quick_log.rs:147",
+        "quick_log.rs:209",
+        "quick_log.rs:224",
+        "quick_log.rs:238",
         // ── trends.rs ──
         "trends.rs:87",
         "trends.rs:115",
-        "trends.rs:160",
-        "trends.rs:211",
-        "trends.rs:219",
-        "trends.rs:265",
+        "trends.rs:161",
+        "trends.rs:214",
+        "trends.rs:222",
+        "trends.rs:268",
     ].into_iter().collect();
 
     let tui_dir = Path::new("src/tui");

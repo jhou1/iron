@@ -4,7 +4,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Padding, Paragraph},
     Frame,
 };
 
@@ -122,6 +122,7 @@ impl TrendsScreen {
                 Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
             ]))
             .borders(Borders::ALL)
+            .padding(Padding::uniform(1))
             .border_style(Style::default().fg(BORDER_COLOR));
         let inner = block.inner(list_area);
         frame.render_widget(block, list_area);
@@ -170,6 +171,7 @@ impl TrendsScreen {
             None => {
                 let block = Block::default()
                     .borders(Borders::ALL)
+                    .padding(Padding::uniform(1))
                     .border_style(Style::default().fg(BORDER_COLOR));
                 frame.render_widget(block, area);
                 return;
@@ -189,6 +191,7 @@ impl TrendsScreen {
                 Span::styled("──", Style::default().fg(BORDER_COLOR)),
             ]))
             .borders(Borders::ALL)
+            .padding(Padding::uniform(1))
             .border_style(Style::default().fg(BORDER_COLOR));
         let inner = block.inner(area);
         frame.render_widget(block, area);

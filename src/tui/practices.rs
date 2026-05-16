@@ -3,7 +3,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Padding, Paragraph},
     Frame,
 };
 
@@ -107,6 +107,7 @@ impl PracticesScreen {
                 Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
             ]))
             .borders(Borders::ALL)
+            .padding(Padding::uniform(1))
             .border_style(Style::default().fg(BORDER_COLOR));
         let inner = block.inner(chunks[0]);
         frame.render_widget(block, chunks[0]);

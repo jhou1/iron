@@ -3,7 +3,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap},
+    widgets::{Block, Borders, Padding, Paragraph, Wrap},
     Frame,
 };
 use unicode_width::UnicodeWidthStr;
@@ -149,6 +149,7 @@ impl DashboardScreen {
                 Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
             ]))
             .borders(Borders::ALL)
+            .padding(Padding::uniform(1))
             .border_style(Style::default().fg(BORDER_COLOR));
         let heatmap_inner = heatmap_block.inner(chunks[2]);
         frame.render_widget(heatmap_block, chunks[2]);
@@ -245,6 +246,7 @@ impl DashboardScreen {
                 Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
             ]))
             .borders(Borders::ALL)
+            .padding(Padding::uniform(1))
             .border_style(Style::default().fg(BORDER_COLOR));
         let inner = block.inner(area);
         frame.render_widget(block, area);
@@ -296,6 +298,7 @@ impl DashboardScreen {
                 Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
             ]))
             .borders(Borders::ALL)
+            .padding(Padding::uniform(1))
             .border_style(Style::default().fg(BORDER_COLOR));
 
         let inner = block.inner(area);
@@ -361,6 +364,7 @@ impl DashboardScreen {
                 Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
             ]))
             .borders(Borders::ALL)
+            .padding(Padding::uniform(1))
             .border_style(Style::default().fg(BORDER_COLOR));
 
         let inner = block.inner(area);

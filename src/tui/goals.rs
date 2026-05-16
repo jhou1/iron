@@ -3,7 +3,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, Paragraph, Wrap},
+    widgets::{Block, BorderType, Borders, Clear, Padding, Paragraph, Wrap},
     Frame,
 };
 
@@ -226,6 +226,7 @@ impl GoalsScreen {
                 Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
             ]))
             .borders(Borders::ALL)
+            .padding(Padding::uniform(1))
             .border_style(Style::default().fg(BORDER_COLOR));
         let list_area = block.inner(chunks[0]);
         frame.render_widget(block, chunks[0]);
@@ -374,6 +375,7 @@ impl GoalsScreen {
                         let block = Block::default()
                             .title(Span::styled(title, Style::default().fg(Color::White).bold()))
                             .borders(Borders::ALL)
+                            .padding(Padding::uniform(1))
                             .border_type(BorderType::Rounded)
                             .border_style(Style::default().fg(BORDER_COLOR));
 

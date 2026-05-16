@@ -3,7 +3,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Cell, Clear, Paragraph, Row, Table, Wrap},
+    widgets::{Block, BorderType, Borders, Cell, Clear, Padding, Paragraph, Row, Table, Wrap},
     Frame,
 };
 
@@ -149,6 +149,7 @@ impl HistoryScreen {
             let block = Block::default()
                 .title(Span::styled(title_text, Style::default().fg(Color::White).bold()))
                 .borders(Borders::ALL)
+                .padding(Padding::uniform(1))
                 .border_type(BorderType::Rounded)
                 .border_style(Style::default().fg(BORDER_COLOR));
             frame.render_widget(Clear, popup_rect);
@@ -208,6 +209,7 @@ impl HistoryScreen {
                 Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
             ]))
             .borders(Borders::ALL)
+            .padding(Padding::uniform(1))
             .border_style(Style::default().fg(BORDER_COLOR));
         let inner = block.inner(area);
         frame.render_widget(block, area);

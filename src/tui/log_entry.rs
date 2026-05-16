@@ -4,7 +4,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap},
+    widgets::{Block, Borders, Padding, Paragraph, Wrap},
     Frame,
 };
 
@@ -212,6 +212,7 @@ impl LogEntryScreen {
                 Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
             ]))
             .borders(Borders::ALL)
+            .padding(Padding::uniform(1))
             .border_style(Style::default().fg(BORDER_COLOR));
         let inner = block.inner(chunks[1]);
         frame.render_widget(block, chunks[1]);
@@ -419,6 +420,7 @@ impl LogEntryScreen {
         let date_block = Block::default()
             .title(Span::styled(date_title, Style::default().fg(ACCENT).bold()))
             .borders(Borders::ALL)
+            .padding(Padding::uniform(1))
             .border_style(Style::default().fg(date_border_color));
         let date_inner = date_block.inner(chunks[0]);
         frame.render_widget(date_block, chunks[0]);
@@ -446,6 +448,7 @@ impl LogEntryScreen {
         let sets_block = Block::default()
             .title(Span::styled(" Sets ", Style::default().fg(Color::White).bold()))
             .borders(Borders::ALL)
+            .padding(Padding::uniform(1))
             .border_style(Style::default().fg(sets_border_color));
         let sets_inner = sets_block.inner(chunks[2]);
         frame.render_widget(sets_block, chunks[2]);
@@ -562,6 +565,7 @@ impl LogEntryScreen {
         let wucd_border_color = BORDER_COLOR;
         let wucd_block = Block::default()
             .borders(Borders::ALL)
+            .padding(Padding::uniform(1))
             .border_style(Style::default().fg(wucd_border_color));
         let wucd_inner = wucd_block.inner(chunks[3]);
         frame.render_widget(wucd_block, chunks[3]);
@@ -602,6 +606,7 @@ impl LogEntryScreen {
                 Style::default().fg(Color::Gray),
             ))
             .borders(Borders::ALL)
+            .padding(Padding::uniform(1))
             .border_style(Style::default().fg(note_border_color));
         let note_inner = note_block.inner(chunks[4]);
         frame.render_widget(note_block, chunks[4]);
