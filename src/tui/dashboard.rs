@@ -121,9 +121,9 @@ impl DashboardScreen {
             .constraints([
                 Constraint::Length(1),            // [0] logo header
                 Constraint::Length(1),            // [1] spacer
-                Constraint::Length(12),           // [2] heatmap
+                Constraint::Length(13),           // [2] heatmap: 9 inner + 2 borders + 2 padding
                 Constraint::Length(1),            // [3] spacer
-                Constraint::Length(5),            // [4] training summary
+                Constraint::Length(7),              // [4] summary: 3 inner + 2 borders + 2 padding
                 Constraint::Length(1),            // [5] spacer
                 Constraint::Length(pane_height),  // [6] split panes
                 Constraint::Length(1),            // [7] status line
@@ -482,5 +482,53 @@ impl DashboardScreen {
         }
     }
 
+}
+
+#[cfg(test)]
+mod tests {
+    use ratatui::layout::{Constraint, Direction, Layout, Rect};
+    use ratatui::widgets::{Block, Borders, Padding};
+
+    #[test]
+    fn dashboard_layout_produces_adequate_inner_areas() {
+        // Simulate dashboard layout with minimum content
+        let area = Rect::new(0, 0, 80, 35);
+        let pane_height: u16 = 2;
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1),            // logo header
+                Constraint::Length(1),              // spacer
+                Constraint::Length(13),           // heatmap
+                Constraint::Length(1),              // spacer
+                Constraint::Length(7),              // summary
+                Constraint::Length(1),              // spacer
+                Constraint::Length(pane_height),    // split panes
+                Constraint::Length(1),              // status line
+                Constraint::Length(4),             // footer
+                Constraint::Min(0),                 // spacer
+            ])
+            .split(area);
+
+        let heatmap_block = Block::default()
+            .borders(Borders::ALL)
+            .padding(Padding::uniform(1));
+        let heatmap_inner = heatmap_block.inner(chunks[2]);
+        assert!(
+            heatmap_inner.height >= 9,
+            "heatmap inner height must be >= 9 (got {}). Increase heatmap constraint if padding is added.",
+            heatmap_inner.height
+        );
+
+        let summary_block = Block::default()
+            .borders(Borders::ALL)
+            .padding(Padding::uniform(1));
+        let summary_inner = summary_block.inner(chunks[4]);
+        assert!(
+            summary_inner.height >= 3,
+            "summary inner height must be >= 3 (got {}). Increase summary constraint if padding is added.",
+            summary_inner.height
+        );
+    }
 }
 

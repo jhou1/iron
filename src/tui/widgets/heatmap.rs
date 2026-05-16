@@ -168,3 +168,49 @@ impl<'a> Widget for Heatmap<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::buffer::Buffer;
+
+    #[test]
+    fn heatmap_renders_when_area_height_is_9() {
+        let data = vec![("2026-05-16".to_string(), 5i64)];
+        let heatmap = Heatmap::new(&data, 52, false);
+        let mut buf = Buffer::empty(Rect::new(0, 0, 30, 9));
+        heatmap.render(Rect::new(0, 0, 30, 9), &mut buf);
+        // At least one cell should have the circle character
+        let has_content = buf.content.iter().any(|cell| cell.symbol() == "\u{25CF}");
+        assert!(has_content, "heatmap should render circles when area.height >= 9");
+    }
+
+    #[test]
+    fn heatmap_renders_nothing_when_area_height_is_8() {
+        let data = vec![("2026-05-16".to_string(), 5i64)];
+        let heatmap = Heatmap::new(&data, 52, false);
+        let mut buf = Buffer::empty(Rect::new(0, 0, 30, 8));
+        heatmap.render(Rect::new(0, 0, 30, 8), &mut buf);
+        let has_content = buf.content.iter().any(|cell| cell.symbol() == "\u{25CF}");
+        assert!(!has_content, "heatmap should render nothing when area.height < 9");
+    }
+
+    #[test]
+    fn heatmap_renders_with_padded_block_inner_area() {
+        use ratatui::widgets::{Block, Borders, Padding};
+        let data = vec![("2026-05-16".to_string(), 5i64)];
+        let heatmap = Heatmap::new(&data, 52, false);
+        // A Block with Borders::ALL + Padding::uniform(1) on a 13-row area produces inner height 9
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .padding(Padding::uniform(1));
+        let area = Rect::new(0, 0, 30, 13);
+        let inner = block.inner(area);
+        assert_eq!(inner.height, 9, "inner height should be exactly 9");
+        let mut buf = Buffer::empty(area);
+        block.render(area, &mut buf);
+        heatmap.render(inner, &mut buf);
+        let has_content = buf.content.iter().any(|cell| cell.symbol() == "\u{25CF}");
+        assert!(has_content, "heatmap should render inside a padded 13-row block");
+    }
+}
