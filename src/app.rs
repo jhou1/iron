@@ -14,7 +14,6 @@ use crate::config::Config;
 use crate::db::Database;
 use crate::i18n::tr_args;
 use crate::tui::{
-    abbreviations::AbbreviationsScreen,
     dashboard::DashboardScreen,
     goals::GoalsScreen,
     history::HistoryScreen,
@@ -51,7 +50,6 @@ fn run_app(
     let mut practices = PracticesScreen::new(db)?;
     let config = Config::load();
     let mut quick_log = QuickLogScreen::new(db, &config.llm)?;
-    let mut abbreviations = AbbreviationsScreen::new(db)?;
     let mut quotes_screen = QuotesScreen::new(db)?;
 
     loop {
@@ -77,7 +75,6 @@ fn run_app(
                 Screen::Trends => trends.render(frame),
                 Screen::Practices => practices.render(frame),
                 Screen::QuickLog => quick_log.render(frame),
-                Screen::Abbreviations => abbreviations.render(frame),
                 Screen::Quotes => quotes_screen.render(frame),
             }
         })?;
@@ -108,7 +105,6 @@ fn run_app(
                 }
                 Screen::Practices => practices.handle_key(key, db),
                 Screen::QuickLog => quick_log.handle_key(key, db),
-                Screen::Abbreviations => abbreviations.handle_key(key, db),
                 Screen::Quotes => quotes_screen.handle_key(key, db),
             };
 
@@ -142,9 +138,6 @@ fn run_app(
                         Screen::Practices => practices = PracticesScreen::new(db)?,
                         Screen::QuickLog => {
                             quick_log = QuickLogScreen::new(db, &config.llm)?;
-                        }
-                        Screen::Abbreviations => {
-                            abbreviations = AbbreviationsScreen::new(db)?;
                         }
                         Screen::Quotes => {
                             quotes_screen = QuotesScreen::new(db)?;

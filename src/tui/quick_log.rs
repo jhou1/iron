@@ -14,7 +14,7 @@ use crate::db::Database;
 use crate::i18n::tr;
 use crate::llm::{self, LlmError};
 use crate::model::{Abbreviation, ParsedLog, Practice, SetData};
-use super::{centered_area, render_status_line, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH};
+use super::{centered_area, render_status_line, visible_input_spans, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH};
 
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
@@ -28,6 +28,12 @@ enum Phase {
     Input,
     Parsing,
     Preview,
+    BrowseAbbreviations,  // Show list of abbreviations
+    AddAbbrShort,
+    AddAbbrFull,
+    EditAbbrShort,
+    EditAbbrFull,
+    ConfirmDeleteAbbr,    // Confirm deletion of abbreviation
 }
 
 pub struct QuickLogScreen {
@@ -45,6 +51,14 @@ pub struct QuickLogScreen {
     status_msg: StatusMessage,
     log_date: String,
     spinner_frame: usize,
+    // Abbreviation modal fields
+    abbr_short_input: String,
+    abbr_short_cursor: usize,
+    abbr_full_input: String,
+    abbr_full_cursor: usize,
+    abbr_editing_id: Option<i64>,
+    abbr_selected: usize,  // Selected index in abbreviations list
+    pre_abbr_phase: Phase,  // Phase to return to when canceling abbreviation modal
 }
 
 impl QuickLogScreen {
@@ -67,7 +81,20 @@ impl QuickLogScreen {
             status_msg: None,
             log_date,
             spinner_frame: 0,
+            abbr_short_input: String::new(),
+            abbr_short_cursor: 0,
+            abbr_full_input: String::new(),
+            abbr_full_cursor: 0,
+            abbr_editing_id: None,
+            abbr_selected: 0,
+            pre_abbr_phase: Phase::Input,
         })
+    }
+
+    fn refresh_abbreviations(&mut self, db: &Database) {
+        if let Ok(abbrs) = db.list_abbreviations() {
+            self.abbreviations = abbrs;
+        }
     }
 
     pub fn check_background_result(&mut self) {
@@ -144,8 +171,236 @@ impl QuickLogScreen {
 
         // ── Shortcuts ──
         let shortcuts = self.build_shortcuts();
-        frame.render_widget(Paragraph::new(vec![shortcuts]), chunks[2]);
+        frame.render_widget(Paragraph::new(vec![shortcuts]).wrap(Wrap { trim: false }), chunks[2]);
 
+        // ── Abbreviation modal (if active) ──
+        if self.is_abbr_modal_active() {
+            self.render_abbr_modal(frame, area);
+        }
+    }
+
+    fn is_abbr_modal_active(&self) -> bool {
+        matches!(self.phase, Phase::BrowseAbbreviations | Phase::AddAbbrShort | Phase::AddAbbrFull | Phase::EditAbbrShort | Phase::EditAbbrFull | Phase::ConfirmDeleteAbbr)
+    }
+
+    fn render_abbr_modal(&self, frame: &mut Frame, parent_area: Rect) {
+        use ratatui::widgets::Clear;
+
+        // Modal dimensions - larger for browse mode
+        let modal_width = 60u16;
+        let modal_height = if matches!(self.phase, Phase::BrowseAbbreviations) {
+            20u16.min(parent_area.height.saturating_sub(4)) // Taller for list
+        } else {
+            8u16
+        };
+
+        // Center the modal
+        let modal_area = Rect {
+            x: parent_area.x + (parent_area.width.saturating_sub(modal_width)) / 2,
+            y: parent_area.y + (parent_area.height.saturating_sub(modal_height)) / 2,
+            width: modal_width.min(parent_area.width),
+            height: modal_height.min(parent_area.height),
+        };
+
+        // Clear the background
+        frame.render_widget(Clear, modal_area);
+
+        // Handle browse mode separately
+        if self.phase == Phase::BrowseAbbreviations {
+            self.render_abbr_browse_modal(frame, modal_area);
+            return;
+        }
+
+        // Handle delete confirmation
+        if self.phase == Phase::ConfirmDeleteAbbr {
+            self.render_abbr_delete_confirm(frame, modal_area);
+            return;
+        }
+
+        // Modal content for add/edit modes
+        let (title, prompt, input_text, cursor_pos) = match self.phase {
+            Phase::AddAbbrShort | Phase::EditAbbrShort => {
+                let title = if matches!(self.phase, Phase::AddAbbrShort) {
+                    tr("abbreviations-enter-short")
+                } else {
+                    tr("abbreviations-edit-short")
+                };
+                (title, tr("abbreviations-enter-short"), &self.abbr_short_input, self.abbr_short_cursor)
+            }
+            Phase::AddAbbrFull | Phase::EditAbbrFull => {
+                let title = if matches!(self.phase, Phase::AddAbbrFull) {
+                    tr("abbreviations-enter-full")
+                } else {
+                    tr("abbreviations-edit-full")
+                };
+                (title, tr("abbreviations-enter-full"), &self.abbr_full_input, self.abbr_full_cursor)
+            }
+            _ => return,
+        };
+
+        // Modal block
+        let block = Block::default()
+            .title(format!(" {} ", title))
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(BORDER_COLOR))
+            .style(Style::default().bg(Color::Black));
+
+        let inner = block.inner(modal_area);
+        frame.render_widget(block, modal_area);
+
+        // Content layout
+        let content = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1), // prompt
+                Constraint::Length(1), // spacer
+                Constraint::Length(1), // input
+            ])
+            .margin(1)
+            .split(inner);
+
+        // Prompt
+        let prompt_line = Line::from(vec![
+            Span::styled(prompt, Style::default().fg(Color::White)),
+        ]);
+        frame.render_widget(Paragraph::new(prompt_line).wrap(Wrap { trim: false }), content[0]);
+
+        // Input with cursor
+        let mut spans = vec![Span::styled(" > ", Style::default().fg(Color::White))];
+        spans.extend(visible_input_spans(input_text, cursor_pos, content[2].width, 3, Color::White));
+        let input_line = Line::from(spans);
+        frame.render_widget(Paragraph::new(input_line).wrap(Wrap { trim: false }), content[2]);
+    }
+
+    fn render_abbr_browse_modal(&self, frame: &mut Frame, modal_area: Rect) {
+        use unicode_width::UnicodeWidthStr;
+
+        // Modal block with title
+        let block = Block::default()
+            .title(format!(" {} ", tr("abbreviations-title")))
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(BORDER_COLOR))
+            .style(Style::default().bg(Color::Black));
+
+        let inner = block.inner(modal_area);
+        frame.render_widget(block, modal_area);
+
+        // Calculate column widths
+        let max_short_len = self.abbreviations.iter()
+            .map(|a| a.short.width())
+            .max()
+            .unwrap_or(0);
+        let short_header = tr("abbreviations-col-short");
+        let col_width = max_short_len.max(short_header.width()) + 2;
+
+        // Header
+        let header_padding = col_width.saturating_sub(short_header.width());
+        let full_header = tr("abbreviations-col-full");
+
+        // Layout: header + list + shortcuts
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(2), // title + header
+                Constraint::Min(3),      // list
+                Constraint::Length(1),   // shortcuts
+            ])
+            .margin(1)
+            .split(inner);
+
+        // Header lines
+        let header_lines = vec![
+            Line::from(vec![
+                Span::styled("  ", Style::default().fg(Color::DarkGray)),
+                Span::styled(&short_header, Style::default().fg(Color::DarkGray)),
+                Span::raw(" ".repeat(header_padding)),
+                Span::styled(&full_header, Style::default().fg(Color::DarkGray)),
+            ]),
+        ];
+        frame.render_widget(Paragraph::new(header_lines).wrap(Wrap { trim: false }), chunks[0]);
+
+        // List of abbreviations
+        let list_lines: Vec<Line> = if self.abbreviations.is_empty() {
+            vec![Line::from(Span::styled(
+                tr("abbreviations-no-items"),
+                Style::default().fg(Color::Gray),
+            ))]
+        } else {
+            self.abbreviations
+                .iter()
+                .enumerate()
+                .map(|(i, a)| {
+                    let marker = if i == self.abbr_selected { "> " } else { "  " };
+                    let style = if i == self.abbr_selected {
+                        Style::default().fg(Color::White).add_modifier(Modifier::BOLD)
+                    } else {
+                        Style::default().fg(Color::White)
+                    };
+                    let padding = col_width.saturating_sub(a.short.width());
+                    Line::from(vec![
+                        Span::styled(marker, style),
+                        Span::styled(&a.short, style),
+                        Span::raw(" ".repeat(padding)),
+                        Span::styled(&a.full_name, style),
+                    ])
+                })
+                .collect()
+        };
+        frame.render_widget(Paragraph::new(list_lines).wrap(Wrap { trim: false }), chunks[1]);
+
+        // Shortcuts
+        let shortcuts = Line::from(vec![
+            Span::styled("[j/k]", Style::default().fg(ACCENT)),
+            Span::styled(format!(" {}  ", tr("key-navigate")), Style::default().fg(Color::DarkGray)),
+            Span::styled("[a]", Style::default().fg(ACCENT)),
+            Span::styled(format!(" {}  ", tr("key-add")), Style::default().fg(Color::DarkGray)),
+            Span::styled("[e]", Style::default().fg(ACCENT)),
+            Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::DarkGray)),
+            Span::styled("[d]", Style::default().fg(ACCENT)),
+            Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::DarkGray)),
+            Span::styled("[Esc]", Style::default().fg(ACCENT)),
+            Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::DarkGray)),
+        ]);
+        frame.render_widget(Paragraph::new(vec![shortcuts]).wrap(Wrap { trim: false }), chunks[2]);
+    }
+
+    fn render_abbr_delete_confirm(&self, frame: &mut Frame, modal_area: Rect) {
+        use ratatui::widgets::Clear;
+        use fluent_bundle::FluentValue;
+
+        // Smaller modal for confirmation
+        let confirm_area = Rect {
+            x: modal_area.x + 10,
+            y: modal_area.y + 5,
+            width: 40u16.min(modal_area.width.saturating_sub(20)),
+            height: 5u16.min(modal_area.height.saturating_sub(10)),
+        };
+        frame.render_widget(Clear, confirm_area);
+
+        let short = self.abbreviations.get(self.abbr_selected)
+            .map(|a| a.short.as_str())
+            .unwrap_or("?");
+
+        let block = Block::default()
+            .title(format!(" {} ", tr("abbreviations-title")))
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(RED))
+            .style(Style::default().bg(Color::Black));
+
+        let inner = block.inner(confirm_area);
+        frame.render_widget(block, confirm_area);
+
+        let msg = crate::i18n::tr_args("abbreviations-delete-confirm", &[("short", FluentValue::from(short.to_string()))]);
+        let lines = vec![
+            Line::from(vec![Span::styled(msg, Style::default().fg(RED))]),
+            Line::from(vec![
+                Span::styled("[y]", Style::default().fg(ACCENT)),
+                Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::DarkGray)),
+                Span::styled("[n]", Style::default().fg(ACCENT)),
+                Span::styled(format!(" {}", tr("key-no")), Style::default().fg(Color::DarkGray)),
+            ]),
+        ];
+        frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }).alignment(ratatui::layout::Alignment::Center), inner);
     }
 
     fn render_input_pane(&self, frame: &mut Frame, area: Rect) {
@@ -158,7 +413,7 @@ impl QuickLogScreen {
         let inner = block.inner(area);
         frame.render_widget(block, area);
 
-        let text_style = if self.phase == Phase::Input {
+        let text_style = if self.phase == Phase::Input || self.is_abbr_modal_active() {
             Style::default().fg(Color::White)
         } else {
             Style::default().fg(Color::DarkGray)
@@ -206,8 +461,12 @@ impl QuickLogScreen {
                         tr("quicklog-no-config"),
                         Style::default().fg(YELLOW),
                     ));
-                    frame.render_widget(Paragraph::new(vec![msg]), inner);
+                    frame.render_widget(Paragraph::new(vec![msg]).wrap(Wrap { trim: false }), inner);
                 }
+            }
+            Phase::BrowseAbbreviations | Phase::AddAbbrShort | Phase::AddAbbrFull | Phase::EditAbbrShort | Phase::EditAbbrFull | Phase::ConfirmDeleteAbbr => {
+                // Show preview results while modal is open (same as Preview phase)
+                self.render_preview_results(frame, inner);
             }
             Phase::Parsing => {
                 let spinner_char = SPINNER[self.spinner_frame];
@@ -221,7 +480,7 @@ impl QuickLogScreen {
                         Style::default().fg(Color::White),
                     ),
                 ]);
-                frame.render_widget(Paragraph::new(vec![msg]), inner);
+                frame.render_widget(Paragraph::new(vec![msg]).wrap(Wrap { trim: false }), inner);
             }
             Phase::Preview => {
                 self.render_preview_results(frame, inner);
@@ -235,7 +494,7 @@ impl QuickLogScreen {
                 tr("quicklog-no-results"),
                 Style::default().fg(Color::DarkGray),
             ));
-            frame.render_widget(Paragraph::new(vec![msg]), area);
+            frame.render_widget(Paragraph::new(vec![msg]).wrap(Wrap { trim: false }), area);
             return;
         }
 
@@ -318,6 +577,11 @@ impl QuickLogScreen {
                         format!(" {}  ", tr("quicklog-key-parse")),
                         Style::default().fg(Color::DarkGray),
                     ),
+                    Span::styled("[Ctrl+O]", Style::default().fg(ACCENT)),
+                    Span::styled(
+                        format!(" {}  ", tr("quicklog-key-abbr")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
                     Span::styled("[Esc]", Style::default().fg(ACCENT)),
                     Span::styled(
                         format!(" {}", tr("key-back")),
@@ -327,6 +591,11 @@ impl QuickLogScreen {
                 if self.llm_config.is_none() {
                     spans.clear();
                     spans.push(Span::styled(" ", Style::default()));
+                    spans.push(Span::styled("[Ctrl+O]", Style::default().fg(ACCENT)));
+                    spans.push(Span::styled(
+                        format!(" {}  ", tr("quicklog-key-abbr")),
+                        Style::default().fg(Color::DarkGray),
+                    ));
                     spans.push(Span::styled("[Esc]", Style::default().fg(ACCENT)));
                     spans.push(Span::styled(
                         format!(" {}", tr("key-back")),
@@ -379,6 +648,63 @@ impl QuickLogScreen {
                     Style::default().fg(Color::DarkGray),
                 ),
             ]),
+            Phase::BrowseAbbreviations => {
+                Line::from(vec![
+                    Span::styled("[j/k]", Style::default().fg(ACCENT)),
+                    Span::styled(
+                        format!(" {}  ", tr("key-navigate")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                    Span::styled("[a]", Style::default().fg(ACCENT)),
+                    Span::styled(
+                        format!(" {}  ", tr("key-add")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                    Span::styled("[e]", Style::default().fg(ACCENT)),
+                    Span::styled(
+                        format!(" {}  ", tr("key-edit")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                    Span::styled("[d]", Style::default().fg(ACCENT)),
+                    Span::styled(
+                        format!(" {}  ", tr("key-delete")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                    Span::styled("[Esc]", Style::default().fg(ACCENT)),
+                    Span::styled(
+                        format!(" {}", tr("key-back")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                ])
+            }
+            Phase::AddAbbrShort | Phase::AddAbbrFull | Phase::EditAbbrShort | Phase::EditAbbrFull => {
+                Line::from(vec![
+                    Span::styled(" [Enter]", Style::default().fg(ACCENT)),
+                    Span::styled(
+                        format!(" {}  ", tr("key-confirm")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                    Span::styled("[Esc]", Style::default().fg(ACCENT)),
+                    Span::styled(
+                        format!(" {}", tr("key-cancel")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                ])
+            }
+            Phase::ConfirmDeleteAbbr => {
+                Line::from(vec![
+                    Span::styled("[y]", Style::default().fg(ACCENT)),
+                    Span::styled(
+                        format!(" {}  ", tr("key-yes")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                    Span::styled("[n]", Style::default().fg(ACCENT)),
+                    Span::styled(
+                        format!(" {}", tr("key-no")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                ])
+            }
         }
     }
 
@@ -388,6 +714,10 @@ impl QuickLogScreen {
             Phase::Input => self.handle_input(key),
             Phase::Parsing => self.handle_parsing(key),
             Phase::Preview => self.handle_preview(key, db),
+            Phase::BrowseAbbreviations => self.handle_abbr_browse(key, db),
+            Phase::AddAbbrShort | Phase::EditAbbrShort => self.handle_abbr_short_input(key),
+            Phase::AddAbbrFull | Phase::EditAbbrFull => self.handle_abbr_full_input(key, db),
+            Phase::ConfirmDeleteAbbr => self.handle_abbr_delete_confirm(key, db),
         }
     }
 
@@ -395,6 +725,10 @@ impl QuickLogScreen {
         match key.code {
             KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.start_llm_parse();
+                Action::None
+            }
+            KeyCode::Char('o') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.open_abbr_browse();
                 Action::None
             }
             KeyCode::Esc => {
@@ -488,10 +822,6 @@ impl QuickLogScreen {
                 }
                 Action::None
             }
-            KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.cursor_pos = 0;
-                Action::None
-            }
             KeyCode::Home => {
                 self.cursor_pos = 0;
                 Action::None
@@ -564,7 +894,10 @@ impl QuickLogScreen {
             {
                 self.save_all(db)
             }
-            KeyCode::Char('a') => Action::Navigate(Screen::Abbreviations),
+            KeyCode::Char('a') => {
+                self.open_abbr_browse();
+                Action::None
+            }
             KeyCode::Esc => {
                 self.phase = Phase::Input;
                 self.parsed_results.clear();
@@ -668,6 +1001,239 @@ impl QuickLogScreen {
             self.scroll_offset = line_idx;
         }
         // We don't know exact visible height here, so just ensure selected is reachable
+    }
+
+    // ── Abbreviation modal methods ──
+
+    fn start_add_abbreviation(&mut self) {
+        self.abbr_short_input.clear();
+        self.abbr_short_cursor = 0;
+        self.abbr_full_input.clear();
+        self.abbr_full_cursor = 0;
+        self.abbr_editing_id = None;
+        self.phase = Phase::AddAbbrShort;
+    }
+
+    fn start_edit_abbreviation(&mut self, id: i64, short: &str, full: &str) {
+        self.abbr_short_input = short.to_string();
+        self.abbr_short_cursor = short.len();
+        self.abbr_full_input = full.to_string();
+        self.abbr_full_cursor = full.len();
+        self.abbr_editing_id = Some(id);
+        self.phase = Phase::EditAbbrShort;
+    }
+
+    fn handle_abbr_text_input(input: &mut String, cursor: &mut usize, key: KeyEvent) {
+        match key.code {
+            KeyCode::Char('b') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                if *cursor > 0 {
+                    let prev = input[..*cursor]
+                        .char_indices()
+                        .next_back()
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
+                    *cursor = prev;
+                }
+            }
+            KeyCode::Left => {
+                if *cursor > 0 {
+                    let prev = input[..*cursor]
+                        .char_indices()
+                        .next_back()
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
+                    *cursor = prev;
+                }
+            }
+            KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                if *cursor < input.len() {
+                    let next = input[*cursor..]
+                        .char_indices()
+                        .nth(1)
+                        .map(|(i, _)| *cursor + i)
+                        .unwrap_or(input.len());
+                    *cursor = next;
+                }
+            }
+            KeyCode::Right => {
+                if *cursor < input.len() {
+                    let next = input[*cursor..]
+                        .char_indices()
+                        .nth(1)
+                        .map(|(i, _)| *cursor + i)
+                        .unwrap_or(input.len());
+                    *cursor = next;
+                }
+            }
+            KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                *cursor = 0;
+            }
+            KeyCode::Home => {
+                *cursor = 0;
+            }
+            KeyCode::Char('e') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                *cursor = input.len();
+            }
+            KeyCode::End => {
+                *cursor = input.len();
+            }
+            KeyCode::Backspace => {
+                if *cursor > 0 {
+                    let prev = input[..*cursor]
+                        .char_indices()
+                        .next_back()
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
+                    input.remove(prev);
+                    *cursor = prev;
+                }
+            }
+            KeyCode::Char('k') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                input.truncate(*cursor);
+            }
+            KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                input.insert(*cursor, c);
+                *cursor += c.len_utf8();
+            }
+            _ => {}
+        }
+    }
+
+    fn handle_abbr_short_input(&mut self, key: KeyEvent) -> Action {
+        match key.code {
+            KeyCode::Enter => {
+                if !self.abbr_short_input.trim().is_empty() {
+                    self.phase = if matches!(self.phase, Phase::AddAbbrShort) {
+                        Phase::AddAbbrFull
+                    } else {
+                        Phase::EditAbbrFull
+                    };
+                }
+            }
+            KeyCode::Esc => {
+                self.phase = self.pre_abbr_phase.clone();
+            }
+            _ => {
+                Self::handle_abbr_text_input(&mut self.abbr_short_input, &mut self.abbr_short_cursor, key);
+            }
+        }
+        Action::None
+    }
+
+    fn handle_abbr_full_input(&mut self, key: KeyEvent, db: &Database) -> Action {
+        match key.code {
+            KeyCode::Enter => {
+                let short_trimmed = self.abbr_short_input.trim();
+                let full_trimmed = self.abbr_full_input.trim();
+                if !short_trimmed.is_empty() && !full_trimmed.is_empty() {
+                    if let Some(id) = self.abbr_editing_id {
+                        // Update existing
+                        if let Err(e) = db.update_abbreviation(id, short_trimmed, full_trimmed) {
+                            self.status_msg = Some((format!("Error: {}", e), true));
+                        }
+                    } else {
+                        // Create new
+                        if let Err(e) = db.create_abbreviation(short_trimmed, full_trimmed) {
+                            self.status_msg = Some((format!("Error: {}", e), true));
+                        }
+                    }
+                    // Refresh abbreviations so LLM can use them
+                    self.refresh_abbreviations(db);
+                }
+                // Reset and return to preview
+                self.abbr_short_input.clear();
+                self.abbr_short_cursor = 0;
+                self.abbr_full_input.clear();
+                self.abbr_full_cursor = 0;
+                self.abbr_editing_id = None;
+                self.phase = Phase::Preview;
+            }
+            KeyCode::Esc => {
+                self.abbr_short_input.clear();
+                self.abbr_short_cursor = 0;
+                self.abbr_full_input.clear();
+                self.abbr_full_cursor = 0;
+                self.abbr_editing_id = None;
+                self.phase = self.pre_abbr_phase.clone();
+            }
+            _ => {
+                Self::handle_abbr_text_input(&mut self.abbr_full_input, &mut self.abbr_full_cursor, key);
+            }
+        }
+        Action::None
+    }
+
+    // ── Abbreviation browse mode handlers ──
+
+    fn open_abbr_browse(&mut self) {
+        self.pre_abbr_phase = self.phase.clone();
+        self.abbr_selected = 0;
+        self.phase = Phase::BrowseAbbreviations;
+    }
+
+    fn handle_abbr_browse(&mut self, key: KeyEvent, _db: &Database) -> Action {
+        match key.code {
+            KeyCode::Char('j') | KeyCode::Down => {
+                if !self.abbreviations.is_empty() {
+                    self.abbr_selected = (self.abbr_selected + 1) % self.abbreviations.len();
+                }
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                if !self.abbreviations.is_empty() {
+                    self.abbr_selected = self
+                        .abbr_selected
+                        .checked_sub(1)
+                        .unwrap_or(self.abbreviations.len() - 1);
+                }
+            }
+            KeyCode::Char('a') => {
+                self.start_add_abbreviation();
+            }
+            KeyCode::Char('e') | KeyCode::Enter => {
+                if let Some(abbr) = self.abbreviations.get(self.abbr_selected) {
+                    let id = abbr.id;
+                    let short = abbr.short.clone();
+                    let full = abbr.full_name.clone();
+                    self.start_edit_abbreviation(id, &short, &full);
+                }
+            }
+            KeyCode::Char('d') => {
+                if !self.abbreviations.is_empty() {
+                    self.phase = Phase::ConfirmDeleteAbbr;
+                }
+            }
+            KeyCode::Esc => {
+                self.phase = self.pre_abbr_phase.clone();
+            }
+            _ => {}
+        }
+        Action::None
+    }
+
+    fn handle_abbr_delete_confirm(&mut self, key: KeyEvent, db: &Database) -> Action {
+        match key.code {
+            KeyCode::Char('y') => {
+                if let Some(abbr) = self.abbreviations.get(self.abbr_selected) {
+                    if let Err(e) = db.delete_abbreviation(abbr.id) {
+                        self.status_msg = Some((format!("Delete failed: {}", e), true));
+                    } else {
+                        // Refresh and adjust selection
+                        self.refresh_abbreviations(db);
+                        if self.abbr_selected >= self.abbreviations.len()
+                            && !self.abbreviations.is_empty()
+                        {
+                            self.abbr_selected = self.abbreviations.len() - 1;
+                        }
+                    }
+                }
+                self.phase = Phase::BrowseAbbreviations;
+            }
+            _ => {
+                // Any other key cancels
+                self.phase = Phase::BrowseAbbreviations;
+            }
+        }
+        Action::None
     }
 }
 

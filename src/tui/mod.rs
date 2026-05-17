@@ -1,4 +1,3 @@
-pub mod abbreviations;
 pub mod dashboard;
 pub mod goals;
 pub mod history;
@@ -115,7 +114,6 @@ pub enum Screen {
     Practices,
     Goals,
     QuickLog,
-    Abbreviations,
     Quotes,
 }
 

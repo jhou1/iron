@@ -39,7 +39,7 @@ fn paragraph_widgets_must_wrap_user_content() {
         "log_entry.rs:599", // warm-up/cool-down: single-line display
         "log_entry.rs:657", // footer: fixed-width shortcuts
         // ── mod.rs ──
-        "mod.rs:104",
+        "mod.rs:103",
         // ── practices.rs ──
         "practices.rs:169",
         "practices.rs:251",
@@ -49,10 +49,7 @@ fn paragraph_widgets_must_wrap_user_content() {
         "quotes_screen.rs:187",
         "quotes_screen.rs:216",
         // ── quick_log.rs ──
-        "quick_log.rs:147",
-        "quick_log.rs:209",
-        "quick_log.rs:224",
-        "quick_log.rs:238",
+        // All Paragraph widgets use .wrap() as required
         // ── trends.rs ──
         "trends.rs:87",
         "trends.rs:115",
