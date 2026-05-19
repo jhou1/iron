@@ -404,10 +404,10 @@ impl LogEntryScreen {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(3),                    // [0] date section (border)
+                Constraint::Length(5),                    // [0] date section (border + padding)
                 Constraint::Length(1),                    // [1] spacer
-                Constraint::Length(sets_content_lines + 2), // [2] sets section (border)
-                Constraint::Length(4),                    // [3] warm-up/cool-down section (border)
+                Constraint::Length(sets_content_lines + 4), // [2] sets section (border + padding)
+                Constraint::Length(6),                    // [3] warm-up/cool-down section (border + padding)
                 Constraint::Min(3),                      // [4] note section (border, grows)
                 Constraint::Length(1),                    // [5] status line
                 Constraint::Length(1),                    // [6] footer
