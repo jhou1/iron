@@ -23,7 +23,7 @@ impl fmt::Display for LlmError {
 
 pub fn build_system_prompt(practices: &[Practice], abbreviations: &[Abbreviation]) -> String {
     let mut prompt = String::from(
-        "You are a training log parser. Convert shorthand training notes into structured JSON.\n\n"
+        "You are a training log parser. Convert shorthand training notes into structured JSON.\n\n",
     );
 
     prompt.push_str("Available practices (name | type):\n");
@@ -41,7 +41,8 @@ pub fn build_system_prompt(practices: &[Practice], abbreviations: &[Abbreviation
         }
     }
 
-    prompt.push_str(r#"
+    prompt.push_str(
+        r#"
 Respond ONLY with a JSON array. Each element:
 {
   "practice_name": "<exact name from practice list>",
@@ -61,18 +62,16 @@ Rules:
 - If weight is shared across sets (e.g., "60kg 5/5/5"), apply it to all sets
 - Notation like "10/10/10" means separate sets with those rep counts
 - If you cannot determine the practice, use the raw text as practice_name
-"#);
+"#,
+    );
 
     prompt
 }
 
-pub fn parse_llm_response(
-    raw: &str,
-    practices: &[Practice],
-) -> Result<Vec<ParsedLog>, LlmError> {
+pub fn parse_llm_response(raw: &str, practices: &[Practice]) -> Result<Vec<ParsedLog>, LlmError> {
     let json_str = extract_json(raw);
-    let raw_logs: Vec<RawParsedLog> = serde_json::from_str(json_str)
-        .map_err(|e| LlmError::ParseError(e.to_string()))?;
+    let raw_logs: Vec<RawParsedLog> =
+        serde_json::from_str(json_str).map_err(|e| LlmError::ParseError(e.to_string()))?;
 
     let mut results = Vec::new();
     for entry in raw_logs {
@@ -82,8 +81,10 @@ pub fn parse_llm_response(
 
         let practice_type = resolve_practice_type(&entry.practice_type, matched_practice);
 
-        let sets: Vec<SetData> = entry.sets.iter().filter_map(|raw_set| {
-            match practice_type {
+        let sets: Vec<SetData> = entry
+            .sets
+            .iter()
+            .filter_map(|raw_set| match practice_type {
                 Some(PracticeType::Weighted) => Some(SetData::Weighted {
                     weight: raw_set.weight.unwrap_or(0.0),
                     reps: raw_set.reps.unwrap_or(0),
@@ -97,15 +98,20 @@ pub fn parse_llm_response(
                 Some(PracticeType::Endurance) => Some(SetData::Endurance {
                     duration: raw_set.duration.unwrap_or(0.0),
                 }),
-                None => match (raw_set.weight, raw_set.reps, raw_set.distance, raw_set.duration) {
+                None => match (
+                    raw_set.weight,
+                    raw_set.reps,
+                    raw_set.distance,
+                    raw_set.duration,
+                ) {
                     (Some(weight), Some(reps), _, _) => Some(SetData::Weighted { weight, reps }),
                     (None, Some(reps), _, _) => Some(SetData::Bodyweight { reps }),
                     (_, _, Some(distance), _) => Some(SetData::Distance { distance }),
                     (_, _, _, Some(duration)) => Some(SetData::Endurance { duration }),
                     _ => None,
-                }
-            }
-        }).collect();
+                },
+            })
+            .collect();
 
         results.push(ParsedLog {
             practice_name: entry.practice_name,
@@ -154,8 +160,7 @@ pub fn call_llm(
         .build()
         .new_agent();
 
-    let mut request = agent.post(&url)
-        .header("Content-Type", "application/json");
+    let mut request = agent.post(&url).header("Content-Type", "application/json");
 
     if let Some(ref key) = config.api_key {
         if !key.is_empty() {
@@ -172,16 +177,14 @@ pub fn call_llm(
         "temperature": 0.0
     });
 
-    let mut response = request
-        .send_json(&body)
-        .map_err(|e| {
-            let msg = e.to_string();
-            if msg.contains("timed out") || msg.contains("timeout") {
-                LlmError::Timeout
-            } else {
-                LlmError::Network(msg)
-            }
-        })?;
+    let mut response = request.send_json(&body).map_err(|e| {
+        let msg = e.to_string();
+        if msg.contains("timed out") || msg.contains("timeout") {
+            LlmError::Timeout
+        } else {
+            LlmError::Network(msg)
+        }
+    })?;
 
     let response_body: serde_json::Value = response
         .body_mut()

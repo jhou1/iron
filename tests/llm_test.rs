@@ -1,6 +1,6 @@
+use chrono::Local;
 use iron::llm::{build_system_prompt, parse_llm_response};
 use iron::model::{Abbreviation, Practice, PracticeType, SetData};
-use chrono::Local;
 
 fn sample_practices() -> Vec<Practice> {
     vec![
@@ -29,9 +29,11 @@ fn sample_practices() -> Vec<Practice> {
 }
 
 fn sample_abbreviations() -> Vec<Abbreviation> {
-    vec![
-        Abbreviation { id: 1, short: "DL".to_string(), full_name: "Deadlift".to_string() },
-    ]
+    vec![Abbreviation {
+        id: 1,
+        short: "DL".to_string(),
+        full_name: "Deadlift".to_string(),
+    }]
 }
 
 #[test]
@@ -70,7 +72,13 @@ fn test_parse_flat_weighted_response() {
     assert_eq!(results[0].practice_name, "Deadlift");
     assert!(results[0].matched);
     assert_eq!(results[0].sets.len(), 2);
-    assert_eq!(results[0].sets[0], SetData::Weighted { weight: 60.0, reps: 5 });
+    assert_eq!(
+        results[0].sets[0],
+        SetData::Weighted {
+            weight: 60.0,
+            reps: 5
+        }
+    );
 }
 
 #[test]
@@ -103,7 +111,13 @@ fn test_parse_response_with_nulls() {
     ]"#;
     let results = parse_llm_response(json, &sample_practices()).unwrap();
     assert_eq!(results.len(), 1);
-    assert_eq!(results[0].sets[0], SetData::Weighted { weight: 20.0, reps: 10 });
+    assert_eq!(
+        results[0].sets[0],
+        SetData::Weighted {
+            weight: 20.0,
+            reps: 10
+        }
+    );
 }
 
 #[test]
@@ -115,7 +129,13 @@ fn test_parse_response_type_from_practice_list() {
         }
     ]"#;
     let results = parse_llm_response(json, &sample_practices()).unwrap();
-    assert_eq!(results[0].sets[0], SetData::Weighted { weight: 100.0, reps: 3 });
+    assert_eq!(
+        results[0].sets[0],
+        SetData::Weighted {
+            weight: 100.0,
+            reps: 3
+        }
+    );
 }
 
 #[test]
@@ -138,7 +158,13 @@ fn test_parse_response_unmatched_practice() {
 fn test_parse_unmatched_no_type_infers_from_fields() {
     let json = r#"[{"practice_name": "Unknown", "sets": [{"weight": 50.0, "reps": 8}]}]"#;
     let results = parse_llm_response(json, &sample_practices()).unwrap();
-    assert_eq!(results[0].sets[0], SetData::Weighted { weight: 50.0, reps: 8 });
+    assert_eq!(
+        results[0].sets[0],
+        SetData::Weighted {
+            weight: 50.0,
+            reps: 8
+        }
+    );
 }
 
 #[test]
@@ -169,7 +195,13 @@ fn test_parse_multi_practice_response() {
     ]"#;
     let results = parse_llm_response(json, &sample_practices()).unwrap();
     assert_eq!(results.len(), 2);
-    assert_eq!(results[0].sets[0], SetData::Weighted { weight: 60.0, reps: 5 });
+    assert_eq!(
+        results[0].sets[0],
+        SetData::Weighted {
+            weight: 60.0,
+            reps: 5
+        }
+    );
     assert_eq!(results[1].sets[0], SetData::Bodyweight { reps: 10 });
 }
 
@@ -177,5 +209,11 @@ fn test_parse_multi_practice_response() {
 fn test_parse_missing_reps_defaults_to_zero() {
     let json = r#"[{"practice_name": "Deadlift", "practice_type": "weighted", "sets": [{"weight": 20.0}]}]"#;
     let results = parse_llm_response(json, &sample_practices()).unwrap();
-    assert_eq!(results[0].sets[0], SetData::Weighted { weight: 20.0, reps: 0 });
+    assert_eq!(
+        results[0].sets[0],
+        SetData::Weighted {
+            weight: 20.0,
+            reps: 0
+        }
+    );
 }

@@ -2,10 +2,10 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 mod app;
+mod config;
 mod db;
 mod export;
 mod i18n;
-mod config;
 mod llm;
 mod model;
 mod tui;
@@ -44,9 +44,13 @@ fn main() -> anyhow::Result<()> {
         Some(Commands::Import { path }) => {
             let db = db::Database::open_default()?;
             let count = export::import_from_json(&db, &path)?;
-            println!("{}", i18n::tr_args("cli-imported", &[
-                ("count", fluent_bundle::FluentValue::from(count as f64)),
-            ]));
+            println!(
+                "{}",
+                i18n::tr_args(
+                    "cli-imported",
+                    &[("count", fluent_bundle::FluentValue::from(count as f64)),]
+                )
+            );
         }
         None => {
             app::run()?;

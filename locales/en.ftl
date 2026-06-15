@@ -62,6 +62,7 @@ goals-press-enter = Press [Enter] to manage milestones
 # ── Log Entry ──
 log-select-practice = Select Practice
 log-press-filter = Press / to filter
+log-cancel-confirm = Discard this log?
 log-weight-label = Weight (kg):
 log-reps-label = Reps:
 log-distance-label = Distance (km):

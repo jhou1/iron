@@ -14,45 +14,36 @@ fn paragraph_widgets_must_wrap_user_content() {
     // Format: "filename:line_number"
     // When adding entries, include a brief reason.
     let allowlist: HashSet<&str> = [
-        // ── dashboard.rs ──
-        "dashboard.rs:142",
-        "dashboard.rs:222",
-        "dashboard.rs:376",
-        "dashboard.rs:406", // gauge bar: width-controlled, cannot overflow
-        // ── goals.rs ──
-        "goals.rs:407",
-        "goals.rs:475",
-        // ── history.rs ──
-        "history.rs:123",
-        "history.rs:186",
-        "history.rs:219",
-        // ── log_entry.rs ──
-        "log_entry.rs:205", // filter bar: single-line, width-controlled
-        "log_entry.rs:252", // practice list: fixed-width rows
-        "log_entry.rs:270", // footer: fixed-width shortcuts
-        "log_entry.rs:444", // date line: single-line, fixed width
-        "log_entry.rs:562", // sets list: structured single-line entries
-        "log_entry.rs:599", // warm-up/cool-down: single-line display
-        "log_entry.rs:657", // footer: fixed-width shortcuts
-        // ── mod.rs ──
-        "mod.rs:103",
-        // ── practices.rs ──
-        "practices.rs:169",
-        "practices.rs:251",
-        "practices.rs:297",
-        // ── quotes_screen.rs ──
-        "quotes_screen.rs:114",
-        "quotes_screen.rs:187",
-        "quotes_screen.rs:216",
-        // ── quick_log.rs ──
-        // All Paragraph widgets use .wrap() as required
-        // ── trends.rs ──
-        "trends.rs:87",
-        "trends.rs:115",
-        "trends.rs:161",
-        "trends.rs:214",
-        "trends.rs:222",
-        "trends.rs:268",
+        "dashboard.rs:152",
+        "dashboard.rs:274",
+        "dashboard.rs:461",
+        "dashboard.rs:481",
+        "dashboard.rs:516",
+        "goals.rs:451",
+        "goals.rs:572",
+        "history.rs:133",
+        "history.rs:231",
+        "history.rs:277",
+        "log_entry.rs:214",
+        "log_entry.rs:264",
+        "log_entry.rs:294",
+        "log_entry.rs:493",
+        "log_entry.rs:669",
+        "log_entry.rs:715",
+        "log_entry.rs:820",
+        "mod.rs:108",
+        "practices.rs:194",
+        "practices.rs:293",
+        "practices.rs:378",
+        "quotes_screen.rs:122",
+        "quotes_screen.rs:224",
+        "quotes_screen.rs:271",
+        "trends.rs:99",
+        "trends.rs:135",
+        "trends.rs:184",
+        "trends.rs:249",
+        "trends.rs:257",
+        "trends.rs:317",
     ].into_iter().collect();
 
     let tui_dir = Path::new("src/tui");

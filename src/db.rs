@@ -3,7 +3,9 @@ use chrono::{Local, NaiveDateTime};
 use rusqlite::{params, Connection};
 use std::path::Path;
 
-use crate::model::{Abbreviation, Goal, Log, LogEntry, Milestone, Practice, PracticeType, Quote, Set, SetData};
+use crate::model::{
+    Abbreviation, Goal, Log, LogEntry, Milestone, Practice, PracticeType, Quote, Set, SetData,
+};
 
 /// Aggregate statistics over a time period.
 #[allow(dead_code)]
@@ -14,7 +16,6 @@ pub struct AggregateStats {
     pub total_distance: f64,
     pub total_duration: f64,
 }
-
 
 pub struct Database {
     conn: Connection,
@@ -33,9 +34,18 @@ impl Database {
         // One-time migration: copy old database to new location if it exists
         if !new_path.exists() && old_path.exists() {
             std::fs::create_dir_all(&new_dir)?;
-            std::fs::copy(&old_path, &new_path)
-                .with_context(|| format!("failed to migrate database from {} to {}", old_path.display(), new_path.display()))?;
-            eprintln!("Migrated database from {} to {}", old_path.display(), new_path.display());
+            std::fs::copy(&old_path, &new_path).with_context(|| {
+                format!(
+                    "failed to migrate database from {} to {}",
+                    old_path.display(),
+                    new_path.display()
+                )
+            })?;
+            eprintln!(
+                "Migrated database from {} to {}",
+                old_path.display(),
+                new_path.display()
+            );
         }
 
         std::fs::create_dir_all(&new_dir)?;
@@ -126,12 +136,26 @@ impl Database {
         )?;
 
         // Migrations for existing databases
-        let _ = self.conn.execute("ALTER TABLE goals ADD COLUMN completed INTEGER NOT NULL DEFAULT 0", []);
-        let _ = self.conn.execute("ALTER TABLE goals ADD COLUMN completed_at TEXT", []);
-        let _ = self.conn.execute("ALTER TABLE milestones ADD COLUMN completed_at TEXT", []);
-        let _ = self.conn.execute("ALTER TABLE logs ADD COLUMN warm_up TEXT", []);
-        let _ = self.conn.execute("ALTER TABLE logs ADD COLUMN cool_down TEXT", []);
-        let _ = self.conn.execute("ALTER TABLE practices ADD COLUMN active INTEGER NOT NULL DEFAULT 1", []);
+        let _ = self.conn.execute(
+            "ALTER TABLE goals ADD COLUMN completed INTEGER NOT NULL DEFAULT 0",
+            [],
+        );
+        let _ = self
+            .conn
+            .execute("ALTER TABLE goals ADD COLUMN completed_at TEXT", []);
+        let _ = self
+            .conn
+            .execute("ALTER TABLE milestones ADD COLUMN completed_at TEXT", []);
+        let _ = self
+            .conn
+            .execute("ALTER TABLE logs ADD COLUMN warm_up TEXT", []);
+        let _ = self
+            .conn
+            .execute("ALTER TABLE logs ADD COLUMN cool_down TEXT", []);
+        let _ = self.conn.execute(
+            "ALTER TABLE practices ADD COLUMN active INTEGER NOT NULL DEFAULT 1",
+            [],
+        );
 
         Ok(())
     }
@@ -155,22 +179,27 @@ impl Database {
     }
 
     pub fn list_practices(&self) -> Result<Vec<Practice>> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT id, name, practice_type, created_at, active FROM practices ORDER BY name")?;
+        let mut stmt = self.conn.prepare(
+            "SELECT id, name, practice_type, created_at, active FROM practices ORDER BY name",
+        )?;
         let rows = stmt.query_map([], |row| {
             let pt_str: String = row.get(2)?;
             let created_str: String = row.get(3)?;
             let active: i32 = row.get(4)?;
-            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?, pt_str, created_str, active))
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                pt_str,
+                created_str,
+                active,
+            ))
         })?;
 
         let mut practices = Vec::new();
         for row in rows {
             let (id, name, pt_str, created_str, active) = row?;
-            let practice_type: PracticeType = pt_str
-                .parse()
-                .map_err(|e: String| anyhow::anyhow!(e))?;
+            let practice_type: PracticeType =
+                pt_str.parse().map_err(|e: String| anyhow::anyhow!(e))?;
             let created_at = NaiveDateTime::parse_from_str(&created_str, "%Y-%m-%d %H:%M:%S%.f")
                 .context("failed to parse created_at")?;
             practices.push(Practice {
@@ -191,15 +220,19 @@ impl Database {
         let rows = stmt.query_map([], |row| {
             let pt_str: String = row.get(2)?;
             let created_str: String = row.get(3)?;
-            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?, pt_str, created_str))
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                pt_str,
+                created_str,
+            ))
         })?;
 
         let mut practices = Vec::new();
         for row in rows {
             let (id, name, pt_str, created_str) = row?;
-            let practice_type: PracticeType = pt_str
-                .parse()
-                .map_err(|e: String| anyhow::anyhow!(e))?;
+            let practice_type: PracticeType =
+                pt_str.parse().map_err(|e: String| anyhow::anyhow!(e))?;
             let created_at = NaiveDateTime::parse_from_str(&created_str, "%Y-%m-%d %H:%M:%S%.f")
                 .context("failed to parse created_at")?;
             practices.push(Practice {
@@ -222,23 +255,30 @@ impl Database {
     }
 
     pub fn rename_practice(&self, id: i64, new_name: &str) -> Result<()> {
-        self.conn
-            .execute("UPDATE practices SET name = ?1 WHERE id = ?2", params![new_name, id])?;
+        self.conn.execute(
+            "UPDATE practices SET name = ?1 WHERE id = ?2",
+            params![new_name, id],
+        )?;
         Ok(())
     }
 
     pub fn delete_practice(&self, id: i64) -> Result<()> {
         // Cascade: delete associated sets and logs first
-        let mut stmt = self.conn.prepare("SELECT id FROM logs WHERE practice_id = ?1")?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id FROM logs WHERE practice_id = ?1")?;
         let log_ids: Vec<i64> = stmt
             .query_map(params![id], |row| row.get(0))?
             .collect::<Result<Vec<_>, _>>()?;
         drop(stmt);
         for log_id in log_ids {
-            self.conn.execute("DELETE FROM sets WHERE log_id = ?1", params![log_id])?;
+            self.conn
+                .execute("DELETE FROM sets WHERE log_id = ?1", params![log_id])?;
         }
-        self.conn.execute("DELETE FROM logs WHERE practice_id = ?1", params![id])?;
-        self.conn.execute("DELETE FROM practices WHERE id = ?1", params![id])?;
+        self.conn
+            .execute("DELETE FROM logs WHERE practice_id = ?1", params![id])?;
+        self.conn
+            .execute("DELETE FROM practices WHERE id = ?1", params![id])?;
         Ok(())
     }
 
@@ -297,8 +337,10 @@ impl Database {
                 params![note, dt.to_string(), warm_up, cool_down, log_id],
             )?;
         } else {
-            self.conn
-                .execute("UPDATE logs SET note = ?1, warm_up = ?2, cool_down = ?3 WHERE id = ?4", params![note, warm_up, cool_down, log_id])?;
+            self.conn.execute(
+                "UPDATE logs SET note = ?1, warm_up = ?2, cool_down = ?3 WHERE id = ?4",
+                params![note, warm_up, cool_down, log_id],
+            )?;
         }
         // Delete old sets and insert new ones
         self.conn
@@ -377,10 +419,18 @@ impl Database {
 
         let mut entries = Vec::new();
         for row in rows {
-            let (log_id, practice_id, logged_at_str, note, warm_up, cool_down, practice_name, pt_str) = row?;
-            let logged_at =
-                NaiveDateTime::parse_from_str(&logged_at_str, "%Y-%m-%d %H:%M:%S%.f")
-                    .context("failed to parse logged_at")?;
+            let (
+                log_id,
+                practice_id,
+                logged_at_str,
+                note,
+                warm_up,
+                cool_down,
+                practice_name,
+                pt_str,
+            ) = row?;
+            let logged_at = NaiveDateTime::parse_from_str(&logged_at_str, "%Y-%m-%d %H:%M:%S%.f")
+                .context("failed to parse logged_at")?;
             let practice_type: PracticeType =
                 pt_str.parse().map_err(|e: String| anyhow::anyhow!(e))?;
             let sets = self.load_sets(log_id, &practice_type)?;
@@ -425,10 +475,18 @@ impl Database {
 
         let mut entries = Vec::new();
         for row in rows {
-            let (log_id, practice_id, logged_at_str, note, warm_up, cool_down, practice_name, pt_str) = row?;
-            let logged_at =
-                NaiveDateTime::parse_from_str(&logged_at_str, "%Y-%m-%d %H:%M:%S%.f")
-                    .context("failed to parse logged_at")?;
+            let (
+                log_id,
+                practice_id,
+                logged_at_str,
+                note,
+                warm_up,
+                cool_down,
+                practice_name,
+                pt_str,
+            ) = row?;
+            let logged_at = NaiveDateTime::parse_from_str(&logged_at_str, "%Y-%m-%d %H:%M:%S%.f")
+                .context("failed to parse logged_at")?;
             let practice_type: PracticeType =
                 pt_str.parse().map_err(|e: String| anyhow::anyhow!(e))?;
             let sets = self.load_sets(log_id, &practice_type)?;
@@ -473,10 +531,10 @@ impl Database {
 
         let mut entries = Vec::new();
         for row in rows {
-            let (log_id, pid, logged_at_str, note, warm_up, cool_down, practice_name, pt_str) = row?;
-            let logged_at =
-                NaiveDateTime::parse_from_str(&logged_at_str, "%Y-%m-%d %H:%M:%S%.f")
-                    .context("failed to parse logged_at")?;
+            let (log_id, pid, logged_at_str, note, warm_up, cool_down, practice_name, pt_str) =
+                row?;
+            let logged_at = NaiveDateTime::parse_from_str(&logged_at_str, "%Y-%m-%d %H:%M:%S%.f")
+                .context("failed to parse logged_at")?;
             let practice_type: PracticeType =
                 pt_str.parse().map_err(|e: String| anyhow::anyhow!(e))?;
             let sets = self.load_sets(log_id, &practice_type)?;
@@ -600,10 +658,18 @@ impl Database {
 
         let mut entries = Vec::new();
         for row in rows {
-            let (log_id, practice_id, logged_at_str, note, warm_up, cool_down, practice_name, pt_str) = row?;
-            let logged_at =
-                NaiveDateTime::parse_from_str(&logged_at_str, "%Y-%m-%d %H:%M:%S%.f")
-                    .context("failed to parse logged_at")?;
+            let (
+                log_id,
+                practice_id,
+                logged_at_str,
+                note,
+                warm_up,
+                cool_down,
+                practice_name,
+                pt_str,
+            ) = row?;
+            let logged_at = NaiveDateTime::parse_from_str(&logged_at_str, "%Y-%m-%d %H:%M:%S%.f")
+                .context("failed to parse logged_at")?;
             let practice_type: PracticeType =
                 pt_str.parse().map_err(|e: String| anyhow::anyhow!(e))?;
             let sets = self.load_sets(log_id, &practice_type)?;
@@ -689,7 +755,8 @@ impl Database {
 
     pub fn create_goal(&self, title: &str) -> Result<i64> {
         let now = Local::now().naive_local();
-        self.conn.execute("UPDATE goals SET position = position + 1", [])?;
+        self.conn
+            .execute("UPDATE goals SET position = position + 1", [])?;
         self.conn.execute(
             "INSERT INTO goals (title, position, created_at) VALUES (?1, 0, ?2)",
             params![title, now.format("%Y-%m-%d %H:%M:%S%.f").to_string()],
@@ -701,43 +768,52 @@ impl Database {
         let mut stmt = self.conn.prepare(
             "SELECT id, title, completed, position, created_at, completed_at FROM goals ORDER BY completed, position"
         )?;
-        let goals: Vec<Goal> = stmt.query_map([], |row| {
-            let created_str: String = row.get(4)?;
-            let completed_at_str: Option<String> = row.get(5)?;
-            Ok(Goal {
-                id: row.get(0)?,
-                title: row.get(1)?,
-                completed: row.get::<_, i32>(2)? != 0,
-                position: row.get(3)?,
-                created_at: NaiveDateTime::parse_from_str(&created_str, "%Y-%m-%d %H:%M:%S%.f")
-                    .unwrap_or_default(),
-                completed_at: completed_at_str
-                    .and_then(|s| NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S%.f").ok()),
-                milestones: Vec::new(),
-            })
-        })?.collect::<std::result::Result<Vec<_>, _>>()?;
+        let goals: Vec<Goal> = stmt
+            .query_map([], |row| {
+                let created_str: String = row.get(4)?;
+                let completed_at_str: Option<String> = row.get(5)?;
+                Ok(Goal {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    completed: row.get::<_, i32>(2)? != 0,
+                    position: row.get(3)?,
+                    created_at: NaiveDateTime::parse_from_str(&created_str, "%Y-%m-%d %H:%M:%S%.f")
+                        .unwrap_or_default(),
+                    completed_at: completed_at_str.and_then(|s| {
+                        NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S%.f").ok()
+                    }),
+                    milestones: Vec::new(),
+                })
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
 
         let mut result = goals;
         for goal in &mut result {
             let mut ms_stmt = self.conn.prepare(
                 "SELECT id, goal_id, title, completed, position, created_at, completed_at \
-                 FROM milestones WHERE goal_id = ?1 ORDER BY position"
+                 FROM milestones WHERE goal_id = ?1 ORDER BY position",
             )?;
-            goal.milestones = ms_stmt.query_map(params![goal.id], |row| {
-                let created_str: String = row.get(5)?;
-                let completed_at_str: Option<String> = row.get(6)?;
-                Ok(Milestone {
-                    id: row.get(0)?,
-                    goal_id: row.get(1)?,
-                    title: row.get(2)?,
-                    completed: row.get::<_, i32>(3)? != 0,
-                    position: row.get(4)?,
-                    created_at: NaiveDateTime::parse_from_str(&created_str, "%Y-%m-%d %H:%M:%S%.f")
+            goal.milestones = ms_stmt
+                .query_map(params![goal.id], |row| {
+                    let created_str: String = row.get(5)?;
+                    let completed_at_str: Option<String> = row.get(6)?;
+                    Ok(Milestone {
+                        id: row.get(0)?,
+                        goal_id: row.get(1)?,
+                        title: row.get(2)?,
+                        completed: row.get::<_, i32>(3)? != 0,
+                        position: row.get(4)?,
+                        created_at: NaiveDateTime::parse_from_str(
+                            &created_str,
+                            "%Y-%m-%d %H:%M:%S%.f",
+                        )
                         .unwrap_or_default(),
-                    completed_at: completed_at_str
-                        .and_then(|s| NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S%.f").ok()),
-                })
-            })?.collect::<std::result::Result<Vec<_>, _>>()?;
+                        completed_at: completed_at_str.and_then(|s| {
+                            NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S%.f").ok()
+                        }),
+                    })
+                })?
+                .collect::<std::result::Result<Vec<_>, _>>()?;
         }
 
         Ok(result)
@@ -752,8 +828,10 @@ impl Database {
     }
 
     pub fn delete_goal(&self, id: i64) -> Result<()> {
-        self.conn.execute("DELETE FROM milestones WHERE goal_id = ?1", params![id])?;
-        self.conn.execute("DELETE FROM goals WHERE id = ?1", params![id])?;
+        self.conn
+            .execute("DELETE FROM milestones WHERE goal_id = ?1", params![id])?;
+        self.conn
+            .execute("DELETE FROM goals WHERE id = ?1", params![id])?;
         Ok(())
     }
 
@@ -778,7 +856,13 @@ impl Database {
             "UPDATE goals SET completed = CASE WHEN completed = 0 THEN 1 ELSE 0 END, \
              completed_at = CASE WHEN completed = 0 THEN ?1 ELSE NULL END \
              WHERE id = ?2",
-            params![Local::now().naive_local().format("%Y-%m-%d %H:%M:%S%.f").to_string(), id],
+            params![
+                Local::now()
+                    .naive_local()
+                    .format("%Y-%m-%d %H:%M:%S%.f")
+                    .to_string(),
+                id
+            ],
         )?;
         Ok(())
     }
@@ -811,7 +895,12 @@ impl Database {
         self.conn.execute(
             "INSERT INTO milestones (goal_id, title, completed, position, created_at) \
              VALUES (?1, ?2, 0, ?3, ?4)",
-            params![goal_id, title, position, now.format("%Y-%m-%d %H:%M:%S%.f").to_string()],
+            params![
+                goal_id,
+                title,
+                position,
+                now.format("%Y-%m-%d %H:%M:%S%.f").to_string()
+            ],
         )?;
         Ok(self.conn.last_insert_rowid())
     }
@@ -829,13 +918,20 @@ impl Database {
             "UPDATE milestones SET completed = CASE WHEN completed = 0 THEN 1 ELSE 0 END, \
              completed_at = CASE WHEN completed = 0 THEN ?1 ELSE NULL END \
              WHERE id = ?2",
-            params![Local::now().naive_local().format("%Y-%m-%d %H:%M:%S%.f").to_string(), id],
+            params![
+                Local::now()
+                    .naive_local()
+                    .format("%Y-%m-%d %H:%M:%S%.f")
+                    .to_string(),
+                id
+            ],
         )?;
         Ok(())
     }
 
     pub fn delete_milestone(&self, id: i64) -> Result<()> {
-        self.conn.execute("DELETE FROM milestones WHERE id = ?1", params![id])?;
+        self.conn
+            .execute("DELETE FROM milestones WHERE id = ?1", params![id])?;
         Ok(())
     }
 
@@ -860,13 +956,17 @@ impl Database {
             params![text, position],
         )?;
         let id = self.conn.last_insert_rowid();
-        Ok(Quote { id, text: text.to_string(), position })
+        Ok(Quote {
+            id,
+            text: text.to_string(),
+            position,
+        })
     }
 
     pub fn list_quotes(&self) -> Result<Vec<Quote>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT id, text, position FROM quotes ORDER BY position",
-        )?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, text, position FROM quotes ORDER BY position")?;
         let quotes = stmt
             .query_map([], |row| {
                 Ok(Quote {
@@ -888,7 +988,8 @@ impl Database {
     }
 
     pub fn delete_quote(&self, id: i64) -> Result<()> {
-        self.conn.execute("DELETE FROM quotes WHERE id = ?1", params![id])?;
+        self.conn
+            .execute("DELETE FROM quotes WHERE id = ?1", params![id])?;
         Ok(())
     }
 
@@ -899,9 +1000,9 @@ impl Database {
     // ── Daily Metrics CRUD ───────────────────────────────────────────
 
     pub fn get_daily_hrv(&self, date: &str) -> Result<Option<i32>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT hrv FROM daily_metrics WHERE date = ?1",
-        )?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT hrv FROM daily_metrics WHERE date = ?1")?;
         let result = stmt.query_row(params![date], |row| row.get::<_, Option<i32>>(0));
         match result {
             Ok(hrv) => Ok(hrv),
@@ -920,9 +1021,9 @@ impl Database {
     }
 
     pub fn list_daily_metrics(&self) -> Result<Vec<crate::model::DailyMetrics>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT id, date, hrv FROM daily_metrics ORDER BY date",
-        )?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, date, hrv FROM daily_metrics ORDER BY date")?;
         let metrics = stmt
             .query_map([], |row| {
                 Ok(crate::model::DailyMetrics {
@@ -981,5 +1082,4 @@ impl Database {
             .execute("DELETE FROM abbreviations WHERE id = ?1", params![id])?;
         Ok(())
     }
-
 }

@@ -1,6 +1,6 @@
 use fluent_bundle::{FluentArgs, FluentBundle, FluentResource, FluentValue};
-use unic_langid::LanguageIdentifier;
 use std::cell::RefCell;
+use unic_langid::LanguageIdentifier;
 
 const EN_FTL: &str = include_str!("../locales/en.ftl");
 const ZH_FTL: &str = include_str!("../locales/zh-CN.ftl");
@@ -15,18 +15,22 @@ thread_local! {
 
 pub fn init() {
     let lang = detect_locale();
-    let ftl_src = if lang.starts_with("zh") { ZH_FTL } else { EN_FTL };
+    let ftl_src = if lang.starts_with("zh") {
+        ZH_FTL
+    } else {
+        EN_FTL
+    };
     let langid: LanguageIdentifier = if lang.starts_with("zh") {
         "zh-CN".parse().unwrap()
     } else {
         "en".parse().unwrap()
     };
 
-    let resource = FluentResource::try_new(ftl_src.to_string())
-        .expect("Failed to parse FTL");
+    let resource = FluentResource::try_new(ftl_src.to_string()).expect("Failed to parse FTL");
     let mut bundle = FluentBundle::new(vec![langid]);
     bundle.set_use_isolating(false);
-    bundle.add_resource(resource)
+    bundle
+        .add_resource(resource)
         .expect("Failed to add FTL resource");
 
     BUNDLE.with(|b| {
@@ -61,7 +65,9 @@ pub fn tr(key: &str) -> String {
             None => return key.to_string(),
         };
         let mut errors = vec![];
-        i18n.bundle.format_pattern(pattern, None, &mut errors).to_string()
+        i18n.bundle
+            .format_pattern(pattern, None, &mut errors)
+            .to_string()
     })
 }
 
@@ -90,6 +96,8 @@ pub fn tr_args(key: &str, args: &[(&str, FluentValue)]) -> String {
             fluent_args.set(*k, v.clone());
         }
         let mut errors = vec![];
-        i18n.bundle.format_pattern(pattern, Some(&fluent_args), &mut errors).to_string()
+        i18n.bundle
+            .format_pattern(pattern, Some(&fluent_args), &mut errors)
+            .to_string()
     })
 }

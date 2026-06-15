@@ -60,11 +60,15 @@ fn test_load_from_missing_file() {
 fn test_load_from_valid_file() {
     let tmp = TempDir::new().unwrap();
     let path = tmp.path().join("config.toml");
-    fs::write(&path, r#"
+    fs::write(
+        &path,
+        r#"
 [llm]
 endpoint = "http://localhost:1234/v1"
 model = "test-model"
-"#).unwrap();
+"#,
+    )
+    .unwrap();
     let config = iron::config::Config::load_from(&path);
     let llm = config.llm.unwrap();
     assert_eq!(llm.endpoint, "http://localhost:1234/v1");

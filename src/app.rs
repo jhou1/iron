@@ -14,15 +14,9 @@ use crate::config::Config;
 use crate::db::Database;
 use crate::i18n::tr_args;
 use crate::tui::{
-    dashboard::DashboardScreen,
-    goals::GoalsScreen,
-    history::HistoryScreen,
-    log_entry::LogEntryScreen,
-    practices::PracticesScreen,
-    quick_log::QuickLogScreen,
-    quotes_screen::QuotesScreen,
-    trends::TrendsScreen,
-    Action, Screen,
+    dashboard::DashboardScreen, goals::GoalsScreen, history::HistoryScreen,
+    log_entry::LogEntryScreen, practices::PracticesScreen, quick_log::QuickLogScreen,
+    quotes_screen::QuotesScreen, trends::TrendsScreen, Action, Screen,
 };
 
 pub fn run() -> Result<()> {
@@ -56,12 +50,11 @@ fn run_app(
         terminal.draw(|frame| {
             let area = frame.area();
             if area.width < 80 || area.height < 24 {
-                let msg = tr_args("terminal-too-small", &[
-                    ("w", FluentValue::from(80)),
-                    ("h", FluentValue::from(24)),
-                ]);
-                let paragraph = Paragraph::new(msg)
-                    .alignment(Alignment::Center);
+                let msg = tr_args(
+                    "terminal-too-small",
+                    &[("w", FluentValue::from(80)), ("h", FluentValue::from(24))],
+                );
+                let paragraph = Paragraph::new(msg).alignment(Alignment::Center);
                 let y = area.height / 2;
                 let msg_area = Rect::new(area.x, y, area.width, 1);
                 frame.render_widget(paragraph, msg_area);

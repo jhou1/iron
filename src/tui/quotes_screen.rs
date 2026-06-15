@@ -7,10 +7,13 @@ use ratatui::{
     Frame,
 };
 
+use super::{
+    centered_area, highlight_row, render_status_line, visible_input_spans, Action, Screen,
+    StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
+};
 use crate::db::Database;
 use crate::i18n::tr;
 use crate::model::Quote;
-use super::{centered_area, highlight_row, render_status_line, visible_input_spans, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH};
 
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
@@ -86,11 +89,11 @@ impl QuotesScreen {
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Min(4),                // bordered list
-                Constraint::Length(1),              // spacer
-                Constraint::Length(action_height),  // input/action area
-                Constraint::Length(1),              // status message
-                Constraint::Length(1),              // shortcuts
-                Constraint::Min(0),                 // spacer
+                Constraint::Length(1),             // spacer
+                Constraint::Length(action_height), // input/action area
+                Constraint::Length(1),             // status message
+                Constraint::Length(1),             // shortcuts
+                Constraint::Min(0),                // spacer
             ])
             .split(area);
 
@@ -98,7 +101,12 @@ impl QuotesScreen {
         let block = Block::default()
             .title(Line::from(vec![
                 Span::styled("── ", Style::default().fg(BORDER_COLOR)),
-                Span::styled(tr("dashboard-quotes"), Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    tr("dashboard-quotes"),
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
             ]))
             .borders(Borders::ALL)
@@ -117,20 +125,26 @@ impl QuotesScreen {
             )));
             frame.render_widget(hint, inner);
         } else {
-            let lines: Vec<Line> = self.quotes.iter().enumerate()
+            let lines: Vec<Line> = self
+                .quotes
+                .iter()
+                .enumerate()
                 .skip(self.scroll_offset)
                 .take(visible)
                 .map(|(i, q)| {
                     let is_sel = i == self.selected;
                     let marker = if is_sel { "> " } else { "  " };
                     let style = if is_sel {
-                        Style::default().fg(Color::White).add_modifier(Modifier::BOLD)
+                        Style::default()
+                            .fg(Color::White)
+                            .add_modifier(Modifier::BOLD)
                     } else {
                         Style::default().fg(Color::White)
                     };
                     let max_text = inner.width.saturating_sub(3) as usize;
                     let display = if q.text.chars().count() > max_text {
-                        let truncated: String = q.text.chars().take(max_text.saturating_sub(1)).collect();
+                        let truncated: String =
+                            q.text.chars().take(max_text.saturating_sub(1)).collect();
                         format!("{}{}…", marker, truncated)
                     } else {
                         format!("{}{}", marker, q.text)
@@ -151,19 +165,36 @@ impl QuotesScreen {
         if action_height > 0 {
             let action_lines = match &self.mode {
                 Mode::Add | Mode::Edit => {
-                    let label = if self.mode == Mode::Add { tr("key-add") } else { tr("key-edit") };
-                    let mut spans = vec![
-                        Span::styled(format!(" {}: ", label), Style::default().fg(Color::Gray)),
-                    ];
-                    spans.extend(visible_input_spans(&self.input, self.input_cursor, area.width, (label.len() + 4) as u16, GREEN));
+                    let label = if self.mode == Mode::Add {
+                        tr("key-add")
+                    } else {
+                        tr("key-edit")
+                    };
+                    let mut spans = vec![Span::styled(
+                        format!(" {}: ", label),
+                        Style::default().fg(Color::Gray),
+                    )];
+                    spans.extend(visible_input_spans(
+                        &self.input,
+                        self.input_cursor,
+                        area.width,
+                        (label.len() + 4) as u16,
+                        GREEN,
+                    ));
                     vec![
                         Line::from(spans),
                         Line::from(""),
                         Line::from(vec![
                             Span::styled(" [Enter]", Style::default().fg(ACCENT)),
-                            Span::styled(format!(" {}  ", tr("key-confirm")), Style::default().fg(Color::DarkGray)),
+                            Span::styled(
+                                format!(" {}  ", tr("key-confirm")),
+                                Style::default().fg(Color::DarkGray),
+                            ),
                             Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                            Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::DarkGray)),
+                            Span::styled(
+                                format!(" {}", tr("key-cancel")),
+                                Style::default().fg(Color::DarkGray),
+                            ),
                         ]),
                     ]
                 }
@@ -176,9 +207,15 @@ impl QuotesScreen {
                         Line::from(""),
                         Line::from(vec![
                             Span::styled(" [y]", Style::default().fg(ACCENT)),
-                            Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::DarkGray)),
+                            Span::styled(
+                                format!(" {}  ", tr("key-yes")),
+                                Style::default().fg(Color::DarkGray),
+                            ),
                             Span::styled("[any]", Style::default().fg(ACCENT)),
-                            Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::DarkGray)),
+                            Span::styled(
+                                format!(" {}", tr("key-cancel")),
+                                Style::default().fg(Color::DarkGray),
+                            ),
                         ]),
                     ]
                 }
@@ -195,20 +232,38 @@ impl QuotesScreen {
             Mode::Browse => {
                 let mut spans = vec![
                     Span::styled(" [j/k]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}  ", tr("key-navigate")), Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!(" {}  ", tr("key-navigate")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
                     Span::styled("[a]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}  ", tr("key-add")), Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!(" {}  ", tr("key-add")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
                     Span::styled("[e]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!(" {}  ", tr("key-edit")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
                     Span::styled("[d]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!(" {}  ", tr("key-delete")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
                 ];
                 if self.last_deleted.is_some() {
                     spans.push(Span::styled("[u]", Style::default().fg(ACCENT)));
-                    spans.push(Span::styled(format!(" {}  ", tr("key-undo")), Style::default().fg(Color::DarkGray)));
+                    spans.push(Span::styled(
+                        format!(" {}  ", tr("key-undo")),
+                        Style::default().fg(Color::DarkGray),
+                    ));
                 }
                 spans.push(Span::styled("[Esc]", Style::default().fg(ACCENT)));
-                spans.push(Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::DarkGray)));
+                spans.push(Span::styled(
+                    format!(" {}", tr("key-back")),
+                    Style::default().fg(Color::DarkGray),
+                ));
                 Line::from(spans)
             }
             _ => Line::from(""),
@@ -230,21 +285,29 @@ impl QuotesScreen {
             KeyCode::Char('b') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 if self.input_cursor > 0 {
                     self.input_cursor = self.input[..self.input_cursor]
-                        .char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+                        .char_indices()
+                        .next_back()
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
                 }
                 true
             }
             KeyCode::Left => {
                 if self.input_cursor > 0 {
                     self.input_cursor = self.input[..self.input_cursor]
-                        .char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+                        .char_indices()
+                        .next_back()
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
                 }
                 true
             }
             KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 if self.input_cursor < self.input.len() {
                     self.input_cursor = self.input[self.input_cursor..]
-                        .char_indices().nth(1).map(|(i, _)| self.input_cursor + i)
+                        .char_indices()
+                        .nth(1)
+                        .map(|(i, _)| self.input_cursor + i)
                         .unwrap_or(self.input.len());
                 }
                 true
@@ -252,7 +315,9 @@ impl QuotesScreen {
             KeyCode::Right => {
                 if self.input_cursor < self.input.len() {
                     self.input_cursor = self.input[self.input_cursor..]
-                        .char_indices().nth(1).map(|(i, _)| self.input_cursor + i)
+                        .char_indices()
+                        .nth(1)
+                        .map(|(i, _)| self.input_cursor + i)
                         .unwrap_or(self.input.len());
                 }
                 true
@@ -261,16 +326,25 @@ impl QuotesScreen {
                 self.input_cursor = 0;
                 true
             }
-            KeyCode::Home => { self.input_cursor = 0; true }
+            KeyCode::Home => {
+                self.input_cursor = 0;
+                true
+            }
             KeyCode::Char('e') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.input_cursor = self.input.len();
                 true
             }
-            KeyCode::End => { self.input_cursor = self.input.len(); true }
+            KeyCode::End => {
+                self.input_cursor = self.input.len();
+                true
+            }
             KeyCode::Backspace => {
                 if self.input_cursor > 0 {
                     let prev = self.input[..self.input_cursor]
-                        .char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+                        .char_indices()
+                        .next_back()
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
                     self.input.remove(prev);
                     self.input_cursor = prev;
                 }

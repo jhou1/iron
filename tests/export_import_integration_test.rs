@@ -73,7 +73,8 @@ fn assert_log_integrity(
             expected_name
         );
         assert_eq!(
-            set.data, expected_sets[i],
+            set.data,
+            expected_sets[i],
             "set data mismatch at set #{} for '{}'",
             i + 1,
             expected_name
@@ -109,10 +110,18 @@ fn export_delete_reimport_restores_all_data() {
     let export_path = t.export_path();
 
     // Setup: 4 practices, one per type, each with a log
-    let kb = db.create_practice("KB Snatch", PracticeType::Weighted).unwrap();
-    let pu = db.create_practice("Push Up", PracticeType::Bodyweight).unwrap();
-    let run = db.create_practice("Running", PracticeType::Distance).unwrap();
-    let plank = db.create_practice("Plank", PracticeType::Endurance).unwrap();
+    let kb = db
+        .create_practice("KB Snatch", PracticeType::Weighted)
+        .unwrap();
+    let pu = db
+        .create_practice("Push Up", PracticeType::Bodyweight)
+        .unwrap();
+    let run = db
+        .create_practice("Running", PracticeType::Distance)
+        .unwrap();
+    let plank = db
+        .create_practice("Plank", PracticeType::Endurance)
+        .unwrap();
 
     let t1 = dt("2025-01-10 08:00:00");
     let t2 = dt("2025-01-11 09:30:00");
@@ -120,9 +129,18 @@ fn export_delete_reimport_restores_all_data() {
     let t4 = dt("2025-01-13 18:00:00");
 
     let kb_sets = vec![
-        SetData::Weighted { weight: 24.0, reps: 10 },
-        SetData::Weighted { weight: 24.0, reps: 9 },
-        SetData::Weighted { weight: 28.0, reps: 8 },
+        SetData::Weighted {
+            weight: 24.0,
+            reps: 10,
+        },
+        SetData::Weighted {
+            weight: 24.0,
+            reps: 9,
+        },
+        SetData::Weighted {
+            weight: 28.0,
+            reps: 8,
+        },
     ];
     let pu_sets = vec![
         SetData::Bodyweight { reps: 20 },
@@ -131,18 +149,50 @@ fn export_delete_reimport_restores_all_data() {
     let run_sets = vec![SetData::Distance { distance: 5.0 }];
     let plank_sets = vec![SetData::Endurance { duration: 2.5 }];
 
-    db.create_log_at(kb.id, &t1, &kb_sets, Some("Felt strong"), None, None).unwrap();
-    db.create_log_at(pu.id, &t2, &pu_sets, None, None, None).unwrap();
-    db.create_log_at(run.id, &t3, &run_sets, Some("Morning run"), None, None).unwrap();
-    db.create_log_at(plank.id, &t4, &plank_sets, None, None, None).unwrap();
+    db.create_log_at(kb.id, &t1, &kb_sets, Some("Felt strong"), None, None)
+        .unwrap();
+    db.create_log_at(pu.id, &t2, &pu_sets, None, None, None)
+        .unwrap();
+    db.create_log_at(run.id, &t3, &run_sets, Some("Morning run"), None, None)
+        .unwrap();
+    db.create_log_at(plank.id, &t4, &plank_sets, None, None, None)
+        .unwrap();
 
     // Pre-export integrity check
     let entries = db.export_all().unwrap();
     assert_eq!(entries.len(), 4);
-    assert_log_integrity(find_log_by_practice(&entries, "KB Snatch"), "KB Snatch", PracticeType::Weighted, &t1, Some("Felt strong"), &kb_sets);
-    assert_log_integrity(find_log_by_practice(&entries, "Push Up"), "Push Up", PracticeType::Bodyweight, &t2, None, &pu_sets);
-    assert_log_integrity(find_log_by_practice(&entries, "Running"), "Running", PracticeType::Distance, &t3, Some("Morning run"), &run_sets);
-    assert_log_integrity(find_log_by_practice(&entries, "Plank"), "Plank", PracticeType::Endurance, &t4, None, &plank_sets);
+    assert_log_integrity(
+        find_log_by_practice(&entries, "KB Snatch"),
+        "KB Snatch",
+        PracticeType::Weighted,
+        &t1,
+        Some("Felt strong"),
+        &kb_sets,
+    );
+    assert_log_integrity(
+        find_log_by_practice(&entries, "Push Up"),
+        "Push Up",
+        PracticeType::Bodyweight,
+        &t2,
+        None,
+        &pu_sets,
+    );
+    assert_log_integrity(
+        find_log_by_practice(&entries, "Running"),
+        "Running",
+        PracticeType::Distance,
+        &t3,
+        Some("Morning run"),
+        &run_sets,
+    );
+    assert_log_integrity(
+        find_log_by_practice(&entries, "Plank"),
+        "Plank",
+        PracticeType::Endurance,
+        &t4,
+        None,
+        &plank_sets,
+    );
 
     // Export
     export_to_json(db, Some(export_path.clone())).unwrap();
@@ -164,10 +214,38 @@ fn export_delete_reimport_restores_all_data() {
     let entries = db.export_all().unwrap();
     assert_eq!(entries.len(), 4);
     assert_eq!(db.list_practices().unwrap().len(), 4);
-    assert_log_integrity(find_log_by_practice(&entries, "KB Snatch"), "KB Snatch", PracticeType::Weighted, &t1, Some("Felt strong"), &kb_sets);
-    assert_log_integrity(find_log_by_practice(&entries, "Push Up"), "Push Up", PracticeType::Bodyweight, &t2, None, &pu_sets);
-    assert_log_integrity(find_log_by_practice(&entries, "Running"), "Running", PracticeType::Distance, &t3, Some("Morning run"), &run_sets);
-    assert_log_integrity(find_log_by_practice(&entries, "Plank"), "Plank", PracticeType::Endurance, &t4, None, &plank_sets);
+    assert_log_integrity(
+        find_log_by_practice(&entries, "KB Snatch"),
+        "KB Snatch",
+        PracticeType::Weighted,
+        &t1,
+        Some("Felt strong"),
+        &kb_sets,
+    );
+    assert_log_integrity(
+        find_log_by_practice(&entries, "Push Up"),
+        "Push Up",
+        PracticeType::Bodyweight,
+        &t2,
+        None,
+        &pu_sets,
+    );
+    assert_log_integrity(
+        find_log_by_practice(&entries, "Running"),
+        "Running",
+        PracticeType::Distance,
+        &t3,
+        Some("Morning run"),
+        &run_sets,
+    );
+    assert_log_integrity(
+        find_log_by_practice(&entries, "Plank"),
+        "Plank",
+        PracticeType::Endurance,
+        &t4,
+        None,
+        &plank_sets,
+    );
 }
 
 #[test]
@@ -178,19 +256,31 @@ fn partial_delete_reimport_merges_correctly() {
 
     // Setup: 2 practices, 3 logs
     let squat = db.create_practice("Squat", PracticeType::Weighted).unwrap();
-    let run = db.create_practice("Running", PracticeType::Distance).unwrap();
+    let run = db
+        .create_practice("Running", PracticeType::Distance)
+        .unwrap();
 
     let t1 = dt("2025-02-01 10:00:00");
     let t2 = dt("2025-02-02 10:00:00");
     let t3 = dt("2025-02-03 10:00:00");
 
-    let squat_sets1 = vec![SetData::Weighted { weight: 100.0, reps: 5 }];
-    let squat_sets2 = vec![SetData::Weighted { weight: 105.0, reps: 5 }];
+    let squat_sets1 = vec![SetData::Weighted {
+        weight: 100.0,
+        reps: 5,
+    }];
+    let squat_sets2 = vec![SetData::Weighted {
+        weight: 105.0,
+        reps: 5,
+    }];
     let run_sets = vec![SetData::Distance { distance: 3.0 }];
 
-    let log1_id = db.create_log_at(squat.id, &t1, &squat_sets1, Some("Heavy day"), None, None).unwrap();
-    db.create_log_at(squat.id, &t2, &squat_sets2, None, None, None).unwrap();
-    db.create_log_at(run.id, &t3, &run_sets, None, None, None).unwrap();
+    let log1_id = db
+        .create_log_at(squat.id, &t1, &squat_sets1, Some("Heavy day"), None, None)
+        .unwrap();
+    db.create_log_at(squat.id, &t2, &squat_sets2, None, None, None)
+        .unwrap();
+    db.create_log_at(run.id, &t3, &run_sets, None, None, None)
+        .unwrap();
 
     // Export all 3 logs
     export_to_json(db, Some(export_path.clone())).unwrap();
@@ -199,7 +289,10 @@ fn partial_delete_reimport_merges_correctly() {
     db.delete_log(log1_id).unwrap();
     let remaining = db.export_all().unwrap();
     assert_eq!(remaining.len(), 2);
-    assert!(remaining.iter().all(|e| e.log.logged_at != t1), "deleted log should be gone");
+    assert!(
+        remaining.iter().all(|e| e.log.logged_at != t1),
+        "deleted log should be gone"
+    );
 
     // Practice should still exist
     assert_eq!(db.list_practices().unwrap().len(), 2);
@@ -215,13 +308,34 @@ fn partial_delete_reimport_merges_correctly() {
 
     // Verify the restored log has correct data
     let restored = find_log_by_time(&entries, &t1);
-    assert_log_integrity(restored, "Squat", PracticeType::Weighted, &t1, Some("Heavy day"), &squat_sets1);
+    assert_log_integrity(
+        restored,
+        "Squat",
+        PracticeType::Weighted,
+        &t1,
+        Some("Heavy day"),
+        &squat_sets1,
+    );
 
     // Verify existing logs are untouched
     let log2 = find_log_by_time(&entries, &t2);
-    assert_log_integrity(log2, "Squat", PracticeType::Weighted, &t2, None, &squat_sets2);
+    assert_log_integrity(
+        log2,
+        "Squat",
+        PracticeType::Weighted,
+        &t2,
+        None,
+        &squat_sets2,
+    );
     let log3 = find_log_by_time(&entries, &t3);
-    assert_log_integrity(log3, "Running", PracticeType::Distance, &t3, None, &run_sets);
+    assert_log_integrity(
+        log3,
+        "Running",
+        PracticeType::Distance,
+        &t3,
+        None,
+        &run_sets,
+    );
 }
 
 #[test]
@@ -231,27 +345,73 @@ fn import_skips_duplicates_all_practice_types() {
     let export_path = t.export_path();
 
     // Setup: all 4 types
-    let kb = db.create_practice("KB Snatch", PracticeType::Weighted).unwrap();
-    let pu = db.create_practice("Push Up", PracticeType::Bodyweight).unwrap();
-    let run = db.create_practice("Running", PracticeType::Distance).unwrap();
-    let plank = db.create_practice("Plank", PracticeType::Endurance).unwrap();
+    let kb = db
+        .create_practice("KB Snatch", PracticeType::Weighted)
+        .unwrap();
+    let pu = db
+        .create_practice("Push Up", PracticeType::Bodyweight)
+        .unwrap();
+    let run = db
+        .create_practice("Running", PracticeType::Distance)
+        .unwrap();
+    let plank = db
+        .create_practice("Plank", PracticeType::Endurance)
+        .unwrap();
 
     let t1 = dt("2025-03-01 08:00:00");
     let t2 = dt("2025-03-02 09:00:00");
     let t3 = dt("2025-03-03 10:00:00");
     let t4 = dt("2025-03-04 11:00:00");
 
-    db.create_log_at(kb.id, &t1, &[SetData::Weighted { weight: 24.0, reps: 10 }], None, None, None).unwrap();
-    db.create_log_at(pu.id, &t2, &[SetData::Bodyweight { reps: 20 }], Some("Easy"), None, None).unwrap();
-    db.create_log_at(run.id, &t3, &[SetData::Distance { distance: 5.0 }], None, None, None).unwrap();
-    db.create_log_at(plank.id, &t4, &[SetData::Endurance { duration: 3.0 }], None, None, None).unwrap();
+    db.create_log_at(
+        kb.id,
+        &t1,
+        &[SetData::Weighted {
+            weight: 24.0,
+            reps: 10,
+        }],
+        None,
+        None,
+        None,
+    )
+    .unwrap();
+    db.create_log_at(
+        pu.id,
+        &t2,
+        &[SetData::Bodyweight { reps: 20 }],
+        Some("Easy"),
+        None,
+        None,
+    )
+    .unwrap();
+    db.create_log_at(
+        run.id,
+        &t3,
+        &[SetData::Distance { distance: 5.0 }],
+        None,
+        None,
+        None,
+    )
+    .unwrap();
+    db.create_log_at(
+        plank.id,
+        &t4,
+        &[SetData::Endurance { duration: 3.0 }],
+        None,
+        None,
+        None,
+    )
+    .unwrap();
 
     // Export
     export_to_json(db, Some(export_path.clone())).unwrap();
 
     // Import into same db — all data still present
     let imported = import_from_json(db, &export_path).unwrap();
-    assert_eq!(imported, 0, "all logs are duplicates, none should be imported");
+    assert_eq!(
+        imported, 0,
+        "all logs are duplicates, none should be imported"
+    );
 
     // Verify no duplicates were created
     assert_eq!(db.export_all().unwrap().len(), 4);
@@ -264,8 +424,13 @@ fn notes_and_timestamps_survive_round_trip() {
     let db = &t.db;
     let export_path = t.export_path();
 
-    let bench = db.create_practice("Bench Press", PracticeType::Weighted).unwrap();
-    let simple_set = vec![SetData::Weighted { weight: 60.0, reps: 8 }];
+    let bench = db
+        .create_practice("Bench Press", PracticeType::Weighted)
+        .unwrap();
+    let simple_set = vec![SetData::Weighted {
+        weight: 60.0,
+        reps: 8,
+    }];
 
     let t1 = dt("2025-03-15 06:30:00");
     let t2 = dt("2025-03-15 18:45:30");
@@ -277,10 +442,14 @@ fn notes_and_timestamps_survive_round_trip() {
     let note3 = Some("Line 1\nLine 2");
     let note4 = Some("Unicode: caf\u{00e9} \u{2192} weights");
 
-    db.create_log_at(bench.id, &t1, &simple_set, note1, None, None).unwrap();
-    db.create_log_at(bench.id, &t2, &simple_set, note2, None, None).unwrap();
-    db.create_log_at(bench.id, &t3, &simple_set, note3, None, None).unwrap();
-    db.create_log_at(bench.id, &t4, &simple_set, note4, None, None).unwrap();
+    db.create_log_at(bench.id, &t1, &simple_set, note1, None, None)
+        .unwrap();
+    db.create_log_at(bench.id, &t2, &simple_set, note2, None, None)
+        .unwrap();
+    db.create_log_at(bench.id, &t3, &simple_set, note3, None, None)
+        .unwrap();
+    db.create_log_at(bench.id, &t4, &simple_set, note4, None, None)
+        .unwrap();
 
     // Export, delete, re-import
     export_to_json(db, Some(export_path.clone())).unwrap();
@@ -298,13 +467,24 @@ fn notes_and_timestamps_survive_round_trip() {
     assert_eq!(e1.log.note.as_deref(), note1);
 
     let e2 = find_log_by_time(&entries, &t2);
-    assert_eq!(e2.log.note, None, "None note should remain None, not Some(\"\")");
+    assert_eq!(
+        e2.log.note, None,
+        "None note should remain None, not Some(\"\")"
+    );
 
     let e3 = find_log_by_time(&entries, &t3);
-    assert_eq!(e3.log.note.as_deref(), note3, "newline in note should survive");
+    assert_eq!(
+        e3.log.note.as_deref(),
+        note3,
+        "newline in note should survive"
+    );
 
     let e4 = find_log_by_time(&entries, &t4);
-    assert_eq!(e4.log.note.as_deref(), note4, "unicode in note should survive");
+    assert_eq!(
+        e4.log.note.as_deref(),
+        note4,
+        "unicode in note should survive"
+    );
 }
 
 #[test]
@@ -313,19 +493,37 @@ fn set_ordering_preserved_across_export_import() {
     let db = &t.db;
     let export_path = t.export_path();
 
-    let bench = db.create_practice("Bench Press", PracticeType::Weighted).unwrap();
+    let bench = db
+        .create_practice("Bench Press", PracticeType::Weighted)
+        .unwrap();
     let t1 = dt("2025-04-01 10:00:00");
 
     // 5 sets with intentionally duplicate values at different positions
     let sets = vec![
-        SetData::Weighted { weight: 40.0, reps: 12 },  // warmup
-        SetData::Weighted { weight: 60.0, reps: 10 },
-        SetData::Weighted { weight: 80.0, reps: 8 },   // working set
-        SetData::Weighted { weight: 100.0, reps: 5 },  // top set
-        SetData::Weighted { weight: 80.0, reps: 8 },   // backoff — same as set 3
+        SetData::Weighted {
+            weight: 40.0,
+            reps: 12,
+        }, // warmup
+        SetData::Weighted {
+            weight: 60.0,
+            reps: 10,
+        },
+        SetData::Weighted {
+            weight: 80.0,
+            reps: 8,
+        }, // working set
+        SetData::Weighted {
+            weight: 100.0,
+            reps: 5,
+        }, // top set
+        SetData::Weighted {
+            weight: 80.0,
+            reps: 8,
+        }, // backoff — same as set 3
     ];
 
-    db.create_log_at(bench.id, &t1, &sets, Some("Pyramid day"), None, None).unwrap();
+    db.create_log_at(bench.id, &t1, &sets, Some("Pyramid day"), None, None)
+        .unwrap();
 
     // Export, delete, re-import
     export_to_json(db, Some(export_path.clone())).unwrap();
@@ -340,13 +538,27 @@ fn set_ordering_preserved_across_export_import() {
     assert_eq!(entries.len(), 1);
 
     let entry = &entries[0];
-    assert_eq!(entry.sets.len(), 5, "all 5 sets should survive including duplicates");
-    assert_log_integrity(entry, "Bench Press", PracticeType::Weighted, &t1, Some("Pyramid day"), &sets);
+    assert_eq!(
+        entry.sets.len(),
+        5,
+        "all 5 sets should survive including duplicates"
+    );
+    assert_log_integrity(
+        entry,
+        "Bench Press",
+        PracticeType::Weighted,
+        &t1,
+        Some("Pyramid day"),
+        &sets,
+    );
 
     // Extra explicit check: sets 3 and 5 have identical data but different set_numbers
     assert_eq!(entry.sets[2].set_number, 3);
     assert_eq!(entry.sets[4].set_number, 5);
-    assert_eq!(entry.sets[2].data, entry.sets[4].data, "sets 3 and 5 should have identical data");
+    assert_eq!(
+        entry.sets[2].data, entry.sets[4].data,
+        "sets 3 and 5 should have identical data"
+    );
 }
 
 #[test]
@@ -407,10 +619,23 @@ fn quotes_survive_export_import() {
 fn warmup_cooldown_survive_export_import() {
     let source = TestDb::new();
     let db = &source.db;
-    let bench = db.create_practice("Bench Press", PracticeType::Weighted).unwrap();
+    let bench = db
+        .create_practice("Bench Press", PracticeType::Weighted)
+        .unwrap();
     let t1 = dt("2026-04-18 10:00:00");
-    let sets = vec![SetData::Weighted { weight: 60.0, reps: 10 }];
-    db.create_log_at(bench.id, &t1, &sets, Some("Good"), Some("Jump rope"), Some("Stretches")).unwrap();
+    let sets = vec![SetData::Weighted {
+        weight: 60.0,
+        reps: 10,
+    }];
+    db.create_log_at(
+        bench.id,
+        &t1,
+        &sets,
+        Some("Good"),
+        Some("Jump rope"),
+        Some("Stretches"),
+    )
+    .unwrap();
     let export_path = source.export_path();
     export_to_json(db, Some(export_path.clone())).unwrap();
     let target = TestDb::new();
@@ -444,12 +669,26 @@ fn inactive_practice_survives_export_import() {
     let source = TestDb::new();
     let db = &source.db;
 
-    let bench = db.create_practice("Bench Press", PracticeType::Weighted).unwrap();
-    db.create_practice("Pull-ups", PracticeType::Bodyweight).unwrap();
+    let bench = db
+        .create_practice("Bench Press", PracticeType::Weighted)
+        .unwrap();
+    db.create_practice("Pull-ups", PracticeType::Bodyweight)
+        .unwrap();
     db.set_practice_active(bench.id, false).unwrap();
 
     let t1 = dt("2026-05-01 10:00:00");
-    db.create_log_at(bench.id, &t1, &[SetData::Weighted { weight: 60.0, reps: 10 }], None, None, None).unwrap();
+    db.create_log_at(
+        bench.id,
+        &t1,
+        &[SetData::Weighted {
+            weight: 60.0,
+            reps: 10,
+        }],
+        None,
+        None,
+        None,
+    )
+    .unwrap();
 
     let export_path = source.export_path();
     export_to_json(db, Some(export_path.clone())).unwrap();

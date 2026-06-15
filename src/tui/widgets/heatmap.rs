@@ -18,7 +18,11 @@ pub struct Heatmap<'a> {
 
 impl<'a> Heatmap<'a> {
     pub fn new(data: &'a [(String, i64)], weeks: u16, no_color: bool) -> Self {
-        Self { data, weeks, no_color }
+        Self {
+            data,
+            weeks,
+            no_color,
+        }
     }
 
     fn cell_color(&self, count: i64) -> Color {
@@ -31,11 +35,11 @@ impl<'a> Heatmap<'a> {
             }
         } else {
             match count {
-                0 => Color::Indexed(240),  // visible gray on dark terminals
-                1 => Color::Indexed(22),   // dark green
-                2 => Color::Indexed(28),   // medium green
-                3 => Color::Indexed(34),   // bright green
-                _ => Color::Indexed(82),   // vivid green
+                0 => Color::Indexed(240), // visible gray on dark terminals
+                1 => Color::Indexed(22),  // dark green
+                2 => Color::Indexed(28),  // medium green
+                3 => Color::Indexed(34),  // bright green
+                _ => Color::Indexed(82),  // vivid green
             }
         }
     }
@@ -69,10 +73,7 @@ impl<'a> Widget for Heatmap<'a> {
             crate::i18n::tr("heatmap-sat"),
             crate::i18n::tr("heatmap-sun"),
         ];
-        let label_width = day_labels.iter()
-            .map(|l| l.width())
-            .max()
-            .unwrap_or(2) as u16 + 1;
+        let label_width = day_labels.iter().map(|l| l.width()).max().unwrap_or(2) as u16 + 1;
         let month_row_y = area.y;
         let grid_y = area.y + 1; // grid starts 1 row below for month labels
 
@@ -122,7 +123,12 @@ impl<'a> Widget for Heatmap<'a> {
                 let label_len = label.width() as u16;
                 let label_x = x.max(last_label_end_x);
                 if label_x + label_len <= area.x + area.width {
-                    buf.set_string(label_x, month_row_y, label, Style::default().fg(Color::Gray));
+                    buf.set_string(
+                        label_x,
+                        month_row_y,
+                        label,
+                        Style::default().fg(Color::Gray),
+                    );
                     last_label_end_x = label_x + label_len + 1;
                 }
                 last_labeled_month = Some(month);
@@ -148,23 +154,48 @@ impl<'a> Widget for Heatmap<'a> {
         if legend_y < area.y + area.height {
             let legend = if self.no_color {
                 Line::from(vec![
-                    Span::styled(format!("{} ", crate::i18n::tr("heatmap-less")), Style::default()),
-                    Span::raw(" "), Span::raw("\u{2591}"), Span::raw(" "),
-                    Span::raw("\u{2592}"), Span::raw(" "), Span::raw("\u{2588}"),
-                    Span::styled(format!(" {}", crate::i18n::tr("heatmap-more")), Style::default()),
+                    Span::styled(
+                        format!("{} ", crate::i18n::tr("heatmap-less")),
+                        Style::default(),
+                    ),
+                    Span::raw(" "),
+                    Span::raw("\u{2591}"),
+                    Span::raw(" "),
+                    Span::raw("\u{2592}"),
+                    Span::raw(" "),
+                    Span::raw("\u{2588}"),
+                    Span::styled(
+                        format!(" {}", crate::i18n::tr("heatmap-more")),
+                        Style::default(),
+                    ),
                 ])
             } else {
                 Line::from(vec![
-                    Span::styled(format!("{} ", crate::i18n::tr("heatmap-less")), Style::default().fg(Color::Gray)),
-                    Span::styled("\u{25CF}", Style::default().fg(Color::Indexed(240))), Span::raw(" "),
-                    Span::styled("\u{25CF}", Style::default().fg(Color::Indexed(22))),  Span::raw(" "),
-                    Span::styled("\u{25CF}", Style::default().fg(Color::Indexed(28))),  Span::raw(" "),
-                    Span::styled("\u{25CF}", Style::default().fg(Color::Indexed(34))),  Span::raw(" "),
+                    Span::styled(
+                        format!("{} ", crate::i18n::tr("heatmap-less")),
+                        Style::default().fg(Color::Gray),
+                    ),
+                    Span::styled("\u{25CF}", Style::default().fg(Color::Indexed(240))),
+                    Span::raw(" "),
+                    Span::styled("\u{25CF}", Style::default().fg(Color::Indexed(22))),
+                    Span::raw(" "),
+                    Span::styled("\u{25CF}", Style::default().fg(Color::Indexed(28))),
+                    Span::raw(" "),
+                    Span::styled("\u{25CF}", Style::default().fg(Color::Indexed(34))),
+                    Span::raw(" "),
                     Span::styled("\u{25CF}", Style::default().fg(Color::Indexed(82))),
-                    Span::styled(format!(" {}", crate::i18n::tr("heatmap-more")), Style::default().fg(Color::Gray)),
+                    Span::styled(
+                        format!(" {}", crate::i18n::tr("heatmap-more")),
+                        Style::default().fg(Color::Gray),
+                    ),
                 ])
             };
-            buf.set_line(area.x + label_width, legend_y, &legend, area.width.saturating_sub(label_width));
+            buf.set_line(
+                area.x + label_width,
+                legend_y,
+                &legend,
+                area.width.saturating_sub(label_width),
+            );
         }
     }
 }
@@ -182,7 +213,10 @@ mod tests {
         heatmap.render(Rect::new(0, 0, 30, 9), &mut buf);
         // At least one cell should have the circle character
         let has_content = buf.content.iter().any(|cell| cell.symbol() == "\u{25CF}");
-        assert!(has_content, "heatmap should render circles when area.height >= 9");
+        assert!(
+            has_content,
+            "heatmap should render circles when area.height >= 9"
+        );
     }
 
     #[test]
@@ -192,7 +226,10 @@ mod tests {
         let mut buf = Buffer::empty(Rect::new(0, 0, 30, 8));
         heatmap.render(Rect::new(0, 0, 30, 8), &mut buf);
         let has_content = buf.content.iter().any(|cell| cell.symbol() == "\u{25CF}");
-        assert!(!has_content, "heatmap should render nothing when area.height < 9");
+        assert!(
+            !has_content,
+            "heatmap should render nothing when area.height < 9"
+        );
     }
 
     #[test]
@@ -211,6 +248,9 @@ mod tests {
         block.render(area, &mut buf);
         heatmap.render(inner, &mut buf);
         let has_content = buf.content.iter().any(|cell| cell.symbol() == "\u{25CF}");
-        assert!(has_content, "heatmap should render inside a padded 13-row block");
+        assert!(
+            has_content,
+            "heatmap should render inside a padded 13-row block"
+        );
     }
 }

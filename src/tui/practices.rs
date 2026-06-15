@@ -9,10 +9,13 @@ use ratatui::{
 
 use unicode_width::UnicodeWidthStr;
 
+use super::{
+    centered_area, highlight_row, render_status_line, visible_input_spans, Action, Screen,
+    StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
+};
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
 use crate::model::{Practice, PracticeType};
-use super::{centered_area, highlight_row, render_status_line, visible_input_spans, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH};
 use fluent_bundle::FluentValue;
 
 const ACCENT: Color = Color::Cyan;
@@ -85,7 +88,9 @@ impl PracticesScreen {
             .split(area);
 
         // ── Bordered practice list ──
-        let max_name_len = self.practices.iter()
+        let max_name_len = self
+            .practices
+            .iter()
             .map(|p| p.name.width())
             .max()
             .unwrap_or(0);
@@ -94,16 +99,24 @@ impl PracticesScreen {
         let name_header = tr("practices-col-name");
         let type_header = tr("practices-col-type");
         let header_padding = col_width.saturating_sub(name_header.width());
-        let type_col_width = self.practices.iter()
+        let type_col_width = self
+            .practices
+            .iter()
             .map(|p| p.practice_type.label().width())
             .max()
             .unwrap_or(0)
-            .max(type_header.width()) + 2;
+            .max(type_header.width())
+            + 2;
 
         let block = Block::default()
             .title(Line::from(vec![
                 Span::styled("── ", Style::default().fg(BORDER_COLOR)),
-                Span::styled(tr("practices-title"), Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    tr("practices-title"),
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
             ]))
             .borders(Borders::ALL)
@@ -112,7 +125,9 @@ impl PracticesScreen {
         let inner = block.inner(chunks[0]);
         frame.render_widget(block, chunks[0]);
 
-        let hdr_style = Style::default().fg(Color::White).add_modifier(Modifier::BOLD);
+        let hdr_style = Style::default()
+            .fg(Color::White)
+            .add_modifier(Modifier::BOLD);
         let header_line = Line::from(vec![
             Span::raw("  "),
             Span::styled(&name_header, hdr_style),
@@ -132,9 +147,19 @@ impl PracticesScreen {
                 let marker = if i == self.selected { "> " } else { "  " };
                 let (name_style, type_color) = if i == self.selected {
                     if p.active {
-                        (Style::default().fg(Color::White).add_modifier(Modifier::BOLD), Color::Gray)
+                        (
+                            Style::default()
+                                .fg(Color::White)
+                                .add_modifier(Modifier::BOLD),
+                            Color::Gray,
+                        )
                     } else {
-                        (Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD), Color::DarkGray)
+                        (
+                            Style::default()
+                                .fg(Color::DarkGray)
+                                .add_modifier(Modifier::BOLD),
+                            Color::DarkGray,
+                        )
                     }
                 } else if p.active {
                     (Style::default().fg(Color::White), Color::Gray)
@@ -184,7 +209,13 @@ impl PracticesScreen {
             }
             Mode::AddName => {
                 let mut spans = vec![Span::styled(" > ", Style::default().fg(GREEN))];
-                spans.extend(visible_input_spans(&self.input, self.input_cursor, area.width, 3, GREEN));
+                spans.extend(visible_input_spans(
+                    &self.input,
+                    self.input_cursor,
+                    area.width,
+                    3,
+                    GREEN,
+                ));
                 vec![
                     Line::from(Span::styled(
                         tr("practices-new-name"),
@@ -203,7 +234,9 @@ impl PracticesScreen {
                 for (i, pt) in PracticeType::ALL.iter().enumerate() {
                     let marker = if i == self.type_selected { "> " } else { "  " };
                     let style = if i == self.type_selected {
-                        Style::default().fg(Color::White).add_modifier(Modifier::BOLD)
+                        Style::default()
+                            .fg(Color::White)
+                            .add_modifier(Modifier::BOLD)
                     } else {
                         Style::default().fg(Color::Gray)
                     };
@@ -217,7 +250,13 @@ impl PracticesScreen {
             }
             Mode::EditName => {
                 let mut spans = vec![Span::styled(" > ", Style::default().fg(GREEN))];
-                spans.extend(visible_input_spans(&self.input, self.input_cursor, area.width, 3, GREEN));
+                spans.extend(visible_input_spans(
+                    &self.input,
+                    self.input_cursor,
+                    area.width,
+                    3,
+                    GREEN,
+                ));
                 vec![
                     Line::from(Span::styled(
                         tr("practices-rename"),
@@ -236,7 +275,10 @@ impl PracticesScreen {
                     .unwrap_or("?");
                 vec![
                     Line::from(Span::styled(
-                        tr_args("practices-delete-confirm", &[("name", FluentValue::from(name.to_string()))]),
+                        tr_args(
+                            "practices-delete-confirm",
+                            &[("name", FluentValue::from(name.to_string()))],
+                        ),
                         Style::default().fg(RED),
                     )),
                     Line::from(Span::styled(
@@ -261,41 +303,79 @@ impl PracticesScreen {
         let shortcuts = match &self.mode {
             Mode::Browse => Line::from(vec![
                 Span::styled(" [j/k]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-navigate")), Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!(" {}  ", tr("key-navigate")),
+                    Style::default().fg(Color::DarkGray),
+                ),
                 Span::styled("[a]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-add")), Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!(" {}  ", tr("key-add")),
+                    Style::default().fg(Color::DarkGray),
+                ),
                 Span::styled("[e]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!(" {}  ", tr("key-edit")),
+                    Style::default().fg(Color::DarkGray),
+                ),
                 Span::styled("[Space]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-toggle")), Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!(" {}  ", tr("key-toggle")),
+                    Style::default().fg(Color::DarkGray),
+                ),
                 Span::styled("[d]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!(" {}  ", tr("key-delete")),
+                    Style::default().fg(Color::DarkGray),
+                ),
                 Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!(" {}", tr("key-back")),
+                    Style::default().fg(Color::DarkGray),
+                ),
             ]),
             Mode::AddName | Mode::EditName => Line::from(vec![
                 Span::styled(" [Enter]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-confirm")), Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!(" {}  ", tr("key-confirm")),
+                    Style::default().fg(Color::DarkGray),
+                ),
                 Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!(" {}", tr("key-cancel")),
+                    Style::default().fg(Color::DarkGray),
+                ),
             ]),
             Mode::AddType => Line::from(vec![
                 Span::styled(" [j/k]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-select")), Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!(" {}  ", tr("key-select")),
+                    Style::default().fg(Color::DarkGray),
+                ),
                 Span::styled("[Enter]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-confirm")), Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!(" {}  ", tr("key-confirm")),
+                    Style::default().fg(Color::DarkGray),
+                ),
                 Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!(" {}", tr("key-cancel")),
+                    Style::default().fg(Color::DarkGray),
+                ),
             ]),
             Mode::ConfirmDelete => Line::from(vec![
                 Span::styled(" [y]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!(" {}  ", tr("key-yes")),
+                    Style::default().fg(Color::DarkGray),
+                ),
                 Span::styled("[n]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}", tr("key-no")), Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!(" {}", tr("key-no")),
+                    Style::default().fg(Color::DarkGray),
+                ),
             ]),
         };
         frame.render_widget(Paragraph::new(vec![shortcuts]), chunks[4]);
-
     }
 
     pub fn handle_key(&mut self, key: KeyEvent, db: &Database) -> Action {

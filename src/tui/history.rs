@@ -9,14 +9,16 @@ use ratatui::{
 
 use unicode_width::UnicodeWidthStr;
 
+use super::{
+    centered_area, highlight_row, render_status_line, Action, Screen, StatusMessage, BORDER_COLOR,
+    CONTENT_WIDTH,
+};
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
 use crate::model::{LogEntry, SetData};
-use super::{centered_area, highlight_row, render_status_line, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH};
 use fluent_bundle::FluentValue;
 
 const ACCENT: Color = Color::Cyan;
-
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Mode {
@@ -56,13 +58,15 @@ impl HistoryScreen {
     }
 
     pub fn selected_entry(&self) -> Option<&LogEntry> {
-        self.filtered_indices.get(self.selected)
+        self.filtered_indices
+            .get(self.selected)
             .and_then(|&idx| self.entries.get(idx))
     }
 
     fn apply_filter(&mut self) {
         let lower = self.filter_text.to_lowercase();
-        self.filtered_indices = self.entries
+        self.filtered_indices = self
+            .entries
             .iter()
             .enumerate()
             .filter(|(_, e)| e.practice_name.to_lowercase().contains(&lower))
@@ -75,20 +79,26 @@ impl HistoryScreen {
     pub fn render(&mut self, frame: &mut Frame) {
         let area = centered_area(frame.area(), CONTENT_WIDTH);
 
-        let max_name_len = self.filtered_indices.iter()
+        let max_name_len = self
+            .filtered_indices
+            .iter()
             .filter_map(|&i| self.entries.get(i))
             .map(|e| e.practice_name.width())
             .max()
             .unwrap_or(4);
         let name_col_w = (max_name_len + 2) as u16;
-        let marker_w: u16 = 2;     // "> " or "  "
-        let date_col_w: u16 = 11;  // "2026-05-12" + 1 padding
-        let max_total_w = self.filtered_indices.iter()
+        let marker_w: u16 = 2; // "> " or "  "
+        let date_col_w: u16 = 11; // "2026-05-12" + 1 padding
+        let max_total_w = self
+            .filtered_indices
+            .iter()
             .filter_map(|&i| self.entries.get(i))
             .map(|e| format!("{:.0}", e.total_metric()).len())
             .max()
             .unwrap_or(4);
-        let max_label_w = self.filtered_indices.iter()
+        let max_label_w = self
+            .filtered_indices
+            .iter()
             .filter_map(|&i| self.entries.get(i))
             .map(|e| e.metric_label().width())
             .max()
@@ -99,7 +109,7 @@ impl HistoryScreen {
         let v_chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1),  // [0] filter
+                Constraint::Length(1), // [0] filter
                 Constraint::Min(1),    // [1] main content area (list + detail side by side)
                 Constraint::Length(1), // [2] status line
                 Constraint::Length(1), // [3] shortcuts
@@ -126,13 +136,25 @@ impl HistoryScreen {
         let list_area = v_chunks[1];
         let list_height = list_area.height as usize;
         self.adjust_scroll(list_height.saturating_sub(3));
-        self.render_list(frame, list_area, list_height.saturating_sub(3), marker_w, name_col_w, date_col_w, vol_col_w, max_total_w, max_label_w);
+        self.render_list(
+            frame,
+            list_area,
+            list_height.saturating_sub(3),
+            marker_w,
+            name_col_w,
+            date_col_w,
+            vol_col_w,
+            max_total_w,
+            max_label_w,
+        );
 
         // ── Floating detail popup ──
         if let Some(entry) = self.selected_entry().cloned() {
             let row_in_list = (self.selected - self.scroll_offset) as u16 + 1; // +1 for header
             let popup_content = self.build_detail_lines(&entry);
-            let popup_h = (popup_content.len() as u16 + 2).min(list_area.height / 2).max(4);
+            let popup_h = (popup_content.len() as u16 + 2)
+                .min(list_area.height / 2)
+                .max(4);
             let popup_w = list_area.width.saturating_sub(8).max(30);
             let popup_x = list_area.x + 4;
 
@@ -143,17 +165,34 @@ impl HistoryScreen {
             } else {
                 below_y
             };
-            let popup_rect = ratatui::layout::Rect { x: popup_x, y: popup_y, width: popup_w, height: popup_h };
+            let popup_rect = ratatui::layout::Rect {
+                x: popup_x,
+                y: popup_y,
+                width: popup_w,
+                height: popup_h,
+            };
 
-            let title_text = format!(" {} — {} ", entry.practice_name, entry.log.logged_at.format("%Y-%m-%d"));
+            let title_text = format!(
+                " {} — {} ",
+                entry.practice_name,
+                entry.log.logged_at.format("%Y-%m-%d")
+            );
             let block = Block::default()
-                .title(Span::styled(title_text, Style::default().fg(Color::White).bold()))
+                .title(Span::styled(
+                    title_text,
+                    Style::default().fg(Color::White).bold(),
+                ))
                 .borders(Borders::ALL)
                 .padding(Padding::uniform(1))
                 .border_type(BorderType::Rounded)
                 .border_style(Style::default().fg(BORDER_COLOR));
             frame.render_widget(Clear, popup_rect);
-            frame.render_widget(Paragraph::new(popup_content).block(block).wrap(Wrap { trim: false }), popup_rect);
+            frame.render_widget(
+                Paragraph::new(popup_content)
+                    .block(block)
+                    .wrap(Wrap { trim: false }),
+                popup_rect,
+            );
         }
 
         // Status + shortcuts
@@ -175,16 +214,21 @@ impl HistoryScreen {
             if self.last_deleted.is_some() {
                 let undo_text = format!(" {}  ", tr("key-undo"));
                 spans.push(Span::styled("[u]", Style::default().fg(ACCENT)));
-                spans.push(Span::styled(undo_text, Style::default().fg(Color::DarkGray)));
+                spans.push(Span::styled(
+                    undo_text,
+                    Style::default().fg(Color::DarkGray),
+                ));
             }
             let back_text = format!(" {}", tr("key-back"));
             spans.push(Span::styled("[Esc]", Style::default().fg(ACCENT)));
-            spans.push(Span::styled(back_text, Style::default().fg(Color::DarkGray)));
+            spans.push(Span::styled(
+                back_text,
+                Style::default().fg(Color::DarkGray),
+            ));
             Line::from(spans)
         };
         render_status_line(frame, v_chunks[2], &self.status_msg);
         frame.render_widget(Paragraph::new(shortcuts), v_chunks[3]);
-
     }
 
     /// Adjusts scroll_offset so the selected item is visible within the given height.
@@ -201,11 +245,25 @@ impl HistoryScreen {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn render_list(&self, frame: &mut Frame, area: ratatui::layout::Rect, visible: usize, marker_w: u16, name_col_w: u16, date_col_w: u16, vol_col_w: u16, max_total_w: usize, max_label_w: usize) {
+    fn render_list(
+        &self,
+        frame: &mut Frame,
+        area: ratatui::layout::Rect,
+        visible: usize,
+        marker_w: u16,
+        name_col_w: u16,
+        date_col_w: u16,
+        vol_col_w: u16,
+        max_total_w: usize,
+        max_label_w: usize,
+    ) {
         let block = Block::default()
             .title(Line::from(vec![
                 Span::styled("── ", Style::default().fg(BORDER_COLOR)),
-                Span::styled(tr("history-title"), Style::default().fg(Color::White).bold()),
+                Span::styled(
+                    tr("history-title"),
+                    Style::default().fg(Color::White).bold(),
+                ),
                 Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
             ]))
             .borders(Borders::ALL)
@@ -233,7 +291,13 @@ impl HistoryScreen {
         ]);
 
         let mut rows: Vec<Row> = Vec::new();
-        for (fi, &entry_idx) in self.filtered_indices.iter().enumerate().skip(self.scroll_offset).take(visible) {
+        for (fi, &entry_idx) in self
+            .filtered_indices
+            .iter()
+            .enumerate()
+            .skip(self.scroll_offset)
+            .take(visible)
+        {
             let entry = &self.entries[entry_idx];
             let date = entry.log.logged_at.format("%Y-%m-%d").to_string();
             let total = format!("{:.0}", entry.total_metric());
@@ -257,7 +321,13 @@ impl HistoryScreen {
                 Cell::from(Span::styled(date, dim)),
                 Cell::from(Span::styled(entry.practice_name.clone(), style)),
                 Cell::from(Span::styled(
-                    format!("{:>w$} {}{}", total, label, " ".repeat(max_label_w.saturating_sub(label.width())), w = max_total_w),
+                    format!(
+                        "{:>w$} {}{}",
+                        total,
+                        label,
+                        " ".repeat(max_label_w.saturating_sub(label.width())),
+                        w = max_total_w
+                    ),
                     dim,
                 )),
             ]));
@@ -267,11 +337,20 @@ impl HistoryScreen {
                     Cell::from(""),
                     Cell::from(""),
                     Cell::from(Line::from(vec![
-                        Span::styled(format!("{} ", tr("history-delete-confirm")), Style::default().fg(Color::Red)),
+                        Span::styled(
+                            format!("{} ", tr("history-delete-confirm")),
+                            Style::default().fg(Color::Red),
+                        ),
                         Span::styled("[y]", Style::default().fg(ACCENT)),
-                        Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::DarkGray)),
+                        Span::styled(
+                            format!(" {}  ", tr("key-yes")),
+                            Style::default().fg(Color::DarkGray),
+                        ),
                         Span::styled("[any]", Style::default().fg(ACCENT)),
-                        Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::DarkGray)),
+                        Span::styled(
+                            format!(" {}", tr("key-cancel")),
+                            Style::default().fg(Color::DarkGray),
+                        ),
                     ])),
                     Cell::from(""),
                 ]));
@@ -305,59 +384,105 @@ impl HistoryScreen {
             let detail = match &set.data {
                 SetData::Weighted { weight, reps } => {
                     total_reps += *reps as f64;
-                    format!(" {}", tr_args("history-set-weighted", &[
-                        ("number", FluentValue::from(set.set_number as f64)),
-                        ("weight", FluentValue::from(*weight)),
-                        ("reps", FluentValue::from(*reps as f64)),
-                    ]))
+                    format!(
+                        " {}",
+                        tr_args(
+                            "history-set-weighted",
+                            &[
+                                ("number", FluentValue::from(set.set_number as f64)),
+                                ("weight", FluentValue::from(*weight)),
+                                ("reps", FluentValue::from(*reps as f64)),
+                            ]
+                        )
+                    )
                 }
                 SetData::Bodyweight { reps } => {
                     total_reps += *reps as f64;
-                    format!(" {}", tr_args("history-set-bodyweight", &[
-                        ("number", FluentValue::from(set.set_number as f64)),
-                        ("reps", FluentValue::from(*reps as f64)),
-                    ]))
+                    format!(
+                        " {}",
+                        tr_args(
+                            "history-set-bodyweight",
+                            &[
+                                ("number", FluentValue::from(set.set_number as f64)),
+                                ("reps", FluentValue::from(*reps as f64)),
+                            ]
+                        )
+                    )
                 }
                 SetData::Distance { distance } => {
-                    format!(" {}", tr_args("history-set-distance", &[
-                        ("number", FluentValue::from(set.set_number as f64)),
-                        ("distance", FluentValue::from(*distance)),
-                    ]))
+                    format!(
+                        " {}",
+                        tr_args(
+                            "history-set-distance",
+                            &[
+                                ("number", FluentValue::from(set.set_number as f64)),
+                                ("distance", FluentValue::from(*distance)),
+                            ]
+                        )
+                    )
                 }
                 SetData::Endurance { duration } => {
-                    format!(" {}", tr_args("history-set-endurance", &[
-                        ("number", FluentValue::from(set.set_number as f64)),
-                        ("duration", FluentValue::from(*duration)),
-                    ]))
+                    format!(
+                        " {}",
+                        tr_args(
+                            "history-set-endurance",
+                            &[
+                                ("number", FluentValue::from(set.set_number as f64)),
+                                ("duration", FluentValue::from(*duration)),
+                            ]
+                        )
+                    )
                 }
             };
-            lines.push(Line::from(Span::styled(detail, Style::default().fg(Color::White))));
+            lines.push(Line::from(Span::styled(
+                detail,
+                Style::default().fg(Color::White),
+            )));
         }
 
-        if matches!(entry.practice_type, crate::model::PracticeType::Weighted | crate::model::PracticeType::Bodyweight) && total_reps > 0.0 {
+        if matches!(
+            entry.practice_type,
+            crate::model::PracticeType::Weighted | crate::model::PracticeType::Bodyweight
+        ) && total_reps > 0.0
+        {
             lines.push(Line::from(""));
             let total_vol = entry.total_metric();
             let vol_label = entry.metric_label();
             let reps_label = tr("metric-reps");
             lines.push(Line::from(Span::styled(
-                format!(" {}", tr_args("history-summary", &[
-                    ("reps", FluentValue::from(total_reps)),
-                    ("reps_label", FluentValue::from(reps_label)),
-                    ("vol", FluentValue::from(total_vol)),
-                    ("vol_label", FluentValue::from(vol_label)),
-                ])),
+                format!(
+                    " {}",
+                    tr_args(
+                        "history-summary",
+                        &[
+                            ("reps", FluentValue::from(total_reps)),
+                            ("reps_label", FluentValue::from(reps_label)),
+                            ("vol", FluentValue::from(total_vol)),
+                            ("vol_label", FluentValue::from(vol_label)),
+                        ]
+                    )
+                ),
                 Style::default().fg(Color::Gray),
             )));
         }
 
         if let Some(warm_up) = &entry.log.warm_up {
-            lines.push(Line::from(Span::styled(format!(" {}: {}", tr("log-warmup-label"), warm_up), Style::default().fg(Color::Gray))));
+            lines.push(Line::from(Span::styled(
+                format!(" {}: {}", tr("log-warmup-label"), warm_up),
+                Style::default().fg(Color::Gray),
+            )));
         }
         if let Some(cool_down) = &entry.log.cool_down {
-            lines.push(Line::from(Span::styled(format!(" {}: {}", tr("log-cooldown-label"), cool_down), Style::default().fg(Color::Gray))));
+            lines.push(Line::from(Span::styled(
+                format!(" {}: {}", tr("log-cooldown-label"), cool_down),
+                Style::default().fg(Color::Gray),
+            )));
         }
         if let Some(note) = &entry.log.note {
-            lines.push(Line::from(Span::styled(format!(" {}: {}", tr("log-note-label"), note), Style::default().fg(Color::Gray))));
+            lines.push(Line::from(Span::styled(
+                format!(" {}: {}", tr("log-note-label"), note),
+                Style::default().fg(Color::Gray),
+            )));
         }
 
         lines
@@ -386,26 +511,36 @@ impl HistoryScreen {
             KeyCode::Char('b') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 if self.filter_cursor > 0 {
                     self.filter_cursor = self.filter_text[..self.filter_cursor]
-                        .char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+                        .char_indices()
+                        .next_back()
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
                 }
             }
             KeyCode::Left => {
                 if self.filter_cursor > 0 {
                     self.filter_cursor = self.filter_text[..self.filter_cursor]
-                        .char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+                        .char_indices()
+                        .next_back()
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
                 }
             }
             KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 if self.filter_cursor < self.filter_text.len() {
                     self.filter_cursor = self.filter_text[self.filter_cursor..]
-                        .char_indices().nth(1).map(|(i, _)| self.filter_cursor + i)
+                        .char_indices()
+                        .nth(1)
+                        .map(|(i, _)| self.filter_cursor + i)
                         .unwrap_or(self.filter_text.len());
                 }
             }
             KeyCode::Right => {
                 if self.filter_cursor < self.filter_text.len() {
                     self.filter_cursor = self.filter_text[self.filter_cursor..]
-                        .char_indices().nth(1).map(|(i, _)| self.filter_cursor + i)
+                        .char_indices()
+                        .nth(1)
+                        .map(|(i, _)| self.filter_cursor + i)
                         .unwrap_or(self.filter_text.len());
                 }
             }
@@ -424,7 +559,10 @@ impl HistoryScreen {
             KeyCode::Backspace => {
                 if self.filter_cursor > 0 {
                     let prev = self.filter_text[..self.filter_cursor]
-                        .char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+                        .char_indices()
+                        .next_back()
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
                     self.filter_text.remove(prev);
                     self.filter_cursor = prev;
                     self.apply_filter();
@@ -446,7 +584,9 @@ impl HistoryScreen {
     fn handle_browse(&mut self, key: KeyEvent, db: &Database) -> Action {
         match key.code {
             KeyCode::Char('j') | KeyCode::Down => {
-                if !self.filtered_indices.is_empty() && self.selected < self.filtered_indices.len() - 1 {
+                if !self.filtered_indices.is_empty()
+                    && self.selected < self.filtered_indices.len() - 1
+                {
                     self.selected += 1;
                 }
                 Action::None
@@ -521,7 +661,9 @@ impl HistoryScreen {
                             self.entries = entries;
                         }
                         self.apply_filter();
-                        if self.selected >= self.filtered_indices.len() && !self.filtered_indices.is_empty() {
+                        if self.selected >= self.filtered_indices.len()
+                            && !self.filtered_indices.is_empty()
+                        {
                             self.selected = self.filtered_indices.len() - 1;
                         }
                         if self.filtered_indices.is_empty() {

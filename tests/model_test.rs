@@ -9,10 +9,22 @@ fn init() {
 
 #[test]
 fn practice_type_from_str() {
-    assert_eq!("weighted".parse::<PracticeType>().unwrap(), PracticeType::Weighted);
-    assert_eq!("bodyweight".parse::<PracticeType>().unwrap(), PracticeType::Bodyweight);
-    assert_eq!("distance".parse::<PracticeType>().unwrap(), PracticeType::Distance);
-    assert_eq!("endurance".parse::<PracticeType>().unwrap(), PracticeType::Endurance);
+    assert_eq!(
+        "weighted".parse::<PracticeType>().unwrap(),
+        PracticeType::Weighted
+    );
+    assert_eq!(
+        "bodyweight".parse::<PracticeType>().unwrap(),
+        PracticeType::Bodyweight
+    );
+    assert_eq!(
+        "distance".parse::<PracticeType>().unwrap(),
+        PracticeType::Distance
+    );
+    assert_eq!(
+        "endurance".parse::<PracticeType>().unwrap(),
+        PracticeType::Endurance
+    );
     assert!("invalid".parse::<PracticeType>().is_err());
 }
 
@@ -27,7 +39,10 @@ fn practice_type_display() {
 #[test]
 fn set_data_metric_weighted() {
     init();
-    let set = SetData::Weighted { weight: 24.0, reps: 10 };
+    let set = SetData::Weighted {
+        weight: 24.0,
+        reps: 10,
+    };
     assert_eq!(set.metric_value(), 240.0);
     assert_eq!(set.metric_label(), "kg");
 }

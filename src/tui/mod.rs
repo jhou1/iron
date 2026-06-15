@@ -27,7 +27,12 @@ pub const CONTENT_WIDTH: u16 = 3 + 52 * 2;
 pub fn centered_area(full: Rect, max_width: u16) -> Rect {
     let width = full.width.min(max_width);
     let x = full.x + (full.width.saturating_sub(width)) / 2;
-    Rect { x, y: full.y, width, height: full.height }
+    Rect {
+        x,
+        y: full.y,
+        width,
+        height: full.height,
+    }
 }
 
 pub fn highlight_row(frame: &mut Frame, area: Rect, row: u16) {
@@ -104,7 +109,6 @@ pub fn render_status_line(frame: &mut Frame, area: Rect, status: &StatusMessage)
     }
 }
 
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum Screen {
     Dashboard,
@@ -123,7 +127,13 @@ pub enum Action {
     Quit,
 }
 
-pub fn render_gauge_line<'a>(ratio: f64, _done: usize, _total: usize, bar_width: usize, indent: usize) -> Line<'a> {
+pub fn render_gauge_line<'a>(
+    ratio: f64,
+    _done: usize,
+    _total: usize,
+    bar_width: usize,
+    indent: usize,
+) -> Line<'a> {
     let filled = (ratio * bar_width as f64).round() as usize;
     let empty = bar_width - filled;
 

@@ -53,8 +53,8 @@ fn ftl_files_have_matching_keys() {
 }
 
 fn extract_message_keys(src: &str) -> HashSet<String> {
-    use fluent_syntax::parser;
     use fluent_syntax::ast::Entry;
+    use fluent_syntax::parser;
 
     let resource = parser::parse(src).expect("Failed to parse .ftl file");
     resource

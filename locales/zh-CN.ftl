@@ -62,6 +62,7 @@ goals-press-enter = 按 [Enter] 管理里程碑
 # ── 记录条目 ──
 log-select-practice = 选择练习项目
 log-press-filter = 按 / 过滤
+log-cancel-confirm = 放弃当前记录？
 log-weight-label = 重量（公斤）：
 log-reps-label = 次数：
 log-distance-label = 距离（公里）：

@@ -10,10 +10,13 @@ use ratatui::{
 
 use unicode_width::UnicodeWidthStr;
 
+use super::{
+    centered_area, highlight_row, render_status_line, visible_input_spans, Action, Screen,
+    StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
+};
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
 use crate::model::{LogEntry, Practice, PracticeType, SetData};
-use super::{centered_area, highlight_row, render_status_line, visible_input_spans, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH};
 use fluent_bundle::FluentValue;
 
 const ACCENT: Color = Color::Cyan;
@@ -61,6 +64,7 @@ pub struct LogEntryScreen {
     editing_date: bool,
     date_input: String,
     date_input_cursor: usize,
+    confirming_exit: bool,
     return_to: Screen,
     status_msg: StatusMessage,
 }
@@ -99,6 +103,7 @@ impl LogEntryScreen {
             editing_date: false,
             date_input: String::new(),
             date_input_cursor: 0,
+            confirming_exit: false,
             return_to: Screen::Dashboard,
             status_msg: None,
         })
@@ -146,6 +151,7 @@ impl LogEntryScreen {
             editing_date: false,
             date_input: String::new(),
             date_input_cursor: 0,
+            confirming_exit: false,
             return_to: Screen::History,
             status_msg: None,
         })
@@ -174,7 +180,7 @@ impl LogEntryScreen {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1),  // filter bar
+                Constraint::Length(1), // filter bar
                 Constraint::Min(1),    // bordered list
                 Constraint::Length(1), // status line
                 Constraint::Length(1), // footer
@@ -182,7 +188,9 @@ impl LogEntryScreen {
             ])
             .split(area);
 
-        let max_name_len = self.practices.iter()
+        let max_name_len = self
+            .practices
+            .iter()
             .map(|p| p.name.width())
             .max()
             .unwrap_or(0);
@@ -202,13 +210,19 @@ impl LogEntryScreen {
         } else {
             Style::default().fg(Color::Gray)
         };
-        frame.render_widget(Paragraph::new(Line::from(Span::styled(filter_display, filter_style))), chunks[0]);
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(filter_display, filter_style))),
+            chunks[0],
+        );
 
         // Bordered list
         let block = Block::default()
             .title(Line::from(vec![
                 Span::styled("── ", Style::default().fg(BORDER_COLOR)),
-                Span::styled(tr("log-select-practice"), Style::default().fg(Color::White).bold()),
+                Span::styled(
+                    tr("log-select-practice"),
+                    Style::default().fg(Color::White).bold(),
+                ),
                 Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
             ]))
             .borders(Borders::ALL)
@@ -221,14 +235,12 @@ impl LogEntryScreen {
         let type_header = tr("practices-col-type");
         let header_padding = col_width.saturating_sub(name_header.width());
 
-        let mut all_lines = vec![
-            Line::from(vec![
-                Span::styled("  ", Style::default().fg(Color::DarkGray)),
-                Span::styled(&name_header, Style::default().fg(Color::DarkGray)),
-                Span::raw(" ".repeat(header_padding)),
-                Span::styled(&type_header, Style::default().fg(Color::DarkGray)),
-            ]),
-        ];
+        let mut all_lines = vec![Line::from(vec![
+            Span::styled("  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(&name_header, Style::default().fg(Color::DarkGray)),
+            Span::raw(" ".repeat(header_padding)),
+            Span::styled(&type_header, Style::default().fg(Color::DarkGray)),
+        ])];
 
         for (i, &idx) in self.filtered_indices.iter().enumerate() {
             let practice = &self.practices[idx];
@@ -259,13 +271,25 @@ impl LogEntryScreen {
 
         let footer = Line::from(vec![
             Span::styled(" [j/k]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}  ", tr("key-navigate")), Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!(" {}  ", tr("key-navigate")),
+                Style::default().fg(Color::DarkGray),
+            ),
             Span::styled("[/]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}  ", tr("key-filter")), Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!(" {}  ", tr("key-filter")),
+                Style::default().fg(Color::DarkGray),
+            ),
             Span::styled("[Enter]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}  ", tr("key-select")), Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!(" {}  ", tr("key-select")),
+                Style::default().fg(Color::DarkGray),
+            ),
             Span::styled("[Esc]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!(" {}", tr("key-back")),
+                Style::default().fg(Color::DarkGray),
+            ),
         ]);
         frame.render_widget(Paragraph::new(footer), chunks[3]);
     }
@@ -282,26 +306,36 @@ impl LogEntryScreen {
                 KeyCode::Char('b') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                     if self.filter_cursor > 0 {
                         self.filter_cursor = self.filter_text[..self.filter_cursor]
-                            .char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+                            .char_indices()
+                            .next_back()
+                            .map(|(i, _)| i)
+                            .unwrap_or(0);
                     }
                 }
                 KeyCode::Left => {
                     if self.filter_cursor > 0 {
                         self.filter_cursor = self.filter_text[..self.filter_cursor]
-                            .char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+                            .char_indices()
+                            .next_back()
+                            .map(|(i, _)| i)
+                            .unwrap_or(0);
                     }
                 }
                 KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                     if self.filter_cursor < self.filter_text.len() {
                         self.filter_cursor = self.filter_text[self.filter_cursor..]
-                            .char_indices().nth(1).map(|(i, _)| self.filter_cursor + i)
+                            .char_indices()
+                            .nth(1)
+                            .map(|(i, _)| self.filter_cursor + i)
                             .unwrap_or(self.filter_text.len());
                     }
                 }
                 KeyCode::Right => {
                     if self.filter_cursor < self.filter_text.len() {
                         self.filter_cursor = self.filter_text[self.filter_cursor..]
-                            .char_indices().nth(1).map(|(i, _)| self.filter_cursor + i)
+                            .char_indices()
+                            .nth(1)
+                            .map(|(i, _)| self.filter_cursor + i)
                             .unwrap_or(self.filter_text.len());
                     }
                 }
@@ -320,7 +354,10 @@ impl LogEntryScreen {
                 KeyCode::Backspace => {
                     if self.filter_cursor > 0 {
                         let prev = self.filter_text[..self.filter_cursor]
-                            .char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+                            .char_indices()
+                            .next_back()
+                            .map(|(i, _)| i)
+                            .unwrap_or(0);
                         self.filter_text.remove(prev);
                         self.filter_cursor = prev;
                         self.apply_filter();
@@ -404,13 +441,13 @@ impl LogEntryScreen {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(5),                    // [0] date section (border + padding)
-                Constraint::Length(1),                    // [1] spacer
+                Constraint::Length(5), // [0] date section (border + padding)
+                Constraint::Length(1), // [1] spacer
                 Constraint::Length(sets_content_lines + 4), // [2] sets section (border + padding)
-                Constraint::Length(6),                    // [3] warm-up/cool-down section (border + padding)
-                Constraint::Min(3),                      // [4] note section (border, grows)
-                Constraint::Length(1),                    // [5] status line
-                Constraint::Length(1),                    // [6] footer
+                Constraint::Length(6), // [3] warm-up/cool-down section (border + padding)
+                Constraint::Min(3),    // [4] note section (border, grows)
+                Constraint::Length(1), // [5] status line
+                Constraint::Length(1), // [6] footer
             ])
             .split(area);
 
@@ -428,17 +465,29 @@ impl LogEntryScreen {
         let date_line = if self.editing_date {
             let (before, after) = self.date_input.split_at(self.date_input_cursor);
             Line::from(vec![
-                Span::styled(format!("{} ", tr("log-date-label")), Style::default().fg(Color::Gray)),
+                Span::styled(
+                    format!("{} ", tr("log-date-label")),
+                    Style::default().fg(Color::Gray),
+                ),
                 Span::styled(before, Style::default().fg(ACCENT)),
                 Span::styled("\u{2588}", Style::default().fg(ACCENT)),
                 Span::styled(after, Style::default().fg(ACCENT)),
-                Span::styled(format!("  {}", tr("log-date-edit-hint")), Style::default().fg(Color::Gray)),
+                Span::styled(
+                    format!("  {}", tr("log-date-edit-hint")),
+                    Style::default().fg(Color::Gray),
+                ),
             ])
         } else {
             Line::from(vec![
-                Span::styled(format!("{} ", tr("log-date-label")), Style::default().fg(Color::Gray)),
+                Span::styled(
+                    format!("{} ", tr("log-date-label")),
+                    Style::default().fg(Color::Gray),
+                ),
                 Span::styled(&self.log_date, Style::default().fg(Color::White)),
-                Span::styled(format!("  {}", tr("log-date-change-hint")), Style::default().fg(Color::Gray)),
+                Span::styled(
+                    format!("  {}", tr("log-date-change-hint")),
+                    Style::default().fg(Color::Gray),
+                ),
             ])
         };
         frame.render_widget(Paragraph::new(date_line), date_inner);
@@ -446,7 +495,10 @@ impl LogEntryScreen {
         // ── Sets section ──
         let sets_border_color = BORDER_COLOR;
         let sets_block = Block::default()
-            .title(Span::styled(" Sets ", Style::default().fg(Color::White).bold()))
+            .title(Span::styled(
+                " Sets ",
+                Style::default().fg(Color::White).bold(),
+            ))
             .borders(Borders::ALL)
             .padding(Padding::uniform(1))
             .border_style(Style::default().fg(sets_border_color));
@@ -455,20 +507,29 @@ impl LogEntryScreen {
 
         let mut sets_lines: Vec<Line> = Vec::new();
         for (i, set) in self.sets.iter().enumerate() {
-            let text = tr_args("log-set-line", &[
-                ("number", FluentValue::from((i + 1) as f64)),
-                ("data", FluentValue::from(format_set_data(set))),
-            ]);
+            let text = tr_args(
+                "log-set-line",
+                &[
+                    ("number", FluentValue::from((i + 1) as f64)),
+                    ("data", FluentValue::from(format_set_data(set))),
+                ],
+            );
             let is_selected = self.selected_set == Some(i) && self.editing_set != Some(i);
             let is_editing = self.editing_set == Some(i);
             let style = if is_editing {
-                Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD)
             } else if is_selected {
                 Style::default().fg(ACCENT)
             } else {
                 Style::default().fg(Color::White)
             };
-            let marker = if is_selected || is_editing { "> " } else { "  " };
+            let marker = if is_selected || is_editing {
+                "> "
+            } else {
+                "  "
+            };
             sets_lines.push(Line::from(vec![
                 Span::styled(marker, style),
                 Span::styled(text, style),
@@ -486,17 +547,39 @@ impl LogEntryScreen {
                 PracticeType::Weighted => {
                     let (f1_before, f1_after) = self.field1.split_at(self.field1_cursor);
                     let (f2_before, f2_after) = self.field2.split_at(self.field2_cursor);
-                    let f1_style = if self.active_field == 0 { ACCENT } else { Color::White };
-                    let f2_style = if self.active_field == 1 { ACCENT } else { Color::White };
+                    let f1_style = if self.active_field == 0 {
+                        ACCENT
+                    } else {
+                        Color::White
+                    };
+                    let f2_style = if self.active_field == 1 {
+                        ACCENT
+                    } else {
+                        Color::White
+                    };
                     sets_lines.push(Line::from(vec![
                         Span::styled(input_label, Style::default().fg(Color::White)),
-                        Span::styled(format!("{} ", tr("log-weight-label")), Style::default().fg(Color::Gray)),
+                        Span::styled(
+                            format!("{} ", tr("log-weight-label")),
+                            Style::default().fg(Color::Gray),
+                        ),
                         Span::styled(f1_before, Style::default().fg(f1_style)),
-                        if self.active_field == 0 { Span::styled("\u{2588}", Style::default().fg(ACCENT)) } else { Span::raw("") },
+                        if self.active_field == 0 {
+                            Span::styled("\u{2588}", Style::default().fg(ACCENT))
+                        } else {
+                            Span::raw("")
+                        },
                         Span::styled(f1_after, Style::default().fg(f1_style)),
-                        Span::styled(format!("  {} ", tr("log-reps-label")), Style::default().fg(Color::Gray)),
+                        Span::styled(
+                            format!("  {} ", tr("log-reps-label")),
+                            Style::default().fg(Color::Gray),
+                        ),
                         Span::styled(f2_before, Style::default().fg(f2_style)),
-                        if self.active_field == 1 { Span::styled("\u{2588}", Style::default().fg(ACCENT)) } else { Span::raw("") },
+                        if self.active_field == 1 {
+                            Span::styled("\u{2588}", Style::default().fg(ACCENT))
+                        } else {
+                            Span::raw("")
+                        },
                         Span::styled(f2_after, Style::default().fg(f2_style)),
                     ]));
                 }
@@ -504,7 +587,10 @@ impl LogEntryScreen {
                     let (f1_before, f1_after) = self.field1.split_at(self.field1_cursor);
                     sets_lines.push(Line::from(vec![
                         Span::styled(input_label, Style::default().fg(Color::White)),
-                        Span::styled(format!("{} ", tr("log-reps-label")), Style::default().fg(Color::Gray)),
+                        Span::styled(
+                            format!("{} ", tr("log-reps-label")),
+                            Style::default().fg(Color::Gray),
+                        ),
                         Span::styled(f1_before, Style::default().fg(ACCENT)),
                         Span::styled("\u{2588}", Style::default().fg(ACCENT)),
                         Span::styled(f1_after, Style::default().fg(ACCENT)),
@@ -514,7 +600,10 @@ impl LogEntryScreen {
                     let (f1_before, f1_after) = self.field1.split_at(self.field1_cursor);
                     sets_lines.push(Line::from(vec![
                         Span::styled(input_label, Style::default().fg(Color::White)),
-                        Span::styled(format!("{} ", tr("log-distance-label")), Style::default().fg(Color::Gray)),
+                        Span::styled(
+                            format!("{} ", tr("log-distance-label")),
+                            Style::default().fg(Color::Gray),
+                        ),
                         Span::styled(f1_before, Style::default().fg(ACCENT)),
                         Span::styled("\u{2588}", Style::default().fg(ACCENT)),
                         Span::styled(f1_after, Style::default().fg(ACCENT)),
@@ -524,7 +613,10 @@ impl LogEntryScreen {
                     let (f1_before, f1_after) = self.field1.split_at(self.field1_cursor);
                     sets_lines.push(Line::from(vec![
                         Span::styled(input_label, Style::default().fg(Color::White)),
-                        Span::styled(format!("{} ", tr("log-duration-label")), Style::default().fg(Color::Gray)),
+                        Span::styled(
+                            format!("{} ", tr("log-duration-label")),
+                            Style::default().fg(Color::Gray),
+                        ),
                         Span::styled(f1_before, Style::default().fg(ACCENT)),
                         Span::styled("\u{2588}", Style::default().fg(ACCENT)),
                         Span::styled(f1_after, Style::default().fg(ACCENT)),
@@ -535,29 +627,44 @@ impl LogEntryScreen {
 
         // Running total
         let total: f64 = self.sets.iter().map(|s| s.metric_value()).sum();
-        let label = self.sets.first()
+        let label = self
+            .sets
+            .first()
             .map(|s| s.metric_label())
             .unwrap_or(metric_label_for_type(&practice.practice_type));
-        let total_reps: i32 = self.sets.iter().map(|s| match s {
-            SetData::Weighted { reps, .. } => *reps,
-            _ => 0,
-        }).sum();
+        let total_reps: i32 = self
+            .sets
+            .iter()
+            .map(|s| match s {
+                SetData::Weighted { reps, .. } => *reps,
+                _ => 0,
+            })
+            .sum();
         let total_formatted = format!("{:.1}", total);
         let total_text = if total_reps > 0 {
-            tr_args("log-sets-total-reps", &[
-                ("sets", FluentValue::from(self.sets.len() as f64)),
-                ("total", FluentValue::from(total_formatted)),
-                ("label", FluentValue::from(label.clone())),
-                ("reps", FluentValue::from(total_reps as f64)),
-            ])
+            tr_args(
+                "log-sets-total-reps",
+                &[
+                    ("sets", FluentValue::from(self.sets.len() as f64)),
+                    ("total", FluentValue::from(total_formatted)),
+                    ("label", FluentValue::from(label.clone())),
+                    ("reps", FluentValue::from(total_reps as f64)),
+                ],
+            )
         } else {
-            tr_args("log-sets-total", &[
-                ("sets", FluentValue::from(self.sets.len() as f64)),
-                ("total", FluentValue::from(total_formatted)),
-                ("label", FluentValue::from(label.clone())),
-            ])
+            tr_args(
+                "log-sets-total",
+                &[
+                    ("sets", FluentValue::from(self.sets.len() as f64)),
+                    ("total", FluentValue::from(total_formatted)),
+                    ("label", FluentValue::from(label.clone())),
+                ],
+            )
         };
-        sets_lines.push(Line::from(Span::styled(total_text, Style::default().fg(Color::DarkGray))));
+        sets_lines.push(Line::from(Span::styled(
+            total_text,
+            Style::default().fg(Color::DarkGray),
+        )));
 
         frame.render_widget(Paragraph::new(sets_lines), sets_inner);
 
@@ -576,7 +683,13 @@ impl LogEntryScreen {
         let wu_prefix_w = wu_label.width() as u16;
         let mut wu_spans = vec![Span::styled(&wu_label, Style::default().fg(Color::Gray))];
         if wu_active {
-            wu_spans.extend(visible_input_spans(&self.warm_up, self.warm_up_cursor, wucd_inner.width, wu_prefix_w, wu_color));
+            wu_spans.extend(visible_input_spans(
+                &self.warm_up,
+                self.warm_up_cursor,
+                wucd_inner.width,
+                wu_prefix_w,
+                wu_color,
+            ));
         } else {
             wu_spans.push(Span::styled(&self.warm_up, Style::default().fg(wu_color)));
         }
@@ -587,15 +700,18 @@ impl LogEntryScreen {
         let cd_prefix_w = cd_label.width() as u16;
         let mut cd_spans = vec![Span::styled(&cd_label, Style::default().fg(Color::Gray))];
         if cd_active {
-            cd_spans.extend(visible_input_spans(&self.cool_down, self.cool_down_cursor, wucd_inner.width, cd_prefix_w, cd_color));
+            cd_spans.extend(visible_input_spans(
+                &self.cool_down,
+                self.cool_down_cursor,
+                wucd_inner.width,
+                cd_prefix_w,
+                cd_color,
+            ));
         } else {
             cd_spans.push(Span::styled(&self.cool_down, Style::default().fg(cd_color)));
         }
 
-        let wucd_lines = vec![
-            Line::from(wu_spans),
-            Line::from(cd_spans),
-        ];
+        let wucd_lines = vec![Line::from(wu_spans), Line::from(cd_spans)];
         frame.render_widget(Paragraph::new(wucd_lines), wucd_inner);
 
         // ── Note section ──
@@ -619,7 +735,10 @@ impl LogEntryScreen {
                 Span::styled("\u{2588}", Style::default().fg(ACCENT)),
                 Span::styled(after, Style::default().fg(Color::White)),
             ]);
-            frame.render_widget(Paragraph::new(note_line).wrap(Wrap { trim: false }), note_inner);
+            frame.render_widget(
+                Paragraph::new(note_line).wrap(Wrap { trim: false }),
+                note_inner,
+            );
         } else {
             frame.render_widget(
                 Paragraph::new(Span::styled(&self.note, Style::default().fg(Color::White)))
@@ -632,32 +751,89 @@ impl LogEntryScreen {
         render_status_line(frame, chunks[5], &self.status_msg);
 
         // ── Footer ──
-        let mut footer_spans = vec![
-            Span::styled(" [Tab]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}  ", tr("key-next")), Style::default().fg(Color::DarkGray)),
-            Span::styled("[Enter]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}  ", tr("key-add-set")), Style::default().fg(Color::DarkGray)),
-        ];
-        if self.focus == FocusSection::Sets && !self.sets.is_empty() {
-            footer_spans.push(Span::styled("[j/k]", Style::default().fg(ACCENT)));
-            footer_spans.push(Span::styled(format!(" {}  ", tr("key-navigate")), Style::default().fg(Color::DarkGray)));
-            footer_spans.push(Span::styled("[d]", Style::default().fg(ACCENT)));
-            footer_spans.push(Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::DarkGray)));
-            footer_spans.push(Span::styled("[e]", Style::default().fg(ACCENT)));
-            footer_spans.push(Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::DarkGray)));
-        }
-        footer_spans.extend(vec![
-            Span::styled("[Ctrl+S]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}  ", tr("key-save")), Style::default().fg(Color::DarkGray)),
-            Span::styled("[D]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}  ", tr("key-date")), Style::default().fg(Color::DarkGray)),
-            Span::styled("[Esc]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::DarkGray)),
-        ]);
-        frame.render_widget(Paragraph::new(Line::from(footer_spans)), chunks[6]);
+        let footer_line = if self.confirming_exit {
+            Line::from(vec![
+                Span::styled(
+                    format!(" {} ", tr("log-cancel-confirm")),
+                    Style::default().fg(Color::Red),
+                ),
+                Span::styled("[y]", Style::default().fg(ACCENT)),
+                Span::styled(
+                    format!(" {}  ", tr("key-yes")),
+                    Style::default().fg(Color::DarkGray),
+                ),
+                Span::styled("[any]", Style::default().fg(ACCENT)),
+                Span::styled(
+                    format!(" {}", tr("key-cancel")),
+                    Style::default().fg(Color::DarkGray),
+                ),
+            ])
+        } else {
+            let mut spans = vec![
+                Span::styled(" [Tab]", Style::default().fg(ACCENT)),
+                Span::styled(
+                    format!(" {}  ", tr("key-next")),
+                    Style::default().fg(Color::DarkGray),
+                ),
+                Span::styled("[Enter]", Style::default().fg(ACCENT)),
+                Span::styled(
+                    format!(" {}  ", tr("key-add-set")),
+                    Style::default().fg(Color::DarkGray),
+                ),
+            ];
+            if self.focus == FocusSection::Sets && !self.sets.is_empty() {
+                spans.push(Span::styled("[j/k]", Style::default().fg(ACCENT)));
+                spans.push(Span::styled(
+                    format!(" {}  ", tr("key-navigate")),
+                    Style::default().fg(Color::DarkGray),
+                ));
+                spans.push(Span::styled("[d]", Style::default().fg(ACCENT)));
+                spans.push(Span::styled(
+                    format!(" {}  ", tr("key-delete")),
+                    Style::default().fg(Color::DarkGray),
+                ));
+                spans.push(Span::styled("[e]", Style::default().fg(ACCENT)));
+                spans.push(Span::styled(
+                    format!(" {}  ", tr("key-edit")),
+                    Style::default().fg(Color::DarkGray),
+                ));
+            }
+            spans.extend(vec![
+                Span::styled("[Ctrl+S]", Style::default().fg(ACCENT)),
+                Span::styled(
+                    format!(" {}  ", tr("key-save")),
+                    Style::default().fg(Color::DarkGray),
+                ),
+                Span::styled("[D]", Style::default().fg(ACCENT)),
+                Span::styled(
+                    format!(" {}  ", tr("key-date")),
+                    Style::default().fg(Color::DarkGray),
+                ),
+                Span::styled("[Esc]", Style::default().fg(ACCENT)),
+                Span::styled(
+                    format!(" {}", tr("key-cancel")),
+                    Style::default().fg(Color::DarkGray),
+                ),
+            ]);
+            Line::from(spans)
+        };
+        frame.render_widget(Paragraph::new(footer_line), chunks[6]);
     }
 
     fn handle_enter_log(&mut self, key: KeyEvent, db: &Database) -> Action {
+        if self.confirming_exit {
+            match key.code {
+                KeyCode::Char('y') | KeyCode::Char('Y') | KeyCode::Enter => {
+                    return Action::Navigate(self.return_to.clone());
+                }
+                KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+                    self.confirming_exit = false;
+                    return Action::None;
+                }
+                _ => return Action::None,
+            }
+        }
+
         if self.editing_date {
             return self.handle_date_edit(key);
         }
@@ -682,7 +858,9 @@ impl LogEntryScreen {
             if key.code == KeyCode::Tab || key.code == KeyCode::BackTab {
                 self.cancel_edit();
                 // fall through to normal Tab handling
-            } else if key.code == KeyCode::Char('D') && !key.modifiers.contains(KeyModifiers::CONTROL) {
+            } else if key.code == KeyCode::Char('D')
+                && !key.modifiers.contains(KeyModifiers::CONTROL)
+            {
                 self.cancel_edit();
                 // fall through to normal D handling
             } else {
@@ -691,7 +869,8 @@ impl LogEntryScreen {
         }
 
         // D — edit date from sets section
-        if key.code == KeyCode::Char('D') && !key.modifiers.contains(KeyModifiers::CONTROL)
+        if key.code == KeyCode::Char('D')
+            && !key.modifiers.contains(KeyModifiers::CONTROL)
             && self.focus == FocusSection::Sets
         {
             self.editing_date = true;
@@ -702,7 +881,8 @@ impl LogEntryScreen {
 
         // Esc — cancel from any section
         if key.code == KeyCode::Esc {
-            return Action::Navigate(self.return_to.clone());
+            self.confirming_exit = true;
+            return Action::None;
         }
 
         // Tab / Shift+Tab — cycle focus
@@ -786,7 +966,11 @@ impl LogEntryScreen {
                 KeyCode::Char('j') | KeyCode::Down => {
                     if n > 0 {
                         self.selected_set = if let Some(i) = self.selected_set {
-                            if i + 1 < n { Some(i + 1) } else { None }
+                            if i + 1 < n {
+                                Some(i + 1)
+                            } else {
+                                None
+                            }
                         } else {
                             Some(0)
                         };
@@ -796,7 +980,11 @@ impl LogEntryScreen {
                 KeyCode::Char('k') | KeyCode::Up => {
                     if n > 0 {
                         self.selected_set = if let Some(i) = self.selected_set {
-                            if i > 0 { Some(i - 1) } else { None }
+                            if i > 0 {
+                                Some(i - 1)
+                            } else {
+                                None
+                            }
                         } else {
                             Some(n - 1)
                         };
@@ -819,8 +1007,8 @@ impl LogEntryScreen {
             return Action::None;
         }
 
-        let both_fields_empty = self.field1.is_empty()
-            && (self.field2.is_empty() || !has_two_fields);
+        let both_fields_empty =
+            self.field1.is_empty() && (self.field2.is_empty() || !has_two_fields);
 
         let (text, cursor) = if has_two_fields {
             if self.active_field == 0 {
@@ -837,8 +1025,11 @@ impl LogEntryScreen {
             || key.code == KeyCode::Left
         {
             if *cursor > 0 {
-                *cursor = text[..*cursor].char_indices()
-                    .next_back().map(|(i, _)| i).unwrap_or(0);
+                *cursor = text[..*cursor]
+                    .char_indices()
+                    .next_back()
+                    .map(|(i, _)| i)
+                    .unwrap_or(0);
             }
             return Action::None;
         }
@@ -846,8 +1037,11 @@ impl LogEntryScreen {
             || key.code == KeyCode::Right
         {
             if *cursor < text.len() {
-                *cursor = text[*cursor..].char_indices().nth(1)
-                    .map(|(i, _)| *cursor + i).unwrap_or(text.len());
+                *cursor = text[*cursor..]
+                    .char_indices()
+                    .nth(1)
+                    .map(|(i, _)| *cursor + i)
+                    .unwrap_or(text.len());
             }
             return Action::None;
         }
@@ -889,8 +1083,11 @@ impl LogEntryScreen {
                         self.sets.pop();
                     }
                 } else if *cursor > 0 {
-                    let prev = text[..*cursor].char_indices().next_back()
-                        .map(|(i, _)| i).unwrap_or(0);
+                    let prev = text[..*cursor]
+                        .char_indices()
+                        .next_back()
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
                     text.remove(prev);
                     *cursor = prev;
                 }
@@ -915,7 +1112,8 @@ impl LogEntryScreen {
                     let set = &self.sets[idx];
                     match set {
                         SetData::Weighted { weight, reps } => {
-                            self.field1 = format!("{:.1}", weight).trim_end_matches(".0").to_string();
+                            self.field1 =
+                                format!("{:.1}", weight).trim_end_matches(".0").to_string();
                             if self.field1.ends_with(".0") {
                                 self.field1 = format!("{:.0}", weight);
                             }
@@ -925,13 +1123,17 @@ impl LogEntryScreen {
                             self.field1 = reps.to_string();
                         }
                         SetData::Distance { distance } => {
-                            self.field1 = format!("{:.1}", distance).trim_end_matches(".0").to_string();
+                            self.field1 = format!("{:.1}", distance)
+                                .trim_end_matches(".0")
+                                .to_string();
                             if self.field1.ends_with(".0") {
                                 self.field1 = format!("{:.0}", distance);
                             }
                         }
                         SetData::Endurance { duration } => {
-                            self.field1 = format!("{:.1}", duration).trim_end_matches(".0").to_string();
+                            self.field1 = format!("{:.1}", duration)
+                                .trim_end_matches(".0")
+                                .to_string();
                             if self.field1.ends_with(".0") {
                                 self.field1 = format!("{:.0}", duration);
                             }
@@ -970,7 +1172,11 @@ impl LogEntryScreen {
             || key.code == KeyCode::Left
         {
             if *cursor > 0 {
-                *cursor = text[..*cursor].char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+                *cursor = text[..*cursor]
+                    .char_indices()
+                    .next_back()
+                    .map(|(i, _)| i)
+                    .unwrap_or(0);
             }
             return Action::None;
         }
@@ -978,7 +1184,11 @@ impl LogEntryScreen {
             || key.code == KeyCode::Right
         {
             if *cursor < text.len() {
-                *cursor = text[*cursor..].char_indices().nth(1).map(|(i, _)| *cursor + i).unwrap_or(text.len());
+                *cursor = text[*cursor..]
+                    .char_indices()
+                    .nth(1)
+                    .map(|(i, _)| *cursor + i)
+                    .unwrap_or(text.len());
             }
             return Action::None;
         }
@@ -998,7 +1208,11 @@ impl LogEntryScreen {
         match key.code {
             KeyCode::Backspace => {
                 if *cursor > 0 {
-                    let prev = text[..*cursor].char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+                    let prev = text[..*cursor]
+                        .char_indices()
+                        .next_back()
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
                     text.remove(prev);
                     *cursor = prev;
                 }
@@ -1020,8 +1234,11 @@ impl LogEntryScreen {
             || key.code == KeyCode::Left
         {
             if *cursor > 0 {
-                *cursor = text[..*cursor].char_indices().next_back()
-                    .map(|(i, _)| i).unwrap_or(0);
+                *cursor = text[..*cursor]
+                    .char_indices()
+                    .next_back()
+                    .map(|(i, _)| i)
+                    .unwrap_or(0);
             }
             return Action::None;
         }
@@ -1029,8 +1246,11 @@ impl LogEntryScreen {
             || key.code == KeyCode::Right
         {
             if *cursor < text.len() {
-                *cursor = text[*cursor..].char_indices().nth(1)
-                    .map(|(i, _)| *cursor + i).unwrap_or(text.len());
+                *cursor = text[*cursor..]
+                    .char_indices()
+                    .nth(1)
+                    .map(|(i, _)| *cursor + i)
+                    .unwrap_or(text.len());
             }
             return Action::None;
         }
@@ -1063,8 +1283,11 @@ impl LogEntryScreen {
             }
             KeyCode::Backspace => {
                 if *cursor > 0 {
-                    let prev = text[..*cursor].char_indices().next_back()
-                        .map(|(i, _)| i).unwrap_or(0);
+                    let prev = text[..*cursor]
+                        .char_indices()
+                        .next_back()
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
                     text.remove(prev);
                     *cursor = prev;
                 }
@@ -1143,16 +1366,36 @@ impl LogEntryScreen {
 
     fn save_log(&mut self, db: &Database) -> Action {
         let practice = self.chosen_practice.as_ref().unwrap();
-        let note = if self.note.is_empty() { None } else { Some(self.note.as_str()) };
-        let warm_up = if self.warm_up.is_empty() { None } else { Some(self.warm_up.as_str()) };
-        let cool_down = if self.cool_down.is_empty() { None } else { Some(self.cool_down.as_str()) };
+        let note = if self.note.is_empty() {
+            None
+        } else {
+            Some(self.note.as_str())
+        };
+        let warm_up = if self.warm_up.is_empty() {
+            None
+        } else {
+            Some(self.warm_up.as_str())
+        };
+        let cool_down = if self.cool_down.is_empty() {
+            None
+        } else {
+            Some(self.cool_down.as_str())
+        };
         let date = NaiveDate::parse_from_str(&self.log_date, "%Y-%m-%d")
             .unwrap_or_else(|_| Local::now().date_naive());
         let datetime = date.and_time(NaiveTime::from_hms_opt(12, 0, 0).unwrap());
         let result = if let Some(log_id) = self.editing_log_id {
-            db.update_log(log_id, &self.sets, note, Some(&datetime), warm_up, cool_down)
+            db.update_log(
+                log_id,
+                &self.sets,
+                note,
+                Some(&datetime),
+                warm_up,
+                cool_down,
+            )
         } else {
-            db.create_log_at(practice.id, &datetime, &self.sets, note, warm_up, cool_down).map(|_| ())
+            db.create_log_at(practice.id, &datetime, &self.sets, note, warm_up, cool_down)
+                .map(|_| ())
         };
         match result {
             Ok(_) => Action::Navigate(self.return_to.clone()),
@@ -1175,19 +1418,25 @@ fn format_set_data(set: &SetData) -> String {
     use crate::i18n::tr_args;
     use fluent_bundle::FluentValue;
     match set {
-        SetData::Weighted { weight, reps } => tr_args("set-weighted", &[
-            ("weight", FluentValue::from(*weight)),
-            ("reps", FluentValue::from(*reps as f64)),
-        ]),
-        SetData::Bodyweight { reps } => tr_args("set-bodyweight", &[
-            ("reps", FluentValue::from(*reps as f64)),
-        ]),
-        SetData::Distance { distance } => tr_args("set-distance", &[
-            ("distance", FluentValue::from(*distance)),
-        ]),
-        SetData::Endurance { duration } => tr_args("set-endurance", &[
-            ("duration", FluentValue::from(*duration)),
-        ]),
+        SetData::Weighted { weight, reps } => tr_args(
+            "set-weighted",
+            &[
+                ("weight", FluentValue::from(*weight)),
+                ("reps", FluentValue::from(*reps as f64)),
+            ],
+        ),
+        SetData::Bodyweight { reps } => tr_args(
+            "set-bodyweight",
+            &[("reps", FluentValue::from(*reps as f64))],
+        ),
+        SetData::Distance { distance } => tr_args(
+            "set-distance",
+            &[("distance", FluentValue::from(*distance))],
+        ),
+        SetData::Endurance { duration } => tr_args(
+            "set-endurance",
+            &[("duration", FluentValue::from(*duration))],
+        ),
     }
 }
 
@@ -1204,8 +1453,8 @@ fn metric_label_for_type(pt: &PracticeType) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
     use crate::db::Database;
+    use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
     fn test_db() -> (Database, tempfile::TempDir) {
         let dir = tempfile::tempdir().expect("temp dir");
@@ -1376,7 +1625,13 @@ mod tests {
         screen.handle_key(char_key('0'), &db);
         screen.handle_key(key(KeyCode::Enter), &db);
         assert_eq!(screen.sets.len(), 1);
-        assert!(matches!(screen.sets[0], SetData::Weighted { weight: 50.0, reps: 10 }));
+        assert!(matches!(
+            screen.sets[0],
+            SetData::Weighted {
+                weight: 50.0,
+                reps: 10
+            }
+        ));
 
         // Select the set and edit it
         screen.handle_key(char_key('k'), &db);
@@ -1397,7 +1652,13 @@ mod tests {
         screen.handle_key(key(KeyCode::Enter), &db); // save edit
         assert!(screen.editing_set.is_none());
         assert_eq!(screen.sets.len(), 1);
-        assert!(matches!(screen.sets[0], SetData::Weighted { weight: 55.0, reps: 10 }));
+        assert!(matches!(
+            screen.sets[0],
+            SetData::Weighted {
+                weight: 55.0,
+                reps: 10
+            }
+        ));
 
         // selected_set stays at 0 after edit; press e again then cancel with Esc
         assert_eq!(screen.selected_set, Some(0));

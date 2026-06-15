@@ -10,12 +10,12 @@ use ratatui::{
 
 use unicode_width::UnicodeWidthStr;
 
+use super::widgets::sparkline::Sparkline;
+use super::{centered_area, highlight_row, Action, Screen, BORDER_COLOR, CONTENT_WIDTH};
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
 use crate::model::{LogEntry, Practice};
 use fluent_bundle::FluentValue;
-use super::widgets::sparkline::Sparkline;
-use super::{centered_area, highlight_row, Action, Screen, BORDER_COLOR, CONTENT_WIDTH};
 
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
@@ -63,10 +63,10 @@ impl TrendsScreen {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1),         // filter bar
-                Constraint::Percentage(40),    // practice list
-                Constraint::Percentage(60),    // sparkline chart
-                Constraint::Length(1),         // footer
+                Constraint::Length(1),      // filter bar
+                Constraint::Percentage(40), // practice list
+                Constraint::Percentage(60), // sparkline chart
+                Constraint::Length(1),      // footer
             ])
             .split(area);
 
@@ -76,19 +76,38 @@ impl TrendsScreen {
         // Footer
         let footer = Line::from(vec![
             Span::styled(" [j/k]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}  ", tr("key-navigate")), Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!(" {}  ", tr("key-navigate")),
+                Style::default().fg(Color::DarkGray),
+            ),
             Span::styled("[h/l]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}  ", tr("key-window")), Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!(" {}  ", tr("key-window")),
+                Style::default().fg(Color::DarkGray),
+            ),
             Span::styled("[/]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}  ", tr("key-filter")), Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!(" {}  ", tr("key-filter")),
+                Style::default().fg(Color::DarkGray),
+            ),
             Span::styled("[Esc]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!(" {}", tr("key-back")),
+                Style::default().fg(Color::DarkGray),
+            ),
         ]);
         frame.render_widget(Paragraph::new(footer), chunks[3]);
     }
 
-    fn render_practice_list(&mut self, frame: &mut Frame, filter_area: ratatui::layout::Rect, list_area: ratatui::layout::Rect) {
-        let max_name_len = self.practices.iter()
+    fn render_practice_list(
+        &mut self,
+        frame: &mut Frame,
+        filter_area: ratatui::layout::Rect,
+        list_area: ratatui::layout::Rect,
+    ) {
+        let max_name_len = self
+            .practices
+            .iter()
             .map(|p| p.name.width())
             .max()
             .unwrap_or(0);
@@ -112,7 +131,10 @@ impl TrendsScreen {
         } else {
             Style::default().fg(Color::Gray)
         };
-        frame.render_widget(Paragraph::new(Line::from(Span::styled(filter_display, filter_style))), filter_area);
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(filter_display, filter_style))),
+            filter_area,
+        );
 
         // Bordered list
         let block = Block::default()
@@ -128,14 +150,12 @@ impl TrendsScreen {
         frame.render_widget(block, list_area);
 
         let hdr_style = Style::default().fg(Color::White).bold();
-        let mut all_lines = vec![
-            Line::from(vec![
-                Span::raw("  "),
-                Span::styled(&name_header, hdr_style),
-                Span::raw(" ".repeat(header_padding)),
-                Span::styled(&type_header, hdr_style),
-            ]),
-        ];
+        let mut all_lines = vec![Line::from(vec![
+            Span::raw("  "),
+            Span::styled(&name_header, hdr_style),
+            Span::raw(" ".repeat(header_padding)),
+            Span::styled(&type_header, hdr_style),
+        ])];
 
         let visible_rows = inner.height.saturating_sub(1) as usize; // -1 for header
         self.list_height = visible_rows;
@@ -155,12 +175,16 @@ impl TrendsScreen {
                 Span::styled(marker, name_style),
                 Span::styled(&practice.name, name_style),
                 Span::raw(" ".repeat(padding)),
-                Span::styled(practice.practice_type.label(), Style::default().fg(Color::Gray)),
+                Span::styled(
+                    practice.practice_type.label(),
+                    Style::default().fg(Color::Gray),
+                ),
             ]));
         }
         frame.render_widget(Paragraph::new(all_lines), inner);
 
-        if !self.filtered_indices.is_empty() && self.selected >= self.scroll && self.selected < end {
+        if !self.filtered_indices.is_empty() && self.selected >= self.scroll && self.selected < end
+        {
             highlight_row(frame, inner, (self.selected - self.scroll) as u16 + 1);
         }
     }
@@ -183,7 +207,12 @@ impl TrendsScreen {
             .first()
             .map(|e| e.metric_label())
             .unwrap_or_else(|| "\u{2014}".to_string());
-        let block_title = format!(" {} ({}) [{}] ", practice.name, metric_label, practice.practice_type.label());
+        let block_title = format!(
+            " {} ({}) [{}] ",
+            practice.name,
+            metric_label,
+            practice.practice_type.label()
+        );
         let block = Block::default()
             .title(Line::from(vec![
                 Span::styled("── ", Style::default().fg(BORDER_COLOR)),
@@ -208,7 +237,13 @@ impl TrendsScreen {
 
         // Subtitle
         let subtitle = Line::from(Span::styled(
-            format!(" {}", tr_args("trends-last-days", &[("days", FluentValue::from(self.days_window as f64))])),
+            format!(
+                " {}",
+                tr_args(
+                    "trends-last-days",
+                    &[("days", FluentValue::from(self.days_window as f64))]
+                )
+            ),
             Style::default().fg(Color::Gray),
         ));
         frame.render_widget(Paragraph::new(subtitle), inner_chunks[0]);
@@ -228,8 +263,7 @@ impl TrendsScreen {
                 .map(|(i, e)| {
                     let day = e.log.logged_at.format("%d").to_string();
                     let label = if i == 0
-                        || e.log.logged_at.month()
-                            != self.entries[i - 1].log.logged_at.month()
+                        || e.log.logged_at.month() != self.entries[i - 1].log.logged_at.month()
                     {
                         let month = e.log.logged_at.format("%b").to_string();
                         format!("{}\n{}", day, month)
@@ -251,17 +285,32 @@ impl TrendsScreen {
 
             let stats_line = Line::from(vec![
                 Span::styled(
-                    format!("  {}", tr_args("trends-avg", &[("value", FluentValue::from(format!("{:.1}", avg)))])),
+                    format!(
+                        "  {}",
+                        tr_args(
+                            "trends-avg",
+                            &[("value", FluentValue::from(format!("{:.1}", avg)))]
+                        )
+                    ),
                     Style::default().fg(Color::White),
                 ),
                 Span::styled("  |  ", Style::default().fg(Color::Gray)),
                 Span::styled(
-                    tr_args("trends-peak", &[("value", FluentValue::from(format!("{:.1}", peak)))]),
+                    tr_args(
+                        "trends-peak",
+                        &[("value", FluentValue::from(format!("{:.1}", peak)))],
+                    ),
                     Style::default().fg(Color::White),
                 ),
                 Span::styled("  |  ", Style::default().fg(Color::Gray)),
                 Span::styled(
-                    tr_args("trends-trend", &[("sign", FluentValue::from(trend_sign.to_string())), ("value", FluentValue::from(format!("{:.1}", trend_pct)))]),
+                    tr_args(
+                        "trends-trend",
+                        &[
+                            ("sign", FluentValue::from(trend_sign.to_string())),
+                            ("value", FluentValue::from(format!("{:.1}", trend_pct))),
+                        ],
+                    ),
                     Style::default().fg(trend_color),
                 ),
             ]);
@@ -278,26 +327,36 @@ impl TrendsScreen {
                 KeyCode::Char('b') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                     if self.filter_cursor > 0 {
                         self.filter_cursor = self.filter_text[..self.filter_cursor]
-                            .char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+                            .char_indices()
+                            .next_back()
+                            .map(|(i, _)| i)
+                            .unwrap_or(0);
                     }
                 }
                 KeyCode::Left => {
                     if self.filter_cursor > 0 {
                         self.filter_cursor = self.filter_text[..self.filter_cursor]
-                            .char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+                            .char_indices()
+                            .next_back()
+                            .map(|(i, _)| i)
+                            .unwrap_or(0);
                     }
                 }
                 KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                     if self.filter_cursor < self.filter_text.len() {
                         self.filter_cursor = self.filter_text[self.filter_cursor..]
-                            .char_indices().nth(1).map(|(i, _)| self.filter_cursor + i)
+                            .char_indices()
+                            .nth(1)
+                            .map(|(i, _)| self.filter_cursor + i)
                             .unwrap_or(self.filter_text.len());
                     }
                 }
                 KeyCode::Right => {
                     if self.filter_cursor < self.filter_text.len() {
                         self.filter_cursor = self.filter_text[self.filter_cursor..]
-                            .char_indices().nth(1).map(|(i, _)| self.filter_cursor + i)
+                            .char_indices()
+                            .nth(1)
+                            .map(|(i, _)| self.filter_cursor + i)
                             .unwrap_or(self.filter_text.len());
                     }
                 }
@@ -316,7 +375,10 @@ impl TrendsScreen {
                 KeyCode::Backspace => {
                     if self.filter_cursor > 0 {
                         let prev = self.filter_text[..self.filter_cursor]
-                            .char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+                            .char_indices()
+                            .next_back()
+                            .map(|(i, _)| i)
+                            .unwrap_or(0);
                         self.filter_text.remove(prev);
                         self.filter_cursor = prev;
                         self.apply_filter();

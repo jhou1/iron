@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 use crate::db::Database;
-use crate::model::{PracticeType, SetData};
 use crate::i18n::tr_args;
+use crate::model::{PracticeType, SetData};
 use fluent_bundle::FluentValue;
 
 // ── Export data structures ─────────────────────────────────────────────
@@ -24,7 +24,9 @@ pub struct ExportData {
     pub daily_metrics: Vec<ExportDailyMetrics>,
 }
 
-fn default_active() -> bool { true }
+fn default_active() -> bool {
+    true
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct ExportPractice {
@@ -142,7 +144,11 @@ pub fn export_to_json(db: &Database, path: Option<PathBuf>) -> Result<()> {
             ExportLog {
                 id: entry.log.id,
                 practice: entry.practice_name.clone(),
-                logged_at: entry.log.logged_at.format("%Y-%m-%d %H:%M:%S%.f").to_string(),
+                logged_at: entry
+                    .log
+                    .logged_at
+                    .format("%Y-%m-%d %H:%M:%S%.f")
+                    .to_string(),
                 note: entry.log.note.clone(),
                 warm_up: entry.log.warm_up.clone(),
                 cool_down: entry.log.cool_down.clone(),
@@ -158,14 +164,19 @@ pub fn export_to_json(db: &Database, path: Option<PathBuf>) -> Result<()> {
             title: g.title.clone(),
             position: g.position,
             completed: g.completed,
-            completed_at: g.completed_at.map(|dt| dt.format("%Y-%m-%d %H:%M:%S%.f").to_string()),
-            milestones: g.milestones
+            completed_at: g
+                .completed_at
+                .map(|dt| dt.format("%Y-%m-%d %H:%M:%S%.f").to_string()),
+            milestones: g
+                .milestones
                 .iter()
                 .map(|m| ExportMilestone {
                     title: m.title.clone(),
                     completed: m.completed,
                     position: m.position,
-                    completed_at: m.completed_at.map(|dt| dt.format("%Y-%m-%d %H:%M:%S%.f").to_string()),
+                    completed_at: m
+                        .completed_at
+                        .map(|dt| dt.format("%Y-%m-%d %H:%M:%S%.f").to_string()),
                 })
                 .collect(),
         })
@@ -214,9 +225,13 @@ pub fn export_to_json(db: &Database, path: Option<PathBuf>) -> Result<()> {
     };
 
     std::fs::write(&out_path, json)?;
-    eprintln!("{}", tr_args("cli-exported-to", &[
-        ("path", FluentValue::from(out_path.display().to_string())),
-    ]));
+    eprintln!(
+        "{}",
+        tr_args(
+            "cli-exported-to",
+            &[("path", FluentValue::from(out_path.display().to_string())),]
+        )
+    );
     Ok(())
 }
 
@@ -225,12 +240,10 @@ pub fn export_to_json(db: &Database, path: Option<PathBuf>) -> Result<()> {
 pub fn import_from_json(db: &Database, path: &Path) -> Result<usize> {
     let json = std::fs::read_to_string(path)
         .with_context(|| format!("failed to read {}", path.display()))?;
-    let data: ExportData =
-        serde_json::from_str(&json).context("failed to parse export JSON")?;
+    let data: ExportData = serde_json::from_str(&json).context("failed to parse export JSON")?;
 
     // Build a map of practice name -> id, creating missing practices.
-    let mut practice_map: std::collections::HashMap<String, i64> =
-        std::collections::HashMap::new();
+    let mut practice_map: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
 
     // Load existing practices first
     for p in db.list_practices()? {
@@ -274,11 +287,7 @@ pub fn import_from_json(db: &Database, path: &Path) -> Result<usize> {
             .get(&log.practice)
             .context("practice not found in map (unexpected)")?;
 
-        let sets: Vec<SetData> = log
-            .sets
-            .iter()
-            .map(reconstruct_set_data)
-            .collect();
+        let sets: Vec<SetData> = log.sets.iter().map(reconstruct_set_data).collect();
 
         db.create_log_at(
             practice_id,

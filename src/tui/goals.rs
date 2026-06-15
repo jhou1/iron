@@ -7,10 +7,13 @@ use ratatui::{
     Frame,
 };
 
+use super::{
+    centered_area, highlight_row, render_gauge_line, render_status_line, Action, Screen,
+    StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
+};
 use crate::db::Database;
 use crate::i18n::tr;
 use crate::model::{Goal, Milestone};
-use super::{centered_area, highlight_row, render_gauge_line, render_status_line, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH};
 
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
@@ -214,7 +217,7 @@ impl GoalsScreen {
                 Constraint::Min(1),    // [0] goals list (bordered)
                 Constraint::Length(1), // [1] status line
                 Constraint::Length(1), // [2] footer
-                Constraint::Min(0),   // [3] spacer
+                Constraint::Min(0),    // [3] spacer
             ])
             .split(area);
 
@@ -279,7 +282,10 @@ impl GoalsScreen {
                 ]));
                 // Date input
                 lines.push(Line::from(vec![
-                    Span::styled(format!("  {} ", tr("dashboard-date-prompt")), Style::default().fg(ACCENT)),
+                    Span::styled(
+                        format!("  {} ", tr("dashboard-date-prompt")),
+                        Style::default().fg(ACCENT),
+                    ),
                     Span::styled(&self.input[..self.cursor], Style::default().fg(GREEN)),
                     Span::styled("\u{2588}", Style::default().fg(GREEN)),
                     Span::styled(&self.input[self.cursor..], Style::default().fg(GREEN)),
@@ -292,11 +298,20 @@ impl GoalsScreen {
                 lines.extend(render_goal_lines(goal, true));
                 // Confirmation line
                 lines.push(Line::from(vec![
-                    Span::styled(format!("  {} ", tr("dashboard-delete-confirm")), Style::default().fg(Color::Red)),
+                    Span::styled(
+                        format!("  {} ", tr("dashboard-delete-confirm")),
+                        Style::default().fg(Color::Red),
+                    ),
                     Span::styled("[y]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!(" {}  ", tr("key-yes")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
                     Span::styled("[any]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!(" {}", tr("key-cancel")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
                 ]));
             } else {
                 lines.extend(render_goal_lines(goal, is_selected));
@@ -340,7 +355,11 @@ impl GoalsScreen {
 
         // ── Floating detail popup (read-only in Browse, interactive in Modal) ──
         if matches!(self.mode, Mode::Browse | Mode::Modal) {
-            let goal_idx = if self.mode == Mode::Modal { self.modal_goal_idx } else { self.selected };
+            let goal_idx = if self.mode == Mode::Modal {
+                self.modal_goal_idx
+            } else {
+                self.selected
+            };
             if let Some(goal) = self.goals.get(goal_idx) {
                 let show_popup = self.mode == Mode::Modal || !goal.milestones.is_empty();
                 if show_popup {
@@ -359,7 +378,9 @@ impl GoalsScreen {
                             lines_out
                         };
 
-                        let popup_h = (popup_lines.len() as u16 + 2).min(list_area.height * 2 / 3).max(4);
+                        let popup_h = (popup_lines.len() as u16 + 2)
+                            .min(list_area.height * 2 / 3)
+                            .max(4);
                         let popup_w = list_area.width.saturating_sub(8).max(30);
                         let popup_x = list_area.x + 4;
 
@@ -369,11 +390,19 @@ impl GoalsScreen {
                         } else {
                             below_y
                         };
-                        let popup_rect = Rect { x: popup_x, y: popup_y, width: popup_w, height: popup_h };
+                        let popup_rect = Rect {
+                            x: popup_x,
+                            y: popup_y,
+                            width: popup_w,
+                            height: popup_h,
+                        };
 
                         let title = format!(" {} ", goal.title);
                         let block = Block::default()
-                            .title(Span::styled(title, Style::default().fg(Color::White).bold()))
+                            .title(Span::styled(
+                                title,
+                                Style::default().fg(Color::White).bold(),
+                            ))
                             .borders(Borders::ALL)
                             .padding(Padding::uniform(1))
                             .border_type(BorderType::Rounded)
@@ -383,14 +412,23 @@ impl GoalsScreen {
                         frame.render_widget(Clear, popup_rect);
                         frame.render_widget(block, popup_rect);
 
-                        let modal_scroll = if self.mode == Mode::Modal { self.modal_scroll as u16 } else { 0 };
+                        let modal_scroll = if self.mode == Mode::Modal {
+                            self.modal_scroll as u16
+                        } else {
+                            0
+                        };
                         frame.render_widget(
-                            Paragraph::new(popup_lines.clone()).scroll((modal_scroll, 0)).wrap(Wrap { trim: false }),
+                            Paragraph::new(popup_lines.clone())
+                                .scroll((modal_scroll, 0))
+                                .wrap(Wrap { trim: false }),
                             inner,
                         );
 
                         // Highlight selected milestone in modal mode
-                        if self.mode == Mode::Modal && !goal.milestones.is_empty() && self.modal_mode != ModalMode::AddMilestone {
+                        if self.mode == Mode::Modal
+                            && !goal.milestones.is_empty()
+                            && self.modal_mode != ModalMode::AddMilestone
+                        {
                             let sel_line = (self.modal_selected + 1) as u16; // +1 for gauge line
                             if sel_line >= modal_scroll && sel_line < modal_scroll + inner.height {
                                 highlight_row(frame, inner, sel_line - modal_scroll);
@@ -403,8 +441,19 @@ impl GoalsScreen {
                                 let color = if *is_error { Color::Red } else { Color::Green };
                                 let status_y = popup_rect.y + popup_rect.height;
                                 if status_y < list_area.y + list_area.height {
-                                    let status_rect = Rect { x: popup_x, y: status_y, width: popup_w, height: 1 };
-                                    frame.render_widget(Paragraph::new(Line::from(Span::styled(msg.as_str(), Style::default().fg(color)))), status_rect);
+                                    let status_rect = Rect {
+                                        x: popup_x,
+                                        y: status_y,
+                                        width: popup_w,
+                                        height: 1,
+                                    };
+                                    frame.render_widget(
+                                        Paragraph::new(Line::from(Span::styled(
+                                            msg.as_str(),
+                                            Style::default().fg(color),
+                                        ))),
+                                        status_rect,
+                                    );
                                 }
                             }
                         }
@@ -421,43 +470,85 @@ impl GoalsScreen {
             Mode::Browse => {
                 let mut spans = vec![
                     Span::styled(" [a]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}  ", tr("key-add-goal")), Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!(" {}  ", tr("key-add-goal")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
                     Span::styled("[e]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!(" {}  ", tr("key-edit")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
                     Span::styled("[Space]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}  ", tr("key-toggle")), Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!(" {}  ", tr("key-toggle")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
                     Span::styled("[d]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!(" {}  ", tr("key-delete")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
                 ];
                 if !self.goals.is_empty() {
                     spans.push(Span::styled("[Enter]", Style::default().fg(ACCENT)));
-                    spans.push(Span::styled(format!(" {}  ", tr("key-milestone")), Style::default().fg(Color::DarkGray)));
+                    spans.push(Span::styled(
+                        format!(" {}  ", tr("key-milestone")),
+                        Style::default().fg(Color::DarkGray),
+                    ));
                 }
                 spans.push(Span::styled("[Esc]", Style::default().fg(ACCENT)));
-                spans.push(Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::DarkGray)));
+                spans.push(Span::styled(
+                    format!(" {}", tr("key-back")),
+                    Style::default().fg(Color::DarkGray),
+                ));
                 spans
             }
             Mode::Modal => {
                 let modal_footer: Vec<Span> = match self.modal_mode {
                     ModalMode::Browse => vec![
                         Span::styled(" [a]", Style::default().fg(ACCENT)),
-                        Span::styled(format!(" {}  ", tr("key-add")), Style::default().fg(Color::DarkGray)),
+                        Span::styled(
+                            format!(" {}  ", tr("key-add")),
+                            Style::default().fg(Color::DarkGray),
+                        ),
                         Span::styled("[e]", Style::default().fg(ACCENT)),
-                        Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::DarkGray)),
+                        Span::styled(
+                            format!(" {}  ", tr("key-edit")),
+                            Style::default().fg(Color::DarkGray),
+                        ),
                         Span::styled("[Space]", Style::default().fg(ACCENT)),
-                        Span::styled(format!(" {}  ", tr("key-toggle")), Style::default().fg(Color::DarkGray)),
+                        Span::styled(
+                            format!(" {}  ", tr("key-toggle")),
+                            Style::default().fg(Color::DarkGray),
+                        ),
                         Span::styled("[d]", Style::default().fg(ACCENT)),
-                        Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::DarkGray)),
+                        Span::styled(
+                            format!(" {}  ", tr("key-delete")),
+                            Style::default().fg(Color::DarkGray),
+                        ),
                         Span::styled("[D]", Style::default().fg(ACCENT)),
-                        Span::styled(format!(" {}  ", tr("key-date")), Style::default().fg(Color::DarkGray)),
+                        Span::styled(
+                            format!(" {}  ", tr("key-date")),
+                            Style::default().fg(Color::DarkGray),
+                        ),
                         Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                        Span::styled(format!(" {}", tr("key-close")), Style::default().fg(Color::DarkGray)),
+                        Span::styled(
+                            format!(" {}", tr("key-close")),
+                            Style::default().fg(Color::DarkGray),
+                        ),
                     ],
                     _ => vec![
                         Span::styled(" [Enter]", Style::default().fg(ACCENT)),
-                        Span::styled(format!(" {}  ", tr("key-confirm")), Style::default().fg(Color::DarkGray)),
+                        Span::styled(
+                            format!(" {}  ", tr("key-confirm")),
+                            Style::default().fg(Color::DarkGray),
+                        ),
                         Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                        Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::DarkGray)),
+                        Span::styled(
+                            format!(" {}", tr("key-cancel")),
+                            Style::default().fg(Color::DarkGray),
+                        ),
                     ],
                 };
                 modal_footer
@@ -465,15 +556,20 @@ impl GoalsScreen {
             _ => {
                 vec![
                     Span::styled(" [Enter]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}  ", tr("key-confirm")), Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!(" {}  ", tr("key-confirm")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
                     Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!(" {}", tr("key-cancel")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
                 ]
             }
         };
         let footer = Line::from(footer_spans);
         frame.render_widget(Paragraph::new(footer), chunks[2]);
-
     }
 
     fn build_modal_lines(&self, goal: &Goal) -> Vec<Line<'static>> {
@@ -509,7 +605,10 @@ impl GoalsScreen {
                 let before = self.input[..self.cursor].to_string();
                 let after = self.input[self.cursor..].to_string();
                 lines.push(Line::from(vec![
-                    Span::styled(format!("  {} ", tr("dashboard-date-prompt")), Style::default().fg(ACCENT)),
+                    Span::styled(
+                        format!("  {} ", tr("dashboard-date-prompt")),
+                        Style::default().fg(ACCENT),
+                    ),
                     Span::styled(before, Style::default().fg(GREEN)),
                     Span::styled("\u{2588}", Style::default().fg(GREEN)),
                     Span::styled(after, Style::default().fg(GREEN)),
@@ -517,11 +616,20 @@ impl GoalsScreen {
             } else if is_sel && self.modal_mode == ModalMode::ConfirmDeleteMilestone {
                 lines.push(render_milestone_line(ms, true));
                 lines.push(Line::from(vec![
-                    Span::styled(format!("  {} ", tr("dashboard-delete-confirm")), Style::default().fg(Color::Red)),
+                    Span::styled(
+                        format!("  {} ", tr("dashboard-delete-confirm")),
+                        Style::default().fg(Color::Red),
+                    ),
                     Span::styled("[y]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!(" {}  ", tr("key-yes")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
                     Span::styled("[any]", Style::default().fg(ACCENT)),
-                    Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!(" {}", tr("key-cancel")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
                 ]));
             } else {
                 lines.push(render_milestone_line(ms, is_sel));
@@ -632,7 +740,9 @@ impl GoalsScreen {
                 if let Some(undo_data) = self.last_deleted.take() {
                     let result = match &undo_data {
                         GoalUndoData::Goal(goal) => db.restore_goal(goal).map(|_| ()),
-                        GoalUndoData::Milestone { goal_id, milestone } => db.restore_milestone(*goal_id, milestone).map(|_| ()),
+                        GoalUndoData::Milestone { goal_id, milestone } => {
+                            db.restore_milestone(*goal_id, milestone).map(|_| ())
+                        }
                     };
                     match result {
                         Ok(()) => {
@@ -856,7 +966,9 @@ impl GoalsScreen {
                 if let Some(undo_data) = self.modal_last_deleted.take() {
                     let result = match &undo_data {
                         GoalUndoData::Goal(_) => Ok(()), // shouldn't happen in modal
-                        GoalUndoData::Milestone { goal_id, milestone } => db.restore_milestone(*goal_id, milestone).map(|_| ()),
+                        GoalUndoData::Milestone { goal_id, milestone } => {
+                            db.restore_milestone(*goal_id, milestone).map(|_| ())
+                        }
                     };
                     match result {
                         Ok(()) => {
@@ -988,7 +1100,8 @@ impl GoalsScreen {
                                 self.modal_status_msg = Some((tr("status-deleted-undo"), false));
                             }
                             Err(e) => {
-                                self.modal_status_msg = Some((format!("Delete failed: {}", e), true));
+                                self.modal_status_msg =
+                                    Some((format!("Delete failed: {}", e), true));
                             }
                         }
                         let _ = self.reload_goals(db);
@@ -1021,7 +1134,8 @@ fn render_goal_lines(goal: &Goal, is_selected: bool) -> Vec<Line<'static>> {
         Style::default().fg(Color::White)
     };
     if goal.completed {
-        let date_str = goal.completed_at
+        let date_str = goal
+            .completed_at
             .map(|dt| format!(" ({})", dt.format("%Y-%m-%d")))
             .unwrap_or_default();
         result.push(Line::from(vec![
@@ -1049,7 +1163,8 @@ fn render_milestone_line(ms: &Milestone, is_selected: bool) -> Line<'static> {
         Style::default().fg(Color::White)
     };
     if ms.completed {
-        let date_str = ms.completed_at
+        let date_str = ms
+            .completed_at
             .map(|dt| format!(" ({})", dt.format("%Y-%m-%d")))
             .unwrap_or_default();
         Line::from(vec![
@@ -1072,7 +1187,10 @@ fn goal_gauge(goal: &Goal) -> Line<'static> {
     let total = goal.milestones.len();
     let mut line = render_gauge_line(ratio, done, total, 16, 4);
     let pct = (ratio * 100.0).round() as u32;
-    line.spans.push(Span::styled(format!("  {}%", pct), Style::default().fg(Color::Gray)));
+    line.spans.push(Span::styled(
+        format!("  {}%", pct),
+        Style::default().fg(Color::Gray),
+    ));
     line
 }
 
@@ -1123,7 +1241,10 @@ mod tests {
         // Move down to goal 4 (index 3) — bottom at line 11, viewport 9
         s.selected = 3;
         s.adjust_scroll();
-        assert!(s.scroll > 0, "scroll should advance when selected goes below viewport");
+        assert!(
+            s.scroll > 0,
+            "scroll should advance when selected goes below viewport"
+        );
         // sel_bottom = 3*3 + 2 = 11, scroll = 11 - 9 = 2
         assert_eq!(s.scroll, 2);
     }

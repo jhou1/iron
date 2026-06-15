@@ -68,10 +68,7 @@ impl Widget for Sparkline {
         let visible = &self.data[start..];
 
         // Find max value
-        let max_val = visible
-            .iter()
-            .map(|(_, v)| *v)
-            .fold(0.0f64, f64::max);
+        let max_val = visible.iter().map(|(_, v)| *v).fold(0.0f64, f64::max);
         let max_val = if max_val == 0.0 { 1.0 } else { max_val };
 
         // Draw bars (bottom-up)
@@ -81,7 +78,8 @@ impl Widget for Sparkline {
         for (i, (label, value)) in visible.iter().enumerate() {
             let x = area.x + (i as u16) * bar_slot;
             let ratio = *value / max_val;
-            let bar_height = ((ratio * (chart_height as f64 - 1.0)).round() as u16).max(if *value > 0.0 { 1 } else { 0 });
+            let bar_height = ((ratio * (chart_height as f64 - 1.0)).round() as u16)
+                .max(if *value > 0.0 { 1 } else { 0 });
             let color = Sparkline::green_for_ratio(ratio);
 
             // Draw bar cells from bottom up
@@ -122,12 +120,21 @@ impl Widget for Sparkline {
         if y_label_x + y_label_width <= area.x + area.width {
             // Max value at the top
             let max_str = format_compact(max_val);
-            buf.set_string(y_label_x, chart_top, &max_str, Style::default().fg(Color::Gray));
+            buf.set_string(
+                y_label_x,
+                chart_top,
+                &max_str,
+                Style::default().fg(Color::Gray),
+            );
 
             // "0" at the bottom
-            buf.set_string(y_label_x, chart_bottom, "0", Style::default().fg(Color::Gray));
+            buf.set_string(
+                y_label_x,
+                chart_bottom,
+                "0",
+                Style::default().fg(Color::Gray),
+            );
         }
-
     }
 }
 

@@ -1,5 +1,5 @@
-use rand::seq::IndexedRandom;
 use crate::model::Quote;
+use rand::seq::IndexedRandom;
 
 pub fn pick_random_quote(quotes: &[Quote]) -> String {
     if quotes.is_empty() {

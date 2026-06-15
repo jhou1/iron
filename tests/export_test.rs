@@ -39,8 +39,14 @@ fn round_trip_export_import() {
     )
     .unwrap();
 
-    db1.create_log(pushups.id, &[SetData::Bodyweight { reps: 20 }], None, None, None)
-        .unwrap();
+    db1.create_log(
+        pushups.id,
+        &[SetData::Bodyweight { reps: 20 }],
+        None,
+        None,
+        None,
+    )
+    .unwrap();
 
     db1.create_log(
         run.id,
@@ -109,10 +115,7 @@ fn round_trip_export_import() {
     assert_eq!(snatch_log.log.note, Some("Felt great".to_string()));
 
     // Verify bodyweight log
-    let pushup_log = logs
-        .iter()
-        .find(|l| l.practice_name == "Push-ups")
-        .unwrap();
+    let pushup_log = logs.iter().find(|l| l.practice_name == "Push-ups").unwrap();
     assert_eq!(pushup_log.sets.len(), 1);
     assert_eq!(pushup_log.sets[0].data, SetData::Bodyweight { reps: 20 });
     assert_eq!(pushup_log.log.note, None);
@@ -128,19 +131,14 @@ fn round_trip_export_import() {
         .find(|l| l.practice_name == "Plank Hold")
         .unwrap();
     assert_eq!(plank_log.sets.len(), 1);
-    assert_eq!(
-        plank_log.sets[0].data,
-        SetData::Endurance { duration: 2.5 }
-    );
+    assert_eq!(plank_log.sets[0].data, SetData::Endurance { duration: 2.5 });
 }
 
 #[test]
 fn import_skips_duplicates() {
     let db = Database::open_in_memory().unwrap();
 
-    let practice = db
-        .create_practice("Squat", PracticeType::Weighted)
-        .unwrap();
+    let practice = db.create_practice("Squat", PracticeType::Weighted).unwrap();
     db.create_log(
         practice.id,
         &[SetData::Weighted {

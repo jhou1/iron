@@ -9,31 +9,37 @@ use ratatui::{
 
 use std::sync::mpsc::{self, Receiver};
 
+use super::{
+    centered_area, render_status_line, visible_input_spans, Action, Screen, StatusMessage,
+    BORDER_COLOR, CONTENT_WIDTH,
+};
 use crate::config::LlmConfig;
 use crate::db::Database;
 use crate::i18n::tr;
 use crate::llm::{self, LlmError};
 use crate::model::{Abbreviation, ParsedLog, Practice, SetData};
-use super::{centered_area, render_status_line, visible_input_spans, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH};
 
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
 const RED: Color = Color::Red;
 const YELLOW: Color = Color::Yellow;
 
-const SPINNER: &[char] = &['\u{280B}', '\u{2819}', '\u{2839}', '\u{2838}', '\u{283C}', '\u{2834}', '\u{2826}', '\u{2827}', '\u{2807}', '\u{280F}'];
+const SPINNER: &[char] = &[
+    '\u{280B}', '\u{2819}', '\u{2839}', '\u{2838}', '\u{283C}', '\u{2834}', '\u{2826}', '\u{2827}',
+    '\u{2807}', '\u{280F}',
+];
 
 #[derive(Debug, Clone, PartialEq)]
 enum Phase {
     Input,
     Parsing,
     Preview,
-    BrowseAbbreviations,  // Show list of abbreviations
+    BrowseAbbreviations, // Show list of abbreviations
     AddAbbrShort,
     AddAbbrFull,
     EditAbbrShort,
     EditAbbrFull,
-    ConfirmDeleteAbbr,    // Confirm deletion of abbreviation
+    ConfirmDeleteAbbr, // Confirm deletion of abbreviation
 }
 
 pub struct QuickLogScreen {
@@ -58,7 +64,7 @@ pub struct QuickLogScreen {
     abbr_full_cursor: usize,
     abbr_editing_id: Option<i64>,
     abbr_selected: usize,  // Selected index in abbreviations list
-    pre_abbr_phase: Phase,  // Phase to return to when canceling abbreviation modal
+    pre_abbr_phase: Phase, // Phase to return to when canceling abbreviation modal
 }
 
 impl QuickLogScreen {
@@ -144,7 +150,12 @@ impl QuickLogScreen {
         let block = Block::default()
             .title(Line::from(vec![
                 Span::styled("── ", Style::default().fg(BORDER_COLOR)),
-                Span::styled(tr("quicklog-title"), Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    tr("quicklog-title"),
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
             ]))
             .borders(Borders::ALL)
@@ -171,7 +182,10 @@ impl QuickLogScreen {
 
         // ── Shortcuts ──
         let shortcuts = self.build_shortcuts();
-        frame.render_widget(Paragraph::new(vec![shortcuts]).wrap(Wrap { trim: false }), chunks[2]);
+        frame.render_widget(
+            Paragraph::new(vec![shortcuts]).wrap(Wrap { trim: false }),
+            chunks[2],
+        );
 
         // ── Abbreviation modal (if active) ──
         if self.is_abbr_modal_active() {
@@ -180,7 +194,15 @@ impl QuickLogScreen {
     }
 
     fn is_abbr_modal_active(&self) -> bool {
-        matches!(self.phase, Phase::BrowseAbbreviations | Phase::AddAbbrShort | Phase::AddAbbrFull | Phase::EditAbbrShort | Phase::EditAbbrFull | Phase::ConfirmDeleteAbbr)
+        matches!(
+            self.phase,
+            Phase::BrowseAbbreviations
+                | Phase::AddAbbrShort
+                | Phase::AddAbbrFull
+                | Phase::EditAbbrShort
+                | Phase::EditAbbrFull
+                | Phase::ConfirmDeleteAbbr
+        )
     }
 
     fn render_abbr_modal(&self, frame: &mut Frame, parent_area: Rect) {
@@ -225,7 +247,12 @@ impl QuickLogScreen {
                 } else {
                     tr("abbreviations-edit-short")
                 };
-                (title, tr("abbreviations-enter-short"), &self.abbr_short_input, self.abbr_short_cursor)
+                (
+                    title,
+                    tr("abbreviations-enter-short"),
+                    &self.abbr_short_input,
+                    self.abbr_short_cursor,
+                )
             }
             Phase::AddAbbrFull | Phase::EditAbbrFull => {
                 let title = if matches!(self.phase, Phase::AddAbbrFull) {
@@ -233,7 +260,12 @@ impl QuickLogScreen {
                 } else {
                     tr("abbreviations-edit-full")
                 };
-                (title, tr("abbreviations-enter-full"), &self.abbr_full_input, self.abbr_full_cursor)
+                (
+                    title,
+                    tr("abbreviations-enter-full"),
+                    &self.abbr_full_input,
+                    self.abbr_full_cursor,
+                )
             }
             _ => return,
         };
@@ -260,16 +292,29 @@ impl QuickLogScreen {
             .split(inner);
 
         // Prompt
-        let prompt_line = Line::from(vec![
-            Span::styled(prompt, Style::default().fg(Color::White)),
-        ]);
-        frame.render_widget(Paragraph::new(prompt_line).wrap(Wrap { trim: false }), content[0]);
+        let prompt_line = Line::from(vec![Span::styled(
+            prompt,
+            Style::default().fg(Color::White),
+        )]);
+        frame.render_widget(
+            Paragraph::new(prompt_line).wrap(Wrap { trim: false }),
+            content[0],
+        );
 
         // Input with cursor
         let mut spans = vec![Span::styled(" > ", Style::default().fg(Color::White))];
-        spans.extend(visible_input_spans(input_text, cursor_pos, content[2].width, 3, Color::White));
+        spans.extend(visible_input_spans(
+            input_text,
+            cursor_pos,
+            content[2].width,
+            3,
+            Color::White,
+        ));
         let input_line = Line::from(spans);
-        frame.render_widget(Paragraph::new(input_line).wrap(Wrap { trim: false }), content[2]);
+        frame.render_widget(
+            Paragraph::new(input_line).wrap(Wrap { trim: false }),
+            content[2],
+        );
     }
 
     fn render_abbr_browse_modal(&self, frame: &mut Frame, modal_area: Rect) {
@@ -286,7 +331,9 @@ impl QuickLogScreen {
         frame.render_widget(block, modal_area);
 
         // Calculate column widths
-        let max_short_len = self.abbreviations.iter()
+        let max_short_len = self
+            .abbreviations
+            .iter()
             .map(|a| a.short.width())
             .max()
             .unwrap_or(0);
@@ -302,22 +349,23 @@ impl QuickLogScreen {
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(2), // title + header
-                Constraint::Min(3),      // list
-                Constraint::Length(1),   // shortcuts
+                Constraint::Min(3),    // list
+                Constraint::Length(1), // shortcuts
             ])
             .margin(1)
             .split(inner);
 
         // Header lines
-        let header_lines = vec![
-            Line::from(vec![
-                Span::styled("  ", Style::default().fg(Color::DarkGray)),
-                Span::styled(&short_header, Style::default().fg(Color::DarkGray)),
-                Span::raw(" ".repeat(header_padding)),
-                Span::styled(&full_header, Style::default().fg(Color::DarkGray)),
-            ]),
-        ];
-        frame.render_widget(Paragraph::new(header_lines).wrap(Wrap { trim: false }), chunks[0]);
+        let header_lines = vec![Line::from(vec![
+            Span::styled("  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(&short_header, Style::default().fg(Color::DarkGray)),
+            Span::raw(" ".repeat(header_padding)),
+            Span::styled(&full_header, Style::default().fg(Color::DarkGray)),
+        ])];
+        frame.render_widget(
+            Paragraph::new(header_lines).wrap(Wrap { trim: false }),
+            chunks[0],
+        );
 
         // List of abbreviations
         let list_lines: Vec<Line> = if self.abbreviations.is_empty() {
@@ -332,7 +380,9 @@ impl QuickLogScreen {
                 .map(|(i, a)| {
                     let marker = if i == self.abbr_selected { "> " } else { "  " };
                     let style = if i == self.abbr_selected {
-                        Style::default().fg(Color::White).add_modifier(Modifier::BOLD)
+                        Style::default()
+                            .fg(Color::White)
+                            .add_modifier(Modifier::BOLD)
                     } else {
                         Style::default().fg(Color::White)
                     };
@@ -346,27 +396,48 @@ impl QuickLogScreen {
                 })
                 .collect()
         };
-        frame.render_widget(Paragraph::new(list_lines).wrap(Wrap { trim: false }), chunks[1]);
+        frame.render_widget(
+            Paragraph::new(list_lines).wrap(Wrap { trim: false }),
+            chunks[1],
+        );
 
         // Shortcuts
         let shortcuts = Line::from(vec![
             Span::styled("[j/k]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}  ", tr("key-navigate")), Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!(" {}  ", tr("key-navigate")),
+                Style::default().fg(Color::DarkGray),
+            ),
             Span::styled("[a]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}  ", tr("key-add")), Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!(" {}  ", tr("key-add")),
+                Style::default().fg(Color::DarkGray),
+            ),
             Span::styled("[e]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}  ", tr("key-edit")), Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!(" {}  ", tr("key-edit")),
+                Style::default().fg(Color::DarkGray),
+            ),
             Span::styled("[d]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}  ", tr("key-delete")), Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!(" {}  ", tr("key-delete")),
+                Style::default().fg(Color::DarkGray),
+            ),
             Span::styled("[Esc]", Style::default().fg(ACCENT)),
-            Span::styled(format!(" {}", tr("key-back")), Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!(" {}", tr("key-back")),
+                Style::default().fg(Color::DarkGray),
+            ),
         ]);
-        frame.render_widget(Paragraph::new(vec![shortcuts]).wrap(Wrap { trim: false }), chunks[2]);
+        frame.render_widget(
+            Paragraph::new(vec![shortcuts]).wrap(Wrap { trim: false }),
+            chunks[2],
+        );
     }
 
     fn render_abbr_delete_confirm(&self, frame: &mut Frame, modal_area: Rect) {
-        use ratatui::widgets::Clear;
         use fluent_bundle::FluentValue;
+        use ratatui::widgets::Clear;
 
         // Smaller modal for confirmation
         let confirm_area = Rect {
@@ -377,7 +448,9 @@ impl QuickLogScreen {
         };
         frame.render_widget(Clear, confirm_area);
 
-        let short = self.abbreviations.get(self.abbr_selected)
+        let short = self
+            .abbreviations
+            .get(self.abbr_selected)
             .map(|a| a.short.as_str())
             .unwrap_or("?");
 
@@ -390,17 +463,31 @@ impl QuickLogScreen {
         let inner = block.inner(confirm_area);
         frame.render_widget(block, confirm_area);
 
-        let msg = crate::i18n::tr_args("abbreviations-delete-confirm", &[("short", FluentValue::from(short.to_string()))]);
+        let msg = crate::i18n::tr_args(
+            "abbreviations-delete-confirm",
+            &[("short", FluentValue::from(short.to_string()))],
+        );
         let lines = vec![
             Line::from(vec![Span::styled(msg, Style::default().fg(RED))]),
             Line::from(vec![
                 Span::styled("[y]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!(" {}  ", tr("key-yes")),
+                    Style::default().fg(Color::DarkGray),
+                ),
                 Span::styled("[n]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}", tr("key-no")), Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!(" {}", tr("key-no")),
+                    Style::default().fg(Color::DarkGray),
+                ),
             ]),
         ];
-        frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }).alignment(ratatui::layout::Alignment::Center), inner);
+        frame.render_widget(
+            Paragraph::new(lines)
+                .wrap(Wrap { trim: false })
+                .alignment(ratatui::layout::Alignment::Center),
+            inner,
+        );
     }
 
     fn render_input_pane(&self, frame: &mut Frame, area: Rect) {
@@ -461,24 +548,24 @@ impl QuickLogScreen {
                         tr("quicklog-no-config"),
                         Style::default().fg(YELLOW),
                     ));
-                    frame.render_widget(Paragraph::new(vec![msg]).wrap(Wrap { trim: false }), inner);
+                    frame
+                        .render_widget(Paragraph::new(vec![msg]).wrap(Wrap { trim: false }), inner);
                 }
             }
-            Phase::BrowseAbbreviations | Phase::AddAbbrShort | Phase::AddAbbrFull | Phase::EditAbbrShort | Phase::EditAbbrFull | Phase::ConfirmDeleteAbbr => {
+            Phase::BrowseAbbreviations
+            | Phase::AddAbbrShort
+            | Phase::AddAbbrFull
+            | Phase::EditAbbrShort
+            | Phase::EditAbbrFull
+            | Phase::ConfirmDeleteAbbr => {
                 // Show preview results while modal is open (same as Preview phase)
                 self.render_preview_results(frame, inner);
             }
             Phase::Parsing => {
                 let spinner_char = SPINNER[self.spinner_frame];
                 let msg = Line::from(vec![
-                    Span::styled(
-                        format!("{} ", spinner_char),
-                        Style::default().fg(ACCENT),
-                    ),
-                    Span::styled(
-                        tr("quicklog-parsing"),
-                        Style::default().fg(Color::White),
-                    ),
+                    Span::styled(format!("{} ", spinner_char), Style::default().fg(ACCENT)),
+                    Span::styled(tr("quicklog-parsing"), Style::default().fg(Color::White)),
                 ]);
                 frame.render_widget(Paragraph::new(vec![msg]).wrap(Wrap { trim: false }), inner);
             }
@@ -503,13 +590,13 @@ impl QuickLogScreen {
 
         for (i, result) in self.parsed_results.iter().enumerate() {
             let is_selected = i == self.selected_result;
-            let marker = if result.matched { "\u{2713}" } else { "\u{2717}" };
-            let marker_color = if result.matched { GREEN } else { RED };
-            let name_color = if result.matched {
-                Color::White
+            let marker = if result.matched {
+                "\u{2713}"
             } else {
-                YELLOW
+                "\u{2717}"
             };
+            let marker_color = if result.matched { GREEN } else { RED };
+            let name_color = if result.matched { Color::White } else { YELLOW };
             let name_style = if is_selected {
                 Style::default().fg(name_color).add_modifier(Modifier::BOLD)
             } else {
@@ -555,7 +642,10 @@ impl QuickLogScreen {
             .take(visible_height)
             .collect();
 
-        frame.render_widget(Paragraph::new(display_lines).wrap(Wrap { trim: false }), area);
+        frame.render_widget(
+            Paragraph::new(display_lines).wrap(Wrap { trim: false }),
+            area,
+        );
     }
 
     fn build_shortcuts(&self) -> Line<'static> {
@@ -567,10 +657,7 @@ impl QuickLogScreen {
                         format!("{}: ", tr("quicklog-date")),
                         Style::default().fg(Color::DarkGray),
                     ),
-                    Span::styled(
-                        self.log_date.clone(),
-                        Style::default().fg(Color::White),
-                    ),
+                    Span::styled(self.log_date.clone(), Style::default().fg(Color::White)),
                     Span::styled("  ", Style::default()),
                     Span::styled("[Ctrl+S]", Style::default().fg(ACCENT)),
                     Span::styled(
@@ -617,10 +704,7 @@ impl QuickLogScreen {
                     format!("{}: ", tr("quicklog-date")),
                     Style::default().fg(Color::DarkGray),
                 ),
-                Span::styled(
-                    self.log_date.clone(),
-                    Style::default().fg(Color::White),
-                ),
+                Span::styled(self.log_date.clone(), Style::default().fg(Color::White)),
                 Span::styled("  ", Style::default()),
                 Span::styled("[j/k]", Style::default().fg(ACCENT)),
                 Span::styled(
@@ -648,63 +732,60 @@ impl QuickLogScreen {
                     Style::default().fg(Color::DarkGray),
                 ),
             ]),
-            Phase::BrowseAbbreviations => {
-                Line::from(vec![
-                    Span::styled("[j/k]", Style::default().fg(ACCENT)),
-                    Span::styled(
-                        format!(" {}  ", tr("key-navigate")),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                    Span::styled("[a]", Style::default().fg(ACCENT)),
-                    Span::styled(
-                        format!(" {}  ", tr("key-add")),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                    Span::styled("[e]", Style::default().fg(ACCENT)),
-                    Span::styled(
-                        format!(" {}  ", tr("key-edit")),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                    Span::styled("[d]", Style::default().fg(ACCENT)),
-                    Span::styled(
-                        format!(" {}  ", tr("key-delete")),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                    Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                    Span::styled(
-                        format!(" {}", tr("key-back")),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                ])
-            }
-            Phase::AddAbbrShort | Phase::AddAbbrFull | Phase::EditAbbrShort | Phase::EditAbbrFull => {
-                Line::from(vec![
-                    Span::styled(" [Enter]", Style::default().fg(ACCENT)),
-                    Span::styled(
-                        format!(" {}  ", tr("key-confirm")),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                    Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                    Span::styled(
-                        format!(" {}", tr("key-cancel")),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                ])
-            }
-            Phase::ConfirmDeleteAbbr => {
-                Line::from(vec![
-                    Span::styled("[y]", Style::default().fg(ACCENT)),
-                    Span::styled(
-                        format!(" {}  ", tr("key-yes")),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                    Span::styled("[n]", Style::default().fg(ACCENT)),
-                    Span::styled(
-                        format!(" {}", tr("key-no")),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                ])
-            }
+            Phase::BrowseAbbreviations => Line::from(vec![
+                Span::styled("[j/k]", Style::default().fg(ACCENT)),
+                Span::styled(
+                    format!(" {}  ", tr("key-navigate")),
+                    Style::default().fg(Color::DarkGray),
+                ),
+                Span::styled("[a]", Style::default().fg(ACCENT)),
+                Span::styled(
+                    format!(" {}  ", tr("key-add")),
+                    Style::default().fg(Color::DarkGray),
+                ),
+                Span::styled("[e]", Style::default().fg(ACCENT)),
+                Span::styled(
+                    format!(" {}  ", tr("key-edit")),
+                    Style::default().fg(Color::DarkGray),
+                ),
+                Span::styled("[d]", Style::default().fg(ACCENT)),
+                Span::styled(
+                    format!(" {}  ", tr("key-delete")),
+                    Style::default().fg(Color::DarkGray),
+                ),
+                Span::styled("[Esc]", Style::default().fg(ACCENT)),
+                Span::styled(
+                    format!(" {}", tr("key-back")),
+                    Style::default().fg(Color::DarkGray),
+                ),
+            ]),
+            Phase::AddAbbrShort
+            | Phase::AddAbbrFull
+            | Phase::EditAbbrShort
+            | Phase::EditAbbrFull => Line::from(vec![
+                Span::styled(" [Enter]", Style::default().fg(ACCENT)),
+                Span::styled(
+                    format!(" {}  ", tr("key-confirm")),
+                    Style::default().fg(Color::DarkGray),
+                ),
+                Span::styled("[Esc]", Style::default().fg(ACCENT)),
+                Span::styled(
+                    format!(" {}", tr("key-cancel")),
+                    Style::default().fg(Color::DarkGray),
+                ),
+            ]),
+            Phase::ConfirmDeleteAbbr => Line::from(vec![
+                Span::styled("[y]", Style::default().fg(ACCENT)),
+                Span::styled(
+                    format!(" {}  ", tr("key-yes")),
+                    Style::default().fg(Color::DarkGray),
+                ),
+                Span::styled("[n]", Style::default().fg(ACCENT)),
+                Span::styled(
+                    format!(" {}", tr("key-no")),
+                    Style::default().fg(Color::DarkGray),
+                ),
+            ]),
         }
     }
 
@@ -731,9 +812,7 @@ impl QuickLogScreen {
                 self.open_abbr_browse();
                 Action::None
             }
-            KeyCode::Esc => {
-                Action::Navigate(Screen::Dashboard)
-            }
+            KeyCode::Esc => Action::Navigate(Screen::Dashboard),
             KeyCode::Enter => {
                 // Insert new line
                 let remainder = self.input_lines[self.current_line][self.cursor_pos..].to_string();
@@ -746,14 +825,18 @@ impl QuickLogScreen {
             KeyCode::Up => {
                 if self.current_line > 0 {
                     self.current_line -= 1;
-                    self.cursor_pos = self.cursor_pos.min(self.input_lines[self.current_line].len());
+                    self.cursor_pos = self
+                        .cursor_pos
+                        .min(self.input_lines[self.current_line].len());
                 }
                 Action::None
             }
             KeyCode::Down => {
                 if self.current_line < self.input_lines.len() - 1 {
                     self.current_line += 1;
-                    self.cursor_pos = self.cursor_pos.min(self.input_lines[self.current_line].len());
+                    self.cursor_pos = self
+                        .cursor_pos
+                        .min(self.input_lines[self.current_line].len());
                 }
                 Action::None
             }
@@ -889,8 +972,7 @@ impl QuickLogScreen {
                 Action::None
             }
             KeyCode::Enter | KeyCode::Char('s')
-                if key.code == KeyCode::Enter
-                    || key.modifiers.contains(KeyModifiers::CONTROL) =>
+                if key.code == KeyCode::Enter || key.modifiers.contains(KeyModifiers::CONTROL) =>
             {
                 self.save_all(db)
             }
@@ -962,24 +1044,22 @@ impl QuickLogScreen {
 
         for entry in &self.parsed_results {
             // Find practice by name (case-insensitive match)
-            let practice = match self.practices.iter().find(|p| {
-                p.name.eq_ignore_ascii_case(&entry.practice_name)
-            }) {
+            let practice = match self
+                .practices
+                .iter()
+                .find(|p| p.name.eq_ignore_ascii_case(&entry.practice_name))
+            {
                 Some(p) => p,
                 None => {
-                    self.status_msg = Some((format!("Practice not found: {}", entry.practice_name), true));
+                    self.status_msg =
+                        Some((format!("Practice not found: {}", entry.practice_name), true));
                     return Action::None;
                 }
             };
 
-            if let Err(e) = db.create_log_at(
-                practice.id,
-                &date,
-                &entry.sets,
-                Some(&raw_text),
-                None,
-                None,
-            ) {
+            if let Err(e) =
+                db.create_log_at(practice.id, &date, &entry.sets, Some(&raw_text), None, None)
+            {
                 self.status_msg = Some((format!("Error: {}", e), true));
                 return Action::None;
             }
@@ -1114,7 +1194,11 @@ impl QuickLogScreen {
                 self.phase = self.pre_abbr_phase.clone();
             }
             _ => {
-                Self::handle_abbr_text_input(&mut self.abbr_short_input, &mut self.abbr_short_cursor, key);
+                Self::handle_abbr_text_input(
+                    &mut self.abbr_short_input,
+                    &mut self.abbr_short_cursor,
+                    key,
+                );
             }
         }
         Action::None
@@ -1157,7 +1241,11 @@ impl QuickLogScreen {
                 self.phase = self.pre_abbr_phase.clone();
             }
             _ => {
-                Self::handle_abbr_text_input(&mut self.abbr_full_input, &mut self.abbr_full_cursor, key);
+                Self::handle_abbr_text_input(
+                    &mut self.abbr_full_input,
+                    &mut self.abbr_full_cursor,
+                    key,
+                );
             }
         }
         Action::None
