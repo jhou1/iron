@@ -203,10 +203,21 @@ impl DashboardScreen {
                 ),
             ])]
         } else if self.mode == DashboardMode::Normal {
+            let log_lbl = tr("footer-group-log");
+            let rev_lbl = tr("footer-group-review");
+            let man_lbl = tr("footer-group-manage");
+            let sys_lbl = tr("footer-group-system");
+            let max_lbl = log_lbl.width().max(rev_lbl.width()).max(man_lbl.width()).max(sys_lbl.width());
+
+            let log_pad = " ".repeat(max_lbl.saturating_sub(log_lbl.width()));
+            let rev_pad = " ".repeat(max_lbl.saturating_sub(rev_lbl.width()));
+            let man_pad = " ".repeat(max_lbl.saturating_sub(man_lbl.width()));
+            let sys_pad = " ".repeat(max_lbl.saturating_sub(sys_lbl.width()));
+
             vec![
                 Line::from(vec![
                     Span::styled(
-                        format!(" {}: ", tr("footer-group-log")),
+                        format!(" {}{}: ", log_pad, log_lbl),
                         Style::default().fg(Color::DarkGray),
                     ),
                     Span::styled("[l]", Style::default().fg(ACCENT)),
@@ -219,7 +230,7 @@ impl DashboardScreen {
                 ]),
                 Line::from(vec![
                     Span::styled(
-                        format!(" {}: ", tr("footer-group-review")),
+                        format!(" {}{}: ", rev_pad, rev_lbl),
                         Style::default().fg(Color::DarkGray),
                     ),
                     Span::styled("[h]", Style::default().fg(ACCENT)),
@@ -232,7 +243,7 @@ impl DashboardScreen {
                 ]),
                 Line::from(vec![
                     Span::styled(
-                        format!(" {}: ", tr("footer-group-manage")),
+                        format!(" {}{}: ", man_pad, man_lbl),
                         Style::default().fg(Color::DarkGray),
                     ),
                     Span::styled("[e]", Style::default().fg(ACCENT)),
@@ -250,7 +261,7 @@ impl DashboardScreen {
                 ]),
                 Line::from(vec![
                     Span::styled(
-                        format!(" {}: ", tr("footer-group-system")),
+                        format!(" {}{}: ", sys_pad, sys_lbl),
                         Style::default().fg(Color::DarkGray),
                     ),
                     Span::styled("[Esc]", Style::default().fg(ACCENT)),
