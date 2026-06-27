@@ -214,6 +214,20 @@ impl DashboardScreen {
             let man_pad = " ".repeat(max_lbl.saturating_sub(man_lbl.width()));
             let sys_pad = " ".repeat(max_lbl.saturating_sub(sys_lbl.width()));
 
+            let log_key = tr("key-log");
+            let rev_key = tr("key-history");
+            let man_key = tr("key-practices");
+            
+            let log_col1_len = 3 + log_key.width(); // "[l]" = 3
+            let rev_col1_len = 3 + rev_key.width(); // "[h]" = 3
+            let man_col1_len = 3 + man_key.width(); // "[e]" = 3
+            
+            let max_col1 = log_col1_len.max(rev_col1_len).max(man_col1_len);
+            
+            let log_col1_pad = " ".repeat(max_col1.saturating_sub(log_col1_len) + 1);
+            let rev_col1_pad = " ".repeat(max_col1.saturating_sub(rev_col1_len) + 1);
+            let man_col1_pad = " ".repeat(max_col1.saturating_sub(man_col1_len) + 1);
+
             vec![
                 Line::from(vec![
                     Span::styled(
@@ -222,7 +236,7 @@ impl DashboardScreen {
                     ),
                     Span::styled("[l]", Style::default().fg(ACCENT)),
                     Span::styled(
-                        format!("{} ", tr("key-log")),
+                        format!("{}{}", log_key, log_col1_pad),
                         Style::default().fg(Color::DarkGray),
                     ),
                     Span::styled("[w]", Style::default().fg(ACCENT)),
@@ -235,7 +249,7 @@ impl DashboardScreen {
                     ),
                     Span::styled("[h]", Style::default().fg(ACCENT)),
                     Span::styled(
-                        format!("{} ", tr("key-history")),
+                        format!("{}{}", rev_key, rev_col1_pad),
                         Style::default().fg(Color::DarkGray),
                     ),
                     Span::styled("[t]", Style::default().fg(ACCENT)),
@@ -248,7 +262,7 @@ impl DashboardScreen {
                     ),
                     Span::styled("[e]", Style::default().fg(ACCENT)),
                     Span::styled(
-                        format!("{} ", tr("key-practices")),
+                        format!("{}{}", man_key, man_col1_pad),
                         Style::default().fg(Color::DarkGray),
                     ),
                     Span::styled("[g]", Style::default().fg(ACCENT)),

@@ -15,10 +15,10 @@ fn paragraph_widgets_must_wrap_user_content() {
     // When adding entries, include a brief reason.
     let allowlist: HashSet<&str> = [
         "dashboard.rs:152",
-        "dashboard.rs:285",
-        "dashboard.rs:472",
-        "dashboard.rs:492",
-        "dashboard.rs:527",
+        "dashboard.rs:299",
+        "dashboard.rs:486",
+        "dashboard.rs:506",
+        "dashboard.rs:541",
         "goals.rs:451",
         "goals.rs:572",
         "history.rs:133",
