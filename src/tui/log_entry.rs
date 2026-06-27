@@ -42,6 +42,8 @@ pub struct LogEntryScreen {
     filter_cursor: usize,
     filtering: bool,
     selected: usize,
+    scroll: usize,
+    list_height: usize,
     phase: Phase,
     chosen_practice: Option<Practice>,
     sets: Vec<SetData>,
@@ -81,6 +83,8 @@ impl LogEntryScreen {
             filter_cursor: 0,
             filtering: false,
             selected: 0,
+            scroll: 0,
+            list_height: 0,
             phase: Phase::SelectPractice,
             chosen_practice: None,
             sets: Vec::new(),
@@ -129,6 +133,8 @@ impl LogEntryScreen {
             filter_cursor: 0,
             filtering: false,
             selected: 0,
+            scroll: 0,
+            list_height: 0,
             phase: Phase::EnterLog,
             chosen_practice: practice,
             sets,
@@ -157,7 +163,7 @@ impl LogEntryScreen {
         })
     }
 
-    pub fn render(&self, frame: &mut Frame) {
+    pub fn render(&mut self, frame: &mut Frame) {
         match self.phase {
             Phase::SelectPractice => self.render_select_practice(frame),
             Phase::EnterLog => self.render_enter_log(frame),
@@ -174,7 +180,7 @@ impl LogEntryScreen {
 
     // ── Phase 1: SelectPractice ───────────────────────────────────────
 
-    fn render_select_practice(&self, frame: &mut Frame) {
+    fn render_select_practice(&mut self, frame: &mut Frame) {
         let area = centered_area(frame.area(), CONTENT_WIDTH);
 
         let chunks = Layout::default()
@@ -242,7 +248,12 @@ impl LogEntryScreen {
             Span::styled(&type_header, Style::default().fg(Color::DarkGray)),
         ])];
 
-        for (i, &idx) in self.filtered_indices.iter().enumerate() {
+        let visible_rows = inner.height.saturating_sub(1) as usize; // -1 for header
+        self.list_height = visible_rows;
+        let end = (self.scroll + visible_rows).min(self.filtered_indices.len());
+
+        for i in self.scroll..end {
+            let idx = self.filtered_indices[i];
             let practice = &self.practices[idx];
             let marker = if i == self.selected { "> " } else { "  " };
             let name_style = if i == self.selected {
@@ -263,8 +274,8 @@ impl LogEntryScreen {
         }
         frame.render_widget(Paragraph::new(all_lines), inner);
 
-        if !self.filtered_indices.is_empty() {
-            highlight_row(frame, inner, self.selected as u16 + 1); // +1 for header
+        if !self.filtered_indices.is_empty() && self.selected >= self.scroll && self.selected < end {
+            highlight_row(frame, inner, (self.selected - self.scroll) as u16 + 1); // +1 for header
         }
 
         render_status_line(frame, chunks[2], &self.status_msg);
@@ -385,6 +396,7 @@ impl LogEntryScreen {
             KeyCode::Char('j') | KeyCode::Down => {
                 if !self.filtered_indices.is_empty() {
                     self.selected = (self.selected + 1) % self.filtered_indices.len();
+                    self.adjust_scroll();
                 }
                 Action::None
             }
@@ -395,6 +407,7 @@ impl LogEntryScreen {
                     } else {
                         self.selected - 1
                     };
+                    self.adjust_scroll();
                 }
                 Action::None
             }
@@ -418,6 +431,14 @@ impl LogEntryScreen {
         }
     }
 
+    fn adjust_scroll(&mut self) {
+        if self.selected < self.scroll {
+            self.scroll = self.selected;
+        } else if self.selected >= self.scroll + self.list_height && self.list_height > 0 {
+            self.scroll = self.selected + 1 - self.list_height;
+        }
+    }
+
     fn apply_filter(&mut self) {
         let lower = self.filter_text.to_lowercase();
         self.filtered_indices = self
@@ -428,11 +449,12 @@ impl LogEntryScreen {
             .map(|(i, _)| i)
             .collect();
         self.selected = 0;
+        self.scroll = 0;
     }
 
     // ── Unified Log Entry Screen ─────────────────────────────────────
 
-    fn render_enter_log(&self, frame: &mut Frame) {
+    fn render_enter_log(&mut self, frame: &mut Frame) {
         let area = centered_area(frame.area(), CONTENT_WIDTH);
         let practice = self.chosen_practice.as_ref().unwrap();
 
