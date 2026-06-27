@@ -228,6 +228,20 @@ impl DashboardScreen {
             let rev_col1_pad = " ".repeat(max_col1.saturating_sub(rev_col1_len) + 1);
             let man_col1_pad = " ".repeat(max_col1.saturating_sub(man_col1_len) + 1);
 
+            let log_key2 = tr("key-quick-log");
+            let rev_key2 = tr("key-trends");
+            let man_key2 = tr("key-goals");
+
+            let log_col2_len = 3 + log_key2.width(); // "[w]" = 3
+            let rev_col2_len = 3 + rev_key2.width(); // "[t]" = 3
+            let man_col2_len = 3 + man_key2.width(); // "[g]" = 3
+
+            let max_col2 = log_col2_len.max(rev_col2_len).max(man_col2_len);
+
+            let log_col2_pad = " ".repeat(max_col2.saturating_sub(log_col2_len) + 1);
+            let rev_col2_pad = " ".repeat(max_col2.saturating_sub(rev_col2_len) + 1);
+            let man_col2_pad = " ".repeat(max_col2.saturating_sub(man_col2_len) + 1);
+
             vec![
                 Line::from(vec![
                     Span::styled(
@@ -240,7 +254,7 @@ impl DashboardScreen {
                         Style::default().fg(Color::DarkGray),
                     ),
                     Span::styled("[w]", Style::default().fg(ACCENT)),
-                    Span::styled(tr("key-quick-log"), Style::default().fg(Color::DarkGray)),
+                    Span::styled(format!("{}{}", log_key2, log_col2_pad), Style::default().fg(Color::DarkGray)),
                 ]),
                 Line::from(vec![
                     Span::styled(
@@ -253,7 +267,7 @@ impl DashboardScreen {
                         Style::default().fg(Color::DarkGray),
                     ),
                     Span::styled("[t]", Style::default().fg(ACCENT)),
-                    Span::styled(tr("key-trends"), Style::default().fg(Color::DarkGray)),
+                    Span::styled(format!("{}{}", rev_key2, rev_col2_pad), Style::default().fg(Color::DarkGray)),
                 ]),
                 Line::from(vec![
                     Span::styled(
@@ -267,7 +281,7 @@ impl DashboardScreen {
                     ),
                     Span::styled("[g]", Style::default().fg(ACCENT)),
                     Span::styled(
-                        format!("{} ", tr("key-goals")),
+                        format!("{}{}", man_key2, man_col2_pad),
                         Style::default().fg(Color::DarkGray),
                     ),
                     Span::styled("[Q]", Style::default().fg(ACCENT)),

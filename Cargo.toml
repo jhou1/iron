@@ -1,6 +1,6 @@
 [package]
 name = "iron"
-version = "2.7.71"
+version = "2.7.72"
 edition = "2021"
 description = "A beautiful TUI for tracking training records"
 
