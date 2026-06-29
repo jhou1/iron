@@ -74,6 +74,7 @@ pub struct Log {
     pub note: Option<String>,
     pub warm_up: Option<String>,
     pub cool_down: Option<String>,
+    pub rpe: Option<u8>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -120,6 +121,7 @@ pub struct LogEntry {
     #[allow(dead_code)]
     pub practice_type: PracticeType,
     pub sets: Vec<Set>,
+    pub rpe: Option<u8>,
 }
 
 impl LogEntry {

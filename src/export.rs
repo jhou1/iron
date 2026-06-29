@@ -52,6 +52,8 @@ pub struct ExportLog {
     pub warm_up: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub cool_down: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub rpe: Option<u8>,
     #[serde(rename = "training_sets")]
     pub sets: Vec<ExportSet>,
 }
@@ -155,6 +157,7 @@ pub fn export_to_json(db: &Database, path: Option<PathBuf>) -> Result<()> {
                 note: entry.log.note.clone(),
                 warm_up: entry.log.warm_up.clone(),
                 cool_down: entry.log.cool_down.clone(),
+                rpe: entry.rpe,
                 sets,
             }
         })
