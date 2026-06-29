@@ -15,6 +15,7 @@ pub struct ExportData {
     pub version: u32,
     pub exported_at: String,
     pub practices: Vec<ExportPractice>,
+    #[serde(rename = "training_sessions", alias = "logs")]
     pub logs: Vec<ExportLog>,
     #[serde(default)]
     pub goals: Vec<ExportGoal>,
@@ -43,6 +44,7 @@ pub struct ExportPractice {
 pub struct ExportLog {
     pub id: i64,
     pub practice: String,
+    #[serde(rename = "created_at", alias = "logged_at")]
     pub logged_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
@@ -50,6 +52,7 @@ pub struct ExportLog {
     pub warm_up: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub cool_down: Option<String>,
+    #[serde(rename = "training_sets", alias = "sets")]
     pub sets: Vec<ExportSet>,
 }
 
