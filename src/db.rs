@@ -70,6 +70,29 @@ impl Database {
     }
 
     fn init_schema(&self) -> Result<()> {
+        let check_logs: i64 = self.conn.query_row(
+            "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='logs'",
+            [],
+            |row| row.get(0),
+        ).unwrap_or(0);
+
+        if check_logs > 0 {
+            self.conn.execute("PRAGMA foreign_keys = OFF", [])?;
+            self.conn.execute("ALTER TABLE logs RENAME TO training_sessions", [])?;
+            self.conn.execute("ALTER TABLE training_sessions RENAME COLUMN logged_at TO created_at", [])?;
+        }
+
+        let check_sets: i64 = self.conn.query_row(
+            "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='sets'",
+            [],
+            |row| row.get(0),
+        ).unwrap_or(0);
+
+        if check_sets > 0 {
+            self.conn.execute("ALTER TABLE sets RENAME TO training_sets", [])?;
+            self.conn.execute("ALTER TABLE training_sets RENAME COLUMN log_id TO training_session_id", [])?;
+        }
+
         self.conn.execute_batch(
             "PRAGMA foreign_keys = ON;
 
