@@ -80,16 +80,16 @@ impl Database {
                 created_at TEXT NOT NULL
             );
 
-            CREATE TABLE IF NOT EXISTS logs (
+            CREATE TABLE IF NOT EXISTS training_sessions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 practice_id INTEGER NOT NULL REFERENCES practices(id),
-                logged_at TEXT NOT NULL,
+                created_at TEXT NOT NULL,
                 note TEXT
             );
 
-            CREATE TABLE IF NOT EXISTS sets (
+            CREATE TABLE IF NOT EXISTS training_sets (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                log_id INTEGER NOT NULL REFERENCES logs(id) ON DELETE CASCADE,
+                training_session_id INTEGER NOT NULL REFERENCES training_sessions(id) ON DELETE CASCADE,
                 set_number INTEGER NOT NULL,
                 weight REAL,
                 reps INTEGER,
@@ -148,10 +148,10 @@ impl Database {
             .execute("ALTER TABLE milestones ADD COLUMN completed_at TEXT", []);
         let _ = self
             .conn
-            .execute("ALTER TABLE logs ADD COLUMN warm_up TEXT", []);
+            .execute("ALTER TABLE training_sessions ADD COLUMN warm_up TEXT", []);
         let _ = self
             .conn
-            .execute("ALTER TABLE logs ADD COLUMN cool_down TEXT", []);
+            .execute("ALTER TABLE training_sessions ADD COLUMN cool_down TEXT", []);
         let _ = self.conn.execute(
             "ALTER TABLE practices ADD COLUMN active INTEGER NOT NULL DEFAULT 1",
             [],
@@ -266,17 +266,17 @@ impl Database {
         // Cascade: delete associated sets and logs first
         let mut stmt = self
             .conn
-            .prepare("SELECT id FROM logs WHERE practice_id = ?1")?;
+            .prepare("SELECT id FROM training_sessions WHERE practice_id = ?1")?;
         let log_ids: Vec<i64> = stmt
             .query_map(params![id], |row| row.get(0))?
             .collect::<Result<Vec<_>, _>>()?;
         drop(stmt);
         for log_id in log_ids {
             self.conn
-                .execute("DELETE FROM sets WHERE log_id = ?1", params![log_id])?;
+                .execute("DELETE FROM training_sets WHERE training_session_id = ?1", params![log_id])?;
         }
         self.conn
-            .execute("DELETE FROM logs WHERE practice_id = ?1", params![id])?;
+            .execute("DELETE FROM training_sessions WHERE practice_id = ?1", params![id])?;
         self.conn
             .execute("DELETE FROM practices WHERE id = ?1", params![id])?;
         Ok(())
@@ -295,7 +295,7 @@ impl Database {
     ) -> Result<i64> {
         let now = Local::now().naive_local();
         self.conn.execute(
-            "INSERT INTO logs (practice_id, logged_at, note, warm_up, cool_down) VALUES (?1, ?2, ?3, ?4, ?5)",
+            "INSERT INTO training_sessions (practice_id, created_at, note, warm_up, cool_down) VALUES (?1, ?2, ?3, ?4, ?5)",
             params![practice_id, now.to_string(), note, warm_up, cool_down],
         )?;
         let log_id = self.conn.last_insert_rowid();
@@ -314,7 +314,7 @@ impl Database {
         cool_down: Option<&str>,
     ) -> Result<i64> {
         self.conn.execute(
-            "INSERT INTO logs (practice_id, logged_at, note, warm_up, cool_down) VALUES (?1, ?2, ?3, ?4, ?5)",
+            "INSERT INTO training_sessions (practice_id, created_at, note, warm_up, cool_down) VALUES (?1, ?2, ?3, ?4, ?5)",
             params![practice_id, logged_at.to_string(), note, warm_up, cool_down],
         )?;
         let log_id = self.conn.last_insert_rowid();
@@ -333,18 +333,18 @@ impl Database {
     ) -> Result<()> {
         if let Some(dt) = logged_at {
             self.conn.execute(
-                "UPDATE logs SET note = ?1, logged_at = ?2, warm_up = ?3, cool_down = ?4 WHERE id = ?5",
+                "UPDATE training_sessions SET note = ?1, created_at = ?2, warm_up = ?3, cool_down = ?4 WHERE id = ?5",
                 params![note, dt.to_string(), warm_up, cool_down, log_id],
             )?;
         } else {
             self.conn.execute(
-                "UPDATE logs SET note = ?1, warm_up = ?2, cool_down = ?3 WHERE id = ?4",
+                "UPDATE training_sessions SET note = ?1, warm_up = ?2, cool_down = ?3 WHERE id = ?4",
                 params![note, warm_up, cool_down, log_id],
             )?;
         }
         // Delete old sets and insert new ones
         self.conn
-            .execute("DELETE FROM sets WHERE log_id = ?1", params![log_id])?;
+            .execute("DELETE FROM training_sets WHERE training_session_id = ?1", params![log_id])?;
         self.insert_sets(log_id, sets)?;
         Ok(())
     }
@@ -352,9 +352,9 @@ impl Database {
     pub fn delete_log(&self, log_id: i64) -> Result<()> {
         // Delete sets first (cascade should handle it, but be explicit)
         self.conn
-            .execute("DELETE FROM sets WHERE log_id = ?1", params![log_id])?;
+            .execute("DELETE FROM training_sets WHERE training_session_id = ?1", params![log_id])?;
         self.conn
-            .execute("DELETE FROM logs WHERE id = ?1", params![log_id])?;
+            .execute("DELETE FROM training_sessions WHERE id = ?1", params![log_id])?;
         Ok(())
     }
 
@@ -372,7 +372,7 @@ impl Database {
 
     fn insert_sets(&self, log_id: i64, sets: &[SetData]) -> Result<()> {
         let mut stmt = self.conn.prepare(
-            "INSERT INTO sets (log_id, set_number, weight, reps, distance, duration)
+            "INSERT INTO training_sets (training_session_id, set_number, weight, reps, distance, duration)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         )?;
         for (i, set_data) in sets.iter().enumerate() {
@@ -398,11 +398,11 @@ impl Database {
 
     pub fn list_logs_all(&self) -> Result<Vec<LogEntry>> {
         let mut stmt = self.conn.prepare(
-            "SELECT l.id, l.practice_id, l.logged_at, l.note, l.warm_up, l.cool_down, p.name, p.practice_type
-             FROM logs l
+            "SELECT l.id, l.practice_id, l.created_at, l.note, l.warm_up, l.cool_down, p.name, p.practice_type
+             FROM training_sessions l
              JOIN practices p ON l.practice_id = p.id
              WHERE p.active = 1
-             ORDER BY l.logged_at DESC",
+             ORDER BY l.created_at DESC",
         )?;
         let rows = stmt.query_map([], |row| {
             Ok((
@@ -430,7 +430,7 @@ impl Database {
                 pt_str,
             ) = row?;
             let logged_at = NaiveDateTime::parse_from_str(&logged_at_str, "%Y-%m-%d %H:%M:%S%.f")
-                .context("failed to parse logged_at")?;
+                .context("failed to parse created_at")?;
             let practice_type: PracticeType =
                 pt_str.parse().map_err(|e: String| anyhow::anyhow!(e))?;
             let sets = self.load_sets(log_id, &practice_type)?;
@@ -454,11 +454,11 @@ impl Database {
     pub fn list_logs_recent(&self, days: i64) -> Result<Vec<LogEntry>> {
         let cutoff = Local::now().naive_local() - chrono::Duration::days(days);
         let mut stmt = self.conn.prepare(
-            "SELECT l.id, l.practice_id, l.logged_at, l.note, l.warm_up, l.cool_down, p.name, p.practice_type
-             FROM logs l
+            "SELECT l.id, l.practice_id, l.created_at, l.note, l.warm_up, l.cool_down, p.name, p.practice_type
+             FROM training_sessions l
              JOIN practices p ON l.practice_id = p.id
-             WHERE l.logged_at >= ?1 AND p.active = 1
-             ORDER BY l.logged_at DESC",
+             WHERE l.created_at >= ?1 AND p.active = 1
+             ORDER BY l.created_at DESC",
         )?;
         let rows = stmt.query_map(params![cutoff.to_string()], |row| {
             Ok((
@@ -486,7 +486,7 @@ impl Database {
                 pt_str,
             ) = row?;
             let logged_at = NaiveDateTime::parse_from_str(&logged_at_str, "%Y-%m-%d %H:%M:%S%.f")
-                .context("failed to parse logged_at")?;
+                .context("failed to parse created_at")?;
             let practice_type: PracticeType =
                 pt_str.parse().map_err(|e: String| anyhow::anyhow!(e))?;
             let sets = self.load_sets(log_id, &practice_type)?;
@@ -510,11 +510,11 @@ impl Database {
     pub fn list_logs_for_practice(&self, practice_id: i64, days: i64) -> Result<Vec<LogEntry>> {
         let cutoff = Local::now().naive_local() - chrono::Duration::days(days);
         let mut stmt = self.conn.prepare(
-            "SELECT l.id, l.practice_id, l.logged_at, l.note, l.warm_up, l.cool_down, p.name, p.practice_type
-             FROM logs l
+            "SELECT l.id, l.practice_id, l.created_at, l.note, l.warm_up, l.cool_down, p.name, p.practice_type
+             FROM training_sessions l
              JOIN practices p ON l.practice_id = p.id
-             WHERE l.practice_id = ?1 AND l.logged_at >= ?2
-             ORDER BY l.logged_at DESC",
+             WHERE l.practice_id = ?1 AND l.created_at >= ?2
+             ORDER BY l.created_at DESC",
         )?;
         let rows = stmt.query_map(params![practice_id, cutoff.to_string()], |row| {
             Ok((
@@ -534,7 +534,7 @@ impl Database {
             let (log_id, pid, logged_at_str, note, warm_up, cool_down, practice_name, pt_str) =
                 row?;
             let logged_at = NaiveDateTime::parse_from_str(&logged_at_str, "%Y-%m-%d %H:%M:%S%.f")
-                .context("failed to parse logged_at")?;
+                .context("failed to parse created_at")?;
             let practice_type: PracticeType =
                 pt_str.parse().map_err(|e: String| anyhow::anyhow!(e))?;
             let sets = self.load_sets(log_id, &practice_type)?;
@@ -559,10 +559,10 @@ impl Database {
     pub fn heatmap_counts(&self, days: i64) -> Result<Vec<(String, i64)>> {
         let cutoff = Local::now().naive_local() - chrono::Duration::days(days);
         let mut stmt = self.conn.prepare(
-            "SELECT substr(l.logged_at, 1, 10) AS day, COUNT(*) AS cnt
-             FROM logs l
+            "SELECT substr(l.created_at, 1, 10) AS day, COUNT(*) AS cnt
+             FROM training_sessions l
              JOIN practices p ON l.practice_id = p.id
-             WHERE l.logged_at >= ?1 AND p.active = 1
+             WHERE l.created_at >= ?1 AND p.active = 1
              GROUP BY day
              ORDER BY day",
         )?;
@@ -581,17 +581,17 @@ impl Database {
     pub fn aggregate_stats(&self, days: i64) -> Result<AggregateStats> {
         let cutoff = Local::now().naive_local() - chrono::Duration::days(days);
         let sessions: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM logs l JOIN practices p ON l.practice_id = p.id WHERE l.logged_at >= ?1 AND p.active = 1",
+            "SELECT COUNT(*) FROM training_sessions l JOIN practices p ON l.practice_id = p.id WHERE l.created_at >= ?1 AND p.active = 1",
             params![cutoff.to_string()],
             |row| row.get(0),
         )?;
 
         let mut stmt = self.conn.prepare(
             "SELECT s.weight, s.reps, s.distance, s.duration
-             FROM sets s
-             JOIN logs l ON s.log_id = l.id
+             FROM training_sets s
+             JOIN training_sessions l ON s.training_session_id = l.id
              JOIN practices p ON l.practice_id = p.id
-             WHERE l.logged_at >= ?1 AND p.active = 1",
+             WHERE l.created_at >= ?1 AND p.active = 1",
         )?;
         let rows = stmt.query_map(params![cutoff.to_string()], |row| {
             Ok((
@@ -638,10 +638,10 @@ impl Database {
     /// Exports all log entries (all time).
     pub fn export_all(&self) -> Result<Vec<LogEntry>> {
         let mut stmt = self.conn.prepare(
-            "SELECT l.id, l.practice_id, l.logged_at, l.note, l.warm_up, l.cool_down, p.name, p.practice_type
-             FROM logs l
+            "SELECT l.id, l.practice_id, l.created_at, l.note, l.warm_up, l.cool_down, p.name, p.practice_type
+             FROM training_sessions l
              JOIN practices p ON l.practice_id = p.id
-             ORDER BY l.logged_at DESC",
+             ORDER BY l.created_at DESC",
         )?;
         let rows = stmt.query_map([], |row| {
             Ok((
@@ -669,7 +669,7 @@ impl Database {
                 pt_str,
             ) = row?;
             let logged_at = NaiveDateTime::parse_from_str(&logged_at_str, "%Y-%m-%d %H:%M:%S%.f")
-                .context("failed to parse logged_at")?;
+                .context("failed to parse created_at")?;
             let practice_type: PracticeType =
                 pt_str.parse().map_err(|e: String| anyhow::anyhow!(e))?;
             let sets = self.load_sets(log_id, &practice_type)?;
@@ -693,9 +693,9 @@ impl Database {
     /// Check if a log already exists for a practice at a specific time (for import dedup).
     pub fn log_exists(&self, practice_name: &str, logged_at: &NaiveDateTime) -> Result<bool> {
         let count: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM logs l
+            "SELECT COUNT(*) FROM training_sessions l
              JOIN practices p ON l.practice_id = p.id
-             WHERE p.name = ?1 AND l.logged_at = ?2",
+             WHERE p.name = ?1 AND l.created_at = ?2",
             params![practice_name, logged_at.to_string()],
             |row| row.get(0),
         )?;
@@ -706,9 +706,9 @@ impl Database {
 
     fn load_sets(&self, log_id: i64, practice_type: &PracticeType) -> Result<Vec<Set>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, log_id, set_number, weight, reps, distance, duration
-             FROM sets
-             WHERE log_id = ?1
+            "SELECT id, training_session_id, set_number, weight, reps, distance, duration
+             FROM training_sets
+             WHERE training_session_id = ?1
              ORDER BY set_number",
         )?;
         let rows = stmt.query_map(params![log_id], |row| {
