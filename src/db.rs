@@ -111,7 +111,7 @@ impl Database {
             CREATE TABLE IF NOT EXISTS practices (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE,
-                practice_type TEXT NOT NULL,
+                type TEXT NOT NULL,
                 created_at TEXT NOT NULL
             );
 
@@ -195,6 +195,15 @@ impl Database {
             [],
         );
 
+        let check_ptype: i64 = self.conn.query_row(
+            "SELECT count(*) FROM pragma_table_info('practices') WHERE name='practice_type'",
+            [],
+            |row| row.get(0),
+        ).unwrap_or(0);
+        if check_ptype > 0 {
+            let _ = self.conn.execute("ALTER TABLE practices RENAME COLUMN practice_type TO type", []);
+        }
+
         Ok(())
     }
 
@@ -203,7 +212,7 @@ impl Database {
     pub fn create_practice(&self, name: &str, practice_type: PracticeType) -> Result<Practice> {
         let now = Local::now().naive_local();
         self.conn.execute(
-            "INSERT INTO practices (name, practice_type, created_at) VALUES (?1, ?2, ?3)",
+            "INSERT INTO practices (name, type, created_at) VALUES (?1, ?2, ?3)",
             params![name, practice_type.to_string(), now.to_string()],
         )?;
         let id = self.conn.last_insert_rowid();
@@ -218,7 +227,7 @@ impl Database {
 
     pub fn list_practices(&self) -> Result<Vec<Practice>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, name, practice_type, created_at, active FROM practices ORDER BY name",
+            "SELECT id, name, type, created_at, active FROM practices ORDER BY name",
         )?;
         let rows = stmt.query_map([], |row| {
             let pt_str: String = row.get(2)?;
@@ -254,7 +263,7 @@ impl Database {
     pub fn list_active_practices(&self) -> Result<Vec<Practice>> {
         let mut stmt = self
             .conn
-            .prepare("SELECT id, name, practice_type, created_at, active FROM practices WHERE active = 1 ORDER BY name")?;
+            .prepare("SELECT id, name, type, created_at, active FROM practices WHERE active = 1 ORDER BY name")?;
         let rows = stmt.query_map([], |row| {
             let pt_str: String = row.get(2)?;
             let created_str: String = row.get(3)?;
@@ -442,7 +451,7 @@ impl Database {
 
     pub fn list_logs_all(&self) -> Result<Vec<LogEntry>> {
         let mut stmt = self.conn.prepare(
-            "SELECT l.id, l.practice_id, l.created_at, l.note, l.warm_up, l.cool_down, p.name, p.practice_type
+            "SELECT l.id, l.practice_id, l.created_at, l.note, l.warm_up, l.cool_down, p.name, p.type
              FROM training_sessions l
              JOIN practices p ON l.practice_id = p.id
              WHERE p.active = 1
@@ -500,7 +509,7 @@ impl Database {
     pub fn list_logs_recent(&self, days: i64) -> Result<Vec<LogEntry>> {
         let cutoff = Local::now().naive_local() - chrono::Duration::days(days);
         let mut stmt = self.conn.prepare(
-            "SELECT l.id, l.practice_id, l.created_at, l.note, l.warm_up, l.cool_down, p.name, p.practice_type
+            "SELECT l.id, l.practice_id, l.created_at, l.note, l.warm_up, l.cool_down, p.name, p.type
              FROM training_sessions l
              JOIN practices p ON l.practice_id = p.id
              WHERE l.created_at >= ?1 AND p.active = 1
@@ -558,7 +567,7 @@ impl Database {
     pub fn list_logs_for_practice(&self, practice_id: i64, days: i64) -> Result<Vec<LogEntry>> {
         let cutoff = Local::now().naive_local() - chrono::Duration::days(days);
         let mut stmt = self.conn.prepare(
-            "SELECT l.id, l.practice_id, l.created_at, l.note, l.warm_up, l.cool_down, p.name, p.practice_type
+            "SELECT l.id, l.practice_id, l.created_at, l.note, l.warm_up, l.cool_down, p.name, p.type
              FROM training_sessions l
              JOIN practices p ON l.practice_id = p.id
              WHERE l.practice_id = ?1 AND l.created_at >= ?2
@@ -688,7 +697,7 @@ impl Database {
     /// Exports all log entries (all time).
     pub fn export_all(&self) -> Result<Vec<LogEntry>> {
         let mut stmt = self.conn.prepare(
-            "SELECT l.id, l.practice_id, l.created_at, l.note, l.warm_up, l.cool_down, p.name, p.practice_type
+            "SELECT l.id, l.practice_id, l.created_at, l.note, l.warm_up, l.cool_down, p.name, p.type
              FROM training_sessions l
              JOIN practices p ON l.practice_id = p.id
              ORDER BY l.created_at DESC",
