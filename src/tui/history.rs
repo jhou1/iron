@@ -83,7 +83,10 @@ impl HistoryScreen {
             .filtered_indices
             .iter()
             .filter_map(|&i| self.entries.get(i))
-            .map(|e| e.practice_name.width())
+            .map(|e| {
+                let rpe_len = if e.log.rpe.is_some() { 10 } else { 0 };
+                e.practice_name.width() + rpe_len
+            })
             .max()
             .unwrap_or(4);
         let name_col_w = (max_name_len + 2) as u16;
@@ -172,16 +175,23 @@ impl HistoryScreen {
                 height: popup_h,
             };
 
-            let title_text = format!(
-                " {} — {} ",
-                entry.practice_name,
-                entry.log.logged_at.format("%Y-%m-%d")
-            );
+            let mut title_spans = vec![Span::styled(
+                format!(
+                    " {} — {} ",
+                    entry.practice_name,
+                    entry.log.logged_at.format("%Y-%m-%d")
+                ),
+                Style::default().fg(Color::White).bold(),
+            )];
+            if let Some(rpe) = entry.log.rpe {
+                title_spans.push(Span::styled(
+                    format!("[RPE: {}] ", rpe),
+                    Style::default().fg(Color::Yellow).bold(),
+                ));
+            }
+
             let block = Block::default()
-                .title(Span::styled(
-                    title_text,
-                    Style::default().fg(Color::White).bold(),
-                ))
+                .title(Line::from(title_spans))
                 .borders(Borders::ALL)
                 .padding(Padding::uniform(1))
                 .border_type(BorderType::Rounded)
@@ -316,10 +326,18 @@ impl HistoryScreen {
 
             let marker = if fi == self.selected { ">" } else { " " };
 
+            let mut name_spans = vec![Span::styled(entry.practice_name.clone(), style)];
+            if let Some(rpe) = entry.log.rpe {
+                name_spans.push(Span::styled(
+                    format!(" [RPE: {}]", rpe),
+                    Style::default().fg(Color::Yellow),
+                ));
+            }
+
             rows.push(Row::new(vec![
                 Cell::from(Span::styled(marker, style)),
                 Cell::from(Span::styled(date, dim)),
-                Cell::from(Span::styled(entry.practice_name.clone(), style)),
+                Cell::from(Line::from(name_spans)),
                 Cell::from(Span::styled(
                     format!(
                         "{:>w$} {}{}",
