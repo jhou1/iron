@@ -21,6 +21,15 @@ pub struct Database {
     conn: Connection,
 }
 
+
+fn parse_datetime(s: &str) -> anyhow::Result<chrono::NaiveDateTime> {
+    chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.f")
+        .or_else(|_| chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S"))
+        .or_else(|_| chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S%.f"))
+        .or_else(|_| chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S"))
+        .map_err(|_| anyhow::anyhow!("failed to parse datetime: {}", s))
+}
+
 impl Database {
     /// Opens the default database at `~/.iron/iron.db`, creating it if needed.
     /// Automatically migrates data from `~/.ironcli/iron.db` on first use.
@@ -247,8 +256,7 @@ impl Database {
             let (id, name, pt_str, created_str, active) = row?;
             let practice_type: PracticeType =
                 pt_str.parse().map_err(|e: String| anyhow::anyhow!(e))?;
-            let created_at = NaiveDateTime::parse_from_str(&created_str, "%Y-%m-%d %H:%M:%S%.f")
-                .context("failed to parse created_at")?;
+            let created_at = parse_datetime(&created_str)?;
             practices.push(Practice {
                 id,
                 name,
@@ -280,8 +288,7 @@ impl Database {
             let (id, name, pt_str, created_str) = row?;
             let practice_type: PracticeType =
                 pt_str.parse().map_err(|e: String| anyhow::anyhow!(e))?;
-            let created_at = NaiveDateTime::parse_from_str(&created_str, "%Y-%m-%d %H:%M:%S%.f")
-                .context("failed to parse created_at")?;
+            let created_at = parse_datetime(&created_str)?;
             practices.push(Practice {
                 id,
                 name,
@@ -451,7 +458,7 @@ impl Database {
 
     pub fn list_logs_all(&self) -> Result<Vec<LogEntry>> {
         let mut stmt = self.conn.prepare(
-            "SELECT l.id, l.practice_id, l.created_at, l.note, l.warm_up, l.cool_down, p.name, p.type
+            "SELECT l.id, l.practice_id, l.created_at, l.note, l.warm_up, l.cool_down, l.rpe, p.name, p.type
              FROM training_sessions l
              JOIN practices p ON l.practice_id = p.id
              WHERE p.active = 1
@@ -465,8 +472,9 @@ impl Database {
                 row.get::<_, Option<String>>(3)?,
                 row.get::<_, Option<String>>(4)?,
                 row.get::<_, Option<String>>(5)?,
-                row.get::<_, String>(6)?,
+                row.get::<_, Option<u8>>(6)?,
                 row.get::<_, String>(7)?,
+                row.get::<_, String>(8)?,
             ))
         })?;
 
@@ -479,11 +487,11 @@ impl Database {
                 note,
                 warm_up,
                 cool_down,
+                rpe_val,
                 practice_name,
                 pt_str,
             ) = row?;
-            let logged_at = NaiveDateTime::parse_from_str(&logged_at_str, "%Y-%m-%d %H:%M:%S%.f")
-                .context("failed to parse created_at")?;
+            let logged_at = parse_datetime(&logged_at_str)?;
             let practice_type: PracticeType =
                 pt_str.parse().map_err(|e: String| anyhow::anyhow!(e))?;
             let sets = self.load_sets(log_id, &practice_type)?;
@@ -495,12 +503,12 @@ impl Database {
                     note,
                     warm_up,
                     cool_down,
-                    rpe: None,
+                    rpe: rpe_val,
                 },
                 practice_name,
                 practice_type,
                 sets,
-                rpe: None,
+                rpe: rpe_val,
             });
         }
         Ok(entries)
@@ -509,7 +517,7 @@ impl Database {
     pub fn list_logs_recent(&self, days: i64) -> Result<Vec<LogEntry>> {
         let cutoff = Local::now().naive_local() - chrono::Duration::days(days);
         let mut stmt = self.conn.prepare(
-            "SELECT l.id, l.practice_id, l.created_at, l.note, l.warm_up, l.cool_down, p.name, p.type
+            "SELECT l.id, l.practice_id, l.created_at, l.note, l.warm_up, l.cool_down, l.rpe, p.name, p.type
              FROM training_sessions l
              JOIN practices p ON l.practice_id = p.id
              WHERE l.created_at >= ?1 AND p.active = 1
@@ -523,8 +531,9 @@ impl Database {
                 row.get::<_, Option<String>>(3)?,
                 row.get::<_, Option<String>>(4)?,
                 row.get::<_, Option<String>>(5)?,
-                row.get::<_, String>(6)?,
+                row.get::<_, Option<u8>>(6)?,
                 row.get::<_, String>(7)?,
+                row.get::<_, String>(8)?,
             ))
         })?;
 
@@ -537,11 +546,11 @@ impl Database {
                 note,
                 warm_up,
                 cool_down,
+                rpe_val,
                 practice_name,
                 pt_str,
             ) = row?;
-            let logged_at = NaiveDateTime::parse_from_str(&logged_at_str, "%Y-%m-%d %H:%M:%S%.f")
-                .context("failed to parse created_at")?;
+            let logged_at = parse_datetime(&logged_at_str)?;
             let practice_type: PracticeType =
                 pt_str.parse().map_err(|e: String| anyhow::anyhow!(e))?;
             let sets = self.load_sets(log_id, &practice_type)?;
@@ -553,12 +562,12 @@ impl Database {
                     note,
                     warm_up,
                     cool_down,
-                    rpe: None,
+                    rpe: rpe_val,
                 },
                 practice_name,
                 practice_type,
                 sets,
-                rpe: None,
+                rpe: rpe_val,
             });
         }
         Ok(entries)
@@ -567,7 +576,7 @@ impl Database {
     pub fn list_logs_for_practice(&self, practice_id: i64, days: i64) -> Result<Vec<LogEntry>> {
         let cutoff = Local::now().naive_local() - chrono::Duration::days(days);
         let mut stmt = self.conn.prepare(
-            "SELECT l.id, l.practice_id, l.created_at, l.note, l.warm_up, l.cool_down, p.name, p.type
+            "SELECT l.id, l.practice_id, l.created_at, l.note, l.warm_up, l.cool_down, l.rpe, p.name, p.type
              FROM training_sessions l
              JOIN practices p ON l.practice_id = p.id
              WHERE l.practice_id = ?1 AND l.created_at >= ?2
@@ -581,17 +590,17 @@ impl Database {
                 row.get::<_, Option<String>>(3)?,
                 row.get::<_, Option<String>>(4)?,
                 row.get::<_, Option<String>>(5)?,
-                row.get::<_, String>(6)?,
+                row.get::<_, Option<u8>>(6)?,
                 row.get::<_, String>(7)?,
+                row.get::<_, String>(8)?,
             ))
         })?;
 
         let mut entries = Vec::new();
         for row in rows {
-            let (log_id, pid, logged_at_str, note, warm_up, cool_down, practice_name, pt_str) =
+            let (log_id, pid, logged_at_str, note, warm_up, cool_down, rpe_val, practice_name, pt_str) =
                 row?;
-            let logged_at = NaiveDateTime::parse_from_str(&logged_at_str, "%Y-%m-%d %H:%M:%S%.f")
-                .context("failed to parse created_at")?;
+            let logged_at = parse_datetime(&logged_at_str)?;
             let practice_type: PracticeType =
                 pt_str.parse().map_err(|e: String| anyhow::anyhow!(e))?;
             let sets = self.load_sets(log_id, &practice_type)?;
@@ -603,12 +612,12 @@ impl Database {
                     note,
                     warm_up,
                     cool_down,
-                    rpe: None,
+                    rpe: rpe_val,
                 },
                 practice_name,
                 practice_type,
                 sets,
-                rpe: None,
+                rpe: rpe_val,
             });
         }
         Ok(entries)
@@ -697,7 +706,7 @@ impl Database {
     /// Exports all log entries (all time).
     pub fn export_all(&self) -> Result<Vec<LogEntry>> {
         let mut stmt = self.conn.prepare(
-            "SELECT l.id, l.practice_id, l.created_at, l.note, l.warm_up, l.cool_down, p.name, p.type
+            "SELECT l.id, l.practice_id, l.created_at, l.note, l.warm_up, l.cool_down, l.rpe, p.name, p.type
              FROM training_sessions l
              JOIN practices p ON l.practice_id = p.id
              ORDER BY l.created_at DESC",
@@ -710,8 +719,9 @@ impl Database {
                 row.get::<_, Option<String>>(3)?,
                 row.get::<_, Option<String>>(4)?,
                 row.get::<_, Option<String>>(5)?,
-                row.get::<_, String>(6)?,
+                row.get::<_, Option<u8>>(6)?,
                 row.get::<_, String>(7)?,
+                row.get::<_, String>(8)?,
             ))
         })?;
 
@@ -724,11 +734,11 @@ impl Database {
                 note,
                 warm_up,
                 cool_down,
+                rpe_val,
                 practice_name,
                 pt_str,
             ) = row?;
-            let logged_at = NaiveDateTime::parse_from_str(&logged_at_str, "%Y-%m-%d %H:%M:%S%.f")
-                .context("failed to parse created_at")?;
+            let logged_at = parse_datetime(&logged_at_str)?;
             let practice_type: PracticeType =
                 pt_str.parse().map_err(|e: String| anyhow::anyhow!(e))?;
             let sets = self.load_sets(log_id, &practice_type)?;
@@ -740,12 +750,12 @@ impl Database {
                     note,
                     warm_up,
                     cool_down,
-                    rpe: None,
+                    rpe: rpe_val,
                 },
                 practice_name,
                 practice_type,
                 sets,
-                rpe: None,
+                rpe: rpe_val,
             });
         }
         Ok(entries)
