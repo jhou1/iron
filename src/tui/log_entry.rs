@@ -32,6 +32,7 @@ enum FocusSection {
     Sets,
     WarmUp,
     CoolDown,
+    Rpe,
     Note,
 }
 
@@ -58,6 +59,8 @@ pub struct LogEntryScreen {
     warm_up_cursor: usize,
     cool_down: String,
     cool_down_cursor: usize,
+    rpe_input: String,
+    rpe_cursor: usize,
     focus: FocusSection,
     selected_set: Option<usize>,
     editing_set: Option<usize>,
@@ -99,6 +102,8 @@ impl LogEntryScreen {
             warm_up_cursor: 0,
             cool_down: String::new(),
             cool_down_cursor: 0,
+            rpe_input: String::new(),
+            rpe_cursor: 0,
             focus: FocusSection::Sets,
             selected_set: None,
             editing_set: None,
@@ -124,6 +129,7 @@ impl LogEntryScreen {
         let note = log_entry.log.note.clone().unwrap_or_default();
         let warm_up = log_entry.log.warm_up.clone().unwrap_or_default();
         let cool_down = log_entry.log.cool_down.clone().unwrap_or_default();
+        let rpe_input = log_entry.log.rpe.map(|r| r.to_string()).unwrap_or_default();
 
         let log_date = log_entry.log.logged_at.format("%Y-%m-%d").to_string();
         Ok(Self {
@@ -149,6 +155,8 @@ impl LogEntryScreen {
             warm_up,
             cool_down_cursor: cool_down.len(),
             cool_down,
+            rpe_cursor: rpe_input.len(),
+            rpe_input,
             focus: FocusSection::Sets,
             selected_set: None,
             editing_set: None,
@@ -466,7 +474,7 @@ impl LogEntryScreen {
                 Constraint::Length(5), // [0] date section (border + padding)
                 Constraint::Length(1), // [1] spacer
                 Constraint::Length(sets_content_lines + 4), // [2] sets section (border + padding)
-                Constraint::Length(6), // [3] warm-up/cool-down section (border + padding)
+                Constraint::Length(7), // [3] warm-up/cool-down section (border + padding)
                 Constraint::Min(3),    // [4] note section (border, grows)
                 Constraint::Length(1), // [5] status line
                 Constraint::Length(1), // [6] footer
@@ -733,7 +741,24 @@ impl LogEntryScreen {
             cd_spans.push(Span::styled(&self.cool_down, Style::default().fg(cd_color)));
         }
 
-        let wucd_lines = vec![Line::from(wu_spans), Line::from(cd_spans)];
+        let rpe_active = self.focus == FocusSection::Rpe;
+        let rpe_color = if rpe_active { ACCENT } else { Color::White };
+        let rpe_label = "RPE (1-10): ";
+        let rpe_prefix_w = rpe_label.width() as u16;
+        let mut rpe_spans = vec![Span::styled(rpe_label, Style::default().fg(Color::Gray))];
+        if rpe_active {
+            rpe_spans.extend(visible_input_spans(
+                &self.rpe_input,
+                self.rpe_cursor,
+                wucd_inner.width,
+                rpe_prefix_w,
+                rpe_color,
+            ));
+        } else {
+            rpe_spans.push(Span::styled(&self.rpe_input, Style::default().fg(rpe_color)));
+        }
+
+        let wucd_lines = vec![Line::from(wu_spans), Line::from(cd_spans), Line::from(rpe_spans)];
         frame.render_widget(Paragraph::new(wucd_lines), wucd_inner);
 
         // ── Note section ──
@@ -919,6 +944,7 @@ impl LogEntryScreen {
             FocusSection::Sets => self.handle_sets_input(key, is_weighted),
             FocusSection::WarmUp => self.handle_text_field_input(key, TextFieldTarget::WarmUp),
             FocusSection::CoolDown => self.handle_text_field_input(key, TextFieldTarget::CoolDown),
+            FocusSection::Rpe => self.handle_text_field_input(key, TextFieldTarget::Rpe),
             FocusSection::Note => self.handle_text_field_input(key, TextFieldTarget::Note),
         }
     }
@@ -937,6 +963,10 @@ impl LogEntryScreen {
                     self.focus = FocusSection::CoolDown;
                 }
                 FocusSection::CoolDown => {
+                    self.focus = FocusSection::Rpe;
+                    self.rpe_cursor = self.rpe_input.len();
+                }
+                FocusSection::Rpe => {
                     self.focus = FocusSection::Note;
                     self.note_cursor = self.note.len();
                 }
@@ -962,8 +992,12 @@ impl LogEntryScreen {
                 FocusSection::CoolDown => {
                     self.focus = FocusSection::WarmUp;
                 }
-                FocusSection::Note => {
+                FocusSection::Rpe => {
                     self.focus = FocusSection::CoolDown;
+                }
+                FocusSection::Note => {
+                    self.focus = FocusSection::Rpe;
+                    self.rpe_cursor = self.rpe_input.len();
                 }
             }
         }
@@ -1180,6 +1214,7 @@ impl LogEntryScreen {
         let (text, cursor) = match target {
             TextFieldTarget::WarmUp => (&mut self.warm_up, &mut self.warm_up_cursor),
             TextFieldTarget::CoolDown => (&mut self.cool_down, &mut self.cool_down_cursor),
+            TextFieldTarget::Rpe => (&mut self.rpe_input, &mut self.rpe_cursor),
             TextFieldTarget::Note => (&mut self.note, &mut self.note_cursor),
         };
 
@@ -1241,8 +1276,15 @@ impl LogEntryScreen {
                 Action::None
             }
             KeyCode::Char(c) => {
-                text.insert(*cursor, c);
-                *cursor += c.len_utf8();
+                if matches!(target, TextFieldTarget::Rpe) {
+                    if c.is_ascii_digit() && text.len() < 2 {
+                        text.insert(*cursor, c);
+                        *cursor += c.len_utf8();
+                    }
+                } else {
+                    text.insert(*cursor, c);
+                    *cursor += c.len_utf8();
+                }
                 Action::None
             }
             _ => Action::None,
@@ -1388,6 +1430,19 @@ impl LogEntryScreen {
 
     fn save_log(&mut self, db: &Database) -> Action {
         let practice = self.chosen_practice.as_ref().unwrap();
+        
+        let rpe = if self.rpe_input.is_empty() {
+            None
+        } else {
+            match self.rpe_input.parse::<u8>() {
+                Ok(val) if val >= 1 && val <= 10 => Some(val),
+                _ => {
+                    self.status_msg = Some(("RPE must be a number between 1 and 10".to_string(), true));
+                    return Action::None;
+                }
+            }
+        };
+
         let note = if self.note.is_empty() {
             None
         } else {
@@ -1414,9 +1469,10 @@ impl LogEntryScreen {
                 Some(&datetime),
                 warm_up,
                 cool_down,
+                rpe,
             )
         } else {
-            db.create_log_at(practice.id, &datetime, &self.sets, note, warm_up, cool_down)
+            db.create_log_at(practice.id, &datetime, &self.sets, note, warm_up, cool_down, rpe)
                 .map(|_| ())
         };
         match result {
@@ -1433,6 +1489,7 @@ impl LogEntryScreen {
 enum TextFieldTarget {
     WarmUp,
     CoolDown,
+    Rpe,
     Note,
 }
 
