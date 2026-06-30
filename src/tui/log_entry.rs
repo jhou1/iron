@@ -1435,7 +1435,7 @@ impl LogEntryScreen {
             None
         } else {
             match self.rpe_input.parse::<u8>() {
-                Ok(val) if val >= 1 && val <= 10 => Some(val),
+                Ok(val) if (1..=10).contains(&val) => Some(val),
                 _ => {
                     self.status_msg = Some(("RPE must be a number between 1 and 10".to_string(), true));
                     return Action::None;

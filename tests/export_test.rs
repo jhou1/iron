@@ -35,8 +35,7 @@ fn round_trip_export_import() {
         ],
         Some("Felt great"),
         None,
-        None,
-    )
+        None, None)
     .unwrap();
 
     db1.create_log(
@@ -44,8 +43,7 @@ fn round_trip_export_import() {
         &[SetData::Bodyweight { reps: 20 }],
         None,
         None,
-        None,
-    )
+        None, None)
     .unwrap();
 
     db1.create_log(
@@ -53,8 +51,7 @@ fn round_trip_export_import() {
         &[SetData::Distance { distance: 5.2 }],
         Some("Morning run"),
         None,
-        None,
-    )
+        None, None)
     .unwrap();
 
     db1.create_log(
@@ -62,8 +59,7 @@ fn round_trip_export_import() {
         &[SetData::Endurance { duration: 2.5 }],
         None,
         None,
-        None,
-    )
+        None, None)
     .unwrap();
 
     // Export to temp file
@@ -147,8 +143,7 @@ fn import_skips_duplicates() {
         }],
         Some("Heavy day"),
         None,
-        None,
-    )
+        None, None)
     .unwrap();
 
     // Export

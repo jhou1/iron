@@ -149,13 +149,13 @@ fn export_delete_reimport_restores_all_data() {
     let run_sets = vec![SetData::Distance { distance: 5.0 }];
     let plank_sets = vec![SetData::Endurance { duration: 2.5 }];
 
-    db.create_log_at(kb.id, &t1, &kb_sets, Some("Felt strong"), None, None)
+    db.create_log_at(kb.id, &t1, &kb_sets, Some("Felt strong"), None, None, None)
         .unwrap();
-    db.create_log_at(pu.id, &t2, &pu_sets, None, None, None)
+    db.create_log_at(pu.id, &t2, &pu_sets, None, None, None, None)
         .unwrap();
-    db.create_log_at(run.id, &t3, &run_sets, Some("Morning run"), None, None)
+    db.create_log_at(run.id, &t3, &run_sets, Some("Morning run"), None, None, None)
         .unwrap();
-    db.create_log_at(plank.id, &t4, &plank_sets, None, None, None)
+    db.create_log_at(plank.id, &t4, &plank_sets, None, None, None, None)
         .unwrap();
 
     // Pre-export integrity check
@@ -275,11 +275,11 @@ fn partial_delete_reimport_merges_correctly() {
     let run_sets = vec![SetData::Distance { distance: 3.0 }];
 
     let log1_id = db
-        .create_log_at(squat.id, &t1, &squat_sets1, Some("Heavy day"), None, None)
+        .create_log_at(squat.id, &t1, &squat_sets1, Some("Heavy day"), None, None, None)
         .unwrap();
-    db.create_log_at(squat.id, &t2, &squat_sets2, None, None, None)
+    db.create_log_at(squat.id, &t2, &squat_sets2, None, None, None, None)
         .unwrap();
-    db.create_log_at(run.id, &t3, &run_sets, None, None, None)
+    db.create_log_at(run.id, &t3, &run_sets, None, None, None, None)
         .unwrap();
 
     // Export all 3 logs
@@ -372,8 +372,7 @@ fn import_skips_duplicates_all_practice_types() {
         }],
         None,
         None,
-        None,
-    )
+        None, None)
     .unwrap();
     db.create_log_at(
         pu.id,
@@ -381,8 +380,7 @@ fn import_skips_duplicates_all_practice_types() {
         &[SetData::Bodyweight { reps: 20 }],
         Some("Easy"),
         None,
-        None,
-    )
+        None, None)
     .unwrap();
     db.create_log_at(
         run.id,
@@ -390,8 +388,7 @@ fn import_skips_duplicates_all_practice_types() {
         &[SetData::Distance { distance: 5.0 }],
         None,
         None,
-        None,
-    )
+        None, None)
     .unwrap();
     db.create_log_at(
         plank.id,
@@ -399,8 +396,7 @@ fn import_skips_duplicates_all_practice_types() {
         &[SetData::Endurance { duration: 3.0 }],
         None,
         None,
-        None,
-    )
+        None, None)
     .unwrap();
 
     // Export
@@ -442,13 +438,13 @@ fn notes_and_timestamps_survive_round_trip() {
     let note3 = Some("Line 1\nLine 2");
     let note4 = Some("Unicode: caf\u{00e9} \u{2192} weights");
 
-    db.create_log_at(bench.id, &t1, &simple_set, note1, None, None)
+    db.create_log_at(bench.id, &t1, &simple_set, note1, None, None, None)
         .unwrap();
-    db.create_log_at(bench.id, &t2, &simple_set, note2, None, None)
+    db.create_log_at(bench.id, &t2, &simple_set, note2, None, None, None)
         .unwrap();
-    db.create_log_at(bench.id, &t3, &simple_set, note3, None, None)
+    db.create_log_at(bench.id, &t3, &simple_set, note3, None, None, None)
         .unwrap();
-    db.create_log_at(bench.id, &t4, &simple_set, note4, None, None)
+    db.create_log_at(bench.id, &t4, &simple_set, note4, None, None, None)
         .unwrap();
 
     // Export, delete, re-import
@@ -522,7 +518,7 @@ fn set_ordering_preserved_across_export_import() {
         }, // backoff — same as set 3
     ];
 
-    db.create_log_at(bench.id, &t1, &sets, Some("Pyramid day"), None, None)
+    db.create_log_at(bench.id, &t1, &sets, Some("Pyramid day"), None, None, None)
         .unwrap();
 
     // Export, delete, re-import
@@ -633,8 +629,7 @@ fn warmup_cooldown_survive_export_import() {
         &sets,
         Some("Good"),
         Some("Jump rope"),
-        Some("Stretches"),
-    )
+        Some("Stretches"), None)
     .unwrap();
     let export_path = source.export_path();
     export_to_json(db, Some(export_path.clone())).unwrap();
@@ -686,8 +681,7 @@ fn inactive_practice_survives_export_import() {
         }],
         None,
         None,
-        None,
-    )
+        None, None)
     .unwrap();
 
     let export_path = source.export_path();

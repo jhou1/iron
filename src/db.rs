@@ -187,6 +187,9 @@ impl Database {
         let _ = self
             .conn
             .execute("ALTER TABLE training_sessions ADD COLUMN cool_down TEXT", []);
+        let _ = self
+            .conn
+            .execute("ALTER TABLE training_sessions ADD COLUMN rpe INTEGER", []);
         let _ = self.conn.execute(
             "ALTER TABLE practices ADD COLUMN active INTEGER NOT NULL DEFAULT 1",
             [],
@@ -327,11 +330,12 @@ impl Database {
         note: Option<&str>,
         warm_up: Option<&str>,
         cool_down: Option<&str>,
+        rpe: Option<u8>,
     ) -> Result<i64> {
         let now = Local::now().naive_local();
         self.conn.execute(
-            "INSERT INTO training_sessions (practice_id, created_at, note, warm_up, cool_down) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![practice_id, now.to_string(), note, warm_up, cool_down],
+            "INSERT INTO training_sessions (practice_id, created_at, note, warm_up, cool_down, rpe) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![practice_id, now.to_string(), note, warm_up, cool_down, rpe],
         )?;
         let log_id = self.conn.last_insert_rowid();
         self.insert_sets(log_id, sets)?;
@@ -339,6 +343,7 @@ impl Database {
     }
 
     /// Creates a log with a specific timestamp (used by import).
+    #[allow(clippy::too_many_arguments)]
     pub fn create_log_at(
         &self,
         practice_id: i64,
@@ -347,16 +352,18 @@ impl Database {
         note: Option<&str>,
         warm_up: Option<&str>,
         cool_down: Option<&str>,
+        rpe: Option<u8>,
     ) -> Result<i64> {
         self.conn.execute(
-            "INSERT INTO training_sessions (practice_id, created_at, note, warm_up, cool_down) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![practice_id, logged_at.to_string(), note, warm_up, cool_down],
+            "INSERT INTO training_sessions (practice_id, created_at, note, warm_up, cool_down, rpe) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![practice_id, logged_at.to_string(), note, warm_up, cool_down, rpe],
         )?;
         let log_id = self.conn.last_insert_rowid();
         self.insert_sets(log_id, sets)?;
         Ok(log_id)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn update_log(
         &self,
         log_id: i64,
@@ -365,16 +372,17 @@ impl Database {
         logged_at: Option<&NaiveDateTime>,
         warm_up: Option<&str>,
         cool_down: Option<&str>,
+        rpe: Option<u8>,
     ) -> Result<()> {
         if let Some(dt) = logged_at {
             self.conn.execute(
-                "UPDATE training_sessions SET note = ?1, created_at = ?2, warm_up = ?3, cool_down = ?4 WHERE id = ?5",
-                params![note, dt.to_string(), warm_up, cool_down, log_id],
+                "UPDATE training_sessions SET note = ?1, created_at = ?2, warm_up = ?3, cool_down = ?4, rpe = ?5 WHERE id = ?6",
+                params![note, dt.to_string(), warm_up, cool_down, rpe, log_id],
             )?;
         } else {
             self.conn.execute(
-                "UPDATE training_sessions SET note = ?1, warm_up = ?2, cool_down = ?3 WHERE id = ?4",
-                params![note, warm_up, cool_down, log_id],
+                "UPDATE training_sessions SET note = ?1, warm_up = ?2, cool_down = ?3, rpe = ?4 WHERE id = ?5",
+                params![note, warm_up, cool_down, rpe, log_id],
             )?;
         }
         // Delete old sets and insert new ones
@@ -402,6 +410,7 @@ impl Database {
             entry.log.note.as_deref(),
             entry.log.warm_up.as_deref(),
             entry.log.cool_down.as_deref(),
+            entry.log.rpe,
         )
     }
 

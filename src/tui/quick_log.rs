@@ -1058,7 +1058,7 @@ impl QuickLogScreen {
             };
 
             if let Err(e) =
-                db.create_log_at(practice.id, &date, &entry.sets, Some(&raw_text), None, None)
+                db.create_log_at(practice.id, &date, &entry.sets, Some(&raw_text), None, None, None)
             {
                 self.status_msg = Some((format!("Error: {}", e), true));
                 return Action::None;

@@ -485,7 +485,7 @@ impl TrendsScreen {
         if let Some(ref practice) = self.chosen_practice {
             match db.list_logs_for_practice(practice.id, self.days_window) {
                 Ok(mut entries) => {
-                    entries.sort_by(|a, b| a.log.logged_at.cmp(&b.log.logged_at));
+                    entries.sort_by_key(|a| a.log.logged_at);
                     self.entries = entries;
                 }
                 Err(_) => {

@@ -1,4 +1,4 @@
-use chrono::{Datelike, Local, NaiveDateTime};
+use chrono::{Datelike, NaiveDateTime};
 use iron::db::Database;
 use iron::model::{PracticeType, SetData};
 
@@ -77,7 +77,7 @@ fn create_log_with_sets() {
         },
     ];
 
-    db.create_log(practice_id, &sets, Some("Felt good"), None, None)
+    db.create_log(practice_id, &sets, Some("Felt good"), None, None, None)
         .unwrap();
 
     let entries = db.list_logs_recent(1).unwrap();
@@ -119,7 +119,7 @@ fn update_log_sets_and_note() {
         weight: 60.0,
         reps: 10,
     }];
-    db.create_log(practice_id, &sets, Some("First attempt"), None, None)
+    db.create_log(practice_id, &sets, Some("First attempt"), None, None, None)
         .unwrap();
 
     let entries = db.list_logs_recent(1).unwrap();
@@ -135,7 +135,7 @@ fn update_log_sets_and_note() {
             reps: 5,
         },
     ];
-    db.update_log(log_id, &new_sets, Some("Updated"), None, None, None)
+    db.update_log(log_id, &new_sets, Some("Updated"), None, None, None, None)
         .unwrap();
 
     let entries = db.list_logs_recent(1).unwrap();
@@ -165,7 +165,7 @@ fn delete_log() {
     let practice_id = practices[0].id;
 
     let sets = vec![SetData::Distance { distance: 5.0 }];
-    db.create_log(practice_id, &sets, None, None, None).unwrap();
+    db.create_log(practice_id, &sets, None, None, None, None).unwrap();
 
     let entries = db.list_logs_recent(1).unwrap();
     let log_id = entries[0].log.id;
@@ -185,8 +185,8 @@ fn heatmap_data() {
     let practice_id = practices[0].id;
 
     let sets = vec![SetData::Bodyweight { reps: 20 }];
-    db.create_log(practice_id, &sets, None, None, None).unwrap();
-    db.create_log(practice_id, &sets, None, None, None).unwrap();
+    db.create_log(practice_id, &sets, None, None, None, None).unwrap();
+    db.create_log(practice_id, &sets, None, None, None, None).unwrap();
 
     let counts = db.heatmap_counts(30).unwrap();
     // Today's date should have count 2
@@ -212,9 +212,9 @@ fn logs_for_practice_trend() {
         weight: 110.0,
         reps: 5,
     }];
-    db.create_log(practice_id, &sets1, None, None, None)
+    db.create_log(practice_id, &sets1, None, None, None, None)
         .unwrap();
-    db.create_log(practice_id, &sets2, None, None, None)
+    db.create_log(practice_id, &sets2, None, None, None, None)
         .unwrap();
 
     let entries = db.list_logs_for_practice(practice_id, 30).unwrap();
@@ -241,7 +241,7 @@ fn fourteen_day_stats() {
             reps: 5,
         }, // volume = 400
     ];
-    db.create_log(bench_id, &weighted_sets, None, None, None)
+    db.create_log(bench_id, &weighted_sets, None, None, None, None)
         .unwrap();
 
     // Create a distance practice with one log
@@ -250,7 +250,7 @@ fn fourteen_day_stats() {
     let run_id = practices.iter().find(|p| p.name == "Run").unwrap().id;
 
     let distance_sets = vec![SetData::Distance { distance: 5.0 }];
-    db.create_log(run_id, &distance_sets, None, None, None)
+    db.create_log(run_id, &distance_sets, None, None, None, None)
         .unwrap();
 
     let stats = db.aggregate_stats(14).unwrap();
@@ -548,8 +548,7 @@ fn create_log_with_warmup_cooldown() {
         &sets,
         Some("Good session"),
         Some("5 min jump rope"),
-        Some("Static stretches"),
-    )
+        Some("Static stretches"), None)
     .unwrap();
     let entries = db.list_logs_recent(1).unwrap();
     assert_eq!(entries.len(), 1);
@@ -570,7 +569,7 @@ fn update_log_warmup_cooldown() {
         weight: 60.0,
         reps: 10,
     }];
-    db.create_log(practice_id, &sets, None, None, None).unwrap();
+    db.create_log(practice_id, &sets, None, None, None, None).unwrap();
     let entries = db.list_logs_recent(1).unwrap();
     let log_id = entries[0].log.id;
     db.update_log(
@@ -579,8 +578,7 @@ fn update_log_warmup_cooldown() {
         Some("Updated"),
         None,
         Some("Foam rolling"),
-        Some("Cool down walk"),
-    )
+        Some("Cool down walk"), None)
     .unwrap();
     let entries = db.list_logs_recent(1).unwrap();
     assert_eq!(entries[0].log.warm_up, Some("Foam rolling".to_string()));
@@ -667,16 +665,14 @@ fn inactive_practice_hidden_from_logs() {
         }],
         None,
         None,
-        None,
-    )
+        None, None)
     .unwrap();
     db.create_log(
         pullups.id,
         &[SetData::Bodyweight { reps: 20 }],
         None,
         None,
-        None,
-    )
+        None, None)
     .unwrap();
 
     db.set_practice_active(bench.id, false).unwrap();
@@ -713,16 +709,14 @@ fn inactive_practice_hidden_from_heatmap() {
         }],
         None,
         None,
-        None,
-    )
+        None, None)
     .unwrap();
     db.create_log(
         pullups.id,
         &[SetData::Bodyweight { reps: 20 }],
         None,
         None,
-        None,
-    )
+        None, None)
     .unwrap();
 
     db.set_practice_active(bench.id, false).unwrap();
@@ -766,8 +760,7 @@ fn test_restore_log() {
             &sets,
             Some("Great session"),
             Some("5 min jog"),
-            Some("Stretching"),
-        )
+            Some("Stretching"), None)
         .unwrap();
 
     // Get the full entry

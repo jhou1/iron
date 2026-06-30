@@ -302,6 +302,7 @@ pub fn import_from_json(db: &Database, path: &Path) -> Result<usize> {
             log.note.as_deref(),
             log.warm_up.as_deref(),
             log.cool_down.as_deref(),
+            log.rpe,
         )?;
 
         imported += 1;
