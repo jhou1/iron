@@ -34,6 +34,7 @@ enum Mode {
 pub struct PracticesScreen {
     practices: Vec<Practice>,
     selected: usize,
+    scroll_offset: usize,
     mode: Mode,
     input: String,
     input_cursor: usize,
@@ -47,6 +48,7 @@ impl PracticesScreen {
         Ok(Self {
             practices,
             selected: 0,
+            scroll_offset: 0,
             mode: Mode::Browse,
             input: String::new(),
             input_cursor: 0,
@@ -67,7 +69,7 @@ impl PracticesScreen {
         }
     }
 
-    pub fn render(&self, frame: &mut Frame) {
+    pub fn render(&mut self, frame: &mut Frame) {
         let area = centered_area(frame.area(), CONTENT_WIDTH);
 
         let list_height = (self.practices.len() as u16).max(1);
@@ -135,6 +137,16 @@ impl PracticesScreen {
             Span::styled(&type_header, hdr_style),
         ]);
 
+        let visible_height = inner.height.saturating_sub(1) as usize; // -1 for header
+        if visible_height > 0 {
+            if self.selected < self.scroll_offset {
+                self.scroll_offset = self.selected;
+            }
+            if self.selected >= self.scroll_offset + visible_height {
+                self.scroll_offset = self.selected - visible_height + 1;
+            }
+        }
+
         let mut all_lines = vec![header_line];
 
         if self.practices.is_empty() {
@@ -143,7 +155,7 @@ impl PracticesScreen {
                 Style::default().fg(Color::Gray),
             )));
         } else {
-            for (i, p) in self.practices.iter().enumerate() {
+            for (i, p) in self.practices.iter().enumerate().skip(self.scroll_offset).take(visible_height) {
                 let marker = if i == self.selected { "> " } else { "  " };
                 let (name_style, type_color) = if i == self.selected {
                     if p.active {
@@ -193,8 +205,9 @@ impl PracticesScreen {
         }
         frame.render_widget(Paragraph::new(all_lines), inner);
 
-        if !self.practices.is_empty() {
-            highlight_row(frame, inner, self.selected as u16 + 1); // +1 for header row
+        if !self.practices.is_empty() && self.selected >= self.scroll_offset {
+            let row = (self.selected - self.scroll_offset) as u16 + 1; // +1 for header row
+            highlight_row(frame, inner, row);
         }
 
         // ── Input/action area ──
