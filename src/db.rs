@@ -98,8 +98,20 @@ impl Database {
         if check_logs > 0 && check_sessions == 0 {
             self.conn.execute("PRAGMA foreign_keys = OFF", [])?;
             self.conn.execute("ALTER TABLE logs RENAME TO training_sessions", [])?;
-            self.conn.execute("ALTER TABLE training_sessions RENAME COLUMN logged_at TO created_at", [])?;
+            self.conn.execute("ALTER TABLE training_sessions RENAME COLUMN logged_at TO date", [])?;
         }
+
+        let check_date_col: i64 = self.conn.query_row(
+            "SELECT count(*) FROM pragma_table_info('training_sessions') WHERE name='date'",
+            [],
+            |row| row.get(0),
+        ).unwrap_or(0);
+
+        if check_sessions > 0 && check_date_col == 0 {
+            let _ = self.conn.execute("ALTER TABLE training_sessions RENAME COLUMN created_at TO date", []);
+            let _ = self.conn.execute("ALTER TABLE training_sessions ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP", []);
+        }
+
 
         let check_sets: i64 = self.conn.query_row(
             "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='sets'",
@@ -131,7 +143,11 @@ impl Database {
             CREATE TABLE IF NOT EXISTS training_sessions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 practice_id INTEGER NOT NULL REFERENCES practices(id),
-                created_at TEXT NOT NULL,
+                date TEXT NOT NULL,
+                warm_up TEXT,
+                cool_down TEXT,
+                rpe INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 note TEXT
             );
 
@@ -354,7 +370,7 @@ impl Database {
     ) -> Result<i64> {
         let now = Local::now().naive_local();
         self.conn.execute(
-            "INSERT INTO training_sessions (practice_id, created_at, note, warm_up, cool_down, rpe) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT INTO training_sessions (practice_id, date, note, warm_up, cool_down, rpe) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![practice_id, now.to_string(), note, warm_up, cool_down, rpe],
         )?;
         let log_id = self.conn.last_insert_rowid();
@@ -375,7 +391,7 @@ impl Database {
         rpe: Option<u8>,
     ) -> Result<i64> {
         self.conn.execute(
-            "INSERT INTO training_sessions (practice_id, created_at, note, warm_up, cool_down, rpe) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT INTO training_sessions (practice_id, date, note, warm_up, cool_down, rpe) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![practice_id, logged_at.to_string(), note, warm_up, cool_down, rpe],
         )?;
         let log_id = self.conn.last_insert_rowid();
@@ -396,7 +412,7 @@ impl Database {
     ) -> Result<()> {
         if let Some(dt) = logged_at {
             self.conn.execute(
-                "UPDATE training_sessions SET note = ?1, created_at = ?2, warm_up = ?3, cool_down = ?4, rpe = ?5 WHERE id = ?6",
+                "UPDATE training_sessions SET note = ?1, date = ?2, warm_up = ?3, cool_down = ?4, rpe = ?5 WHERE id = ?6",
                 params![note, dt.to_string(), warm_up, cool_down, rpe, log_id],
             )?;
         } else {
@@ -462,11 +478,11 @@ impl Database {
 
     pub fn list_logs_all(&self) -> Result<Vec<LogEntry>> {
         let mut stmt = self.conn.prepare(
-            "SELECT l.id, l.practice_id, l.created_at, l.note, l.warm_up, l.cool_down, l.rpe, p.name, p.type
+            "SELECT l.id, l.practice_id, l.date, l.note, l.warm_up, l.cool_down, l.rpe, p.name, p.type
              FROM training_sessions l
              JOIN practices p ON l.practice_id = p.id
              WHERE p.active = 1
-             ORDER BY l.created_at DESC",
+             ORDER BY l.date DESC, l.created_at DESC",
         )?;
         let rows = stmt.query_map([], |row| {
             Ok((
@@ -521,11 +537,11 @@ impl Database {
     pub fn list_logs_recent(&self, days: i64) -> Result<Vec<LogEntry>> {
         let cutoff = Local::now().naive_local() - chrono::Duration::days(days);
         let mut stmt = self.conn.prepare(
-            "SELECT l.id, l.practice_id, l.created_at, l.note, l.warm_up, l.cool_down, l.rpe, p.name, p.type
+            "SELECT l.id, l.practice_id, l.date, l.note, l.warm_up, l.cool_down, l.rpe, p.name, p.type
              FROM training_sessions l
              JOIN practices p ON l.practice_id = p.id
-             WHERE l.created_at >= ?1 AND p.active = 1
-             ORDER BY l.created_at DESC",
+             WHERE l.date >= ?1 AND p.active = 1
+             ORDER BY l.date DESC, l.created_at DESC",
         )?;
         let rows = stmt.query_map(params![cutoff.to_string()], |row| {
             Ok((
@@ -580,11 +596,11 @@ impl Database {
     pub fn list_logs_for_practice(&self, practice_id: i64, days: i64) -> Result<Vec<LogEntry>> {
         let cutoff = Local::now().naive_local() - chrono::Duration::days(days);
         let mut stmt = self.conn.prepare(
-            "SELECT l.id, l.practice_id, l.created_at, l.note, l.warm_up, l.cool_down, l.rpe, p.name, p.type
+            "SELECT l.id, l.practice_id, l.date, l.note, l.warm_up, l.cool_down, l.rpe, p.name, p.type
              FROM training_sessions l
              JOIN practices p ON l.practice_id = p.id
-             WHERE l.practice_id = ?1 AND l.created_at >= ?2
-             ORDER BY l.created_at DESC",
+             WHERE l.practice_id = ?1 AND l.date >= ?2
+             ORDER BY l.date DESC, l.created_at DESC",
         )?;
         let rows = stmt.query_map(params![practice_id, cutoff.to_string()], |row| {
             Ok((
@@ -631,10 +647,10 @@ impl Database {
     pub fn heatmap_counts(&self, days: i64) -> Result<Vec<(String, i64)>> {
         let cutoff = Local::now().naive_local() - chrono::Duration::days(days);
         let mut stmt = self.conn.prepare(
-            "SELECT substr(l.created_at, 1, 10) AS day, COUNT(*) AS cnt
+            "SELECT substr(l.date, 1, 10) AS day, COUNT(*) AS cnt
              FROM training_sessions l
              JOIN practices p ON l.practice_id = p.id
-             WHERE l.created_at >= ?1 AND p.active = 1
+             WHERE l.date >= ?1 AND p.active = 1
              GROUP BY day
              ORDER BY day",
         )?;
@@ -653,7 +669,7 @@ impl Database {
     pub fn aggregate_stats(&self, days: i64) -> Result<AggregateStats> {
         let cutoff = Local::now().naive_local() - chrono::Duration::days(days);
         let sessions: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM training_sessions l JOIN practices p ON l.practice_id = p.id WHERE l.created_at >= ?1 AND p.active = 1",
+            "SELECT COUNT(*) FROM training_sessions l JOIN practices p ON l.practice_id = p.id WHERE l.date >= ?1 AND p.active = 1",
             params![cutoff.to_string()],
             |row| row.get(0),
         )?;
@@ -663,7 +679,7 @@ impl Database {
              FROM training_sets s
              JOIN training_sessions l ON s.training_session_id = l.id
              JOIN practices p ON l.practice_id = p.id
-             WHERE l.created_at >= ?1 AND p.active = 1",
+             WHERE l.date >= ?1 AND p.active = 1",
         )?;
         let rows = stmt.query_map(params![cutoff.to_string()], |row| {
             Ok((
@@ -710,10 +726,10 @@ impl Database {
     /// Exports all log entries (all time).
     pub fn export_all(&self) -> Result<Vec<LogEntry>> {
         let mut stmt = self.conn.prepare(
-            "SELECT l.id, l.practice_id, l.created_at, l.note, l.warm_up, l.cool_down, l.rpe, p.name, p.type
+            "SELECT l.id, l.practice_id, l.date, l.note, l.warm_up, l.cool_down, l.rpe, p.name, p.type
              FROM training_sessions l
              JOIN practices p ON l.practice_id = p.id
-             ORDER BY l.created_at DESC",
+             ORDER BY l.date DESC, l.created_at DESC",
         )?;
         let rows = stmt.query_map([], |row| {
             Ok((
@@ -770,7 +786,7 @@ impl Database {
         let count: i64 = self.conn.query_row(
             "SELECT COUNT(*) FROM training_sessions l
              JOIN practices p ON l.practice_id = p.id
-             WHERE p.name = ?1 AND l.created_at = ?2",
+             WHERE p.name = ?1 AND l.date = ?2",
             params![practice_name, logged_at.to_string()],
             |row| row.get(0),
         )?;
