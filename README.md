@@ -2,6 +2,8 @@
 
 A terminal UI for tracking training. Log practices set-by-set, review history, and visualize consistency. All data stays local in a single SQLite file.
 
+![](./iron.jpg)
+
 ## Philosophy
 
 - **Terminal-native**: keyboard-driven, fast, distraction-free
