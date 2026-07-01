@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iron - Terminal UI for tracking training records</title>
+    <style>
+        :root {
+            --bg-color: #0d0d0d;
+            --text-color: #e0e0e0;
+            --accent-green: #27c93f;
+            --accent-cyan: #00ffcc;
+            --panel-bg: #1a1a1a;
+            --border-color: #333;
+        }
+        
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 2rem;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        h1 {
+            color: var(--accent-cyan);
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: #aaa;
+            font-size: 1.1rem;
+        }
+
+        .hero-image {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 3rem;
+            box-shadow: 0 4px 20px rgba(0, 255, 204, 0.05);
+            text-align: center;
+        }
+
+        .hero-image img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+        }
+        
+        .hero-window-controls {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 1rem;
+        }
+        
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        .dot.red { background: #ff5f56; }
+        .dot.yellow { background: #ffbd2e; }
+        .dot.green { background: #27c93f; }
+
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 600px) {
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        h3 {
+            color: var(--accent-cyan);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .install-box {
+            background-color: #222;
+            padding: 1rem;
+            border-radius: 6px;
+            color: #fff;
+            border: 1px solid #444;
+            display: inline-block;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        ul {
+            padding-left: 1.2rem;
+            color: #aaa;
+        }
+        
+        li {
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>iron 🏋️</h1>
+            <p class="subtitle">A terminal UI application for tracking training records, built in Rust.</p>
+        </header>
+
+        <section class="hero-image">
+            <div class="hero-window-controls">
+                <div class="dot red"></div>
+                <div class="dot yellow"></div>
+                <div class="dot green"></div>
+            </div>
+            <img src="iron.jpg" alt="iron terminal UI screenshot">
+        </section>
+
+        <section class="content-grid">
+            <div>
+                <h3>Installation</h3>
+                <div class="install-box">
+                    $ cargo install iron
+                </div>
+            </div>
+            <div>
+                <h3>Features</h3>
+                <ul>
+                    <li>Vim-style navigation (j/k, h/l)</li>
+                    <li>Contribution heatmap</li>
+                    <li>Fast, local SQLite storage</li>
+                </ul>
+            </div>
+        </section>
+    </div>
+</body>
+</html>
