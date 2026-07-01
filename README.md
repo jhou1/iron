@@ -31,7 +31,7 @@ A terminal UI for tracking training. Log practices set-by-set, review history, a
 Requires Rust 1.70+.
 
 ```bash
-git clone <repo-url> && cd iron
+git clone https://github.com/jhou1/iron.git
 cargo build --release
 cp target/release/iron ~/.local/bin/
 ```
@@ -47,17 +47,17 @@ LANG=zh_CN.UTF-8 iron  # Chinese
 
 The home screen shows the heatmap, training summary, recent activity, active goals, and a daily quote.
 
-| Key | Action |
-|---|---|
-| `l` | Log a practice |
-| `w` | Quick Log (LLM-powered) |
-| `h` | History |
-| `t` | Trends |
-| `e` | Practices |
-| `g` | Goals |
-| `Q` | Quotes |
-| `v` | Record today's HRV |
-| `Esc` | Quit |
+| Key   | Action                  |
+|-------|-------------------------|
+| `l`   | Log a practice          |
+| `w`   | Quick Log (LLM-powered) |
+| `h`   | History                 |
+| `t`   | Trends                  |
+| `e`   | Practices               |
+| `g`   | Goals                   |
+| `Q`   | Quotes                  |
+| `v`   | Record today's HRV      |
+| `Esc` | Quit                    |
 
 ### First Time Setup
 
