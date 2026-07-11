@@ -1,5 +1,7 @@
 # iron
 
+English | [中文版](README_zh.md)
+
 A terminal UI for tracking training. Log practices set-by-set, review history, and visualize consistency. All data stays local in a single SQLite file.
 
 ![](docs/iron.jpg)
