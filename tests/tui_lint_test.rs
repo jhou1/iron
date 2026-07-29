@@ -15,26 +15,26 @@ fn paragraph_widgets_must_wrap_user_content() {
     // When adding entries, include a brief reason.
     let allowlist: HashSet<&str> = [
         "dashboard.rs:152",
-        "dashboard.rs:313",
-        "dashboard.rs:500",
-        "dashboard.rs:520",
-        "dashboard.rs:555",
+        "dashboard.rs:323",
+        "dashboard.rs:510",
+        "dashboard.rs:530",
+        "dashboard.rs:565",
         "goals.rs:451",
         "goals.rs:572",
         "history.rs:136",
-        "history.rs:250",
-        "history.rs:296",
+        "history.rs:259",
+        "history.rs:305",
         "log_entry.rs:228",
         "log_entry.rs:283",
-        "log_entry.rs:313",
-        "log_entry.rs:523",
-        "log_entry.rs:699",
-        "log_entry.rs:762",
-        "log_entry.rs:867",
+        "log_entry.rs:315",
+        "log_entry.rs:525",
+        "log_entry.rs:701",
+        "log_entry.rs:771",
+        "log_entry.rs:876",
         "mod.rs:108",
-        "practices.rs:206",
-        "practices.rs:306",
-        "practices.rs:391",
+        "practices.rs:212",
+        "practices.rs:312",
+        "practices.rs:397",
         "quotes_screen.rs:122",
         "quotes_screen.rs:224",
         "quotes_screen.rs:271",
@@ -44,7 +44,9 @@ fn paragraph_widgets_must_wrap_user_content() {
         "trends.rs:249",
         "trends.rs:257",
         "trends.rs:317",
-    ].into_iter().collect();
+    ]
+    .into_iter()
+    .collect();
 
     let tui_dir = Path::new("src/tui");
     let mut violations = Vec::new();
@@ -102,7 +104,11 @@ fn paragraph_widgets_must_wrap_user_content() {
         let source = std::fs::read_to_string(&path).unwrap();
         let lines: Vec<&str> = source.lines().collect();
         if line_num == 0 || line_num > lines.len() {
-            stale.push(format!("  {} — line number out of range (file has {} lines)", entry, lines.len()));
+            stale.push(format!(
+                "  {} — line number out of range (file has {} lines)",
+                entry,
+                lines.len()
+            ));
             continue;
         }
         if !lines[line_num - 1].contains("Paragraph::new(") {

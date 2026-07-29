@@ -1031,8 +1031,6 @@ impl QuickLogScreen {
             return Action::None;
         }
 
-        let raw_text = self.input_lines.join("\n");
-
         // Parse date
         let date = match chrono::NaiveDate::parse_from_str(&self.log_date, "%Y-%m-%d") {
             Ok(d) => d.and_hms_opt(12, 0, 0).unwrap(),
@@ -1058,7 +1056,7 @@ impl QuickLogScreen {
             };
 
             if let Err(e) =
-                db.create_log_at(practice.id, &date, &entry.sets, Some(&raw_text), None, None, None)
+                db.create_log_at(practice.id, &date, &entry.sets, None, None, None, None)
             {
                 self.status_msg = Some((format!("Error: {}", e), true));
                 return Action::None;
@@ -1339,5 +1337,36 @@ fn format_set(number: usize, data: &SetData) -> String {
         SetData::Endurance { duration } => {
             format!("Set {}: {} min", number, duration)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::PracticeType;
+
+    #[test]
+    fn save_all_does_not_store_raw_llm_input_as_note() {
+        let db = Database::open_in_memory().unwrap();
+        db.create_practice("Deadlift", PracticeType::Weighted)
+            .unwrap();
+
+        let mut screen = QuickLogScreen::new(&db, &None).unwrap();
+        screen.input_lines = vec!["DL 60kg 5/5/5".to_string()];
+        screen.parsed_results = vec![ParsedLog {
+            practice_name: "Deadlift".to_string(),
+            sets: vec![SetData::Weighted {
+                weight: 60.0,
+                reps: 5,
+            }],
+            matched: true,
+        }];
+
+        let action = screen.save_all(&db);
+
+        assert!(matches!(action, Action::Navigate(Screen::Dashboard)));
+        let entries = db.list_logs_all().unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].log.note, None);
     }
 }
