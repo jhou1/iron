@@ -153,8 +153,16 @@ fn export_delete_reimport_restores_all_data() {
         .unwrap();
     db.create_log_at(pu.id, &t2, &pu_sets, None, None, None, None)
         .unwrap();
-    db.create_log_at(run.id, &t3, &run_sets, Some("Morning run"), None, None, None)
-        .unwrap();
+    db.create_log_at(
+        run.id,
+        &t3,
+        &run_sets,
+        Some("Morning run"),
+        None,
+        None,
+        None,
+    )
+    .unwrap();
     db.create_log_at(plank.id, &t4, &plank_sets, None, None, None, None)
         .unwrap();
 
@@ -275,7 +283,15 @@ fn partial_delete_reimport_merges_correctly() {
     let run_sets = vec![SetData::Distance { distance: 3.0 }];
 
     let log1_id = db
-        .create_log_at(squat.id, &t1, &squat_sets1, Some("Heavy day"), None, None, None)
+        .create_log_at(
+            squat.id,
+            &t1,
+            &squat_sets1,
+            Some("Heavy day"),
+            None,
+            None,
+            None,
+        )
         .unwrap();
     db.create_log_at(squat.id, &t2, &squat_sets2, None, None, None, None)
         .unwrap();
@@ -372,7 +388,9 @@ fn import_skips_duplicates_all_practice_types() {
         }],
         None,
         None,
-        None, None)
+        None,
+        None,
+    )
     .unwrap();
     db.create_log_at(
         pu.id,
@@ -380,7 +398,9 @@ fn import_skips_duplicates_all_practice_types() {
         &[SetData::Bodyweight { reps: 20 }],
         Some("Easy"),
         None,
-        None, None)
+        None,
+        None,
+    )
     .unwrap();
     db.create_log_at(
         run.id,
@@ -388,7 +408,9 @@ fn import_skips_duplicates_all_practice_types() {
         &[SetData::Distance { distance: 5.0 }],
         None,
         None,
-        None, None)
+        None,
+        None,
+    )
     .unwrap();
     db.create_log_at(
         plank.id,
@@ -396,7 +418,9 @@ fn import_skips_duplicates_all_practice_types() {
         &[SetData::Endurance { duration: 3.0 }],
         None,
         None,
-        None, None)
+        None,
+        None,
+    )
     .unwrap();
 
     // Export
@@ -629,7 +653,9 @@ fn warmup_cooldown_survive_export_import() {
         &sets,
         Some("Good"),
         Some("Jump rope"),
-        Some("Stretches"), None)
+        Some("Stretches"),
+        None,
+    )
     .unwrap();
     let export_path = source.export_path();
     export_to_json(db, Some(export_path.clone())).unwrap();
@@ -681,7 +707,9 @@ fn inactive_practice_survives_export_import() {
         }],
         None,
         None,
-        None, None)
+        None,
+        None,
+    )
     .unwrap();
 
     let export_path = source.export_path();

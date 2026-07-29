@@ -155,7 +155,13 @@ impl PracticesScreen {
                 Style::default().fg(Color::Gray),
             )));
         } else {
-            for (i, p) in self.practices.iter().enumerate().skip(self.scroll_offset).take(visible_height) {
+            for (i, p) in self
+                .practices
+                .iter()
+                .enumerate()
+                .skip(self.scroll_offset)
+                .take(visible_height)
+            {
                 let marker = if i == self.selected { "> " } else { "  " };
                 let (name_style, type_color) = if i == self.selected {
                     if p.active {

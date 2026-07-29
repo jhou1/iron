@@ -208,11 +208,20 @@ impl HistoryScreen {
         // Status + shortcuts
         let shortcuts = match self.mode {
             Mode::ConfirmDelete => Line::from(vec![
-                Span::styled(format!(" {} ", tr("history-delete-confirm")), Style::default().fg(Color::Red)),
+                Span::styled(
+                    format!(" {} ", tr("history-delete-confirm")),
+                    Style::default().fg(Color::Red),
+                ),
                 Span::styled("[y]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}  ", tr("key-yes")), Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!(" {}  ", tr("key-yes")),
+                    Style::default().fg(Color::DarkGray),
+                ),
                 Span::styled("[any]", Style::default().fg(ACCENT)),
-                Span::styled(format!(" {}", tr("key-cancel")), Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!(" {}", tr("key-cancel")),
+                    Style::default().fg(Color::DarkGray),
+                ),
             ]),
             _ => {
                 let navigate_text = format!(" {}  ", tr("key-navigate"));

@@ -207,7 +207,11 @@ impl DashboardScreen {
             let rev_lbl = tr("footer-group-review");
             let man_lbl = tr("footer-group-manage");
             let sys_lbl = tr("footer-group-system");
-            let max_lbl = log_lbl.width().max(rev_lbl.width()).max(man_lbl.width()).max(sys_lbl.width());
+            let max_lbl = log_lbl
+                .width()
+                .max(rev_lbl.width())
+                .max(man_lbl.width())
+                .max(sys_lbl.width());
 
             let log_pad = " ".repeat(max_lbl.saturating_sub(log_lbl.width()));
             let rev_pad = " ".repeat(max_lbl.saturating_sub(rev_lbl.width()));
@@ -217,13 +221,13 @@ impl DashboardScreen {
             let log_key = tr("key-log");
             let rev_key = tr("key-history");
             let man_key = tr("key-practices");
-            
+
             let log_col1_len = 3 + log_key.width(); // "[l]" = 3
             let rev_col1_len = 3 + rev_key.width(); // "[h]" = 3
             let man_col1_len = 3 + man_key.width(); // "[e]" = 3
-            
+
             let max_col1 = log_col1_len.max(rev_col1_len).max(man_col1_len);
-            
+
             let log_col1_pad = " ".repeat(max_col1.saturating_sub(log_col1_len) + 1);
             let rev_col1_pad = " ".repeat(max_col1.saturating_sub(rev_col1_len) + 1);
             let man_col1_pad = " ".repeat(max_col1.saturating_sub(man_col1_len) + 1);
@@ -254,7 +258,10 @@ impl DashboardScreen {
                         Style::default().fg(Color::DarkGray),
                     ),
                     Span::styled("[w]", Style::default().fg(ACCENT)),
-                    Span::styled(format!("{}{}", log_key2, log_col2_pad), Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!("{}{}", log_key2, log_col2_pad),
+                        Style::default().fg(Color::DarkGray),
+                    ),
                 ]),
                 Line::from(vec![
                     Span::styled(
@@ -267,7 +274,10 @@ impl DashboardScreen {
                         Style::default().fg(Color::DarkGray),
                     ),
                     Span::styled("[t]", Style::default().fg(ACCENT)),
-                    Span::styled(format!("{}{}", rev_key2, rev_col2_pad), Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!("{}{}", rev_key2, rev_col2_pad),
+                        Style::default().fg(Color::DarkGray),
+                    ),
                 ]),
                 Line::from(vec![
                     Span::styled(

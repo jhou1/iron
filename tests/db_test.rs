@@ -165,7 +165,8 @@ fn delete_log() {
     let practice_id = practices[0].id;
 
     let sets = vec![SetData::Distance { distance: 5.0 }];
-    db.create_log(practice_id, &sets, None, None, None, None).unwrap();
+    db.create_log(practice_id, &sets, None, None, None, None)
+        .unwrap();
 
     let entries = db.list_logs_recent(1).unwrap();
     let log_id = entries[0].log.id;
@@ -185,8 +186,10 @@ fn heatmap_data() {
     let practice_id = practices[0].id;
 
     let sets = vec![SetData::Bodyweight { reps: 20 }];
-    db.create_log(practice_id, &sets, None, None, None, None).unwrap();
-    db.create_log(practice_id, &sets, None, None, None, None).unwrap();
+    db.create_log(practice_id, &sets, None, None, None, None)
+        .unwrap();
+    db.create_log(practice_id, &sets, None, None, None, None)
+        .unwrap();
 
     let counts = db.heatmap_counts(30).unwrap();
     // Today's date should have count 2
@@ -548,7 +551,9 @@ fn create_log_with_warmup_cooldown() {
         &sets,
         Some("Good session"),
         Some("5 min jump rope"),
-        Some("Static stretches"), None)
+        Some("Static stretches"),
+        None,
+    )
     .unwrap();
     let entries = db.list_logs_recent(1).unwrap();
     assert_eq!(entries.len(), 1);
@@ -569,7 +574,8 @@ fn update_log_warmup_cooldown() {
         weight: 60.0,
         reps: 10,
     }];
-    db.create_log(practice_id, &sets, None, None, None, None).unwrap();
+    db.create_log(practice_id, &sets, None, None, None, None)
+        .unwrap();
     let entries = db.list_logs_recent(1).unwrap();
     let log_id = entries[0].log.id;
     db.update_log(
@@ -578,7 +584,9 @@ fn update_log_warmup_cooldown() {
         Some("Updated"),
         None,
         Some("Foam rolling"),
-        Some("Cool down walk"), None)
+        Some("Cool down walk"),
+        None,
+    )
     .unwrap();
     let entries = db.list_logs_recent(1).unwrap();
     assert_eq!(entries[0].log.warm_up, Some("Foam rolling".to_string()));
@@ -665,14 +673,18 @@ fn inactive_practice_hidden_from_logs() {
         }],
         None,
         None,
-        None, None)
+        None,
+        None,
+    )
     .unwrap();
     db.create_log(
         pullups.id,
         &[SetData::Bodyweight { reps: 20 }],
         None,
         None,
-        None, None)
+        None,
+        None,
+    )
     .unwrap();
 
     db.set_practice_active(bench.id, false).unwrap();
@@ -709,14 +721,18 @@ fn inactive_practice_hidden_from_heatmap() {
         }],
         None,
         None,
-        None, None)
+        None,
+        None,
+    )
     .unwrap();
     db.create_log(
         pullups.id,
         &[SetData::Bodyweight { reps: 20 }],
         None,
         None,
-        None, None)
+        None,
+        None,
+    )
     .unwrap();
 
     db.set_practice_active(bench.id, false).unwrap();
@@ -760,7 +776,9 @@ fn test_restore_log() {
             &sets,
             Some("Great session"),
             Some("5 min jog"),
-            Some("Stretching"), None)
+            Some("Stretching"),
+            None,
+        )
         .unwrap();
 
     // Get the full entry

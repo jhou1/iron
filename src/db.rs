@@ -21,7 +21,6 @@ pub struct Database {
     conn: Connection,
 }
 
-
 fn parse_datetime(s: &str) -> anyhow::Result<chrono::NaiveDateTime> {
     chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.f")
         .or_else(|_| chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S"))
@@ -83,11 +82,14 @@ impl Database {
     }
 
     fn init_schema(&self) -> Result<()> {
-        let check_logs: i64 = self.conn.query_row(
-            "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='logs'",
-            [],
-            |row| row.get(0),
-        ).unwrap_or(0);
+        let check_logs: i64 = self
+            .conn
+            .query_row(
+                "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='logs'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
 
         let check_sessions: i64 = self.conn.query_row(
             "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='training_sessions'",
@@ -97,37 +99,56 @@ impl Database {
 
         if check_logs > 0 && check_sessions == 0 {
             self.conn.execute("PRAGMA foreign_keys = OFF", [])?;
-            self.conn.execute("ALTER TABLE logs RENAME TO training_sessions", [])?;
-            self.conn.execute("ALTER TABLE training_sessions RENAME COLUMN logged_at TO date", [])?;
+            self.conn
+                .execute("ALTER TABLE logs RENAME TO training_sessions", [])?;
+            self.conn.execute(
+                "ALTER TABLE training_sessions RENAME COLUMN logged_at TO date",
+                [],
+            )?;
         }
 
-        let check_date_col: i64 = self.conn.query_row(
-            "SELECT count(*) FROM pragma_table_info('training_sessions') WHERE name='date'",
-            [],
-            |row| row.get(0),
-        ).unwrap_or(0);
+        let check_date_col: i64 = self
+            .conn
+            .query_row(
+                "SELECT count(*) FROM pragma_table_info('training_sessions') WHERE name='date'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
 
         if check_sessions > 0 && check_date_col == 0 {
-            let _ = self.conn.execute("ALTER TABLE training_sessions RENAME COLUMN created_at TO date", []);
+            let _ = self.conn.execute(
+                "ALTER TABLE training_sessions RENAME COLUMN created_at TO date",
+                [],
+            );
             let _ = self.conn.execute("ALTER TABLE training_sessions ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP", []);
         }
 
+        let check_sets: i64 = self
+            .conn
+            .query_row(
+                "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='sets'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
 
-        let check_sets: i64 = self.conn.query_row(
-            "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='sets'",
-            [],
-            |row| row.get(0),
-        ).unwrap_or(0);
-
-        let check_t_sets: i64 = self.conn.query_row(
-            "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='training_sets'",
-            [],
-            |row| row.get(0),
-        ).unwrap_or(0);
+        let check_t_sets: i64 = self
+            .conn
+            .query_row(
+                "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='training_sets'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
 
         if check_sets > 0 && check_t_sets == 0 {
-            self.conn.execute("ALTER TABLE sets RENAME TO training_sets", [])?;
-            self.conn.execute("ALTER TABLE training_sets RENAME COLUMN log_id TO training_session_id", [])?;
+            self.conn
+                .execute("ALTER TABLE sets RENAME TO training_sets", [])?;
+            self.conn.execute(
+                "ALTER TABLE training_sets RENAME COLUMN log_id TO training_session_id",
+                [],
+            )?;
         }
 
         self.conn.execute_batch(
@@ -213,9 +234,10 @@ impl Database {
         let _ = self
             .conn
             .execute("ALTER TABLE training_sessions ADD COLUMN warm_up TEXT", []);
-        let _ = self
-            .conn
-            .execute("ALTER TABLE training_sessions ADD COLUMN cool_down TEXT", []);
+        let _ = self.conn.execute(
+            "ALTER TABLE training_sessions ADD COLUMN cool_down TEXT",
+            [],
+        );
         let _ = self
             .conn
             .execute("ALTER TABLE training_sessions ADD COLUMN rpe INTEGER", []);
@@ -224,13 +246,19 @@ impl Database {
             [],
         );
 
-        let check_ptype: i64 = self.conn.query_row(
-            "SELECT count(*) FROM pragma_table_info('practices') WHERE name='practice_type'",
-            [],
-            |row| row.get(0),
-        ).unwrap_or(0);
+        let check_ptype: i64 = self
+            .conn
+            .query_row(
+                "SELECT count(*) FROM pragma_table_info('practices') WHERE name='practice_type'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
         if check_ptype > 0 {
-            let _ = self.conn.execute("ALTER TABLE practices RENAME COLUMN practice_type TO type", []);
+            let _ = self.conn.execute(
+                "ALTER TABLE practices RENAME COLUMN practice_type TO type",
+                [],
+            );
         }
 
         Ok(())
@@ -255,9 +283,9 @@ impl Database {
     }
 
     pub fn list_practices(&self) -> Result<Vec<Practice>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT id, name, type, created_at, active FROM practices ORDER BY name",
-        )?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, name, type, created_at, active FROM practices ORDER BY name")?;
         let rows = stmt.query_map([], |row| {
             let pt_str: String = row.get(2)?;
             let created_str: String = row.get(3)?;
@@ -346,11 +374,15 @@ impl Database {
             .collect::<Result<Vec<_>, _>>()?;
         drop(stmt);
         for log_id in log_ids {
-            self.conn
-                .execute("DELETE FROM training_sets WHERE training_session_id = ?1", params![log_id])?;
+            self.conn.execute(
+                "DELETE FROM training_sets WHERE training_session_id = ?1",
+                params![log_id],
+            )?;
         }
-        self.conn
-            .execute("DELETE FROM training_sessions WHERE practice_id = ?1", params![id])?;
+        self.conn.execute(
+            "DELETE FROM training_sessions WHERE practice_id = ?1",
+            params![id],
+        )?;
         self.conn
             .execute("DELETE FROM practices WHERE id = ?1", params![id])?;
         Ok(())
@@ -422,18 +454,24 @@ impl Database {
             )?;
         }
         // Delete old sets and insert new ones
-        self.conn
-            .execute("DELETE FROM training_sets WHERE training_session_id = ?1", params![log_id])?;
+        self.conn.execute(
+            "DELETE FROM training_sets WHERE training_session_id = ?1",
+            params![log_id],
+        )?;
         self.insert_sets(log_id, sets)?;
         Ok(())
     }
 
     pub fn delete_log(&self, log_id: i64) -> Result<()> {
         // Delete sets first (cascade should handle it, but be explicit)
-        self.conn
-            .execute("DELETE FROM training_sets WHERE training_session_id = ?1", params![log_id])?;
-        self.conn
-            .execute("DELETE FROM training_sessions WHERE id = ?1", params![log_id])?;
+        self.conn.execute(
+            "DELETE FROM training_sets WHERE training_session_id = ?1",
+            params![log_id],
+        )?;
+        self.conn.execute(
+            "DELETE FROM training_sessions WHERE id = ?1",
+            params![log_id],
+        )?;
         Ok(())
     }
 
@@ -618,8 +656,17 @@ impl Database {
 
         let mut entries = Vec::new();
         for row in rows {
-            let (log_id, pid, logged_at_str, note, warm_up, cool_down, rpe_val, practice_name, pt_str) =
-                row?;
+            let (
+                log_id,
+                pid,
+                logged_at_str,
+                note,
+                warm_up,
+                cool_down,
+                rpe_val,
+                practice_name,
+                pt_str,
+            ) = row?;
             let logged_at = parse_datetime(&logged_at_str)?;
             let practice_type: PracticeType =
                 pt_str.parse().map_err(|e: String| anyhow::anyhow!(e))?;

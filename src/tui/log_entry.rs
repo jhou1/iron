@@ -282,8 +282,10 @@ impl LogEntryScreen {
         }
         frame.render_widget(Paragraph::new(all_lines), inner);
 
-        if !self.filtered_indices.is_empty() && self.selected >= self.scroll && self.selected < end {
-            highlight_row(frame, inner, (self.selected - self.scroll) as u16 + 1); // +1 for header
+        if !self.filtered_indices.is_empty() && self.selected >= self.scroll && self.selected < end
+        {
+            highlight_row(frame, inner, (self.selected - self.scroll) as u16 + 1);
+            // +1 for header
         }
 
         render_status_line(frame, chunks[2], &self.status_msg);
@@ -755,10 +757,17 @@ impl LogEntryScreen {
                 rpe_color,
             ));
         } else {
-            rpe_spans.push(Span::styled(&self.rpe_input, Style::default().fg(rpe_color)));
+            rpe_spans.push(Span::styled(
+                &self.rpe_input,
+                Style::default().fg(rpe_color),
+            ));
         }
 
-        let wucd_lines = vec![Line::from(wu_spans), Line::from(cd_spans), Line::from(rpe_spans)];
+        let wucd_lines = vec![
+            Line::from(wu_spans),
+            Line::from(cd_spans),
+            Line::from(rpe_spans),
+        ];
         frame.render_widget(Paragraph::new(wucd_lines), wucd_inner);
 
         // ── Note section ──
@@ -1430,14 +1439,15 @@ impl LogEntryScreen {
 
     fn save_log(&mut self, db: &Database) -> Action {
         let practice = self.chosen_practice.as_ref().unwrap();
-        
+
         let rpe = if self.rpe_input.is_empty() {
             None
         } else {
             match self.rpe_input.parse::<u8>() {
                 Ok(val) if (1..=10).contains(&val) => Some(val),
                 _ => {
-                    self.status_msg = Some(("RPE must be a number between 1 and 10".to_string(), true));
+                    self.status_msg =
+                        Some(("RPE must be a number between 1 and 10".to_string(), true));
                     return Action::None;
                 }
             }
@@ -1472,8 +1482,16 @@ impl LogEntryScreen {
                 rpe,
             )
         } else {
-            db.create_log_at(practice.id, &datetime, &self.sets, note, warm_up, cool_down, rpe)
-                .map(|_| ())
+            db.create_log_at(
+                practice.id,
+                &datetime,
+                &self.sets,
+                note,
+                warm_up,
+                cool_down,
+                rpe,
+            )
+            .map(|_| ())
         };
         match result {
             Ok(_) => Action::Navigate(self.return_to.clone()),
