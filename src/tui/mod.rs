@@ -14,9 +14,10 @@ use ratatui::{
     layout::{Position, Rect},
     style::{Color, Style},
     text::{Line, Span},
-    widgets::Paragraph,
     Frame,
 };
+
+pub use framework::components::{render_status_line, StatusMessage};
 
 const HIGHLIGHT_BG: Color = Color::Rgb(204, 163, 0);
 const HIGHLIGHT_FG: Color = Color::Black;
@@ -98,16 +99,6 @@ pub fn visible_input_spans<'a>(
         Span::styled("_", Style::default().fg(color)),
         Span::styled(visible_after, Style::default().fg(color)),
     ]
-}
-
-pub type StatusMessage = Option<(String, bool)>; // (message, is_error)
-
-pub fn render_status_line(frame: &mut Frame, area: Rect, status: &StatusMessage) {
-    if let Some((msg, is_error)) = status {
-        let color = if *is_error { Color::Red } else { Color::Green };
-        let line = Line::from(Span::styled(msg.as_str(), Style::default().fg(color)));
-        frame.render_widget(Paragraph::new(line), area);
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
