@@ -90,6 +90,20 @@ impl TextInput {
         }
     }
 
+    #[allow(dead_code)]
+    pub fn handle_key_if<F>(&mut self, key: KeyEvent, accepts: F) -> bool
+    where
+        F: Fn(char) -> bool,
+    {
+        let control = key.modifiers.contains(KeyModifiers::CONTROL);
+        if let KeyCode::Char(character) = key.code {
+            if !control && !accepts(character) {
+                return false;
+            }
+        }
+        self.handle_key(key)
+    }
+
     pub fn visible_spans(
         &self,
         max_width: u16,
@@ -196,5 +210,20 @@ mod tests {
         let line = ratatui::text::Line::from(rendered);
         assert!(line.width() <= 10);
         assert!(text.contains('_'));
+    }
+
+    #[test]
+    fn filtered_input_rejects_invalid_characters_without_blocking_navigation() {
+        let mut input = TextInput::from("12");
+        input.handle_key_if(key(KeyCode::Char('x')), |character| {
+            character.is_ascii_digit()
+        });
+        input.handle_key_if(key(KeyCode::Left), |character| character.is_ascii_digit());
+        input.handle_key_if(key(KeyCode::Backspace), |character| {
+            character.is_ascii_digit()
+        });
+
+        assert_eq!(input.value(), "2");
+        assert_eq!(input.cursor(), 0);
     }
 }

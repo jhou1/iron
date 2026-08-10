@@ -11,8 +11,13 @@ use ratatui::{
 use unicode_width::UnicodeWidthStr;
 
 use super::{
-    centered_area, highlight_row, render_status_line, visible_input_spans, Action, Screen,
-    StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
+    centered_area,
+    framework::{
+        move_selection, render_shortcuts, shortcut_height, truncate_to_width, EdgeBehavior,
+        Shortcut, TextInput, ViewportState, VisualSpan,
+    },
+    highlight_row, render_status_line, visible_input_spans, Action, Screen, StatusMessage,
+    BORDER_COLOR, CONTENT_WIDTH,
 };
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
@@ -39,12 +44,10 @@ enum FocusSection {
 pub struct LogEntryScreen {
     practices: Vec<Practice>,
     filtered_indices: Vec<usize>,
-    filter_text: String,
-    filter_cursor: usize,
+    filter: TextInput,
     filtering: bool,
     selected: usize,
-    scroll: usize,
-    list_height: usize,
+    list_viewport: ViewportState,
     phase: Phase,
     chosen_practice: Option<Practice>,
     sets: Vec<SetData>,
@@ -82,12 +85,10 @@ impl LogEntryScreen {
         Ok(Self {
             practices,
             filtered_indices,
-            filter_text: String::new(),
-            filter_cursor: 0,
+            filter: TextInput::new(),
             filtering: false,
             selected: 0,
-            scroll: 0,
-            list_height: 0,
+            list_viewport: ViewportState::new(0),
             phase: Phase::SelectPractice,
             chosen_practice: None,
             sets: Vec::new(),
@@ -135,12 +136,10 @@ impl LogEntryScreen {
         Ok(Self {
             practices,
             filtered_indices,
-            filter_text: String::new(),
-            filter_cursor: 0,
+            filter: TextInput::new(),
             filtering: false,
             selected: 0,
-            scroll: 0,
-            list_height: 0,
+            list_viewport: ViewportState::new(0),
             phase: Phase::EnterLog,
             chosen_practice: practice,
             sets,
@@ -188,66 +187,114 @@ impl LogEntryScreen {
 
     // ── Phase 1: SelectPractice ───────────────────────────────────────
 
+    fn active_select_shortcuts(&self) -> Vec<Shortcut> {
+        if self.filtering {
+            vec![
+                Shortcut::new("Enter", tr("key-confirm")),
+                Shortcut::new("Esc", tr("key-cancel")),
+            ]
+        } else {
+            vec![
+                Shortcut::new("j/k", tr("key-navigate")),
+                Shortcut::new("/", tr("key-filter")),
+                Shortcut::new("Enter", tr("key-select")),
+                Shortcut::new("Esc", tr("key-back")),
+            ]
+        }
+    }
+
     fn render_select_practice(&mut self, frame: &mut Frame) {
         let area = centered_area(frame.area(), CONTENT_WIDTH);
+        let shortcuts = self.active_select_shortcuts();
+        let shortcut_rows = shortcut_height(&shortcuts, area.width);
 
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1), // filter bar
-                Constraint::Min(1),    // bordered list
-                Constraint::Length(1), // status line
-                Constraint::Length(1), // footer
-                Constraint::Min(0),    // spacer
+                Constraint::Length(1),             // filter bar
+                Constraint::Min(1),                // bordered list
+                Constraint::Length(1),             // status line
+                Constraint::Length(shortcut_rows), // footer
+                Constraint::Min(0),                // spacer
             ])
             .split(area);
 
-        let max_name_len = self
-            .practices
-            .iter()
-            .map(|p| p.name.width())
-            .max()
-            .unwrap_or(0);
-        let col_width = max_name_len + 4;
-
         // Filter bar
-        let filter_display = if self.filtering {
-            let (before, after) = self.filter_text.split_at(self.filter_cursor);
-            format!(" /{}{}{}", before, "\u{2588}", after)
-        } else if !self.filter_text.is_empty() {
-            format!(" /{}", self.filter_text)
-        } else {
-            format!(" {}", tr("log-press-filter"))
-        };
         let filter_style = if self.filtering {
             Style::default().fg(ACCENT)
         } else {
             Style::default().fg(Color::Gray)
         };
+        let mut filter_spans = if self.filtering || !self.filter.value().is_empty() {
+            vec![Span::styled(" /", filter_style)]
+        } else {
+            vec![Span::styled(
+                format!(" {}", tr("log-press-filter")),
+                filter_style,
+            )]
+        };
+        if self.filtering {
+            filter_spans.extend(self.filter.visible_spans(chunks[0].width, 2, ACCENT));
+        } else if !self.filter.value().is_empty() {
+            filter_spans.push(Span::styled(
+                truncate_to_width(
+                    self.filter.value(),
+                    chunks[0].width.saturating_sub(2) as usize,
+                ),
+                filter_style,
+            ));
+        }
         frame.render_widget(
-            Paragraph::new(Line::from(Span::styled(filter_display, filter_style))),
+            Paragraph::new(Line::from(filter_spans)).wrap(Wrap { trim: false }),
             chunks[0],
         );
 
         // Bordered list
         let block = Block::default()
-            .title(Line::from(vec![
-                Span::styled("── ", Style::default().fg(BORDER_COLOR)),
-                Span::styled(
-                    tr("log-select-practice"),
-                    Style::default().fg(Color::White).bold(),
-                ),
-                Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
-            ]))
             .borders(Borders::ALL)
             .padding(Padding::uniform(1))
             .border_style(Style::default().fg(BORDER_COLOR));
         let inner = block.inner(chunks[1]);
+        let visible_rows = inner.height.saturating_sub(1) as usize; // -1 for header
+        self.list_viewport.set_height(visible_rows);
+        if !self.filtered_indices.is_empty() {
+            self.list_viewport.reveal(VisualSpan {
+                start: self.selected,
+                height: 1,
+            });
+        }
+        self.list_viewport.clamp(self.filtered_indices.len());
+        let overflow = self
+            .list_viewport
+            .overflow(self.filtered_indices.len())
+            .suffix();
+        let block = block.title(Line::from(vec![
+            Span::styled("── ", Style::default().fg(BORDER_COLOR)),
+            Span::styled(
+                format!("{}{}", tr("log-select-practice"), overflow),
+                Style::default().fg(Color::White).bold(),
+            ),
+            Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
+        ]));
         frame.render_widget(block, chunks[1]);
 
         let name_header = tr("practices-col-name");
         let type_header = tr("practices-col-type");
-        let header_padding = col_width.saturating_sub(name_header.width());
+        let desired_type_width = self
+            .practices
+            .iter()
+            .map(|practice| practice.practice_type.label().width())
+            .max()
+            .unwrap_or(0)
+            .max(type_header.width());
+        let type_col_width = desired_type_width.min((inner.width as usize) / 3);
+        let name_col_width = (inner.width as usize)
+            .saturating_sub(2)
+            .saturating_sub(2)
+            .saturating_sub(type_col_width);
+        let name_header = truncate_to_width(&name_header, name_col_width);
+        let type_header = truncate_to_width(&type_header, type_col_width);
+        let header_padding = name_col_width.saturating_sub(name_header.width()) + 2;
 
         let mut all_lines = vec![Line::from(vec![
             Span::styled("  ", Style::default().fg(Color::DarkGray)),
@@ -256,11 +303,10 @@ impl LogEntryScreen {
             Span::styled(&type_header, Style::default().fg(Color::DarkGray)),
         ])];
 
-        let visible_rows = inner.height.saturating_sub(1) as usize; // -1 for header
-        self.list_height = visible_rows;
-        let end = (self.scroll + visible_rows).min(self.filtered_indices.len());
+        let scroll = self.list_viewport.offset();
+        let end = (scroll + visible_rows).min(self.filtered_indices.len());
 
-        for i in self.scroll..end {
+        for i in scroll..end {
             let idx = self.filtered_indices[i];
             let practice = &self.practices[idx];
             let marker = if i == self.selected { "> " } else { "  " };
@@ -269,127 +315,35 @@ impl LogEntryScreen {
             } else {
                 Style::default().fg(Color::White)
             };
-            let padding = col_width.saturating_sub(practice.name.width());
+            let name = truncate_to_width(&practice.name, name_col_width);
+            let padding = name_col_width.saturating_sub(name.width()) + 2;
+            let type_label = truncate_to_width(&practice.practice_type.label(), type_col_width);
             all_lines.push(Line::from(vec![
                 Span::styled(marker, name_style),
-                Span::styled(&practice.name, name_style),
+                Span::styled(name, name_style),
                 Span::raw(" ".repeat(padding)),
-                Span::styled(
-                    practice.practice_type.label(),
-                    Style::default().fg(Color::Gray),
-                ),
+                Span::styled(type_label, Style::default().fg(Color::Gray)),
             ]));
         }
-        frame.render_widget(Paragraph::new(all_lines), inner);
+        frame.render_widget(Paragraph::new(all_lines).wrap(Wrap { trim: false }), inner);
 
-        if !self.filtered_indices.is_empty() && self.selected >= self.scroll && self.selected < end
-        {
-            highlight_row(frame, inner, (self.selected - self.scroll) as u16 + 1);
+        if !self.filtered_indices.is_empty() && self.selected >= scroll && self.selected < end {
+            highlight_row(frame, inner, (self.selected - scroll) as u16 + 1);
             // +1 for header
         }
 
         render_status_line(frame, chunks[2], &self.status_msg);
 
-        let footer = Line::from(vec![
-            Span::styled(" [j/k]", Style::default().fg(ACCENT)),
-            Span::styled(
-                format!(" {}  ", tr("key-navigate")),
-                Style::default().fg(Color::DarkGray),
-            ),
-            Span::styled("[/]", Style::default().fg(ACCENT)),
-            Span::styled(
-                format!(" {}  ", tr("key-filter")),
-                Style::default().fg(Color::DarkGray),
-            ),
-            Span::styled("[Enter]", Style::default().fg(ACCENT)),
-            Span::styled(
-                format!(" {}  ", tr("key-select")),
-                Style::default().fg(Color::DarkGray),
-            ),
-            Span::styled("[Esc]", Style::default().fg(ACCENT)),
-            Span::styled(
-                format!(" {}", tr("key-back")),
-                Style::default().fg(Color::DarkGray),
-            ),
-        ]);
-        frame.render_widget(Paragraph::new(footer), chunks[3]);
+        render_shortcuts(frame, chunks[3], &shortcuts);
     }
 
     fn handle_select_practice(&mut self, key: KeyEvent) -> Action {
         if self.filtering {
             match key.code {
-                KeyCode::Esc => {
+                KeyCode::Esc | KeyCode::Enter => {
                     self.filtering = false;
                 }
-                KeyCode::Enter => {
-                    self.filtering = false;
-                }
-                KeyCode::Char('b') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                    if self.filter_cursor > 0 {
-                        self.filter_cursor = self.filter_text[..self.filter_cursor]
-                            .char_indices()
-                            .next_back()
-                            .map(|(i, _)| i)
-                            .unwrap_or(0);
-                    }
-                }
-                KeyCode::Left => {
-                    if self.filter_cursor > 0 {
-                        self.filter_cursor = self.filter_text[..self.filter_cursor]
-                            .char_indices()
-                            .next_back()
-                            .map(|(i, _)| i)
-                            .unwrap_or(0);
-                    }
-                }
-                KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                    if self.filter_cursor < self.filter_text.len() {
-                        self.filter_cursor = self.filter_text[self.filter_cursor..]
-                            .char_indices()
-                            .nth(1)
-                            .map(|(i, _)| self.filter_cursor + i)
-                            .unwrap_or(self.filter_text.len());
-                    }
-                }
-                KeyCode::Right => {
-                    if self.filter_cursor < self.filter_text.len() {
-                        self.filter_cursor = self.filter_text[self.filter_cursor..]
-                            .char_indices()
-                            .nth(1)
-                            .map(|(i, _)| self.filter_cursor + i)
-                            .unwrap_or(self.filter_text.len());
-                    }
-                }
-                KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                    self.filter_cursor = 0;
-                }
-                KeyCode::Home => {
-                    self.filter_cursor = 0;
-                }
-                KeyCode::Char('e') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                    self.filter_cursor = self.filter_text.len();
-                }
-                KeyCode::End => {
-                    self.filter_cursor = self.filter_text.len();
-                }
-                KeyCode::Backspace => {
-                    if self.filter_cursor > 0 {
-                        let prev = self.filter_text[..self.filter_cursor]
-                            .char_indices()
-                            .next_back()
-                            .map(|(i, _)| i)
-                            .unwrap_or(0);
-                        self.filter_text.remove(prev);
-                        self.filter_cursor = prev;
-                        self.apply_filter();
-                    }
-                }
-                KeyCode::Char('k') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                    self.filter_text.truncate(self.filter_cursor);
-                }
-                KeyCode::Char(c) => {
-                    self.filter_text.insert(self.filter_cursor, c);
-                    self.filter_cursor += c.len_utf8();
+                _ if self.filter.handle_key(key) => {
                     self.apply_filter();
                 }
                 _ => {}
@@ -405,19 +359,23 @@ impl LogEntryScreen {
             }
             KeyCode::Char('j') | KeyCode::Down => {
                 if !self.filtered_indices.is_empty() {
-                    self.selected = (self.selected + 1) % self.filtered_indices.len();
-                    self.adjust_scroll();
+                    self.selected = move_selection(
+                        self.selected,
+                        self.filtered_indices.len(),
+                        1,
+                        EdgeBehavior::Clamp,
+                    );
                 }
                 Action::None
             }
             KeyCode::Char('k') | KeyCode::Up => {
                 if !self.filtered_indices.is_empty() {
-                    self.selected = if self.selected == 0 {
-                        self.filtered_indices.len() - 1
-                    } else {
-                        self.selected - 1
-                    };
-                    self.adjust_scroll();
+                    self.selected = move_selection(
+                        self.selected,
+                        self.filtered_indices.len(),
+                        -1,
+                        EdgeBehavior::Clamp,
+                    );
                 }
                 Action::None
             }
@@ -441,16 +399,8 @@ impl LogEntryScreen {
         }
     }
 
-    fn adjust_scroll(&mut self) {
-        if self.selected < self.scroll {
-            self.scroll = self.selected;
-        } else if self.selected >= self.scroll + self.list_height && self.list_height > 0 {
-            self.scroll = self.selected + 1 - self.list_height;
-        }
-    }
-
     fn apply_filter(&mut self) {
-        let lower = self.filter_text.to_lowercase();
+        let lower = self.filter.value().to_lowercase();
         self.filtered_indices = self
             .practices
             .iter()
@@ -459,7 +409,7 @@ impl LogEntryScreen {
             .map(|(i, _)| i)
             .collect();
         self.selected = 0;
-        self.scroll = 0;
+        self.list_viewport.set_offset(0);
     }
 
     // ── Unified Log Entry Screen ─────────────────────────────────────
@@ -1551,6 +1501,7 @@ fn metric_label_for_type(pt: &PracticeType) -> String {
 mod tests {
     use super::*;
     use crate::db::Database;
+    use crate::tui::framework::test_support::render_to_string;
     use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
     fn test_db() -> (Database, tempfile::TempDir) {
@@ -1584,6 +1535,34 @@ mod tests {
             kind: KeyEventKind::Press,
             state: crossterm::event::KeyEventState::empty(),
         }
+    }
+
+    fn render_log_entry(screen: &mut LogEntryScreen, width: u16, height: u16) -> String {
+        render_to_string(width, height, |frame| screen.render(frame))
+    }
+
+    #[test]
+    fn long_filter_and_last_practice_remain_visible() {
+        let db = Database::open_in_memory().unwrap();
+        for number in 1..=40 {
+            db.create_practice(&format!("Practice {number:02}"), PracticeType::Weighted)
+                .unwrap();
+        }
+        let mut screen = LogEntryScreen::new(&db).unwrap();
+        screen.filtering = true;
+        screen.filter = TextInput::from("练习".repeat(60));
+        let filtered = render_log_entry(&mut screen, 80, 24);
+        assert!(filtered.contains('_'), "{filtered}");
+
+        screen.filter.clear();
+        screen.apply_filter();
+        screen.filtering = false;
+        for _ in 1..40 {
+            screen.handle_key(key(KeyCode::Down), &db);
+        }
+        let last = render_log_entry(&mut screen, 80, 24);
+        assert!(last.contains("Practice 40"), "{last}");
+        assert!(last.contains('↑'), "{last}");
     }
 
     #[test]
