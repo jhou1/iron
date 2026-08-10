@@ -261,6 +261,8 @@ impl Database {
             );
         }
 
+        self.reconcile_goal_completion_from_milestones()?;
+
         Ok(())
     }
 
@@ -1014,14 +1016,73 @@ impl Database {
     }
 
     pub fn set_milestone_completed_at(&self, id: i64, completed_at: &NaiveDateTime) -> Result<()> {
+        let goal_id: i64 = self.conn.query_row(
+            "SELECT goal_id FROM milestones WHERE id = ?1",
+            params![id],
+            |row| row.get(0),
+        )?;
         self.conn.execute(
             "UPDATE milestones SET completed_at = ?1 WHERE id = ?2",
             params![completed_at.format("%Y-%m-%d %H:%M:%S%.f").to_string(), id],
         )?;
+        self.sync_goal_completion_from_milestones(goal_id)?;
         Ok(())
     }
 
     // ── Milestone CRUD ────────────────────────────────────────────────
+
+    fn sync_goal_completion_from_milestones(&self, goal_id: i64) -> Result<()> {
+        let (total, done, latest): (i64, i64, Option<String>) = self.conn.query_row(
+            "SELECT COUNT(*), \
+                    COALESCE(SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END), 0), \
+                    MAX(completed_at) \
+             FROM milestones WHERE goal_id = ?1",
+            params![goal_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )?;
+
+        if total == 0 {
+            return Ok(());
+        }
+
+        if done == total {
+            let completed_at = latest.unwrap_or_else(|| {
+                Local::now()
+                    .naive_local()
+                    .format("%Y-%m-%d %H:%M:%S%.f")
+                    .to_string()
+            });
+            self.conn.execute(
+                "UPDATE goals SET completed = 1, completed_at = ?1 WHERE id = ?2",
+                params![completed_at, goal_id],
+            )?;
+        } else {
+            self.conn.execute(
+                "UPDATE goals SET completed = 0, completed_at = NULL WHERE id = ?1",
+                params![goal_id],
+            )?;
+        }
+
+        Ok(())
+    }
+
+    fn reconcile_goal_completion_from_milestones(&self) -> Result<()> {
+        let goal_ids = {
+            let mut stmt = self
+                .conn
+                .prepare("SELECT DISTINCT goal_id FROM milestones")?;
+            let ids = stmt
+                .query_map([], |row| row.get(0))?
+                .collect::<std::result::Result<Vec<i64>, _>>()?;
+            ids
+        };
+
+        for goal_id in goal_ids {
+            self.sync_goal_completion_from_milestones(goal_id)?;
+        }
+
+        Ok(())
+    }
 
     pub fn create_milestone(&self, goal_id: i64, title: &str) -> Result<i64> {
         let now = Local::now().naive_local();
@@ -1040,7 +1101,9 @@ impl Database {
                 now.format("%Y-%m-%d %H:%M:%S%.f").to_string()
             ],
         )?;
-        Ok(self.conn.last_insert_rowid())
+        let id = self.conn.last_insert_rowid();
+        self.sync_goal_completion_from_milestones(goal_id)?;
+        Ok(id)
     }
 
     pub fn update_milestone(&self, id: i64, title: &str) -> Result<()> {
@@ -1052,6 +1115,11 @@ impl Database {
     }
 
     pub fn toggle_milestone(&self, id: i64) -> Result<()> {
+        let goal_id: i64 = self.conn.query_row(
+            "SELECT goal_id FROM milestones WHERE id = ?1",
+            params![id],
+            |row| row.get(0),
+        )?;
         self.conn.execute(
             "UPDATE milestones SET completed = CASE WHEN completed = 0 THEN 1 ELSE 0 END, \
              completed_at = CASE WHEN completed = 0 THEN ?1 ELSE NULL END \
@@ -1064,20 +1132,43 @@ impl Database {
                 id
             ],
         )?;
+        self.sync_goal_completion_from_milestones(goal_id)?;
         Ok(())
     }
 
     pub fn delete_milestone(&self, id: i64) -> Result<()> {
+        let goal_id: i64 = self.conn.query_row(
+            "SELECT goal_id FROM milestones WHERE id = ?1",
+            params![id],
+            |row| row.get(0),
+        )?;
         self.conn
             .execute("DELETE FROM milestones WHERE id = ?1", params![id])?;
+        self.sync_goal_completion_from_milestones(goal_id)?;
         Ok(())
     }
 
     pub fn restore_milestone(&self, goal_id: i64, milestone: &Milestone) -> Result<i64> {
-        let ms_id = self.create_milestone(goal_id, &milestone.title)?;
-        if milestone.completed {
-            self.toggle_milestone(ms_id)?;
-        }
+        self.conn.execute(
+            "INSERT INTO milestones \
+             (goal_id, title, completed, position, created_at, completed_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                goal_id,
+                milestone.title,
+                i32::from(milestone.completed),
+                milestone.position,
+                milestone
+                    .created_at
+                    .format("%Y-%m-%d %H:%M:%S%.f")
+                    .to_string(),
+                milestone
+                    .completed_at
+                    .map(|dt| dt.format("%Y-%m-%d %H:%M:%S%.f").to_string())
+            ],
+        )?;
+        let ms_id = self.conn.last_insert_rowid();
+        self.sync_goal_completion_from_milestones(goal_id)?;
         Ok(ms_id)
     }
 

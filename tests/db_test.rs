@@ -340,6 +340,51 @@ fn toggle_milestone_completion() {
 }
 
 #[test]
+fn completing_last_milestone_completes_goal_and_reopening_reactivates_it() {
+    let db = Database::open_in_memory().unwrap();
+    let goal_id = db.create_goal("Goal").unwrap();
+    let first = db.create_milestone(goal_id, "First").unwrap();
+    let second = db.create_milestone(goal_id, "Second").unwrap();
+
+    db.toggle_milestone(first).unwrap();
+    assert!(!db.list_goals().unwrap()[0].completed);
+
+    db.toggle_milestone(second).unwrap();
+    let completed = db.list_goals().unwrap();
+    assert!(completed[0].completed);
+    assert!(completed[0].completed_at.is_some());
+
+    db.toggle_milestone(first).unwrap();
+    let reopened = db.list_goals().unwrap();
+    assert!(!reopened[0].completed);
+    assert!(reopened[0].completed_at.is_none());
+}
+
+#[test]
+fn adding_incomplete_milestone_reopens_completed_goal() {
+    let db = Database::open_in_memory().unwrap();
+    let goal_id = db.create_goal("Goal").unwrap();
+    let first = db.create_milestone(goal_id, "First").unwrap();
+    db.toggle_milestone(first).unwrap();
+    assert!(db.list_goals().unwrap()[0].completed);
+
+    db.create_milestone(goal_id, "Second").unwrap();
+    assert!(!db.list_goals().unwrap()[0].completed);
+}
+
+#[test]
+fn deleting_incomplete_milestone_completes_goal_when_remaining_are_done() {
+    let db = Database::open_in_memory().unwrap();
+    let goal_id = db.create_goal("Goal").unwrap();
+    let done = db.create_milestone(goal_id, "Done").unwrap();
+    let pending = db.create_milestone(goal_id, "Pending").unwrap();
+    db.toggle_milestone(done).unwrap();
+
+    db.delete_milestone(pending).unwrap();
+    assert!(db.list_goals().unwrap()[0].completed);
+}
+
+#[test]
 fn update_milestone_title() {
     let db = Database::open_in_memory().unwrap();
     let goal_id = db.create_goal("Goal").unwrap();
@@ -894,6 +939,12 @@ fn test_restore_milestone() {
     let goal_id = db.create_goal("Get stronger").unwrap();
     let ms_id = db.create_milestone(goal_id, "Bench 100kg").unwrap();
     db.create_milestone(goal_id, "Squat 120kg").unwrap();
+    db.toggle_milestone(ms_id).unwrap();
+    let completed_at = chrono::NaiveDate::from_ymd_opt(2026, 3, 15)
+        .unwrap()
+        .and_hms_opt(0, 0, 0)
+        .unwrap();
+    db.set_milestone_completed_at(ms_id, &completed_at).unwrap();
 
     // Get milestone data before delete
     let goals = db.list_goals().unwrap();
@@ -913,13 +964,44 @@ fn test_restore_milestone() {
     db.restore_milestone(goal_id, &milestone).unwrap();
     let goals = db.list_goals().unwrap();
     assert_eq!(goals[0].milestones.len(), 2);
-    let ms_titles: Vec<&str> = goals[0]
+    let restored = goals[0]
         .milestones
         .iter()
-        .map(|m| m.title.as_str())
-        .collect();
-    assert!(ms_titles.contains(&"Bench 100kg"));
-    assert!(ms_titles.contains(&"Squat 120kg"));
+        .find(|m| m.title == "Bench 100kg")
+        .unwrap();
+    assert_eq!(restored.position, milestone.position);
+    assert_eq!(restored.completed, milestone.completed);
+    assert_eq!(restored.completed_at, milestone.completed_at);
+}
+
+#[test]
+fn reconciles_existing_goal_completion_on_open() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("iron.db");
+    let completed_at = chrono::NaiveDate::from_ymd_opt(2026, 3, 15)
+        .unwrap()
+        .and_hms_opt(0, 0, 0)
+        .unwrap();
+
+    {
+        let db = Database::open(&path).unwrap();
+        let goal_id = db.create_goal("Goal").unwrap();
+        let milestone_id = db.create_milestone(goal_id, "Done").unwrap();
+        db.toggle_milestone(milestone_id).unwrap();
+        db.set_milestone_completed_at(milestone_id, &completed_at)
+            .unwrap();
+    }
+
+    {
+        let conn = rusqlite::Connection::open(&path).unwrap();
+        conn.execute("UPDATE goals SET completed = 0, completed_at = NULL", [])
+            .unwrap();
+    }
+
+    let reopened = Database::open(&path).unwrap();
+    let goals = reopened.list_goals().unwrap();
+    assert!(goals[0].completed);
+    assert_eq!(goals[0].completed_at, Some(completed_at));
 }
 
 #[test]
