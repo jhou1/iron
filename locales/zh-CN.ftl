@@ -215,6 +215,7 @@ summary-frequency = 训练频率：{ $days }/7
 
 # ── 其他界面 ──
 quotes-delete-confirm = 删除这条格言？
+quotes-empty-error = 格言内容不能为空
 practices-delete-cascade-warning = 此操作将永久删除所有日志。建议使用 [t] 切换为非活跃。
 terminal-too-small = 请调整终端大小（最小 { $w }×{ $h }）
 

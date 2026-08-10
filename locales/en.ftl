@@ -215,6 +215,7 @@ summary-frequency = Frequency: { $days }/7
 
 # ── Additional UI ──
 quotes-delete-confirm = Delete this quote?
+quotes-empty-error = Quote text cannot be empty
 practices-delete-cascade-warning = This PERMANENTLY removes all logs. Consider [t] toggle inactive.
 terminal-too-small = Please resize terminal (min { $w }×{ $h })
 

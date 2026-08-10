@@ -1,15 +1,19 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Padding, Paragraph, Wrap},
+    widgets::{Block, Borders, Clear, Padding, Paragraph, Wrap},
     Frame,
 };
 
 use super::{
-    centered_area, highlight_row, render_status_line, visible_input_spans, Action, Screen,
-    StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
+    centered_area,
+    framework::{
+        render_detail_panel, render_shortcuts, truncate_to_width, visual_spans, DetailPanelState,
+        Shortcut, TextInput, ViewportState, VisualSpan,
+    },
+    highlight_row, render_status_line, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
 };
 use crate::db::Database;
 use crate::i18n::tr;
@@ -21,6 +25,7 @@ const GREEN: Color = Color::Green;
 #[derive(Debug, Clone, PartialEq)]
 enum Mode {
     Browse,
+    Detail,
     Add,
     Edit,
     ConfirmDelete,
@@ -29,10 +34,11 @@ enum Mode {
 pub struct QuotesScreen {
     quotes: Vec<Quote>,
     selected: usize,
-    scroll_offset: usize,
+    list_viewport: ViewportState,
+    detail_state: DetailPanelState,
+    detail_content_height: usize,
     mode: Mode,
-    input: String,
-    input_cursor: usize,
+    input: TextInput,
     editing_id: Option<i64>,
     status_msg: StatusMessage,
     last_deleted: Option<Quote>,
@@ -44,45 +50,35 @@ impl QuotesScreen {
         Ok(Self {
             quotes,
             selected: 0,
-            scroll_offset: 0,
+            list_viewport: ViewportState::default(),
+            detail_state: DetailPanelState::new(false),
+            detail_content_height: 0,
             mode: Mode::Browse,
-            input: String::new(),
-            input_cursor: 0,
+            input: TextInput::new(),
             editing_id: None,
             status_msg: None,
             last_deleted: None,
         })
     }
 
-    fn refresh(&mut self, db: &Database) {
-        if let Ok(quotes) = db.list_quotes() {
-            self.quotes = quotes;
-            if self.selected >= self.quotes.len() && !self.quotes.is_empty() {
-                self.selected = self.quotes.len() - 1;
-            }
-            if self.quotes.is_empty() {
-                self.selected = 0;
-            }
+    fn refresh(&mut self, db: &Database) -> anyhow::Result<()> {
+        let selected_id = self.quotes.get(self.selected).map(|quote| quote.id);
+        self.quotes = db.list_quotes()?;
+        self.selected = selected_id
+            .and_then(|id| self.quotes.iter().position(|quote| quote.id == id))
+            .unwrap_or_else(|| self.selected.min(self.quotes.len().saturating_sub(1)));
+        if self.quotes.is_empty() {
+            self.selected = 0;
         }
-    }
-
-    fn adjust_scroll(&mut self, visible_height: usize) {
-        if visible_height == 0 {
-            return;
-        }
-        if self.selected < self.scroll_offset {
-            self.scroll_offset = self.selected;
-        }
-        if self.selected >= self.scroll_offset + visible_height {
-            self.scroll_offset = self.selected - visible_height + 1;
-        }
+        self.list_viewport.clamp(self.quotes.len());
+        Ok(())
     }
 
     pub fn render(&mut self, frame: &mut Frame) {
         let area = centered_area(frame.area(), CONTENT_WIDTH);
 
         let action_height: u16 = match &self.mode {
-            Mode::Browse => 0,
+            Mode::Browse | Mode::Detail => 0,
             _ => 3,
         };
         let chunks = Layout::default()
@@ -98,11 +94,21 @@ impl QuotesScreen {
             .split(area);
 
         // ── Bordered quote list ──
+        let visible = chunks[0].height.saturating_sub(4) as usize;
+        self.list_viewport.set_height(visible);
+        if !self.quotes.is_empty() {
+            self.list_viewport.reveal(VisualSpan {
+                start: self.selected,
+                height: 1,
+            });
+        }
+        self.list_viewport.clamp(self.quotes.len());
+        let overflow = self.list_viewport.overflow(self.quotes.len()).suffix();
         let block = Block::default()
             .title(Line::from(vec![
                 Span::styled("── ", Style::default().fg(BORDER_COLOR)),
                 Span::styled(
-                    tr("dashboard-quotes"),
+                    format!("{}{}", tr("dashboard-quotes"), overflow),
                     Style::default()
                         .fg(Color::White)
                         .add_modifier(Modifier::BOLD),
@@ -115,21 +121,19 @@ impl QuotesScreen {
         let inner = block.inner(chunks[0]);
         frame.render_widget(block, chunks[0]);
 
-        let visible = inner.height as usize;
-        self.adjust_scroll(visible);
-
         if self.quotes.is_empty() {
-            let hint = Paragraph::new(Line::from(Span::styled(
+            let hint_content = Line::from(Span::styled(
                 tr("dashboard-no-quotes-modal"),
                 Style::default().fg(Color::Gray),
-            )));
+            ));
+            let hint = Paragraph::new(hint_content).wrap(Wrap { trim: false });
             frame.render_widget(hint, inner);
         } else {
             let lines: Vec<Line> = self
                 .quotes
                 .iter()
                 .enumerate()
-                .skip(self.scroll_offset)
+                .skip(self.list_viewport.offset())
                 .take(visible)
                 .map(|(i, q)| {
                     let is_sel = i == self.selected;
@@ -142,22 +146,57 @@ impl QuotesScreen {
                         Style::default().fg(Color::White)
                     };
                     let max_text = inner.width.saturating_sub(3) as usize;
-                    let display = if q.text.chars().count() > max_text {
-                        let truncated: String =
-                            q.text.chars().take(max_text.saturating_sub(1)).collect();
-                        format!("{}{}…", marker, truncated)
-                    } else {
-                        format!("{}{}", marker, q.text)
-                    };
+                    let display = truncate_to_width(&q.text, max_text);
+                    let display = format!("{marker}{display}");
                     Line::from(Span::styled(display, style))
                 })
                 .collect();
 
             frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
 
-            if self.selected >= self.scroll_offset {
-                let row = (self.selected - self.scroll_offset) as u16;
+            if self.selected >= self.list_viewport.offset() {
+                let row = (self.selected - self.list_viewport.offset()) as u16;
                 highlight_row(frame, inner, row);
+            }
+        }
+
+        if matches!(self.mode, Mode::Browse | Mode::Detail) {
+            if let Some(quote) = self.quotes.get(self.selected) {
+                let popup_w = inner.width.saturating_sub(8).max(30);
+                let popup_inner_width = popup_w.saturating_sub(2).max(1);
+                let lines = vec![Line::from(quote.text.clone())];
+                let spans = visual_spans(&lines, popup_inner_width);
+                self.detail_content_height = spans.first().map(|span| span.height).unwrap_or(0);
+                let popup_h = if self.mode == Mode::Detail {
+                    inner.height
+                } else {
+                    (self.detail_content_height as u16 + 2)
+                        .min(inner.height / 2)
+                        .max(4)
+                };
+                let popup_rect = ratatui::layout::Rect {
+                    x: inner.x + 4,
+                    y: if self.mode == Mode::Detail {
+                        inner.y
+                    } else {
+                        inner.y + inner.height.saturating_sub(popup_h)
+                    },
+                    width: popup_w,
+                    height: popup_h,
+                };
+                self.detail_state.focused = self.mode == Mode::Detail;
+                if !self.detail_state.focused {
+                    self.detail_state.viewport.set_offset(0);
+                }
+                frame.render_widget(Clear, popup_rect);
+                render_detail_panel(
+                    frame,
+                    popup_rect,
+                    format!(" {} ", tr("dashboard-quotes")),
+                    lines,
+                    &mut self.detail_state,
+                    None,
+                );
             }
         }
 
@@ -170,17 +209,10 @@ impl QuotesScreen {
                     } else {
                         tr("key-edit")
                     };
-                    let mut spans = vec![Span::styled(
-                        format!(" {}: ", label),
-                        Style::default().fg(Color::Gray),
-                    )];
-                    spans.extend(visible_input_spans(
-                        &self.input,
-                        self.input_cursor,
-                        area.width,
-                        (label.len() + 4) as u16,
-                        GREEN,
-                    ));
+                    let prefix = format!(" {}: ", label);
+                    let prefix_width = Line::from(prefix.as_str()).width() as u16;
+                    let mut spans = vec![Span::styled(prefix, Style::default().fg(Color::Gray))];
+                    spans.extend(self.input.visible_spans(area.width, prefix_width, GREEN));
                     vec![
                         Line::from(spans),
                         Line::from(""),
@@ -219,147 +251,55 @@ impl QuotesScreen {
                         ]),
                     ]
                 }
-                Mode::Browse => vec![],
+                Mode::Browse | Mode::Detail => vec![],
             };
-            frame.render_widget(Paragraph::new(action_lines), chunks[2]);
+            frame.render_widget(
+                Paragraph::new(action_lines).wrap(Wrap { trim: false }),
+                chunks[2],
+            );
         }
 
         // ── Status line ──
         render_status_line(frame, chunks[3], &self.status_msg);
 
         // ── Shortcuts ──
-        let shortcuts = match &self.mode {
-            Mode::Browse => {
-                let mut spans = vec![
-                    Span::styled(" [j/k]", Style::default().fg(ACCENT)),
-                    Span::styled(
-                        format!(" {}  ", tr("key-navigate")),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                    Span::styled("[a]", Style::default().fg(ACCENT)),
-                    Span::styled(
-                        format!(" {}  ", tr("key-add")),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                    Span::styled("[e]", Style::default().fg(ACCENT)),
-                    Span::styled(
-                        format!(" {}  ", tr("key-edit")),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                    Span::styled("[d]", Style::default().fg(ACCENT)),
-                    Span::styled(
-                        format!(" {}  ", tr("key-delete")),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                ];
-                if self.last_deleted.is_some() {
-                    spans.push(Span::styled("[u]", Style::default().fg(ACCENT)));
-                    spans.push(Span::styled(
-                        format!(" {}  ", tr("key-undo")),
-                        Style::default().fg(Color::DarkGray),
-                    ));
-                }
-                spans.push(Span::styled("[Esc]", Style::default().fg(ACCENT)));
-                spans.push(Span::styled(
-                    format!(" {}", tr("key-back")),
-                    Style::default().fg(Color::DarkGray),
-                ));
-                Line::from(spans)
-            }
-            _ => Line::from(""),
+        let mut shortcuts = match &self.mode {
+            Mode::Browse => vec![
+                Shortcut::new("j/k", tr("key-navigate")),
+                Shortcut::new("Enter", tr("key-details")),
+                Shortcut::new("a", tr("key-add")),
+                Shortcut::new("e", tr("key-edit")),
+                Shortcut::new("d", tr("key-delete")),
+            ],
+            Mode::Detail => vec![
+                Shortcut::new("j/k", tr("key-scroll")),
+                Shortcut::new("Esc", tr("key-back")),
+            ],
+            Mode::Add | Mode::Edit => vec![
+                Shortcut::new("Enter", tr("key-confirm")),
+                Shortcut::new("Esc", tr("key-cancel")),
+            ],
+            Mode::ConfirmDelete => vec![
+                Shortcut::new("y", tr("key-yes")),
+                Shortcut::new("any", tr("key-cancel")),
+            ],
         };
-        frame.render_widget(Paragraph::new(vec![shortcuts]), chunks[4]);
+        if self.mode == Mode::Browse && self.last_deleted.is_some() {
+            shortcuts.push(Shortcut::new("u", tr("key-undo")));
+        }
+        if self.mode == Mode::Browse {
+            shortcuts.push(Shortcut::new("Esc", tr("key-back")));
+        }
+        render_shortcuts(frame, chunks[4], &shortcuts);
     }
 
     pub fn handle_key(&mut self, key: KeyEvent, db: &Database) -> Action {
         self.status_msg = None;
         match &self.mode {
             Mode::Browse => self.handle_browse(key, db),
+            Mode::Detail => self.handle_detail(key),
             Mode::Add | Mode::Edit => self.handle_input(key, db),
             Mode::ConfirmDelete => self.handle_confirm_delete(key, db),
-        }
-    }
-
-    fn handle_text_input(&mut self, key: KeyEvent) -> bool {
-        match key.code {
-            KeyCode::Char('b') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                if self.input_cursor > 0 {
-                    self.input_cursor = self.input[..self.input_cursor]
-                        .char_indices()
-                        .next_back()
-                        .map(|(i, _)| i)
-                        .unwrap_or(0);
-                }
-                true
-            }
-            KeyCode::Left => {
-                if self.input_cursor > 0 {
-                    self.input_cursor = self.input[..self.input_cursor]
-                        .char_indices()
-                        .next_back()
-                        .map(|(i, _)| i)
-                        .unwrap_or(0);
-                }
-                true
-            }
-            KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                if self.input_cursor < self.input.len() {
-                    self.input_cursor = self.input[self.input_cursor..]
-                        .char_indices()
-                        .nth(1)
-                        .map(|(i, _)| self.input_cursor + i)
-                        .unwrap_or(self.input.len());
-                }
-                true
-            }
-            KeyCode::Right => {
-                if self.input_cursor < self.input.len() {
-                    self.input_cursor = self.input[self.input_cursor..]
-                        .char_indices()
-                        .nth(1)
-                        .map(|(i, _)| self.input_cursor + i)
-                        .unwrap_or(self.input.len());
-                }
-                true
-            }
-            KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.input_cursor = 0;
-                true
-            }
-            KeyCode::Home => {
-                self.input_cursor = 0;
-                true
-            }
-            KeyCode::Char('e') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.input_cursor = self.input.len();
-                true
-            }
-            KeyCode::End => {
-                self.input_cursor = self.input.len();
-                true
-            }
-            KeyCode::Backspace => {
-                if self.input_cursor > 0 {
-                    let prev = self.input[..self.input_cursor]
-                        .char_indices()
-                        .next_back()
-                        .map(|(i, _)| i)
-                        .unwrap_or(0);
-                    self.input.remove(prev);
-                    self.input_cursor = prev;
-                }
-                true
-            }
-            KeyCode::Char('k') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.input.truncate(self.input_cursor);
-                true
-            }
-            KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.input.insert(self.input_cursor, c);
-                self.input_cursor += c.len_utf8();
-                true
-            }
-            _ => false,
         }
     }
 
@@ -379,15 +319,21 @@ impl QuotesScreen {
             }
             KeyCode::Char('a') => {
                 self.input.clear();
-                self.input_cursor = 0;
                 self.editing_id = None;
                 self.mode = Mode::Add;
                 Action::None
             }
-            KeyCode::Char('e') | KeyCode::Enter => {
+            KeyCode::Enter => {
+                if !self.quotes.is_empty() {
+                    self.mode = Mode::Detail;
+                    self.detail_state.focused = true;
+                    self.detail_state.viewport.set_offset(0);
+                }
+                Action::None
+            }
+            KeyCode::Char('e') => {
                 if let Some(q) = self.quotes.get(self.selected) {
-                    self.input = q.text.clone();
-                    self.input_cursor = self.input.len();
+                    self.input.set(q.text.clone());
                     self.editing_id = Some(q.id);
                     self.mode = Mode::Edit;
                 }
@@ -402,11 +348,16 @@ impl QuotesScreen {
             KeyCode::Char('u') => {
                 if let Some(quote) = self.last_deleted.take() {
                     match db.restore_quote(&quote) {
-                        Ok(_) => {
-                            self.refresh(db);
-                            self.status_msg = Some((tr("status-restored"), false));
-                        }
+                        Ok(_) => match self.refresh(db) {
+                            Ok(()) => {
+                                self.status_msg = Some((tr("status-restored"), false));
+                            }
+                            Err(error) => {
+                                self.status_msg = Some((format!("Error: {error}"), true));
+                            }
+                        },
                         Err(e) => {
+                            self.last_deleted = Some(quote);
                             self.status_msg = Some((format!("Error: {}", e), true));
                         }
                     }
@@ -418,38 +369,67 @@ impl QuotesScreen {
         }
     }
 
+    fn handle_detail(&mut self, key: KeyEvent) -> Action {
+        match key.code {
+            KeyCode::Char('j') | KeyCode::Down => {
+                let content_height = if self.detail_content_height == 0 {
+                    usize::MAX
+                } else {
+                    self.detail_content_height
+                };
+                self.detail_state.scroll_by(1, content_height);
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                self.detail_state
+                    .scroll_by(-1, self.detail_content_height.max(1));
+            }
+            KeyCode::Esc | KeyCode::Enter => {
+                self.mode = Mode::Browse;
+                self.detail_state.focused = false;
+            }
+            _ => {}
+        }
+        Action::None
+    }
+
     fn handle_input(&mut self, key: KeyEvent, db: &Database) -> Action {
         match key.code {
             KeyCode::Enter => {
-                let text = self.input.trim().to_string();
-                if !text.is_empty() {
-                    let result = if let Some(id) = self.editing_id {
-                        db.update_quote(id, &text)
-                    } else {
-                        db.create_quote(&text).map(|_| ())
-                    };
-                    match result {
-                        Ok(()) => self.refresh(db),
-                        Err(e) => {
-                            self.status_msg = Some((format!("Error: {}", e), true));
+                let text = self.input.trimmed().to_string();
+                if text.is_empty() {
+                    self.status_msg = Some((tr("quotes-empty-error"), true));
+                    return Action::None;
+                }
+                let result = if let Some(id) = self.editing_id {
+                    db.update_quote(id, &text)
+                } else {
+                    db.create_quote(&text).map(|_| ())
+                };
+                match result {
+                    Ok(()) => match self.refresh(db) {
+                        Ok(()) => {
+                            self.input.clear();
+                            self.editing_id = None;
+                            self.mode = Mode::Browse;
                         }
+                        Err(error) => {
+                            self.status_msg = Some((format!("Error: {error}"), true));
+                        }
+                    },
+                    Err(error) => {
+                        self.status_msg = Some((format!("Error: {error}"), true));
                     }
                 }
-                self.input.clear();
-                self.input_cursor = 0;
-                self.editing_id = None;
-                self.mode = Mode::Browse;
                 Action::None
             }
             KeyCode::Esc => {
                 self.input.clear();
-                self.input_cursor = 0;
                 self.editing_id = None;
                 self.mode = Mode::Browse;
                 Action::None
             }
             _ => {
-                self.handle_text_input(key);
+                self.input.handle_key(key);
                 Action::None
             }
         }
@@ -463,16 +443,70 @@ impl QuotesScreen {
                 match db.delete_quote(id) {
                     Ok(()) => {
                         self.last_deleted = Some(quote_clone);
-                        self.status_msg = Some((tr("status-deleted-undo"), false));
+                        match self.refresh(db) {
+                            Ok(()) => {
+                                self.status_msg = Some((tr("status-deleted-undo"), false));
+                                self.mode = Mode::Browse;
+                            }
+                            Err(error) => {
+                                self.status_msg = Some((format!("Error: {error}"), true));
+                            }
+                        }
                     }
                     Err(e) => {
                         self.status_msg = Some((format!("Error: {}", e), true));
                     }
                 }
-                self.refresh(db);
             }
+        } else {
+            self.mode = Mode::Browse;
         }
-        self.mode = Mode::Browse;
         Action::None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tui::framework::test_support::render_to_string;
+    use crossterm::event::KeyModifiers;
+
+    fn key(code: KeyCode) -> KeyEvent {
+        KeyEvent::new(code, KeyModifiers::NONE)
+    }
+
+    fn render_quotes(screen: &mut QuotesScreen, width: u16, height: u16) -> String {
+        render_to_string(width, height, |frame| screen.render(frame))
+    }
+
+    #[test]
+    fn selected_long_quote_has_complete_focusable_preview() {
+        let db = Database::open_in_memory().unwrap();
+        let text = "Long quote ".repeat(80);
+        db.create_quote(&text).unwrap();
+        let mut screen = QuotesScreen::new(&db).unwrap();
+        screen.handle_key(key(KeyCode::Enter), &db);
+        for _ in 0..20 {
+            screen.handle_key(key(KeyCode::Down), &db);
+        }
+
+        let output = render_quotes(&mut screen, 80, 24);
+
+        assert_eq!(screen.mode, Mode::Detail);
+        assert!(output.contains('↑'), "{output}");
+    }
+
+    #[test]
+    fn empty_quote_edit_retains_input_mode() {
+        let db = Database::open_in_memory().unwrap();
+        db.create_quote("Quote").unwrap();
+        let mut screen = QuotesScreen::new(&db).unwrap();
+        screen.handle_key(key(KeyCode::Char('e')), &db);
+        screen.input.clear();
+
+        screen.handle_key(key(KeyCode::Enter), &db);
+
+        assert_eq!(screen.mode, Mode::Edit);
+        assert!(screen.status_msg.as_ref().is_some_and(|(_, error)| *error));
     }
 }
