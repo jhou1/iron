@@ -2,11 +2,9 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 mod app;
-mod config;
 mod db;
 mod export;
 mod i18n;
-mod llm;
 mod model;
 mod tui;
 

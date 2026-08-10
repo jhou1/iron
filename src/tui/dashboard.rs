@@ -232,17 +232,14 @@ impl DashboardScreen {
             let rev_col1_pad = " ".repeat(max_col1.saturating_sub(rev_col1_len) + 1);
             let man_col1_pad = " ".repeat(max_col1.saturating_sub(man_col1_len) + 1);
 
-            let log_key2 = tr("key-quick-log");
             let rev_key2 = tr("key-trends");
             let man_key2 = tr("key-goals");
 
-            let log_col2_len = 3 + log_key2.width(); // "[w]" = 3
             let rev_col2_len = 3 + rev_key2.width(); // "[t]" = 3
             let man_col2_len = 3 + man_key2.width(); // "[g]" = 3
 
-            let max_col2 = log_col2_len.max(rev_col2_len).max(man_col2_len);
+            let max_col2 = rev_col2_len.max(man_col2_len);
 
-            let log_col2_pad = " ".repeat(max_col2.saturating_sub(log_col2_len) + 1);
             let rev_col2_pad = " ".repeat(max_col2.saturating_sub(rev_col2_len) + 1);
             let man_col2_pad = " ".repeat(max_col2.saturating_sub(man_col2_len) + 1);
 
@@ -255,11 +252,6 @@ impl DashboardScreen {
                     Span::styled("[l]", Style::default().fg(ACCENT)),
                     Span::styled(
                         format!("{}{}", log_key, log_col1_pad),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                    Span::styled("[w]", Style::default().fg(ACCENT)),
-                    Span::styled(
-                        format!("{}{}", log_key2, log_col2_pad),
                         Style::default().fg(Color::DarkGray),
                     ),
                 ]),
@@ -590,7 +582,6 @@ impl DashboardScreen {
             KeyCode::Char('t') => Action::Navigate(Screen::Trends),
             KeyCode::Char('e') => Action::Navigate(Screen::Practices),
             KeyCode::Char('g') => Action::Navigate(Screen::Goals),
-            KeyCode::Char('w') => Action::Navigate(Screen::QuickLog),
             KeyCode::Char('Q') => Action::Navigate(Screen::Quotes),
             KeyCode::Char('v') => {
                 self.hrv_input = self.hrv_today.map(|v| v.to_string()).unwrap_or_default();

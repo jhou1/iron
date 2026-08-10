@@ -8,15 +8,13 @@ use fluent_bundle::FluentValue;
 use ratatui::prelude::*;
 use ratatui::widgets::Paragraph;
 use std::io::stdout;
-use std::time::Duration;
 
-use crate::config::Config;
 use crate::db::Database;
 use crate::i18n::tr_args;
 use crate::tui::{
     dashboard::DashboardScreen, goals::GoalsScreen, history::HistoryScreen,
-    log_entry::LogEntryScreen, practices::PracticesScreen, quick_log::QuickLogScreen,
-    quotes_screen::QuotesScreen, trends::TrendsScreen, Action, Screen,
+    log_entry::LogEntryScreen, practices::PracticesScreen, quotes_screen::QuotesScreen,
+    trends::TrendsScreen, Action, Screen,
 };
 
 pub fn run() -> Result<()> {
@@ -42,8 +40,6 @@ fn run_app(
     let mut history = HistoryScreen::new(db)?;
     let mut trends = TrendsScreen::new(db)?;
     let mut practices = PracticesScreen::new(db)?;
-    let config = Config::load();
-    let mut quick_log = QuickLogScreen::new(db, &config.llm)?;
     let mut quotes_screen = QuotesScreen::new(db)?;
 
     loop {
@@ -67,17 +63,10 @@ fn run_app(
                 Screen::History => history.render(frame),
                 Screen::Trends => trends.render(frame),
                 Screen::Practices => practices.render(frame),
-                Screen::QuickLog => quick_log.render(frame),
                 Screen::Quotes => quotes_screen.render(frame),
             }
         })?;
 
-        if !event::poll(Duration::from_millis(100))? {
-            if let Screen::QuickLog = current_screen {
-                quick_log.check_background_result();
-            }
-            continue;
-        }
         if let Event::Key(key) = event::read()? {
             if key.kind != event::KeyEventKind::Press {
                 continue;
@@ -97,13 +86,8 @@ fn run_app(
                     action
                 }
                 Screen::Practices => practices.handle_key(key, db),
-                Screen::QuickLog => quick_log.handle_key(key, db),
                 Screen::Quotes => quotes_screen.handle_key(key, db),
             };
-
-            if let Screen::QuickLog = current_screen {
-                quick_log.check_background_result();
-            }
 
             match action {
                 Action::Quit => break,
@@ -129,9 +113,6 @@ fn run_app(
                         }
                         Screen::Trends => trends = TrendsScreen::new(db)?,
                         Screen::Practices => practices = PracticesScreen::new(db)?,
-                        Screen::QuickLog => {
-                            quick_log = QuickLogScreen::new(db, &config.llm)?;
-                        }
                         Screen::Quotes => {
                             quotes_screen = QuotesScreen::new(db)?;
                         }

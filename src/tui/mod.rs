@@ -4,7 +4,6 @@ pub mod goals;
 pub mod history;
 pub mod log_entry;
 pub mod practices;
-pub mod quick_log;
 pub mod quotes;
 pub mod quotes_screen;
 pub mod trends;
@@ -109,7 +108,6 @@ pub enum Screen {
     Trends,
     Practices,
     Goals,
-    QuickLog,
     Quotes,
 }
 

@@ -15,10 +15,10 @@ fn paragraph_widgets_must_wrap_user_content() {
     // When adding entries, include a brief reason.
     let allowlist: HashSet<&str> = [
         "dashboard.rs:152",
-        "dashboard.rs:323",
-        "dashboard.rs:510",
-        "dashboard.rs:530",
-        "dashboard.rs:565",
+        "dashboard.rs:315",
+        "dashboard.rs:502",
+        "dashboard.rs:522",
+        "dashboard.rs:557",
         "log_entry.rs:228",
         "log_entry.rs:283",
         "log_entry.rs:315",
@@ -130,7 +130,6 @@ fn screens_must_have_bordered_blocks() {
         "history.rs",
         "practices.rs",
         "quotes_screen.rs",
-        "quick_log.rs",
         "log_entry.rs",
     ];
 
