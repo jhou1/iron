@@ -1,15 +1,19 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, Padding, Paragraph, Wrap},
+    widgets::{Block, Borders, Clear, Padding, Paragraph, Wrap},
     Frame,
 };
 
 use super::{
-    centered_area, highlight_row, render_gauge_line, render_status_line, visible_input_spans,
-    Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
+    centered_area,
+    framework::{
+        combined_span, render_detail_panel, visual_spans, DetailPanelState, TextInput, VisualSpan,
+    },
+    highlight_row, render_gauge_line, render_status_line, Action, Screen, StatusMessage,
+    BORDER_COLOR, CONTENT_WIDTH,
 };
 use crate::db::Database;
 use crate::i18n::tr;
@@ -17,57 +21,6 @@ use crate::model::{Goal, Milestone};
 
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct VisualSpan {
-    start: usize,
-    height: usize,
-}
-
-fn visual_spans(lines: &[Line<'_>], width: u16) -> Vec<VisualSpan> {
-    let width = usize::from(width.max(1));
-    let mut start = 0;
-    lines
-        .iter()
-        .map(|line| {
-            let line_width = line.width();
-            let height = if line_width == 0 {
-                1
-            } else {
-                line_width.div_ceil(width)
-            };
-            let span = VisualSpan { start, height };
-            start += height;
-            span
-        })
-        .collect()
-}
-
-fn keep_span_visible(scroll: usize, viewport: usize, span: VisualSpan) -> usize {
-    if viewport == 0 || span.start < scroll {
-        return span.start;
-    }
-
-    let span_bottom = span.start + span.height;
-    if span_bottom > scroll + viewport {
-        span_bottom.saturating_sub(viewport)
-    } else {
-        scroll
-    }
-}
-
-fn owned_visible_input_spans(
-    text: &str,
-    cursor: usize,
-    max_width: u16,
-    prefix_width: u16,
-    color: Color,
-) -> Vec<Span<'static>> {
-    visible_input_spans(text, cursor, max_width, prefix_width, color)
-        .into_iter()
-        .map(|span| Span::styled(span.content.into_owned(), span.style))
-        .collect()
-}
 
 fn goal_gauge_ratio(goal: &Goal) -> f64 {
     if goal.milestones.is_empty() {
@@ -124,14 +77,13 @@ pub struct GoalsScreen {
     scroll: usize,
     list_height: u16,
     mode: Mode,
-    input: String,
-    cursor: usize,
+    input: TextInput,
     status_msg: StatusMessage,
     last_deleted: Option<GoalUndoData>,
     // Modal state
     modal_goal_idx: usize,
     modal_selected: usize,
-    modal_scroll: usize,
+    detail_state: DetailPanelState,
     modal_mode: ModalMode,
     modal_status_msg: StatusMessage,
     modal_last_deleted: Option<GoalUndoData>,
@@ -146,13 +98,12 @@ impl GoalsScreen {
             scroll: 0,
             list_height: 0,
             mode: Mode::Browse,
-            input: String::new(),
-            cursor: 0,
+            input: TextInput::new(),
             status_msg: None,
             last_deleted: None,
             modal_goal_idx: 0,
             modal_selected: 0,
-            modal_scroll: 0,
+            detail_state: DetailPanelState::new(false),
             modal_mode: ModalMode::Browse,
             modal_status_msg: None,
             modal_last_deleted: None,
@@ -202,90 +153,7 @@ impl GoalsScreen {
     }
 
     fn handle_text_input(&mut self, key: KeyEvent) -> bool {
-        match key.code {
-            KeyCode::Char('b') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                if self.cursor > 0 {
-                    let prev = self.input[..self.cursor]
-                        .char_indices()
-                        .next_back()
-                        .map(|(i, _)| i)
-                        .unwrap_or(0);
-                    self.cursor = prev;
-                }
-                true
-            }
-            KeyCode::Left => {
-                if self.cursor > 0 {
-                    let prev = self.input[..self.cursor]
-                        .char_indices()
-                        .next_back()
-                        .map(|(i, _)| i)
-                        .unwrap_or(0);
-                    self.cursor = prev;
-                }
-                true
-            }
-            KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                if self.cursor < self.input.len() {
-                    let next = self.input[self.cursor..]
-                        .char_indices()
-                        .nth(1)
-                        .map(|(i, _)| self.cursor + i)
-                        .unwrap_or(self.input.len());
-                    self.cursor = next;
-                }
-                true
-            }
-            KeyCode::Right => {
-                if self.cursor < self.input.len() {
-                    let next = self.input[self.cursor..]
-                        .char_indices()
-                        .nth(1)
-                        .map(|(i, _)| self.cursor + i)
-                        .unwrap_or(self.input.len());
-                    self.cursor = next;
-                }
-                true
-            }
-            KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.cursor = 0;
-                true
-            }
-            KeyCode::Home => {
-                self.cursor = 0;
-                true
-            }
-            KeyCode::Char('e') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.cursor = self.input.len();
-                true
-            }
-            KeyCode::End => {
-                self.cursor = self.input.len();
-                true
-            }
-            KeyCode::Backspace => {
-                if self.cursor > 0 {
-                    let prev = self.input[..self.cursor]
-                        .char_indices()
-                        .next_back()
-                        .map(|(i, _)| i)
-                        .unwrap_or(0);
-                    self.input.remove(prev);
-                    self.cursor = prev;
-                }
-                true
-            }
-            KeyCode::Char('k') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.input.truncate(self.cursor);
-                true
-            }
-            KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.input.insert(self.cursor, c);
-                self.cursor += c.len_utf8();
-                true
-            }
-            _ => false,
-        }
+        self.input.handle_key(key)
     }
 
     // ── Rendering ──
@@ -324,9 +192,7 @@ impl GoalsScreen {
         if self.mode == Mode::AddGoal {
             let prefix = "⏳ ";
             let mut input_spans = vec![Span::styled(prefix, Style::default().fg(Color::Yellow))];
-            input_spans.extend(visible_input_spans(
-                &self.input,
-                self.cursor,
+            input_spans.extend(self.input.visible_spans(
                 list_area.width,
                 Line::from(prefix).width() as u16,
                 GREEN,
@@ -353,9 +219,7 @@ impl GoalsScreen {
                 let prefix = "⏳ ";
                 let mut input_spans =
                     vec![Span::styled(prefix, Style::default().fg(Color::Yellow))];
-                input_spans.extend(visible_input_spans(
-                    &self.input,
-                    self.cursor,
+                input_spans.extend(self.input.visible_spans(
                     list_area.width,
                     Line::from(prefix).width() as u16,
                     GREEN,
@@ -375,13 +239,10 @@ impl GoalsScreen {
                 let prefix = format!("  {} ", tr("dashboard-date-prompt"));
                 let prefix_width = Line::from(prefix.as_str()).width() as u16;
                 let mut input_spans = vec![Span::styled(prefix, Style::default().fg(ACCENT))];
-                input_spans.extend(visible_input_spans(
-                    &self.input,
-                    self.cursor,
-                    list_area.width,
-                    prefix_width,
-                    GREEN,
-                ));
+                input_spans.extend(
+                    self.input
+                        .visible_spans(list_area.width, prefix_width, GREEN),
+                );
                 lines.push(Line::from(input_spans));
                 // Gauge
                 lines.push(goal_gauge(goal));
@@ -455,7 +316,7 @@ impl GoalsScreen {
                         let scroll_offset = self.scroll as u16;
                         let row_in_view = visual_row + sel_rows - scroll_offset;
                         let popup_w = list_area.width.saturating_sub(8).max(30);
-                        let popup_inner_width = popup_w.saturating_sub(4).max(1);
+                        let popup_inner_width = popup_w.saturating_sub(2).max(1);
 
                         let content = if self.mode == Mode::Modal {
                             self.build_modal_content(&goal, popup_inner_width)
@@ -478,7 +339,7 @@ impl GoalsScreen {
                             .map(|span| span.start + span.height)
                             .unwrap_or(1) as u16;
                         let popup_h = popup_content_height
-                            .saturating_add(5) // borders + padding + one action row
+                            .saturating_add(2)
                             .min(list_area.height)
                             .max(5);
                         let popup_x = list_area.x + 4;
@@ -496,90 +357,35 @@ impl GoalsScreen {
                             height: popup_h,
                         };
 
-                        let viewport_height = popup_h.saturating_sub(4) as usize;
-                        let max_scroll =
-                            (popup_content_height as usize).saturating_sub(viewport_height);
-                        let mut modal_scroll = if self.mode == Mode::Modal {
-                            self.modal_scroll.min(max_scroll)
-                        } else {
-                            0
-                        };
                         let selected_span = content.selected_line.and_then(|line_index| {
-                            let first = spans.get(line_index).copied()?;
-                            let last_index = line_index
-                                .saturating_add(content.selected_line_count.saturating_sub(1));
-                            let last = spans.get(last_index).copied().unwrap_or(first);
-                            Some(VisualSpan {
-                                start: first.start,
-                                height: last.start + last.height - first.start,
-                            })
+                            combined_span(&spans, line_index, content.selected_line_count)
                         });
-                        if let Some(span) = selected_span {
-                            let scroll_span = if content.selected_line == Some(1) {
+                        let selected_span = selected_span.map(|span| {
+                            if content.selected_line == Some(1) {
                                 VisualSpan {
                                     start: 0,
                                     height: span.start + span.height,
                                 }
                             } else {
                                 span
-                            };
-                            modal_scroll =
-                                keep_span_visible(modal_scroll, viewport_height, scroll_span)
-                                    .min(max_scroll);
-                            self.modal_scroll = modal_scroll;
-                        }
-
-                        let above = modal_scroll > 0;
-                        let below = modal_scroll < max_scroll;
-                        let overflow = match (above, below) {
-                            (true, true) => " ↑↓",
-                            (true, false) => " ↑",
-                            (false, true) => " ↓",
-                            (false, false) => "",
-                        };
-                        let title = format!(" {}{} ", goal.title, overflow);
-                        let border_color = if self.mode == Mode::Modal {
-                            ACCENT
-                        } else {
-                            BORDER_COLOR
-                        };
-                        let block = Block::default()
-                            .title(Span::styled(
-                                title,
-                                Style::default().fg(Color::White).bold(),
-                            ))
-                            .borders(Borders::ALL)
-                            .padding(Padding::uniform(1))
-                            .border_type(BorderType::Rounded)
-                            .border_style(Style::default().fg(border_color));
-
-                        let inner = block.inner(popup_rect);
-                        frame.render_widget(Clear, popup_rect);
-                        frame.render_widget(block, popup_rect);
-
-                        frame.render_widget(
-                            Paragraph::new(content.lines.clone())
-                                .scroll((modal_scroll as u16, 0))
-                                .wrap(Wrap { trim: false }),
-                            inner,
-                        );
-
-                        if self.mode == Mode::Modal {
-                            if let Some(span) = selected_span {
-                                for row in 0..span.height {
-                                    let visual_row = span.start + row;
-                                    if visual_row >= modal_scroll
-                                        && visual_row < modal_scroll + viewport_height
-                                    {
-                                        highlight_row(
-                                            frame,
-                                            inner,
-                                            (visual_row - modal_scroll) as u16,
-                                        );
-                                    }
-                                }
                             }
+                        });
+
+                        self.detail_state.focused = self.mode == Mode::Modal;
+                        if !self.detail_state.focused {
+                            self.detail_state.viewport.set_offset(0);
                         }
+                        frame.render_widget(Clear, popup_rect);
+                        render_detail_panel(
+                            frame,
+                            popup_rect,
+                            format!(" {} ", goal.title),
+                            content.lines,
+                            &mut self.detail_state,
+                            (self.mode == Mode::Modal)
+                                .then_some(selected_span)
+                                .flatten(),
+                        );
                     }
                 }
             }
@@ -731,9 +537,7 @@ impl GoalsScreen {
                     check.to_string(),
                     Style::default().fg(check_color),
                 )];
-                input_spans.extend(owned_visible_input_spans(
-                    &self.input,
-                    self.cursor,
+                input_spans.extend(self.input.visible_spans(
                     inner_width,
                     Line::from(check).width() as u16,
                     GREEN,
@@ -748,13 +552,7 @@ impl GoalsScreen {
                 let prefix = format!("  {} ", tr("dashboard-date-prompt"));
                 let prefix_width = Line::from(prefix.as_str()).width() as u16;
                 let mut input_spans = vec![Span::styled(prefix, Style::default().fg(ACCENT))];
-                input_spans.extend(owned_visible_input_spans(
-                    &self.input,
-                    self.cursor,
-                    inner_width,
-                    prefix_width,
-                    GREEN,
-                ));
+                input_spans.extend(self.input.visible_spans(inner_width, prefix_width, GREEN));
                 lines.push(Line::from(input_spans));
             } else if is_sel && self.modal_mode == ModalMode::ConfirmDeleteMilestone {
                 selected_line_count = 2;
@@ -784,9 +582,7 @@ impl GoalsScreen {
             selected_line = Some(lines.len());
             let prefix = "⏳ ";
             let mut input_spans = vec![Span::styled(prefix, Style::default().fg(Color::Yellow))];
-            input_spans.extend(owned_visible_input_spans(
-                &self.input,
-                self.cursor,
+            input_spans.extend(self.input.visible_spans(
                 inner_width,
                 Line::from(prefix).width() as u16,
                 GREEN,
@@ -841,7 +637,7 @@ impl GoalsScreen {
                     self.mode = Mode::Modal;
                     self.modal_goal_idx = self.selected;
                     self.modal_selected = 0;
-                    self.modal_scroll = 0;
+                    self.detail_state.viewport.set_offset(0);
                     self.modal_mode = ModalMode::Browse;
                     self.modal_status_msg = None;
                     self.modal_last_deleted = None;
@@ -853,25 +649,22 @@ impl GoalsScreen {
                     self.mode = Mode::Modal;
                     self.modal_goal_idx = self.selected;
                     self.modal_selected = 0;
-                    self.modal_scroll = 0;
+                    self.detail_state.viewport.set_offset(0);
                     self.modal_mode = ModalMode::AddMilestone;
                     self.modal_status_msg = None;
                     self.modal_last_deleted = None;
                     self.input.clear();
-                    self.cursor = 0;
                 }
                 Action::None
             }
             KeyCode::Char('a') => {
                 self.input.clear();
-                self.cursor = 0;
                 self.mode = Mode::AddGoal;
                 Action::None
             }
             KeyCode::Char('e') => {
                 if let Some(goal) = self.goals.get(self.selected) {
-                    self.input = goal.title.clone();
-                    self.cursor = self.input.len();
+                    self.input.set(goal.title.clone());
                     self.mode = Mode::EditGoal;
                 }
                 Action::None
@@ -894,7 +687,6 @@ impl GoalsScreen {
                 if let Some(goal) = self.goals.get(self.selected) {
                     if goal.completed {
                         self.input.clear();
-                        self.cursor = 0;
                         self.mode = Mode::EditGoalDate;
                     }
                 }
@@ -939,13 +731,12 @@ impl GoalsScreen {
     fn handle_add_goal(&mut self, key: KeyEvent, db: &Database) -> Action {
         match key.code {
             KeyCode::Enter => {
-                let title = self.input.trim().to_string();
+                let title = self.input.trimmed().to_string();
                 if !title.is_empty() {
                     match db.create_goal(&title) {
                         Ok(_) => match self.reload_goals(db) {
                             Ok(()) => {
                                 self.input.clear();
-                                self.cursor = 0;
                                 self.selected = 0;
                                 self.scroll = 0;
                                 self.mode = Mode::Browse;
@@ -963,7 +754,6 @@ impl GoalsScreen {
             }
             KeyCode::Esc => {
                 self.input.clear();
-                self.cursor = 0;
                 self.mode = Mode::Browse;
                 Action::None
             }
@@ -977,14 +767,13 @@ impl GoalsScreen {
     fn handle_edit_goal(&mut self, key: KeyEvent, db: &Database) -> Action {
         match key.code {
             KeyCode::Enter => {
-                let title = self.input.trim().to_string();
+                let title = self.input.trimmed().to_string();
                 if !title.is_empty() {
                     if let Some(goal_id) = self.goals.get(self.selected).map(|goal| goal.id) {
                         match db.update_goal(goal_id, &title) {
                             Ok(()) => match self.reload_goals(db) {
                                 Ok(()) => {
                                     self.input.clear();
-                                    self.cursor = 0;
                                     self.mode = Mode::Browse;
                                 }
                                 Err(e) => {
@@ -1001,7 +790,6 @@ impl GoalsScreen {
             }
             KeyCode::Esc => {
                 self.input.clear();
-                self.cursor = 0;
                 self.mode = Mode::Browse;
                 Action::None
             }
@@ -1015,7 +803,7 @@ impl GoalsScreen {
     fn handle_edit_goal_date(&mut self, key: KeyEvent, db: &Database) -> Action {
         match key.code {
             KeyCode::Enter => {
-                let date = match chrono::NaiveDate::parse_from_str(&self.input, "%Y-%m-%d") {
+                let date = match chrono::NaiveDate::parse_from_str(self.input.value(), "%Y-%m-%d") {
                     Ok(date) => date,
                     Err(_) => {
                         self.status_msg = Some((tr("goals-invalid-date"), true));
@@ -1028,7 +816,6 @@ impl GoalsScreen {
                         Ok(()) => match self.reload_goals(db) {
                             Ok(()) => {
                                 self.input.clear();
-                                self.cursor = 0;
                                 self.mode = Mode::Browse;
                             }
                             Err(e) => {
@@ -1044,7 +831,6 @@ impl GoalsScreen {
             }
             KeyCode::Esc => {
                 self.input.clear();
-                self.cursor = 0;
                 self.mode = Mode::Browse;
                 Action::None
             }
@@ -1128,15 +914,13 @@ impl GoalsScreen {
             }
             KeyCode::Char('a') => {
                 self.input.clear();
-                self.cursor = 0;
                 self.modal_mode = ModalMode::AddMilestone;
                 Action::None
             }
             KeyCode::Enter | KeyCode::Char('e') => {
                 if let Some(goal) = self.goals.get(self.modal_goal_idx) {
                     if let Some(ms) = goal.milestones.get(self.modal_selected) {
-                        self.input = ms.title.clone();
-                        self.cursor = self.input.len();
+                        self.input.set(ms.title.clone());
                         self.modal_mode = ModalMode::EditMilestone;
                     }
                 }
@@ -1167,7 +951,6 @@ impl GoalsScreen {
                     if let Some(ms) = goal.milestones.get(self.modal_selected) {
                         if ms.completed {
                             self.input.clear();
-                            self.cursor = 0;
                             self.modal_mode = ModalMode::EditMilestoneDate;
                         }
                     }
@@ -1216,7 +999,7 @@ impl GoalsScreen {
     fn handle_modal_add_milestone(&mut self, key: KeyEvent, db: &Database) -> Action {
         match key.code {
             KeyCode::Enter => {
-                let title = self.input.trim().to_string();
+                let title = self.input.trimmed().to_string();
                 if !title.is_empty() {
                     if let Some(goal_id) = self.goals.get(self.modal_goal_idx).map(|goal| goal.id) {
                         match db.create_milestone(goal_id, &title) {
@@ -1225,7 +1008,6 @@ impl GoalsScreen {
                                     self.modal_selected =
                                         self.modal_milestone_count().saturating_sub(1);
                                     self.input.clear();
-                                    self.cursor = 0;
                                     self.modal_mode = ModalMode::Browse;
                                 }
                                 Err(e) => {
@@ -1242,7 +1024,6 @@ impl GoalsScreen {
             }
             KeyCode::Esc => {
                 self.input.clear();
-                self.cursor = 0;
                 self.modal_mode = ModalMode::Browse;
                 Action::None
             }
@@ -1256,7 +1037,7 @@ impl GoalsScreen {
     fn handle_modal_edit_milestone(&mut self, key: KeyEvent, db: &Database) -> Action {
         match key.code {
             KeyCode::Enter => {
-                let title = self.input.trim().to_string();
+                let title = self.input.trimmed().to_string();
                 if !title.is_empty() {
                     let milestone_id = self
                         .goals
@@ -1268,7 +1049,6 @@ impl GoalsScreen {
                             Ok(()) => match self.reload_goals(db) {
                                 Ok(()) => {
                                     self.input.clear();
-                                    self.cursor = 0;
                                     self.modal_mode = ModalMode::Browse;
                                 }
                                 Err(e) => {
@@ -1285,7 +1065,6 @@ impl GoalsScreen {
             }
             KeyCode::Esc => {
                 self.input.clear();
-                self.cursor = 0;
                 self.modal_mode = ModalMode::Browse;
                 Action::None
             }
@@ -1299,7 +1078,7 @@ impl GoalsScreen {
     fn handle_modal_edit_milestone_date(&mut self, key: KeyEvent, db: &Database) -> Action {
         match key.code {
             KeyCode::Enter => {
-                let date = match chrono::NaiveDate::parse_from_str(&self.input, "%Y-%m-%d") {
+                let date = match chrono::NaiveDate::parse_from_str(self.input.value(), "%Y-%m-%d") {
                     Ok(date) => date,
                     Err(_) => {
                         self.modal_status_msg = Some((tr("goals-invalid-date"), true));
@@ -1317,7 +1096,6 @@ impl GoalsScreen {
                         Ok(()) => match self.reload_goals(db) {
                             Ok(()) => {
                                 self.input.clear();
-                                self.cursor = 0;
                                 self.modal_mode = ModalMode::Browse;
                             }
                             Err(e) => {
@@ -1333,7 +1111,6 @@ impl GoalsScreen {
             }
             KeyCode::Esc => {
                 self.input.clear();
-                self.cursor = 0;
                 self.modal_mode = ModalMode::Browse;
                 Action::None
             }
@@ -1463,7 +1240,14 @@ fn goal_gauge(goal: &Goal) -> Line<'static> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crossterm::event::KeyModifiers;
     use ratatui::{backend::TestBackend, Terminal};
+
+    use crate::tui::framework::ViewportState;
+
+    fn key(code: KeyCode) -> KeyEvent {
+        KeyEvent::new(code, KeyModifiers::NONE)
+    }
 
     fn render_screen(screen: &mut GoalsScreen, width: u16, height: u16) -> String {
         let backend = TestBackend::new(width, height);
@@ -1522,13 +1306,12 @@ mod tests {
             scroll: 0,
             list_height,
             mode: Mode::Browse,
-            input: String::new(),
-            cursor: 0,
+            input: TextInput::new(),
             status_msg: None,
             last_deleted: None,
             modal_goal_idx: 0,
             modal_selected: 0,
-            modal_scroll: 0,
+            detail_state: DetailPanelState::new(false),
             modal_mode: ModalMode::Browse,
             modal_status_msg: None,
             modal_last_deleted: None,
@@ -1596,21 +1379,24 @@ mod tests {
     }
 
     #[test]
-    fn keep_span_visible_scrolls_down_and_back_up() {
+    fn viewport_reveals_span_down_and_back_up() {
+        let mut viewport = ViewportState::new(4);
         let selected = VisualSpan {
             start: 5,
             height: 2,
         };
-        assert_eq!(keep_span_visible(0, 4, selected), 3);
+        viewport.reveal(selected);
+        assert_eq!(viewport.offset(), 3);
         let first = VisualSpan {
             start: 0,
             height: 1,
         };
-        assert_eq!(keep_span_visible(3, 4, first), 0);
+        viewport.reveal(first);
+        assert_eq!(viewport.offset(), 0);
     }
 
     #[test]
-    fn visual_spans_count_wrapped_rows() {
+    fn framework_counts_wrapped_visual_rows() {
         let lines = vec![Line::from("123456789"), Line::from("x")];
         assert_eq!(
             visual_spans(&lines, 4),
@@ -1662,7 +1448,7 @@ mod tests {
         }
 
         let output = render_screen(&mut screen, 80, 24);
-        assert!(screen.modal_scroll > 0);
+        assert!(screen.detail_state.viewport.offset() > 0);
         assert!(output.contains("Milestone 20"), "{output}");
 
         for _ in 1..20 {
@@ -1670,7 +1456,28 @@ mod tests {
             render_screen(&mut screen, 80, 24);
         }
 
-        assert_eq!(screen.modal_scroll, 0);
+        assert_eq!(screen.detail_state.viewport.offset(), 0);
+    }
+
+    #[test]
+    fn goals_framework_migration_preserves_preview_and_focus_contract() {
+        let db = Database::open_in_memory().unwrap();
+        let goal_id = db.create_goal("Goal").unwrap();
+        for number in 1..=20 {
+            db.create_milestone(goal_id, &format!("Milestone {number:02}"))
+                .unwrap();
+        }
+        let mut screen = GoalsScreen::new(&db).unwrap();
+
+        let preview = render_screen(&mut screen, 80, 24);
+        assert!(preview.contains("Goal ↓"), "{preview}");
+
+        screen.handle_key(key(KeyCode::Enter), &db);
+        for _ in 1..20 {
+            screen.handle_key(key(KeyCode::Down), &db);
+        }
+        let focused = render_screen(&mut screen, 80, 24);
+        assert!(focused.contains("Milestone 20"), "{focused}");
     }
 
     #[test]
@@ -1691,8 +1498,7 @@ mod tests {
         db.create_goal("Goal").unwrap();
         let mut screen = GoalsScreen::new(&db).unwrap();
         screen.handle_key(KeyEvent::new(KeyCode::Char('m'), KeyModifiers::NONE), &db);
-        screen.input = "New milestone".to_string();
-        screen.cursor = screen.input.len();
+        screen.input.set("New milestone");
 
         screen.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE), &db);
 
@@ -1722,8 +1528,7 @@ mod tests {
         db.create_goal("Goal").unwrap();
         let mut screen = GoalsScreen::new(&db).unwrap();
         screen.handle_key(KeyEvent::new(KeyCode::Char('m'), KeyModifiers::NONE), &db);
-        screen.input = "X".repeat(200);
-        screen.cursor = screen.input.len();
+        screen.input.set("X".repeat(200));
 
         let output = render_screen(&mut screen, 80, 24);
 
@@ -1763,13 +1568,12 @@ mod tests {
         let mut screen = GoalsScreen::new(&db).unwrap();
         screen.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE), &db);
         screen.handle_key(KeyEvent::new(KeyCode::Char('D'), KeyModifiers::NONE), &db);
-        screen.input = "not-a-date".to_string();
-        screen.cursor = screen.input.len();
+        screen.input.set("not-a-date");
 
         screen.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE), &db);
 
         assert_eq!(screen.modal_mode, ModalMode::EditMilestoneDate);
-        assert_eq!(screen.input, "not-a-date");
+        assert_eq!(screen.input.value(), "not-a-date");
         assert!(screen
             .modal_status_msg
             .as_ref()
@@ -1794,8 +1598,7 @@ mod tests {
             screen.handle_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE), &db);
         }
         screen.handle_key(KeyEvent::new(KeyCode::Char('D'), KeyModifiers::NONE), &db);
-        screen.input = "not-a-date".to_string();
-        screen.cursor = screen.input.len();
+        screen.input.set("not-a-date");
         screen.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE), &db);
 
         let output = render_screen(&mut screen, 80, 24);
