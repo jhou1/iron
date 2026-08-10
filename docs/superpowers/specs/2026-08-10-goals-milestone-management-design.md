@@ -26,7 +26,7 @@ The database loads all milestones, but the Goals view loses access to some of th
 
 ## Stage One Scope
 
-Stage one changes only the Goals workflow and the documentation and tests that describe it. It may add Goals-specific helpers, but it must not change the behavior of History, Trends, Quotes, Practices, Dashboard, or other screens.
+Stage one changes only the Goals workflow and the documentation and tests that describe it. It may add Goals-specific helpers, but it must not change the rendering, input handling, or presentation rules of History, Trends, Quotes, Practices, Dashboard, or other screens. The existing Dashboard may naturally reflect a goal's newly synchronized completion state through its current data query; no Dashboard code is changed in stage one.
 
 The existing milestone data model remains binary: each milestone is either complete or incomplete. Stage one does not add a separate 0–100% value to individual milestones. Goal progress is the aggregate `completed milestones / total milestones`.
 
