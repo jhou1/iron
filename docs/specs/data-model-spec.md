@@ -130,16 +130,6 @@ Dashboard displays one random quote at a time.
 
 Upsert by date — one record per day.
 
-### Abbreviation
-
-| Field | Type | Constraints |
-|-------|------|------------|
-| id | integer | PK |
-| short | string | unique, case-insensitive |
-| full_name | string | maps to a practice name |
-
-Used by Quick Log to expand shorthand (e.g., "DL" -> "Deadlift").
-
 ## Relationships
 
 ```

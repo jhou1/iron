@@ -78,12 +78,10 @@ Triggered by `Q`. Overlay with scrollable list of all quotes.
 | Key | Action |
 |-----|--------|
 | `l` | Go to Log Entry |
-| `w` | Go to Quick Log |
 | `h` | Go to History |
 | `t` | Go to Trends |
 | `e` | Go to Practices |
 | `g` | Go to Goals |
-| `a` | Go to Abbreviations |
 | `Tab` | Cycle heatmap view |
 | `Q` | Manage quotes |
 | `v` | Record/edit HRV |

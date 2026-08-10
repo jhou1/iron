@@ -1,7 +1,7 @@
 # TUI Consistency Framework Design
 
 **Date:** 2026-08-10
-**Status:** Approved for implementation planning
+**Status:** Superseded for Batch 2 by [the Batch 2 design](2026-08-10-tui-consistency-batch-2-design.md)
 **Branch:** `codex/tui-consistency`
 **Base:** validated Goals milestone-management implementation (`0069c04`)
 
@@ -9,7 +9,7 @@
 
 The validated Goals redesign established observable interaction guarantees that are not consistently implemented elsewhere: selected content remains reachable, wrapped content is measured as visual rows, focused management is distinct from preview, long inputs keep the cursor visible, mutations preserve context on failure, and shortcuts describe the active mode.
 
-The audit of Dashboard, History, Trends, Practices, Quotes, Log Entry, and Quick Log found repeated local implementations of selection, scrolling, input editing, status lines, and shortcut bars. Those implementations have drifted. Examples include logical-row scrolling for wrapped content, detail popups without their own viewport, raw cursor rendering, result scrolling without a known viewport height, lists without overflow signaling, and edit modes that close after a failed database write.
+The audit of Dashboard, History, Trends, Practices, Quotes, and Log Entry found repeated local implementations of selection, scrolling, input editing, status lines, and shortcut bars. Those implementations have drifted. Examples include logical-row scrolling for wrapped content, detail popups without their own viewport, raw cursor rendering, result scrolling without a known viewport height, lists without overflow signaling, and edit modes that close after a failed database write.
 
 The project will replace those repeated interaction mechanisms with a unified TUI framework. Migration will be incremental rather than a big-bang rewrite.
 
@@ -50,7 +50,6 @@ All calculations use the actual inner rectangle after borders and padding. Wrapp
 Owns reusable text editing state and cursor visibility:
 
 - `TextInput` for single-line Unicode text, cursor movement, insertion, deletion, and horizontal viewport rendering
-- `TextBuffer` for multi-line input, vertical line selection, line splitting/merging, and a visible text viewport
 - full Emacs bindings required by `CLAUDE.md`: `Ctrl+B/F/A/E/K`, arrows, Home, End, and Backspace
 - rendering built on width-aware Unicode calculations rather than byte or character counts
 
@@ -115,7 +114,6 @@ Stable database IDs, not array positions, preserve selection across reloads and 
 ### Text Input
 
 - All single-line inputs use `TextInput` and remain horizontally bounded.
-- Quick Log uses `TextBuffer`; the current line and cursor remain visible vertically and horizontally.
 - Empty or invalid values retain focus and display a useful status message.
 
 ### Mutations and Errors
@@ -124,7 +122,6 @@ Stable database IDs, not array positions, preserve selection across reloads and 
 - Failed edits retain the original input and cursor.
 - Failed deletes retain selection; failed undo retains the undo payload.
 - Errors appear in a reserved status line that remains visible even when a panel fills its viewport.
-- Quick Log batch save is transactional: any failed entry rolls back the complete batch and leaves the user in Preview.
 
 ### Status and Shortcuts
 
@@ -145,15 +142,9 @@ Build the framework's visual viewport, single-line input, list/detail, status, s
 
 Batch 1 acceptance requires Goals regression parity plus list/detail verification at `80x24`.
 
-### Batch 2: Form and Complex-Input Screens
+### Batch 2: Superseded
 
-Extend the framework with `TextBuffer` and migrate Log Entry, Quick Log, and Quick Log abbreviation management.
-
-- Log Entry: practice filter and every field use the input framework; the sets section becomes a real viewport whose selected or edited set remains visible; long notes remain bounded.
-- Quick Log: multi-line input scrolls to the current line; parsed results use measured item spans and the real preview height; abbreviation lists scroll; add/edit errors retain their phase and input.
-- Quick Log batch save uses one database transaction and returns a single success or error outcome.
-
-Batch 2 acceptance covers large set collections, long notes, long input lines, many parsed results, many abbreviations, and transaction rollback.
+Batch 2 is superseded by [the Batch 2 design](2026-08-10-tui-consistency-batch-2-design.md), which defines the approved Log Entry and Dashboard migration and removal scope.
 
 ### Batch 3: Dashboard and Framework Consolidation
 
@@ -193,8 +184,6 @@ Before migration, record the behavior that must remain. After migration, use Tes
 ### Data Tests
 
 - selection identity after database-driven reorder or reload
-- Quick Log successful transactional save
-- Quick Log rollback when a later entry fails
 - no database schema change
 
 Every batch must pass:
@@ -220,10 +209,6 @@ cargo build
 ### Batch 1
 
 Navigate long Goals, History, Trends, Practices, and Quotes collections; verify every item and detail is reachable, focus is visible, overflow is signaled, long filters/edits retain the cursor, and mutation errors retain context.
-
-### Batch 2
-
-Create and edit logs with many sets and long text; enter multi-line Quick Log content; navigate large previews and abbreviation collections; confirm failed saves retain data and transactional failure creates no partial logs.
 
 ### Batch 3
 

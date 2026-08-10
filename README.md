@@ -22,7 +22,6 @@ A terminal UI for tracking training. Log practices set-by-set, review history, a
 - **Goals & milestones** with progress bars
 - **Daily quotes** on the Dashboard, managed via Quotes screen
 - **HRV tracking** — record a 0–100 score each morning
-- **Quick Log** — natural-language entry via LLM (optional)
 - **4 practice types**: Weight x Reps, Reps Only, Distance (km), Duration (min)
 - **JSON export/import** for backup
 - **Vim navigation** (j/k, h/l, /, Enter, Esc) + Emacs text input (Ctrl+A/E/B/F/K)
@@ -52,7 +51,6 @@ The home screen shows the heatmap, training summary, recent activity, active goa
 | Key   | Action                  |
 |-------|-------------------------|
 | `l`   | Log a practice          |
-| `w`   | Quick Log (LLM-powered) |
 | `h`   | History                 |
 | `t`   | Trends                  |
 | `e`   | Practices               |
@@ -169,10 +167,6 @@ Press `Q`. The list keeps each row compact while the selected quote is shown com
 | `a` / `e` | Add / edit a quote |
 | `d` / `u` | Delete / undo deletion |
 | `Esc` | Return from detail focus or go back |
-
-### Quick Log (LLM)
-
-Press `w`. Type training notes in natural shorthand (e.g., `DL 60kg 5/5/5`), press `Ctrl+S` to parse. Review results, press Enter to save. Requires LLM config in `~/.iron/config.toml`.
 
 ## Data
 

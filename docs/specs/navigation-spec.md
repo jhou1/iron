@@ -8,7 +8,7 @@ Global navigation patterns, keybinding conventions, and text input requirements.
                     Dashboard
                    /  |  |  \  \  \  \
                   /   |  |   \  \  \   \
-           LogEntry  History Trends Practices Goals QuickLog Quotes
+           LogEntry  History Trends Practices Goals Quotes
 ```
 
 All screens return to Dashboard via `Esc`. History can navigate to LogEntry (edit mode), which returns to History.

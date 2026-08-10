@@ -144,7 +144,6 @@ set-endurance = { $duration } min
 
 # ── Keyboard labels ──
 key-log = Log
-key-quick-log = Quick Log
 key-history = History
 key-trends = Trends
 key-practices = Practices
@@ -194,17 +193,6 @@ status-delete-error = Delete failed: { $msg }
 # ── Help ──
 help-title = Keyboard Shortcuts
 
-# ── Abbreviations ──
-abbreviations-title = Abbreviations
-abbreviations-col-short = Short
-abbreviations-col-full = Full Name
-abbreviations-no-items = No abbreviations — press [a] to add one
-abbreviations-enter-short = Enter abbreviation (e.g., DL):
-abbreviations-enter-full = Enter full name (e.g., Deadlift):
-abbreviations-edit-short = Edit abbreviation:
-abbreviations-edit-full = Edit full name:
-abbreviations-delete-confirm = Delete { $short }?
-
 # ── Training Summary ──
 summary-title = Summary
 summary-volume = This Week: { $value } t
@@ -219,22 +207,6 @@ quotes-empty-error = Quote text cannot be empty
 practices-delete-cascade-warning = This PERMANENTLY removes all logs. Consider [t] toggle inactive.
 practices-empty-name-error = Practice name cannot be empty
 terminal-too-small = Please resize terminal (min { $w }×{ $h })
-
-# ── Quick Log ──
-quicklog-title = Quick Log
-quicklog-input-title = Input
-quicklog-preview-title = Preview
-quicklog-date = Date
-quicklog-no-config = Configure LLM in ~/.iron/config.toml
-quicklog-parsing = Parsing with LLM...
-quicklog-no-results = No results
-quicklog-unmatched-warning = ✗ marks unknown practices — create them first or fix the text
-quicklog-unmatched-error = Cannot save: some practice names don't match
-quicklog-key-parse = Parse
-quicklog-key-save = Save all
-quicklog-key-remove = Remove
-quicklog-key-abbr = Abbreviations
-quicklog-key-edit = Back to edit
 
 # ── CLI ──
 cli-export-about = Export all data to JSON

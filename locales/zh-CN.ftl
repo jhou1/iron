@@ -144,7 +144,6 @@ set-endurance = { $duration } 分钟
 
 # ── 按键标签 ──
 key-log = 记录
-key-quick-log = 快速记录
 key-history = 历史
 key-trends = 趋势
 key-practices = 练习项目
@@ -194,17 +193,6 @@ status-delete-error = 删除失败：{ $msg }
 # ── 帮助 ──
 help-title = 快捷键
 
-# ── 缩写词典 ──
-abbreviations-title = 缩写词典
-abbreviations-col-short = 缩写
-abbreviations-col-full = 全称
-abbreviations-no-items = 暂无缩写 — 按 [a] 添加
-abbreviations-enter-short = 输入缩写（例如 DL）：
-abbreviations-enter-full = 输入全称（例如 Deadlift）：
-abbreviations-edit-short = 编辑缩写：
-abbreviations-edit-full = 编辑全称：
-abbreviations-delete-confirm = 删除 { $short }？
-
 # ── 训练概览 ──
 summary-title = 概览
 summary-volume = 本周：{ $value } 吨
@@ -219,22 +207,6 @@ quotes-empty-error = 格言内容不能为空
 practices-delete-cascade-warning = 此操作将永久删除所有日志。建议使用 [t] 切换为非活跃。
 practices-empty-name-error = 练习名称不能为空
 terminal-too-small = 请调整终端大小（最小 { $w }×{ $h }）
-
-# ── 快速记录 ──
-quicklog-title = 快速记录
-quicklog-input-title = 输入
-quicklog-preview-title = 预览
-quicklog-date = 日期
-quicklog-no-config = 请在 ~/.iron/config.toml 中配置 LLM
-quicklog-parsing = 正在通过 LLM 解析...
-quicklog-no-results = 无结果
-quicklog-unmatched-warning = ✗ 标记未知练习 — 请先创建或修正文本
-quicklog-unmatched-error = 无法保存：部分练习名称未匹配
-quicklog-key-parse = 解析
-quicklog-key-save = 全部保存
-quicklog-key-remove = 移除
-quicklog-key-abbr = 缩写词典
-quicklog-key-edit = 返回编辑
 
 # ── 命令行 ──
 cli-export-about = 导出所有数据为 JSON
