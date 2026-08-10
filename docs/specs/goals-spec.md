@@ -2,101 +2,87 @@
 
 Track training goals with nested milestones and completion progress.
 
-## Layout (top to bottom)
+## Layout
 
-1. Title
-2. Goal list (scrollable)
-3. Action area (contextual)
-4. Status line
-5. Shortcuts bar
+The screen contains a bordered, scrollable goal list, a contextual selected-goal panel, a status line, and a shortcut bar. The selected goal's panel is shown as a read-only preview whenever it has milestones. `Enter` focuses that panel for management.
 
-## Goal List
+Each goal shows its selection marker, completion state, title, optional completion date, gauge, and progress text. Goals are ordered with incomplete goals first, then completed goals; each group retains its saved position.
 
-Each row shows:
-- Marker: ">" if selected
-- Checkbox: "☑" (completed) or "☐" (incomplete)
-- Title
-- Progress gauge: `[=====     ] 3/5` (completed/total milestones)
-- Completion date (if completed): "(Apr 15)"
+## Progress and Completion
 
-Goals ordered: incomplete first (by position), then completed (by position).
+- A goal with milestones displays `completed/total · percentage`, for example `2/4 · 50%`.
+- Its completion state is derived from its milestones: completing the last pending milestone completes the goal; reopening, adding, restoring, or deleting a milestone recalculates the goal immediately.
+- A goal without milestones displays `0%` or `100%` and can be completed manually with `Space`.
+- Pressing `Space` on a goal that has milestones does not override derived progress; the status line explains that milestones control completion.
+- Startup reconciliation repairs stale goal completion values from milestone data.
 
-## Progress Gauge
+## Selected-Goal Panel
 
-- If goal has milestones: completed_milestones / total_milestones
-- If no milestones: 0% when incomplete, 100% when completed
+The panel contains the goal gauge followed by every milestone. Each milestone row shows completion state, title, and completion date when available.
 
-## Modes (Main)
+- The preview grows to show all content when space permits.
+- In constrained terminals, `↑`, `↓`, or `↑↓` in the panel title indicates hidden content.
+- Focused panels use an accent border and highlight the active milestone, including wrapped rows.
+- Navigation keeps the active milestone and contextual date/delete row visible.
+- Long edit fields scroll horizontally so the cursor remains visible.
+- Successful add/edit/toggle/date/delete operations keep the panel focused; failed mutations retain the current input and show an error.
 
-| Mode | Trigger | Behavior |
-|------|---------|----------|
-| Browse | default | Navigate goal list |
-| AddGoal | `a` | Text input for new goal title |
-| EditGoal | `Enter` | Text input to rename goal |
-| EditGoalDate | `D` | Date input (YYYY-MM-DD) for completion date |
-| ConfirmDeleteGoal | `d` | Deletion confirmation |
-| Modal | `Enter`/`m` | Milestone sub-screen for selected goal |
+## Modes
 
-## Milestone Modal
-
-Overlay showing milestones for a single goal.
-
-**Layout:**
-- Goal name as centered header
-- Milestone list (scrollable)
-- Action area
-- Shortcuts
-
-**Milestone row:** checkbox, title, completion date (if completed)
-
-### Modal Modes
+### Goal List
 
 | Mode | Trigger | Behavior |
-|------|---------|----------|
-| Browse | default | Navigate milestones |
-| AddMilestone | `a` | Text input for new milestone |
-| EditMilestone | `Enter` | Text input to rename |
-| EditMilestoneDate | `D` | Date input for completion date |
-| ConfirmDeleteMilestone | `d` | Deletion confirmation |
+|---|---|---|
+| Browse | default | Navigate goals and preview the selected goal |
+| AddGoal | `a` | Enter a new goal title |
+| EditGoal | `e` | Rename the selected goal |
+| EditGoalDate | `D` | Edit a completed goal's date as `YYYY-MM-DD` |
+| ConfirmDeleteGoal | `d` | Confirm goal deletion |
+| Milestone panel | `Enter` | Focus and manage the selected goal's milestones |
+| AddMilestone | `m` | Focus the panel directly in milestone-add mode |
 
-## Keybindings (Main)
+### Milestone Panel
+
+| Mode | Trigger | Behavior |
+|---|---|---|
+| Browse | `Enter` from goal list | Navigate milestones |
+| AddMilestone | `a` or `m` from goal list | Enter a new milestone title |
+| EditMilestone | `Enter` or `e` | Rename the selected milestone |
+| EditMilestoneDate | `D` | Edit a completed milestone's date as `YYYY-MM-DD` |
+| ConfirmDeleteMilestone | `d` | Confirm milestone deletion |
+
+## Keybindings
+
+### Goal List
 
 | Key | Action |
-|-----|--------|
-| `j/k` | Navigate goals |
-| `a` | Add new goal |
-| `Enter` | Edit goal title or open milestones |
-| `m` | Add milestone to selected goal |
-| `Space` | Toggle goal completion |
-| `D` | Edit completion date |
-| `d` | Delete goal (confirm) |
-| `y/n` | Confirm/cancel deletion |
-| `?` | Help overlay |
-| `Esc` | Back to Dashboard |
+|---|---|
+| `j/k` or arrows | Navigate goals |
+| `Enter` | Focus the selected goal's milestone panel |
+| `m` | Add a milestone to the selected goal |
+| `a` | Add a goal |
+| `e` | Rename the selected goal |
+| `Space` | Toggle completion only when the goal has no milestones |
+| `D` | Edit a completed goal's completion date |
+| `d`, then `y` | Delete the selected goal |
+| `u` | Undo the last goal deletion |
+| `Esc` | Return to Dashboard |
 
-## Keybindings (Modal)
+### Milestone Panel
 
 | Key | Action |
-|-----|--------|
-| `j/k` | Navigate milestones |
-| `a` | Add milestone |
-| `Enter` | Edit milestone title |
-| `Space` | Toggle milestone completion |
-| `D` | Edit milestone completion date |
-| `d` | Delete milestone (confirm) |
-| `Esc` | Close modal, back to goal list |
+|---|---|
+| `j/k` or arrows | Navigate milestones |
+| `a` | Add a milestone |
+| `Enter` or `e` | Rename the selected milestone |
+| `Space` | Toggle milestone completion and refresh goal progress |
+| `D` | Edit a completed milestone's completion date |
+| `d`, then `y` | Delete the selected milestone |
+| `u` | Undo the last milestone deletion |
+| `Esc` | Return to the goal list |
 
-## Undo
+Text-entry modes use `Enter` to save and `Esc` to cancel. Delete confirmation accepts `y`; any other key cancels.
 
-One level of undo for goal or milestone deletions. Stores the deleted entity and restores it on `u`.
+## Undo and Deletion
 
-## Cascade Deletion
-
-Deleting a goal deletes all its milestones.
-
-## Completion Toggle
-
-- `Space` toggles `completed` flag
-- Sets `completed_at` to now when completing, clears it when uncompleting
-- Goals: toggling does not affect milestone states
-- Milestones: toggling updates the parent goal's progress gauge
+Goal and milestone deletion each support one level of undo. Milestone restore preserves its original position, creation timestamp, completion state, and completion date. Deleting a goal cascades to its milestones.

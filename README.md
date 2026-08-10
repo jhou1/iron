@@ -127,16 +127,33 @@ Press `e` to manage your practice inventory.
 
 Press `g`.
 
+Goal list:
+
 | Key | Action |
 |---|---|
-| `j/k` | Navigate goals / milestones |
+| `j/k` | Navigate goals |
 | `a` | Add goal |
-| `m` | Add milestone |
-| `Enter` | Edit title |
-| `Space` | Toggle completion |
-| `D` | Edit completion date |
-| `d` | Delete |
-| `Esc` | Back |
+| `e` | Rename selected goal |
+| `Enter` | Focus the selected goal's milestone panel |
+| `m` | Add a milestone directly |
+| `Space` | Toggle goals without milestones |
+| `D` | Edit a completed goal's date |
+| `d` / `u` | Delete / undo deletion |
+| `Esc` | Back to Dashboard |
+
+Milestone panel:
+
+| Key | Action |
+|---|---|
+| `j/k` | Navigate every milestone; the panel scrolls as needed |
+| `a` | Add milestone |
+| `Enter` / `e` | Rename selected milestone |
+| `Space` | Toggle completion and refresh goal progress |
+| `D` | Edit a completed milestone's date |
+| `d` / `u` | Delete / undo deletion |
+| `Esc` | Return to the goal list |
+
+Goals with milestones show `completed/total · percentage`; their completion state is derived from the milestone states.
 
 ### Quick Log (LLM)
 

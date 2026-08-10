@@ -1,4 +1,4 @@
-use chrono::{Datelike, NaiveDateTime};
+use chrono::NaiveDateTime;
 use iron::db::Database;
 use iron::model::{PracticeType, SetData};
 
@@ -314,7 +314,7 @@ fn create_and_list_milestones() {
     assert_eq!(goals[0].milestones.len(), 2);
     assert_eq!(goals[0].milestones[0].id, m1);
     assert_eq!(goals[0].milestones[0].title, "First milestone");
-    assert_eq!(goals[0].milestones[0].completed, false);
+    assert!(!goals[0].milestones[0].completed);
     assert_eq!(goals[0].milestones[0].position, 1);
     assert_eq!(goals[0].milestones[1].id, m2);
     assert_eq!(goals[0].milestones[1].title, "Second milestone");
@@ -328,15 +328,15 @@ fn toggle_milestone_completion() {
     let m_id = db.create_milestone(goal_id, "Task").unwrap();
 
     let goals = db.list_goals().unwrap();
-    assert_eq!(goals[0].milestones[0].completed, false);
+    assert!(!goals[0].milestones[0].completed);
 
     db.toggle_milestone(m_id).unwrap();
     let goals = db.list_goals().unwrap();
-    assert_eq!(goals[0].milestones[0].completed, true);
+    assert!(goals[0].milestones[0].completed);
 
     db.toggle_milestone(m_id).unwrap();
     let goals = db.list_goals().unwrap();
-    assert_eq!(goals[0].milestones[0].completed, false);
+    assert!(!goals[0].milestones[0].completed);
 }
 
 #[test]
@@ -416,17 +416,17 @@ fn toggle_goal_completion() {
     let id = db.create_goal("My Goal").unwrap();
 
     let goals = db.list_goals().unwrap();
-    assert_eq!(goals[0].completed, false);
+    assert!(!goals[0].completed);
     assert!(goals[0].completed_at.is_none());
 
     db.toggle_goal(id).unwrap();
     let goals = db.list_goals().unwrap();
-    assert_eq!(goals[0].completed, true);
+    assert!(goals[0].completed);
     assert!(goals[0].completed_at.is_some());
 
     db.toggle_goal(id).unwrap();
     let goals = db.list_goals().unwrap();
-    assert_eq!(goals[0].completed, false);
+    assert!(!goals[0].completed);
     assert!(goals[0].completed_at.is_none());
 }
 

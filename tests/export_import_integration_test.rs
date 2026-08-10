@@ -605,9 +605,9 @@ fn goals_and_milestones_survive_export_import() {
     assert_eq!(goals[0].title, "Master KB Sport");
     assert_eq!(goals[0].milestones.len(), 2);
     assert_eq!(goals[0].milestones[0].title, "10-min snatch set");
-    assert_eq!(goals[0].milestones[0].completed, false);
+    assert!(!goals[0].milestones[0].completed);
     assert_eq!(goals[0].milestones[1].title, "First competition");
-    assert_eq!(goals[0].milestones[1].completed, true);
+    assert!(goals[0].milestones[1].completed);
     assert_eq!(goals[1].title, "Run a marathon");
     assert_eq!(goals[1].milestones.len(), 1);
     assert_eq!(goals[1].milestones[0].title, "Run 10km under 50min");
