@@ -11,7 +11,9 @@ use unicode_width::UnicodeWidthStr;
 use super::widgets::heatmap::Heatmap;
 use super::{
     centered_area,
-    framework::{render_shortcuts, shortcut_height, truncate_to_width, Shortcut, TextInput},
+    framework::{
+        fit_rect, render_shortcuts, shortcut_height, truncate_to_width, Shortcut, TextInput,
+    },
     render_gauge_line, render_status_line, Action, Screen, StatusMessage, BORDER_COLOR,
     CONTENT_WIDTH,
 };
@@ -27,6 +29,10 @@ enum DashboardMode {
     Normal,
     ConfirmQuit,
     HrvInput,
+}
+
+fn dashboard_block_inner(block: &Block<'_>, parent: Rect) -> Rect {
+    fit_rect(parent, block.inner(parent))
 }
 
 pub struct DashboardScreen {
@@ -173,7 +179,7 @@ impl DashboardScreen {
             .padding(Padding::uniform(1))
             .border_style(Style::default().fg(BORDER_COLOR));
         if chunks[2].width > 0 && chunks[2].height > 0 {
-            let heatmap_inner = heatmap_block.inner(chunks[2]);
+            let heatmap_inner = dashboard_block_inner(&heatmap_block, chunks[2]);
             frame.render_widget(heatmap_block, chunks[2]);
             if heatmap_inner.width > 0 && heatmap_inner.height > 0 {
                 let heatmap = Heatmap::new(&self.heatmap_data, 52, self.no_color);
@@ -249,7 +255,7 @@ impl DashboardScreen {
             .borders(Borders::ALL)
             .padding(Padding::uniform(1))
             .border_style(Style::default().fg(BORDER_COLOR));
-        let inner = block.inner(area);
+        let inner = dashboard_block_inner(&block, area);
         frame.render_widget(block, area);
         if inner.width == 0 || inner.height == 0 {
             return;
@@ -345,7 +351,7 @@ impl DashboardScreen {
             .padding(Padding::uniform(1))
             .border_style(Style::default().fg(BORDER_COLOR));
 
-        let inner = block.inner(area);
+        let inner = dashboard_block_inner(&block, area);
         frame.render_widget(block, area);
         if inner.width == 0 || inner.height == 0 {
             return;
@@ -421,7 +427,7 @@ impl DashboardScreen {
             .padding(Padding::uniform(1))
             .border_style(Style::default().fg(BORDER_COLOR));
 
-        let inner = block.inner(area);
+        let inner = dashboard_block_inner(&block, area);
         frame.render_widget(block, area);
         if inner.width == 0 || inner.height == 0 {
             return;
@@ -591,6 +597,24 @@ mod tests {
 
     fn render_dashboard(screen: &DashboardScreen, width: u16, height: u16) -> String {
         render_to_string(width, height, |frame| screen.render(frame))
+    }
+
+    #[test]
+    fn dashboard_block_inners_remain_within_tiny_parents() {
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .padding(Padding::uniform(1));
+
+        for parent in [Rect::new(0, 2, 40, 1), Rect::new(7, 9, 1, 1)] {
+            let inner = dashboard_block_inner(&block, parent);
+            assert!(
+                inner.x >= parent.x
+                    && inner.y >= parent.y
+                    && inner.right() <= parent.right()
+                    && inner.bottom() <= parent.bottom(),
+                "inner {inner:?} escaped parent {parent:?}"
+            );
+        }
     }
 
     #[test]
