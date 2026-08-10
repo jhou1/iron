@@ -1,4 +1,5 @@
 pub mod dashboard;
+pub mod framework;
 pub mod goals;
 pub mod history;
 pub mod log_entry;
