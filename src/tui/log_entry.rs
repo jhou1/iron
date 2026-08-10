@@ -16,8 +16,7 @@ use super::{
         move_selection, render_shortcuts, shortcut_height, truncate_to_width, EdgeBehavior,
         Shortcut, TextInput, ViewportState, VisualSpan,
     },
-    highlight_row, render_status_line, visible_input_spans, Action, Screen, StatusMessage,
-    BORDER_COLOR, CONTENT_WIDTH,
+    highlight_row, render_status_line, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
 };
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
@@ -51,27 +50,20 @@ pub struct LogEntryScreen {
     phase: Phase,
     chosen_practice: Option<Practice>,
     sets: Vec<SetData>,
-    field1: String,
-    field1_cursor: usize,
-    field2: String,
-    field2_cursor: usize,
+    field1: TextInput,
+    field2: TextInput,
     active_field: usize,
-    note: String,
-    note_cursor: usize,
-    warm_up: String,
-    warm_up_cursor: usize,
-    cool_down: String,
-    cool_down_cursor: usize,
-    rpe_input: String,
-    rpe_cursor: usize,
+    note: TextInput,
+    warm_up: TextInput,
+    cool_down: TextInput,
+    rpe_input: TextInput,
     focus: FocusSection,
     selected_set: Option<usize>,
     editing_set: Option<usize>,
     editing_log_id: Option<i64>,
     log_date: String,
     editing_date: bool,
-    date_input: String,
-    date_input_cursor: usize,
+    date_input: TextInput,
     confirming_exit: bool,
     return_to: Screen,
     status_msg: StatusMessage,
@@ -92,27 +84,20 @@ impl LogEntryScreen {
             phase: Phase::SelectPractice,
             chosen_practice: None,
             sets: Vec::new(),
-            field1: String::new(),
-            field1_cursor: 0,
-            field2: String::new(),
-            field2_cursor: 0,
+            field1: TextInput::new(),
+            field2: TextInput::new(),
             active_field: 0,
-            note: String::new(),
-            note_cursor: 0,
-            warm_up: String::new(),
-            warm_up_cursor: 0,
-            cool_down: String::new(),
-            cool_down_cursor: 0,
-            rpe_input: String::new(),
-            rpe_cursor: 0,
+            note: TextInput::new(),
+            warm_up: TextInput::new(),
+            cool_down: TextInput::new(),
+            rpe_input: TextInput::new(),
             focus: FocusSection::Sets,
             selected_set: None,
             editing_set: None,
             editing_log_id: None,
             log_date: today,
             editing_date: false,
-            date_input: String::new(),
-            date_input_cursor: 0,
+            date_input: TextInput::new(),
             confirming_exit: false,
             return_to: Screen::Dashboard,
             status_msg: None,
@@ -143,27 +128,20 @@ impl LogEntryScreen {
             phase: Phase::EnterLog,
             chosen_practice: practice,
             sets,
-            field1: String::new(),
-            field1_cursor: 0,
-            field2: String::new(),
-            field2_cursor: 0,
+            field1: TextInput::new(),
+            field2: TextInput::new(),
             active_field: 0,
-            note_cursor: note.len(),
-            note,
-            warm_up_cursor: warm_up.len(),
-            warm_up,
-            cool_down_cursor: cool_down.len(),
-            cool_down,
-            rpe_cursor: rpe_input.len(),
-            rpe_input,
+            note: TextInput::from(note),
+            warm_up: TextInput::from(warm_up),
+            cool_down: TextInput::from(cool_down),
+            rpe_input: TextInput::from(rpe_input),
             focus: FocusSection::Sets,
             selected_set: None,
             editing_set: None,
             editing_log_id: Some(log_entry.log.id),
             log_date,
             editing_date: false,
-            date_input: String::new(),
-            date_input_cursor: 0,
+            date_input: TextInput::new(),
             confirming_exit: false,
             return_to: Screen::History,
             status_msg: None,
@@ -385,9 +363,7 @@ impl LogEntryScreen {
                     self.phase = Phase::EnterLog;
                     self.sets.clear();
                     self.field1.clear();
-                    self.field1_cursor = 0;
                     self.field2.clear();
-                    self.field2_cursor = 0;
                     self.active_field = 0;
                     self.selected_set = None;
                     self.editing_set = None;
@@ -445,20 +421,18 @@ impl LogEntryScreen {
         frame.render_widget(date_block, chunks[0]);
 
         let date_line = if self.editing_date {
-            let (before, after) = self.date_input.split_at(self.date_input_cursor);
-            Line::from(vec![
-                Span::styled(
-                    format!("{} ", tr("log-date-label")),
-                    Style::default().fg(Color::Gray),
-                ),
-                Span::styled(before, Style::default().fg(ACCENT)),
-                Span::styled("\u{2588}", Style::default().fg(ACCENT)),
-                Span::styled(after, Style::default().fg(ACCENT)),
-                Span::styled(
-                    format!("  {}", tr("log-date-edit-hint")),
-                    Style::default().fg(Color::Gray),
-                ),
-            ])
+            let label = format!("{} ", tr("log-date-label"));
+            let prefix_width = label.width() as u16;
+            let mut spans = vec![Span::styled(label, Style::default().fg(Color::Gray))];
+            spans.extend(
+                self.date_input
+                    .visible_spans(date_inner.width, prefix_width, ACCENT),
+            );
+            spans.push(Span::styled(
+                format!("  {}", tr("log-date-edit-hint")),
+                Style::default().fg(Color::Gray),
+            ));
+            Line::from(spans)
         } else {
             Line::from(vec![
                 Span::styled(
@@ -527,82 +501,86 @@ impl LogEntryScreen {
             };
             match practice.practice_type {
                 PracticeType::Weighted => {
-                    let (f1_before, f1_after) = self.field1.split_at(self.field1_cursor);
-                    let (f2_before, f2_after) = self.field2.split_at(self.field2_cursor);
-                    let f1_style = if self.active_field == 0 {
-                        ACCENT
+                    let weight_label = format!("{} ", tr("log-weight-label"));
+                    let reps_label = format!("  {} ", tr("log-reps-label"));
+                    let mut spans = vec![
+                        Span::styled(input_label.clone(), Style::default().fg(Color::White)),
+                        Span::styled(weight_label.clone(), Style::default().fg(Color::Gray)),
+                    ];
+                    if self.active_field == 0 {
+                        let prefix_width = (input_label.width() + weight_label.width()) as u16;
+                        spans.extend(self.field1.visible_spans(
+                            sets_inner.width,
+                            prefix_width,
+                            ACCENT,
+                        ));
+                        spans.push(Span::styled(reps_label, Style::default().fg(Color::Gray)));
+                        spans.push(Span::styled(
+                            self.field2.value(),
+                            Style::default().fg(Color::White),
+                        ));
                     } else {
-                        Color::White
-                    };
-                    let f2_style = if self.active_field == 1 {
-                        ACCENT
-                    } else {
-                        Color::White
-                    };
-                    sets_lines.push(Line::from(vec![
-                        Span::styled(input_label, Style::default().fg(Color::White)),
-                        Span::styled(
-                            format!("{} ", tr("log-weight-label")),
+                        let max_field1_width = (sets_inner.width as usize)
+                            .saturating_sub(input_label.width())
+                            .saturating_sub(weight_label.width())
+                            .saturating_sub(reps_label.width())
+                            .saturating_sub(1);
+                        let field1 = truncate_to_width(self.field1.value(), max_field1_width);
+                        spans.push(Span::styled(field1, Style::default().fg(Color::White)));
+                        spans.push(Span::styled(
+                            reps_label.clone(),
                             Style::default().fg(Color::Gray),
-                        ),
-                        Span::styled(f1_before, Style::default().fg(f1_style)),
-                        if self.active_field == 0 {
-                            Span::styled("\u{2588}", Style::default().fg(ACCENT))
-                        } else {
-                            Span::raw("")
-                        },
-                        Span::styled(f1_after, Style::default().fg(f1_style)),
-                        Span::styled(
-                            format!("  {} ", tr("log-reps-label")),
-                            Style::default().fg(Color::Gray),
-                        ),
-                        Span::styled(f2_before, Style::default().fg(f2_style)),
-                        if self.active_field == 1 {
-                            Span::styled("\u{2588}", Style::default().fg(ACCENT))
-                        } else {
-                            Span::raw("")
-                        },
-                        Span::styled(f2_after, Style::default().fg(f2_style)),
-                    ]));
+                        ));
+                        let prefix_width = (input_label.width()
+                            + weight_label.width()
+                            + spans[2].width()
+                            + reps_label.width()) as u16;
+                        spans.extend(self.field2.visible_spans(
+                            sets_inner.width,
+                            prefix_width,
+                            ACCENT,
+                        ));
+                    }
+                    sets_lines.push(Line::from(spans));
                 }
                 PracticeType::Bodyweight => {
-                    let (f1_before, f1_after) = self.field1.split_at(self.field1_cursor);
-                    sets_lines.push(Line::from(vec![
+                    let field_label = format!("{} ", tr("log-reps-label"));
+                    let prefix_width = (input_label.width() + field_label.width()) as u16;
+                    let mut spans = vec![
                         Span::styled(input_label, Style::default().fg(Color::White)),
-                        Span::styled(
-                            format!("{} ", tr("log-reps-label")),
-                            Style::default().fg(Color::Gray),
-                        ),
-                        Span::styled(f1_before, Style::default().fg(ACCENT)),
-                        Span::styled("\u{2588}", Style::default().fg(ACCENT)),
-                        Span::styled(f1_after, Style::default().fg(ACCENT)),
-                    ]));
+                        Span::styled(field_label, Style::default().fg(Color::Gray)),
+                    ];
+                    spans.extend(
+                        self.field1
+                            .visible_spans(sets_inner.width, prefix_width, ACCENT),
+                    );
+                    sets_lines.push(Line::from(spans));
                 }
                 PracticeType::Distance => {
-                    let (f1_before, f1_after) = self.field1.split_at(self.field1_cursor);
-                    sets_lines.push(Line::from(vec![
+                    let field_label = format!("{} ", tr("log-distance-label"));
+                    let prefix_width = (input_label.width() + field_label.width()) as u16;
+                    let mut spans = vec![
                         Span::styled(input_label, Style::default().fg(Color::White)),
-                        Span::styled(
-                            format!("{} ", tr("log-distance-label")),
-                            Style::default().fg(Color::Gray),
-                        ),
-                        Span::styled(f1_before, Style::default().fg(ACCENT)),
-                        Span::styled("\u{2588}", Style::default().fg(ACCENT)),
-                        Span::styled(f1_after, Style::default().fg(ACCENT)),
-                    ]));
+                        Span::styled(field_label, Style::default().fg(Color::Gray)),
+                    ];
+                    spans.extend(
+                        self.field1
+                            .visible_spans(sets_inner.width, prefix_width, ACCENT),
+                    );
+                    sets_lines.push(Line::from(spans));
                 }
                 PracticeType::Endurance => {
-                    let (f1_before, f1_after) = self.field1.split_at(self.field1_cursor);
-                    sets_lines.push(Line::from(vec![
+                    let field_label = format!("{} ", tr("log-duration-label"));
+                    let prefix_width = (input_label.width() + field_label.width()) as u16;
+                    let mut spans = vec![
                         Span::styled(input_label, Style::default().fg(Color::White)),
-                        Span::styled(
-                            format!("{} ", tr("log-duration-label")),
-                            Style::default().fg(Color::Gray),
-                        ),
-                        Span::styled(f1_before, Style::default().fg(ACCENT)),
-                        Span::styled("\u{2588}", Style::default().fg(ACCENT)),
-                        Span::styled(f1_after, Style::default().fg(ACCENT)),
-                    ]));
+                        Span::styled(field_label, Style::default().fg(Color::Gray)),
+                    ];
+                    spans.extend(
+                        self.field1
+                            .visible_spans(sets_inner.width, prefix_width, ACCENT),
+                    );
+                    sets_lines.push(Line::from(spans));
                 }
             }
         }
@@ -665,15 +643,18 @@ impl LogEntryScreen {
         let wu_prefix_w = wu_label.width() as u16;
         let mut wu_spans = vec![Span::styled(&wu_label, Style::default().fg(Color::Gray))];
         if wu_active {
-            wu_spans.extend(visible_input_spans(
-                &self.warm_up,
-                self.warm_up_cursor,
-                wucd_inner.width,
-                wu_prefix_w,
-                wu_color,
-            ));
+            wu_spans.extend(
+                self.warm_up
+                    .visible_spans(wucd_inner.width, wu_prefix_w, ACCENT),
+            );
         } else {
-            wu_spans.push(Span::styled(&self.warm_up, Style::default().fg(wu_color)));
+            wu_spans.push(Span::styled(
+                truncate_to_width(
+                    self.warm_up.value(),
+                    wucd_inner.width.saturating_sub(wu_prefix_w) as usize,
+                ),
+                Style::default().fg(wu_color),
+            ));
         }
 
         let cd_active = self.focus == FocusSection::CoolDown;
@@ -682,15 +663,18 @@ impl LogEntryScreen {
         let cd_prefix_w = cd_label.width() as u16;
         let mut cd_spans = vec![Span::styled(&cd_label, Style::default().fg(Color::Gray))];
         if cd_active {
-            cd_spans.extend(visible_input_spans(
-                &self.cool_down,
-                self.cool_down_cursor,
-                wucd_inner.width,
-                cd_prefix_w,
-                cd_color,
-            ));
+            cd_spans.extend(
+                self.cool_down
+                    .visible_spans(wucd_inner.width, cd_prefix_w, ACCENT),
+            );
         } else {
-            cd_spans.push(Span::styled(&self.cool_down, Style::default().fg(cd_color)));
+            cd_spans.push(Span::styled(
+                truncate_to_width(
+                    self.cool_down.value(),
+                    wucd_inner.width.saturating_sub(cd_prefix_w) as usize,
+                ),
+                Style::default().fg(cd_color),
+            ));
         }
 
         let rpe_active = self.focus == FocusSection::Rpe;
@@ -699,16 +683,13 @@ impl LogEntryScreen {
         let rpe_prefix_w = rpe_label.width() as u16;
         let mut rpe_spans = vec![Span::styled(rpe_label, Style::default().fg(Color::Gray))];
         if rpe_active {
-            rpe_spans.extend(visible_input_spans(
-                &self.rpe_input,
-                self.rpe_cursor,
-                wucd_inner.width,
-                rpe_prefix_w,
-                rpe_color,
-            ));
+            rpe_spans.extend(
+                self.rpe_input
+                    .visible_spans(wucd_inner.width, rpe_prefix_w, ACCENT),
+            );
         } else {
             rpe_spans.push(Span::styled(
-                &self.rpe_input,
+                self.rpe_input.value(),
                 Style::default().fg(rpe_color),
             ));
         }
@@ -718,7 +699,10 @@ impl LogEntryScreen {
             Line::from(cd_spans),
             Line::from(rpe_spans),
         ];
-        frame.render_widget(Paragraph::new(wucd_lines), wucd_inner);
+        frame.render_widget(
+            Paragraph::new(wucd_lines).wrap(Wrap { trim: false }),
+            wucd_inner,
+        );
 
         // ── Note section ──
         let note_border_color = BORDER_COLOR;
@@ -728,27 +712,24 @@ impl LogEntryScreen {
                 Style::default().fg(Color::Gray),
             ))
             .borders(Borders::ALL)
-            .padding(Padding::uniform(1))
+            .padding(Padding::horizontal(1))
             .border_style(Style::default().fg(note_border_color));
         let note_inner = note_block.inner(chunks[4]);
         frame.render_widget(note_block, chunks[4]);
 
         if self.focus == FocusSection::Note {
-            let before = &self.note[..self.note_cursor];
-            let after = &self.note[self.note_cursor..];
-            let note_line = Line::from(vec![
-                Span::styled(before, Style::default().fg(Color::White)),
-                Span::styled("\u{2588}", Style::default().fg(ACCENT)),
-                Span::styled(after, Style::default().fg(Color::White)),
-            ]);
+            let note_line = Line::from(self.note.visible_spans(note_inner.width, 0, ACCENT));
             frame.render_widget(
                 Paragraph::new(note_line).wrap(Wrap { trim: false }),
                 note_inner,
             );
         } else {
             frame.render_widget(
-                Paragraph::new(Span::styled(&self.note, Style::default().fg(Color::White)))
-                    .wrap(Wrap { trim: false }),
+                Paragraph::new(Span::styled(
+                    self.note.value(),
+                    Style::default().fg(Color::White),
+                ))
+                .wrap(Wrap { trim: false }),
                 note_inner,
             );
         }
@@ -880,8 +861,7 @@ impl LogEntryScreen {
             && self.focus == FocusSection::Sets
         {
             self.editing_date = true;
-            self.date_input = self.log_date.clone();
-            self.date_input_cursor = self.date_input.len();
+            self.date_input.set(self.log_date.clone());
             return Action::None;
         }
 
@@ -923,11 +903,11 @@ impl LogEntryScreen {
                 }
                 FocusSection::CoolDown => {
                     self.focus = FocusSection::Rpe;
-                    self.rpe_cursor = self.rpe_input.len();
+                    self.rpe_input.set(self.rpe_input.value().to_owned());
                 }
                 FocusSection::Rpe => {
                     self.focus = FocusSection::Note;
-                    self.note_cursor = self.note.len();
+                    self.note.set(self.note.value().to_owned());
                 }
                 FocusSection::Note => {
                     self.focus = FocusSection::Sets;
@@ -941,7 +921,7 @@ impl LogEntryScreen {
                         self.active_field = 0;
                     } else {
                         self.focus = FocusSection::Note;
-                        self.note_cursor = self.note.len();
+                        self.note.set(self.note.value().to_owned());
                     }
                 }
                 FocusSection::WarmUp => {
@@ -956,7 +936,7 @@ impl LogEntryScreen {
                 }
                 FocusSection::Note => {
                     self.focus = FocusSection::Rpe;
-                    self.rpe_cursor = self.rpe_input.len();
+                    self.rpe_input.set(self.rpe_input.value().to_owned());
                 }
             }
         }
@@ -965,9 +945,7 @@ impl LogEntryScreen {
     fn cancel_edit(&mut self) {
         self.editing_set = None;
         self.field1.clear();
-        self.field1_cursor = 0;
         self.field2.clear();
-        self.field2_cursor = 0;
         self.active_field = 0;
     }
 
@@ -1010,69 +988,6 @@ impl LogEntryScreen {
             }
         }
 
-        // Ctrl+K – delete from cursor to end
-        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('k') {
-            if has_two_fields && self.active_field == 0 {
-                self.field1.truncate(self.field1_cursor);
-            } else if has_two_fields && self.active_field == 1 {
-                self.field2.truncate(self.field2_cursor);
-            } else {
-                self.field1.truncate(self.field1_cursor);
-            }
-            return Action::None;
-        }
-
-        let both_fields_empty =
-            self.field1.is_empty() && (self.field2.is_empty() || !has_two_fields);
-
-        let (text, cursor) = if has_two_fields {
-            if self.active_field == 0 {
-                (&mut self.field1, &mut self.field1_cursor)
-            } else {
-                (&mut self.field2, &mut self.field2_cursor)
-            }
-        } else {
-            (&mut self.field1, &mut self.field1_cursor)
-        };
-
-        // Emacs cursor nav
-        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('b')
-            || key.code == KeyCode::Left
-        {
-            if *cursor > 0 {
-                *cursor = text[..*cursor]
-                    .char_indices()
-                    .next_back()
-                    .map(|(i, _)| i)
-                    .unwrap_or(0);
-            }
-            return Action::None;
-        }
-        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('f')
-            || key.code == KeyCode::Right
-        {
-            if *cursor < text.len() {
-                *cursor = text[*cursor..]
-                    .char_indices()
-                    .nth(1)
-                    .map(|(i, _)| *cursor + i)
-                    .unwrap_or(text.len());
-            }
-            return Action::None;
-        }
-        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('a')
-            || key.code == KeyCode::Home
-        {
-            *cursor = 0;
-            return Action::None;
-        }
-        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('e')
-            || key.code == KeyCode::End
-        {
-            *cursor = text.len();
-            return Action::None;
-        }
-
         match key.code {
             KeyCode::Enter => {
                 if has_two_fields && self.active_field == 0 && self.editing_set.is_none() {
@@ -1083,7 +998,14 @@ impl LogEntryScreen {
                 Action::None
             }
             KeyCode::Backspace => {
-                if text.is_empty() && !self.sets.is_empty() {
+                let active_input_empty = if has_two_fields && self.active_field == 1 {
+                    self.field2.value().is_empty()
+                } else {
+                    self.field1.value().is_empty()
+                };
+                let both_fields_empty = self.field1.value().is_empty()
+                    && (self.field2.value().is_empty() || !has_two_fields);
+                if active_input_empty && !self.sets.is_empty() {
                     if let Some(idx) = self.selected_set {
                         // Selected set + empty active field = delete it
                         self.sets.remove(idx);
@@ -1097,14 +1019,11 @@ impl LogEntryScreen {
                     } else if both_fields_empty {
                         self.sets.pop();
                     }
-                } else if *cursor > 0 {
-                    let prev = text[..*cursor]
-                        .char_indices()
-                        .next_back()
-                        .map(|(i, _)| i)
-                        .unwrap_or(0);
-                    text.remove(prev);
-                    *cursor = prev;
+                } else {
+                    self.active_set_input_mut(has_two_fields)
+                        .handle_key_if(key, |character| {
+                            character.is_ascii_digit() || character == '.'
+                        });
                 }
                 Action::None
             }
@@ -1127,199 +1046,86 @@ impl LogEntryScreen {
                     let set = &self.sets[idx];
                     match set {
                         SetData::Weighted { weight, reps } => {
-                            self.field1 =
-                                format!("{:.1}", weight).trim_end_matches(".0").to_string();
-                            if self.field1.ends_with(".0") {
-                                self.field1 = format!("{:.0}", weight);
-                            }
-                            self.field2 = reps.to_string();
+                            self.field1
+                                .set(format!("{:.1}", weight).trim_end_matches(".0"));
+                            self.field2.set(reps.to_string());
                         }
                         SetData::Bodyweight { reps } => {
-                            self.field1 = reps.to_string();
+                            self.field1.set(reps.to_string());
                         }
                         SetData::Distance { distance } => {
-                            self.field1 = format!("{:.1}", distance)
-                                .trim_end_matches(".0")
-                                .to_string();
-                            if self.field1.ends_with(".0") {
-                                self.field1 = format!("{:.0}", distance);
-                            }
+                            self.field1
+                                .set(format!("{:.1}", distance).trim_end_matches(".0"));
                         }
                         SetData::Endurance { duration } => {
-                            self.field1 = format!("{:.1}", duration)
-                                .trim_end_matches(".0")
-                                .to_string();
-                            if self.field1.ends_with(".0") {
-                                self.field1 = format!("{:.0}", duration);
-                            }
+                            self.field1
+                                .set(format!("{:.1}", duration).trim_end_matches(".0"));
                         }
                     }
-                    self.field1_cursor = self.field1.len();
-                    self.field2_cursor = self.field2.len();
                     self.active_field = 0;
                 }
                 Action::None
             }
-            KeyCode::Char(c) if c.is_ascii_digit() || c == '.' => {
-                text.insert(*cursor, c);
-                *cursor += c.len_utf8();
+            _ => {
+                self.active_set_input_mut(has_two_fields)
+                    .handle_key_if(key, |character| {
+                        character.is_ascii_digit() || character == '.'
+                    });
                 Action::None
             }
-            _ => Action::None,
+        }
+    }
+
+    fn active_set_input_mut(&mut self, has_two_fields: bool) -> &mut TextInput {
+        if has_two_fields && self.active_field == 1 {
+            &mut self.field2
+        } else {
+            &mut self.field1
         }
     }
 
     fn handle_text_field_input(&mut self, key: KeyEvent, target: TextFieldTarget) -> Action {
-        let (text, cursor) = match target {
-            TextFieldTarget::WarmUp => (&mut self.warm_up, &mut self.warm_up_cursor),
-            TextFieldTarget::CoolDown => (&mut self.cool_down, &mut self.cool_down_cursor),
-            TextFieldTarget::Rpe => (&mut self.rpe_input, &mut self.rpe_cursor),
-            TextFieldTarget::Note => (&mut self.note, &mut self.note_cursor),
-        };
-
-        // Ctrl+K
-        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('k') {
-            text.truncate(*cursor);
-            return Action::None;
-        }
-
-        // Emacs cursor nav
-        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('b')
-            || key.code == KeyCode::Left
-        {
-            if *cursor > 0 {
-                *cursor = text[..*cursor]
-                    .char_indices()
-                    .next_back()
-                    .map(|(i, _)| i)
-                    .unwrap_or(0);
+        match target {
+            TextFieldTarget::WarmUp => {
+                self.warm_up.handle_key(key);
             }
-            return Action::None;
-        }
-        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('f')
-            || key.code == KeyCode::Right
-        {
-            if *cursor < text.len() {
-                *cursor = text[*cursor..]
-                    .char_indices()
-                    .nth(1)
-                    .map(|(i, _)| *cursor + i)
-                    .unwrap_or(text.len());
+            TextFieldTarget::CoolDown => {
+                self.cool_down.handle_key(key);
             }
-            return Action::None;
-        }
-        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('a')
-            || key.code == KeyCode::Home
-        {
-            *cursor = 0;
-            return Action::None;
-        }
-        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('e')
-            || key.code == KeyCode::End
-        {
-            *cursor = text.len();
-            return Action::None;
-        }
-
-        match key.code {
-            KeyCode::Backspace => {
-                if *cursor > 0 {
-                    let prev = text[..*cursor]
-                        .char_indices()
-                        .next_back()
-                        .map(|(i, _)| i)
-                        .unwrap_or(0);
-                    text.remove(prev);
-                    *cursor = prev;
-                }
-                Action::None
+            TextFieldTarget::Rpe => {
+                let accepts_more = self.rpe_input.value().len() < 2;
+                self.rpe_input
+                    .handle_key_if(key, |character| accepts_more && character.is_ascii_digit());
             }
-            KeyCode::Char(c) => {
-                if matches!(target, TextFieldTarget::Rpe) {
-                    if c.is_ascii_digit() && text.len() < 2 {
-                        text.insert(*cursor, c);
-                        *cursor += c.len_utf8();
-                    }
-                } else {
-                    text.insert(*cursor, c);
-                    *cursor += c.len_utf8();
-                }
-                Action::None
+            TextFieldTarget::Note => {
+                self.note.handle_key(key);
             }
-            _ => Action::None,
         }
+        Action::None
     }
 
     fn handle_date_edit(&mut self, key: KeyEvent) -> Action {
-        let (text, cursor) = (&mut self.date_input, &mut self.date_input_cursor);
-
-        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('b')
-            || key.code == KeyCode::Left
-        {
-            if *cursor > 0 {
-                *cursor = text[..*cursor]
-                    .char_indices()
-                    .next_back()
-                    .map(|(i, _)| i)
-                    .unwrap_or(0);
-            }
-            return Action::None;
-        }
-        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('f')
-            || key.code == KeyCode::Right
-        {
-            if *cursor < text.len() {
-                *cursor = text[*cursor..]
-                    .char_indices()
-                    .nth(1)
-                    .map(|(i, _)| *cursor + i)
-                    .unwrap_or(text.len());
-            }
-            return Action::None;
-        }
-        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('a')
-            || key.code == KeyCode::Home
-        {
-            *cursor = 0;
-            return Action::None;
-        }
-        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('e')
-            || key.code == KeyCode::End
-        {
-            *cursor = text.len();
-            return Action::None;
-        }
-        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('k') {
-            text.truncate(*cursor);
-            return Action::None;
-        }
-
         match key.code {
             KeyCode::Enter => {
-                if NaiveDate::parse_from_str(&self.date_input, "%Y-%m-%d").is_ok() {
-                    self.log_date = self.date_input.clone();
+                match NaiveDate::parse_from_str(self.date_input.value(), "%Y-%m-%d") {
+                    Ok(_) => {
+                        self.log_date = self.date_input.value().to_owned();
+                        self.date_input.clear();
+                        self.editing_date = false;
+                    }
+                    Err(_) => {
+                        self.status_msg = Some((tr("log-invalid-date"), true));
+                    }
                 }
-                self.editing_date = false;
             }
             KeyCode::Esc => {
                 self.editing_date = false;
             }
-            KeyCode::Backspace => {
-                if *cursor > 0 {
-                    let prev = text[..*cursor]
-                        .char_indices()
-                        .next_back()
-                        .map(|(i, _)| i)
-                        .unwrap_or(0);
-                    text.remove(prev);
-                    *cursor = prev;
-                }
+            _ => {
+                self.date_input.handle_key_if(key, |character| {
+                    character.is_ascii_digit() || character == '-'
+                });
             }
-            KeyCode::Char(c) if c.is_ascii_digit() || c == '-' => {
-                text.insert(*cursor, c);
-                *cursor += c.len_utf8();
-            }
-            _ => {}
         }
         Action::None
     }
@@ -1328,7 +1134,7 @@ impl LogEntryScreen {
         let practice = self.chosen_practice.as_ref().unwrap();
         let set_data = match practice.practice_type {
             PracticeType::Weighted => {
-                let weight = if self.field1.is_empty() {
+                let weight = if self.field1.value().is_empty() {
                     self.sets
                         .last()
                         .and_then(|s| match s {
@@ -1337,30 +1143,30 @@ impl LogEntryScreen {
                         })
                         .unwrap_or(0.0)
                 } else {
-                    self.field1.parse::<f64>().unwrap_or(0.0)
+                    self.field1.value().parse::<f64>().unwrap_or(0.0)
                 };
-                let reps = self.field2.parse::<i32>().unwrap_or(0);
+                let reps = self.field2.value().parse::<i32>().unwrap_or(0);
                 if reps == 0 {
                     return;
                 }
                 Some(SetData::Weighted { weight, reps })
             }
             PracticeType::Bodyweight => {
-                let reps = self.field1.parse::<i32>().unwrap_or(0);
+                let reps = self.field1.value().parse::<i32>().unwrap_or(0);
                 if reps == 0 {
                     return;
                 }
                 Some(SetData::Bodyweight { reps })
             }
             PracticeType::Distance => {
-                let distance = self.field1.parse::<f64>().unwrap_or(0.0);
+                let distance = self.field1.value().parse::<f64>().unwrap_or(0.0);
                 if distance == 0.0 {
                     return;
                 }
                 Some(SetData::Distance { distance })
             }
             PracticeType::Endurance => {
-                let duration = self.field1.parse::<f64>().unwrap_or(0.0);
+                let duration = self.field1.value().parse::<f64>().unwrap_or(0.0);
                 if duration == 0.0 {
                     return;
                 }
@@ -1377,11 +1183,9 @@ impl LogEntryScreen {
             }
             if practice.practice_type == PracticeType::Weighted {
                 self.field2.clear();
-                self.field2_cursor = 0;
                 self.active_field = 1;
             } else {
                 self.field1.clear();
-                self.field1_cursor = 0;
                 self.active_field = 0;
             }
         }
@@ -1390,10 +1194,10 @@ impl LogEntryScreen {
     fn save_log(&mut self, db: &Database) -> Action {
         let practice = self.chosen_practice.as_ref().unwrap();
 
-        let rpe = if self.rpe_input.is_empty() {
+        let rpe = if self.rpe_input.value().is_empty() {
             None
         } else {
-            match self.rpe_input.parse::<u8>() {
+            match self.rpe_input.value().parse::<u8>() {
                 Ok(val) if (1..=10).contains(&val) => Some(val),
                 _ => {
                     self.status_msg =
@@ -1403,20 +1207,20 @@ impl LogEntryScreen {
             }
         };
 
-        let note = if self.note.is_empty() {
+        let note = if self.note.value().is_empty() {
             None
         } else {
-            Some(self.note.as_str())
+            Some(self.note.value())
         };
-        let warm_up = if self.warm_up.is_empty() {
+        let warm_up = if self.warm_up.value().is_empty() {
             None
         } else {
-            Some(self.warm_up.as_str())
+            Some(self.warm_up.value())
         };
-        let cool_down = if self.cool_down.is_empty() {
+        let cool_down = if self.cool_down.value().is_empty() {
             None
         } else {
-            Some(self.cool_down.as_str())
+            Some(self.cool_down.value())
         };
         let date = NaiveDate::parse_from_str(&self.log_date, "%Y-%m-%d")
             .unwrap_or_else(|_| Local::now().date_naive());
@@ -1566,6 +1370,55 @@ mod tests {
     }
 
     #[test]
+    fn every_long_log_input_keeps_its_cursor_visible() {
+        let db = Database::open_in_memory().unwrap();
+        let practice = db
+            .create_practice("Deadlift", PracticeType::Weighted)
+            .unwrap();
+        let mut screen = LogEntryScreen::new(&db).unwrap();
+        screen.phase = Phase::EnterLog;
+        screen.chosen_practice = Some(practice);
+        let long = "练习".repeat(80);
+        for focus in [
+            FocusSection::Sets,
+            FocusSection::WarmUp,
+            FocusSection::CoolDown,
+            FocusSection::Rpe,
+            FocusSection::Note,
+        ] {
+            screen.focus = focus;
+            match focus {
+                FocusSection::Sets => screen.field1.set(&long),
+                FocusSection::WarmUp => screen.warm_up.set(&long),
+                FocusSection::CoolDown => screen.cool_down.set(&long),
+                FocusSection::Rpe => screen.rpe_input.set("99"),
+                FocusSection::Note => screen.note.set(&long),
+            }
+            let output = render_log_entry(&mut screen, 80, 24);
+            assert!(output.contains('_'), "focus={focus:?}\n{output}");
+        }
+    }
+
+    #[test]
+    fn invalid_date_keeps_date_editor_and_input() {
+        let db = Database::open_in_memory().unwrap();
+        let practice = db
+            .create_practice("Deadlift", PracticeType::Weighted)
+            .unwrap();
+        let mut screen = LogEntryScreen::new(&db).unwrap();
+        screen.phase = Phase::EnterLog;
+        screen.chosen_practice = Some(practice);
+        screen.editing_date = true;
+        screen.date_input = TextInput::from("2026-99-99");
+
+        screen.handle_key(key(KeyCode::Enter), &db);
+
+        assert!(screen.editing_date);
+        assert_eq!(screen.date_input.value(), "2026-99-99");
+        assert!(screen.status_msg.as_ref().is_some_and(|(_, error)| *error));
+    }
+
+    #[test]
     fn sets_cursor_movement_works() {
         let (db, _dir) = test_db();
         db.create_practice("Bench", PracticeType::Weighted).unwrap();
@@ -1577,8 +1430,8 @@ mod tests {
         // Type weight
         screen.handle_key(char_key('5'), &db);
         screen.handle_key(char_key('0'), &db);
-        assert_eq!(screen.field1, "50");
-        assert_eq!(screen.field1_cursor, 2);
+        assert_eq!(screen.field1.value(), "50");
+        assert_eq!(screen.field1.cursor(), 2);
 
         // Tab to reps field
         screen.handle_key(key(KeyCode::Tab), &db);
@@ -1587,32 +1440,32 @@ mod tests {
         // Type reps
         screen.handle_key(char_key('1'), &db);
         screen.handle_key(char_key('0'), &db);
-        assert_eq!(screen.field2, "10");
-        assert_eq!(screen.field2_cursor, 2);
+        assert_eq!(screen.field2.value(), "10");
+        assert_eq!(screen.field2.cursor(), 2);
 
         // Left moves cursor back
         screen.handle_key(key(KeyCode::Left), &db);
-        assert_eq!(screen.field2_cursor, 1);
+        assert_eq!(screen.field2.cursor(), 1);
         screen.handle_key(key(KeyCode::Left), &db);
-        assert_eq!(screen.field2_cursor, 0);
+        assert_eq!(screen.field2.cursor(), 0);
         screen.handle_key(key(KeyCode::Left), &db);
-        assert_eq!(screen.field2_cursor, 0); // clamped
+        assert_eq!(screen.field2.cursor(), 0); // clamped
 
         // Right moves cursor forward
         screen.handle_key(key(KeyCode::Right), &db);
-        assert_eq!(screen.field2_cursor, 1);
+        assert_eq!(screen.field2.cursor(), 1);
         screen.handle_key(key(KeyCode::Right), &db);
-        assert_eq!(screen.field2_cursor, 2);
+        assert_eq!(screen.field2.cursor(), 2);
         screen.handle_key(key(KeyCode::Right), &db);
-        assert_eq!(screen.field2_cursor, 2); // clamped
+        assert_eq!(screen.field2.cursor(), 2); // clamped
 
         // Ctrl+A to start
         screen.handle_key(ctrl_key('a'), &db);
-        assert_eq!(screen.field2_cursor, 0);
+        assert_eq!(screen.field2.cursor(), 0);
 
         // Ctrl+E to end
         screen.handle_key(ctrl_key('e'), &db);
-        assert_eq!(screen.field2_cursor, 2);
+        assert_eq!(screen.field2.cursor(), 2);
     }
 
     #[test]
@@ -1714,8 +1567,8 @@ mod tests {
         assert_eq!(screen.selected_set, Some(0));
         screen.handle_key(char_key('e'), &db);
         assert_eq!(screen.editing_set, Some(0));
-        assert_eq!(screen.field1, "50");
-        assert_eq!(screen.field2, "10");
+        assert_eq!(screen.field1.value(), "50");
+        assert_eq!(screen.field2.value(), "10");
         assert_eq!(screen.active_field, 0);
 
         // Change weight to 55 (go to start, clear, then type)
@@ -1742,6 +1595,6 @@ mod tests {
         assert_eq!(screen.editing_set, Some(0));
         screen.handle_key(key(KeyCode::Esc), &db);
         assert!(screen.editing_set.is_none());
-        assert!(screen.field1.is_empty());
+        assert!(screen.field1.value().is_empty());
     }
 }

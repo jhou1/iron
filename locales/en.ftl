@@ -74,6 +74,7 @@ log-date-label = Date:
 log-date-confirm-hint = [Enter] confirm  [D] edit
 log-date-change-hint = [D] to change
 log-date-edit-hint = (YYYY-MM-DD, Enter to confirm)
+log-invalid-date = Invalid date; use YYYY-MM-DD
 log-set-line = Set { $number }: { $data }
 log-sets-total = Sets: { $sets }  Total: { $total } { $label }
 log-sets-total-reps = Sets: { $sets }  Total: { $total } { $label }  Reps: { $reps }

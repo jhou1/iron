@@ -74,6 +74,7 @@ log-date-label = 日期：
 log-date-confirm-hint = [Enter] 确认  [D] 编辑
 log-date-change-hint = [D] 修改
 log-date-edit-hint = （YYYY-MM-DD，按 Enter 确认）
+log-invalid-date = 日期无效，请使用 YYYY-MM-DD
 log-set-line = 第 { $number } 组：{ $data }
 log-sets-total = 组数：{ $sets }  合计：{ $total } { $label }
 log-sets-total-reps = 组数：{ $sets }  合计：{ $total } { $label }  次数：{ $reps }
