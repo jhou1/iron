@@ -10,8 +10,10 @@ use unicode_width::UnicodeWidthStr;
 
 use super::widgets::heatmap::Heatmap;
 use super::{
-    centered_area, framework::TextInput, render_gauge_line, render_status_line, Action, Screen,
-    StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
+    centered_area,
+    framework::{render_shortcuts, shortcut_height, truncate_to_width, Shortcut, TextInput},
+    render_gauge_line, render_status_line, Action, Screen, StatusMessage, BORDER_COLOR,
+    CONTENT_WIDTH,
 };
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
@@ -99,46 +101,50 @@ impl DashboardScreen {
         Ok(())
     }
 
+    fn active_shortcuts(&self) -> Vec<Shortcut> {
+        match self.mode {
+            DashboardMode::Normal => vec![
+                Shortcut::new("l", tr("key-log")),
+                Shortcut::new("h", tr("key-history")),
+                Shortcut::new("t", tr("key-trends")),
+                Shortcut::new("e", tr("key-practices")),
+                Shortcut::new("g", tr("key-goals")),
+                Shortcut::new("Q", tr("key-quotes")),
+                Shortcut::new("v", tr("key-hrv")),
+                Shortcut::new("Esc", tr("key-quit")),
+            ],
+            DashboardMode::ConfirmQuit => vec![
+                Shortcut::new("y", tr("key-yes")),
+                Shortcut::new("any", tr("key-cancel")),
+            ],
+            DashboardMode::HrvInput => vec![
+                Shortcut::new("Enter", tr("key-confirm")),
+                Shortcut::new("Esc", tr("key-cancel")),
+            ],
+        }
+    }
+
     pub fn render(&self, frame: &mut Frame) {
         let area = centered_area(frame.area(), CONTENT_WIDTH);
+        if area.width == 0 || area.height == 0 {
+            return;
+        }
 
-        // Pane height adapts to content
-        let active_goal_count = self.goals.iter().filter(|g| !g.completed).count() as u16;
-        let goals_lines: u16 = (active_goal_count * 2 + 1).max(2);
-
-        // Recent pane: 1 title + per-group (1 date header + N entries + 1 blank separator)
-        let date_groups = {
-            let mut count = 0u16;
-            let mut current_date = String::new();
-            for entry in &self.recent_entries {
-                let dk = entry.log.logged_at.format("%Y-%m-%d").to_string();
-                if dk != current_date {
-                    if !current_date.is_empty() {
-                        count += 1; // blank separator
-                    }
-                    count += 1; // date header
-                    current_date = dk;
-                }
-                count += 1; // entry line
-            }
-            count
-        };
-        let recent_lines = (date_groups + 1).max(2); // +1 for title
-        let pane_height = recent_lines.max(goals_lines).max(7);
+        let shortcuts = self.active_shortcuts();
+        let shortcut_rows = shortcut_height(&shortcuts, area.width);
 
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1),           // [0] logo header
-                Constraint::Length(1),           // [1] spacer
-                Constraint::Length(13),          // [2] heatmap: 9 inner + 2 borders + 2 padding
-                Constraint::Length(1),           // [3] spacer
-                Constraint::Length(7),           // [4] summary: 3 inner + 2 borders + 2 padding
-                Constraint::Length(1),           // [5] spacer
-                Constraint::Length(pane_height), // [6] split panes
-                Constraint::Length(1),           // [7] status line
-                Constraint::Length(4),           // [8] footer (4 lines)
-                Constraint::Min(0),              // [9] spacer
+                Constraint::Length(1),             // [0] logo header
+                Constraint::Length(1),             // [1] spacer
+                Constraint::Length(13),            // [2] heatmap preferred height
+                Constraint::Length(1),             // [3] spacer
+                Constraint::Length(7),             // [4] summary preferred height
+                Constraint::Length(1),             // [5] spacer
+                Constraint::Min(1),                // [6] split panes use remaining height
+                Constraint::Length(1),             // [7] reserved status row
+                Constraint::Length(shortcut_rows), // [8] complete dynamic footer
             ])
             .split(area);
 
@@ -149,7 +155,9 @@ impl DashboardScreen {
             Span::styled("\u{26a1} ", Style::default().fg(Color::Yellow)),
             Span::styled(logo_text, Style::default().fg(Color::Yellow).bold()),
         ]);
-        frame.render_widget(Paragraph::new(logo_line), chunks[0]);
+        if chunks[0].width > 0 && chunks[0].height > 0 {
+            frame.render_widget(Paragraph::new(logo_line), chunks[0]);
+        }
 
         // ── Heatmap ──
         let heatmap_block = Block::default()
@@ -164,155 +172,43 @@ impl DashboardScreen {
             .borders(Borders::ALL)
             .padding(Padding::uniform(1))
             .border_style(Style::default().fg(BORDER_COLOR));
-        let heatmap_inner = heatmap_block.inner(chunks[2]);
-        frame.render_widget(heatmap_block, chunks[2]);
-        let heatmap = Heatmap::new(&self.heatmap_data, 52, self.no_color);
-        frame.render_widget(heatmap, heatmap_inner);
+        if chunks[2].width > 0 && chunks[2].height > 0 {
+            let heatmap_inner = heatmap_block.inner(chunks[2]);
+            frame.render_widget(heatmap_block, chunks[2]);
+            if heatmap_inner.width > 0 && heatmap_inner.height > 0 {
+                let heatmap = Heatmap::new(&self.heatmap_data, 52, self.no_color);
+                frame.render_widget(heatmap, heatmap_inner);
+            }
+        }
 
         // ── Training summary ──
         self.render_summary(frame, chunks[4]);
 
         // ── Split panes ──
-        let panes = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-            .split(chunks[6]);
+        if chunks[6].width > 0 && chunks[6].height > 0 {
+            let panes = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+                .split(chunks[6]);
 
-        self.render_recent_pane(frame, panes[0]);
-        self.render_goals_pane(frame, panes[1]);
+            self.render_recent_pane(frame, panes[0]);
+            self.render_goals_pane(frame, panes[1]);
+        }
 
         // ── Status line ──
-        render_status_line(frame, chunks[7], &self.status_msg);
+        if chunks[7].width > 0 && chunks[7].height > 0 {
+            let status = if self.mode == DashboardMode::ConfirmQuit {
+                Some((tr("dashboard-quit-confirm"), true))
+            } else {
+                self.status_msg.clone()
+            };
+            render_status_line(frame, chunks[7], &status);
+        }
 
         // ── Footer ──
-        let footer_lines: Vec<Line> = if self.mode == DashboardMode::ConfirmQuit {
-            vec![Line::from(vec![
-                Span::styled(
-                    format!(" {} ", tr("dashboard-quit-confirm")),
-                    Style::default().fg(Color::Red),
-                ),
-                Span::styled("[y]", Style::default().fg(ACCENT)),
-                Span::styled(
-                    format!(" {}  ", tr("key-yes")),
-                    Style::default().fg(Color::DarkGray),
-                ),
-                Span::styled("[any]", Style::default().fg(ACCENT)),
-                Span::styled(
-                    format!(" {}", tr("key-cancel")),
-                    Style::default().fg(Color::DarkGray),
-                ),
-            ])]
-        } else if self.mode == DashboardMode::Normal {
-            let log_lbl = tr("footer-group-log");
-            let rev_lbl = tr("footer-group-review");
-            let man_lbl = tr("footer-group-manage");
-            let sys_lbl = tr("footer-group-system");
-            let max_lbl = log_lbl
-                .width()
-                .max(rev_lbl.width())
-                .max(man_lbl.width())
-                .max(sys_lbl.width());
-
-            let log_pad = " ".repeat(max_lbl.saturating_sub(log_lbl.width()));
-            let rev_pad = " ".repeat(max_lbl.saturating_sub(rev_lbl.width()));
-            let man_pad = " ".repeat(max_lbl.saturating_sub(man_lbl.width()));
-            let sys_pad = " ".repeat(max_lbl.saturating_sub(sys_lbl.width()));
-
-            let log_key = tr("key-log");
-            let rev_key = tr("key-history");
-            let man_key = tr("key-practices");
-
-            let log_col1_len = 3 + log_key.width(); // "[l]" = 3
-            let rev_col1_len = 3 + rev_key.width(); // "[h]" = 3
-            let man_col1_len = 3 + man_key.width(); // "[e]" = 3
-
-            let max_col1 = log_col1_len.max(rev_col1_len).max(man_col1_len);
-
-            let log_col1_pad = " ".repeat(max_col1.saturating_sub(log_col1_len) + 1);
-            let rev_col1_pad = " ".repeat(max_col1.saturating_sub(rev_col1_len) + 1);
-            let man_col1_pad = " ".repeat(max_col1.saturating_sub(man_col1_len) + 1);
-
-            let rev_key2 = tr("key-trends");
-            let man_key2 = tr("key-goals");
-
-            let rev_col2_len = 3 + rev_key2.width(); // "[t]" = 3
-            let man_col2_len = 3 + man_key2.width(); // "[g]" = 3
-
-            let max_col2 = rev_col2_len.max(man_col2_len);
-
-            let rev_col2_pad = " ".repeat(max_col2.saturating_sub(rev_col2_len) + 1);
-            let man_col2_pad = " ".repeat(max_col2.saturating_sub(man_col2_len) + 1);
-
-            vec![
-                Line::from(vec![
-                    Span::styled(
-                        format!(" {}{}: ", log_pad, log_lbl),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                    Span::styled("[l]", Style::default().fg(ACCENT)),
-                    Span::styled(
-                        format!("{}{}", log_key, log_col1_pad),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                ]),
-                Line::from(vec![
-                    Span::styled(
-                        format!(" {}{}: ", rev_pad, rev_lbl),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                    Span::styled("[h]", Style::default().fg(ACCENT)),
-                    Span::styled(
-                        format!("{}{}", rev_key, rev_col1_pad),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                    Span::styled("[t]", Style::default().fg(ACCENT)),
-                    Span::styled(
-                        format!("{}{}", rev_key2, rev_col2_pad),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                ]),
-                Line::from(vec![
-                    Span::styled(
-                        format!(" {}{}: ", man_pad, man_lbl),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                    Span::styled("[e]", Style::default().fg(ACCENT)),
-                    Span::styled(
-                        format!("{}{}", man_key, man_col1_pad),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                    Span::styled("[g]", Style::default().fg(ACCENT)),
-                    Span::styled(
-                        format!("{}{}", man_key2, man_col2_pad),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                    Span::styled("[Q]", Style::default().fg(ACCENT)),
-                    Span::styled(tr("key-quotes"), Style::default().fg(Color::DarkGray)),
-                ]),
-                Line::from(vec![
-                    Span::styled(
-                        format!(" {}{}: ", sys_pad, sys_lbl),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                    Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                    Span::styled(tr("key-quit"), Style::default().fg(Color::DarkGray)),
-                ]),
-            ]
-        } else {
-            vec![Line::from(vec![
-                Span::styled(" [Enter]", Style::default().fg(ACCENT)),
-                Span::styled(
-                    format!(" {}  ", tr("key-confirm")),
-                    Style::default().fg(Color::DarkGray),
-                ),
-                Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(
-                    format!(" {}", tr("key-cancel")),
-                    Style::default().fg(Color::DarkGray),
-                ),
-            ])]
-        };
-        frame.render_widget(Paragraph::new(footer_lines), chunks[8]);
+        if chunks[8].width > 0 && chunks[8].height > 0 {
+            render_shortcuts(frame, chunks[8], &shortcuts);
+        }
     }
 
     fn compute_streak(heatmap_data: &[(String, i64)]) -> (usize, i64) {
@@ -337,6 +233,10 @@ impl DashboardScreen {
     }
 
     fn render_summary(&self, frame: &mut Frame, area: Rect) {
+        if area.width == 0 || area.height == 0 {
+            return;
+        }
+
         let block = Block::default()
             .title(Line::from(vec![
                 Span::styled("── ", Style::default().fg(BORDER_COLOR)),
@@ -351,6 +251,9 @@ impl DashboardScreen {
             .border_style(Style::default().fg(BORDER_COLOR));
         let inner = block.inner(area);
         frame.render_widget(block, area);
+        if inner.width == 0 || inner.height == 0 {
+            return;
+        }
 
         let volume_tons = self.weekly_volume / 1000.0;
         let volume_text = tr_args(
@@ -425,6 +328,10 @@ impl DashboardScreen {
     }
 
     fn render_recent_pane(&self, frame: &mut Frame, area: Rect) {
+        if area.width == 0 || area.height == 0 {
+            return;
+        }
+
         let block = Block::default()
             .title(Line::from(vec![
                 Span::styled("── ", Style::default().fg(BORDER_COLOR)),
@@ -440,6 +347,9 @@ impl DashboardScreen {
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
+        if inner.width == 0 || inner.height == 0 {
+            return;
+        }
 
         let mut lines: Vec<Line> = Vec::new();
 
@@ -449,26 +359,6 @@ impl DashboardScreen {
                 Style::default().fg(Color::Gray),
             )));
         } else {
-            let max_name = self
-                .recent_entries
-                .iter()
-                .map(|e| e.practice_name.width())
-                .max()
-                .unwrap_or(0);
-            let name_col = max_name + 2;
-            let max_total_w = self
-                .recent_entries
-                .iter()
-                .map(|e| format!("{:.0}", e.total_metric()).len())
-                .max()
-                .unwrap_or(0);
-            let max_label_w = self
-                .recent_entries
-                .iter()
-                .map(|e| e.metric_label().width())
-                .max()
-                .unwrap_or(0);
-
             let mut current_date = String::new();
             for entry in &self.recent_entries {
                 let date_key = entry.log.logged_at.format("%Y-%m-%d").to_string();
@@ -484,17 +374,28 @@ impl DashboardScreen {
                 }
                 let total = format!("{:.0}", entry.total_metric());
                 let label = entry.metric_label();
-                let name_pad = name_col.saturating_sub(entry.practice_name.width());
-                let num_pad = max_total_w.saturating_sub(total.len());
-                let label_pad = max_label_w.saturating_sub(label.width());
+                let row_width = inner.width as usize;
+                let indent = truncate_to_width("    ", row_width);
+                let indent_width = indent.width();
+                let suffix_budget = row_width.saturating_sub(indent_width);
+                let suffix = truncate_to_width(&format!("{total} {label}"), suffix_budget);
+                let suffix_width = suffix.width();
+                let gap_width = usize::from(suffix_width > 0 && suffix_width < suffix_budget);
+                let name_width = row_width
+                    .saturating_sub(indent_width)
+                    .saturating_sub(suffix_width)
+                    .saturating_sub(gap_width);
+                let practice_name = truncate_to_width(&entry.practice_name, name_width);
+                let gap = if practice_name.is_empty() || suffix.is_empty() {
+                    ""
+                } else {
+                    " "
+                };
                 lines.push(Line::from(vec![
-                    Span::raw("    "),
-                    Span::styled(&entry.practice_name, Style::default().fg(Color::Gray)),
-                    Span::raw(" ".repeat(name_pad + num_pad)),
-                    Span::styled(
-                        format!("{} {}{}", total, label, " ".repeat(label_pad)),
-                        Style::default().fg(Color::Gray),
-                    ),
+                    Span::raw(indent),
+                    Span::styled(practice_name, Style::default().fg(Color::Gray)),
+                    Span::raw(gap),
+                    Span::styled(suffix, Style::default().fg(Color::Gray)),
                 ]));
             }
         }
@@ -503,6 +404,10 @@ impl DashboardScreen {
     }
 
     fn render_goals_pane(&self, frame: &mut Frame, area: Rect) {
+        if area.width == 0 || area.height == 0 {
+            return;
+        }
+
         let block = Block::default()
             .title(Line::from(vec![
                 Span::styled("── ", Style::default().fg(BORDER_COLOR)),
@@ -518,10 +423,13 @@ impl DashboardScreen {
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
+        if inner.width == 0 || inner.height == 0 {
+            return;
+        }
 
         let active_goals: Vec<&Goal> = self.goals.iter().filter(|g| !g.completed).collect();
 
-        if active_goals.is_empty() {
+        if active_goals.is_empty() && self.mode == DashboardMode::Normal {
             let hint = Paragraph::new(Line::from(Span::styled(
                 tr("dashboard-press-g"),
                 Style::default().fg(Color::Gray),
@@ -532,7 +440,7 @@ impl DashboardScreen {
 
         let mut y = inner.y;
         for goal in &active_goals {
-            if y >= inner.y + inner.height {
+            if y >= inner.bottom() {
                 break;
             }
             let title_rect = Rect {
@@ -543,15 +451,15 @@ impl DashboardScreen {
             };
             frame.render_widget(
                 Paragraph::new(Line::from(Span::styled(
-                    goal.title.clone(),
+                    truncate_to_width(&goal.title, inner.width as usize),
                     Style::default().fg(Color::White).bold(),
                 )))
                 .wrap(Wrap { trim: false }),
                 title_rect,
             );
-            y += 1;
+            y = y.saturating_add(1);
 
-            if y >= inner.y + inner.height {
+            if y >= inner.bottom() {
                 break;
             }
             let milestones = &goal.milestones;
@@ -571,14 +479,14 @@ impl DashboardScreen {
                 width: inner.width,
                 height: 1,
             };
-            let bar_width = (inner.width as usize).saturating_sub(7);
+            let suffix = truncate_to_width(&format!("  {pct}%"), inner.width as usize);
+            let bar_width = (inner.width as usize).saturating_sub(suffix.width());
             let mut gauge_line = render_gauge_line(ratio, 0, 0, bar_width, 0);
-            gauge_line.spans.push(Span::styled(
-                format!("  {}%", pct),
-                Style::default().fg(Color::Gray),
-            ));
+            gauge_line
+                .spans
+                .push(Span::styled(suffix, Style::default().fg(Color::Gray)));
             frame.render_widget(Paragraph::new(gauge_line), gauge_rect);
-            y += 2;
+            y = y.saturating_add(2);
         }
     }
 
@@ -667,10 +575,9 @@ impl DashboardScreen {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::{PracticeType, SetData};
     use crate::tui::framework::test_support::render_to_string;
     use crossterm::event::{KeyEventKind, KeyModifiers};
-    use ratatui::layout::{Constraint, Direction, Layout, Rect};
-    use ratatui::widgets::{Block, Borders, Padding};
     use rusqlite::Connection;
 
     fn key(code: KeyCode) -> KeyEvent {
@@ -798,44 +705,104 @@ mod tests {
     }
 
     #[test]
-    fn dashboard_layout_produces_adequate_inner_areas() {
-        // Simulate dashboard layout with minimum content
-        let area = Rect::new(0, 0, 80, 35);
-        let pane_height: u16 = 2;
-        let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(1),           // logo header
-                Constraint::Length(1),           // spacer
-                Constraint::Length(13),          // heatmap
-                Constraint::Length(1),           // spacer
-                Constraint::Length(7),           // summary
-                Constraint::Length(1),           // spacer
-                Constraint::Length(pane_height), // split panes
-                Constraint::Length(1),           // status line
-                Constraint::Length(4),           // footer
-                Constraint::Min(0),              // spacer
-            ])
-            .split(area);
+    fn dashboard_renders_complete_remaining_navigation_at_80_by_35() {
+        let db = Database::open_in_memory().unwrap();
+        let screen = DashboardScreen::new(&db, false).unwrap();
+        let output = render_dashboard(&screen, 80, 35);
 
-        let heatmap_block = Block::default()
-            .borders(Borders::ALL)
-            .padding(Padding::uniform(1));
-        let heatmap_inner = heatmap_block.inner(chunks[2]);
-        assert!(
-            heatmap_inner.height >= 9,
-            "heatmap inner height must be >= 9 (got {}). Increase heatmap constraint if padding is added.",
-            heatmap_inner.height
-        );
+        for command in ["[l]", "[h]", "[t]", "[e]", "[g]", "[Q]", "[v]", "[Esc]"] {
+            assert!(output.contains(command), "missing {command}\n{output}");
+        }
+        assert!(!output.contains("[w]"), "{output}");
+    }
 
-        let summary_block = Block::default()
-            .borders(Borders::ALL)
-            .padding(Padding::uniform(1));
-        let summary_inner = summary_block.inner(chunks[4]);
-        assert!(
-            summary_inner.height >= 3,
-            "summary inner height must be >= 3 (got {}). Increase summary constraint if padding is added.",
-            summary_inner.height
-        );
+    #[test]
+    fn dashboard_renders_small_rectangle_without_panicking() {
+        let db = Database::open_in_memory().unwrap();
+        let screen = DashboardScreen::new(&db, false).unwrap();
+        let output = render_dashboard(&screen, 40, 16);
+
+        assert!(!output.is_empty());
+    }
+
+    #[test]
+    fn long_content_preserves_dashboard_sections_and_footer() {
+        let db = Database::open_in_memory().unwrap();
+        let practice = db
+            .create_practice(
+                "A very long weighted practice name that must stay inside Recent",
+                PracticeType::Weighted,
+            )
+            .unwrap();
+        db.create_log(
+            practice.id,
+            &[SetData::Weighted {
+                weight: 1234.0,
+                reps: 5678,
+            }],
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        db.create_goal(
+            "A very long goal title that must stay inside Goals and preserve the footer",
+        )
+        .unwrap();
+        db.create_quote(
+            "A very long quote must wrap only inside the actual Summary panel width while every Dashboard section and footer command remains visible.",
+        )
+        .unwrap();
+        let screen = DashboardScreen::new(&db, false).unwrap();
+
+        let output = render_dashboard(&screen, 80, 35);
+
+        for section in ["Heatmap", "Summary", "Recent", "Goals"] {
+            assert!(output.contains(section), "missing {section}\n{output}");
+        }
+        for command in ["[l]", "[h]", "[t]", "[e]", "[g]", "[Q]", "[v]", "[Esc]"] {
+            assert!(output.contains(command), "missing {command}\n{output}");
+        }
+    }
+
+    #[test]
+    fn quit_confirmation_advertises_only_real_confirmation_commands() {
+        let db = Database::open_in_memory().unwrap();
+        let mut screen = DashboardScreen::new(&db, false).unwrap();
+        screen.handle_key(key(KeyCode::Esc), &db);
+
+        let output = render_dashboard(&screen, 80, 35);
+
+        for command in ["[y]", "[any]"] {
+            assert!(output.contains(command), "missing {command}\n{output}");
+        }
+        for inactive in ["[l]", "[h]", "[t]", "[e]", "[g]", "[Q]", "[v]", "[Esc]"] {
+            assert!(
+                !output.contains(inactive),
+                "unexpected {inactive}\n{output}"
+            );
+        }
+    }
+
+    #[test]
+    fn hrv_input_advertises_only_real_confirmation_commands() {
+        let db = Database::open_in_memory().unwrap();
+        let mut screen = DashboardScreen::new(&db, false).unwrap();
+        screen.handle_key(key(KeyCode::Char('v')), &db);
+
+        let output = render_dashboard(&screen, 80, 35);
+
+        for command in ["[Enter]", "[Esc]"] {
+            assert!(output.contains(command), "missing {command}\n{output}");
+        }
+        for inactive in [
+            "[l]", "[h]", "[t]", "[e]", "[g]", "[Q]", "[v]", "[y]", "[any]",
+        ] {
+            assert!(
+                !output.contains(inactive),
+                "unexpected {inactive}\n{output}"
+            );
+        }
     }
 }
