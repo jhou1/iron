@@ -1,6 +1,46 @@
 use chrono::NaiveDateTime;
 use iron::db::Database;
 use iron::model::{PracticeType, SetData};
+use rusqlite::Connection;
+use tempfile::tempdir;
+
+#[test]
+fn opening_database_drops_abbreviations_and_preserves_training_data() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("legacy.db");
+    let legacy = Connection::open(&path).unwrap();
+    legacy
+        .execute_batch(
+            "CREATE TABLE abbreviations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                short TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                full_name TEXT NOT NULL
+             );
+             INSERT INTO abbreviations (short, full_name) VALUES ('DL', 'Deadlift');",
+        )
+        .unwrap();
+    drop(legacy);
+
+    let db = Database::open(&path).unwrap();
+    db.create_practice("Deadlift", PracticeType::Weighted)
+        .unwrap();
+    drop(db);
+
+    let raw = Connection::open(&path).unwrap();
+    let abbreviation_tables: i64 = raw
+        .query_row(
+            "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='abbreviations'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    let practices: i64 = raw
+        .query_row("SELECT count(*) FROM practices", [], |row| row.get(0))
+        .unwrap();
+
+    assert_eq!(abbreviation_tables, 0);
+    assert_eq!(practices, 1);
+}
 
 #[test]
 fn create_and_list_practices() {
@@ -1002,53 +1042,4 @@ fn reconciles_existing_goal_completion_on_open() {
     let goals = reopened.list_goals().unwrap();
     assert!(goals[0].completed);
     assert_eq!(goals[0].completed_at, Some(completed_at));
-}
-
-#[test]
-fn test_abbreviation_crud() {
-    let db = Database::open_in_memory().unwrap();
-
-    let abbr = db.create_abbreviation("DL", "Deadlift").unwrap();
-    assert_eq!(abbr.short, "DL");
-    assert_eq!(abbr.full_name, "Deadlift");
-
-    let abbrs = db.list_abbreviations().unwrap();
-    assert_eq!(abbrs.len(), 1);
-    assert_eq!(abbrs[0].short, "DL");
-
-    db.update_abbreviation(abbr.id, "DL", "Dead Lift").unwrap();
-    let abbrs = db.list_abbreviations().unwrap();
-    assert_eq!(abbrs[0].full_name, "Dead Lift");
-
-    db.delete_abbreviation(abbr.id).unwrap();
-    let abbrs = db.list_abbreviations().unwrap();
-    assert!(abbrs.is_empty());
-}
-
-#[test]
-fn test_abbreviation_unique_constraint() {
-    let db = Database::open_in_memory().unwrap();
-    db.create_abbreviation("DL", "Deadlift").unwrap();
-    let result = db.create_abbreviation("DL", "Something else");
-    assert!(result.is_err());
-}
-
-#[test]
-fn test_abbreviation_case_insensitive() {
-    let db = Database::open_in_memory().unwrap();
-    db.create_abbreviation("DL", "Deadlift").unwrap();
-    let result = db.create_abbreviation("dl", "Something else");
-    assert!(result.is_err());
-}
-
-#[test]
-fn test_abbreviation_list_ordered() {
-    let db = Database::open_in_memory().unwrap();
-    db.create_abbreviation("KB SW", "Kettlebell Swing").unwrap();
-    db.create_abbreviation("BP", "Bench Press").unwrap();
-    db.create_abbreviation("DL", "Deadlift").unwrap();
-    let abbrs = db.list_abbreviations().unwrap();
-    assert_eq!(abbrs[0].short, "BP");
-    assert_eq!(abbrs[1].short, "DL");
-    assert_eq!(abbrs[2].short, "KB SW");
 }

@@ -175,32 +175,3 @@ pub struct DailyMetrics {
     pub date: String,
     pub hrv: Option<i32>,
 }
-
-#[derive(Debug, Clone)]
-pub struct Abbreviation {
-    pub id: i64,
-    pub short: String,
-    pub full_name: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct ParsedLog {
-    pub practice_name: String,
-    pub sets: Vec<SetData>,
-    pub matched: bool,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct RawParsedLog {
-    pub practice_name: String,
-    pub practice_type: Option<String>,
-    pub sets: Vec<RawSet>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct RawSet {
-    pub weight: Option<f64>,
-    pub reps: Option<i32>,
-    pub distance: Option<f64>,
-    pub duration: Option<f64>,
-}
