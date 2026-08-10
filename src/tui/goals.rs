@@ -43,7 +43,6 @@ fn visual_spans(lines: &[Line<'_>], width: u16) -> Vec<VisualSpan> {
         .collect()
 }
 
-#[allow(dead_code)]
 fn keep_span_visible(scroll: usize, viewport: usize, span: VisualSpan) -> usize {
     if viewport == 0 || span.start < scroll {
         return span.start;
@@ -98,6 +97,11 @@ enum ModalMode {
 enum GoalUndoData {
     Goal(Goal),
     Milestone { goal_id: i64, milestone: Milestone },
+}
+
+struct ModalContent {
+    lines: Vec<Line<'static>>,
+    selected_line: Option<usize>,
 }
 
 pub struct GoalsScreen {
@@ -267,7 +271,7 @@ impl GoalsScreen {
                 Constraint::Min(1),    // [0] goals list (bordered)
                 Constraint::Length(1), // [1] status line
                 Constraint::Length(1), // [2] footer
-                Constraint::Min(0),    // [3] spacer
+                Constraint::Length(0), // [3] reserved
             ])
             .split(area);
 
@@ -405,28 +409,38 @@ impl GoalsScreen {
             } else {
                 self.selected
             };
-            if let Some(goal) = self.goals.get(goal_idx) {
+            if let Some(goal) = self.goals.get(goal_idx).cloned() {
                 let show_popup = self.mode == Mode::Modal || !goal.milestones.is_empty();
                 if show_popup {
                     if let Some((visual_row, sel_rows)) = sel_visual {
                         let scroll_offset = self.scroll as u16;
                         let row_in_view = visual_row + sel_rows - scroll_offset;
 
-                        let popup_lines = if self.mode == Mode::Modal {
-                            self.build_modal_lines(goal)
+                        let content = if self.mode == Mode::Modal {
+                            self.build_modal_content(&goal)
                         } else {
                             let mut lines_out: Vec<Line> = Vec::new();
-                            lines_out.push(goal_gauge(goal));
+                            lines_out.push(goal_gauge(&goal));
                             for ms in &goal.milestones {
                                 lines_out.push(render_milestone_line(ms, false));
                             }
-                            lines_out
+                            ModalContent {
+                                lines: lines_out,
+                                selected_line: None,
+                            }
                         };
 
-                        let popup_h = (popup_lines.len() as u16 + 2)
-                            .min(list_area.height * 2 / 3)
-                            .max(4);
                         let popup_w = list_area.width.saturating_sub(8).max(30);
+                        let popup_inner_width = popup_w.saturating_sub(4).max(1);
+                        let spans = visual_spans(&content.lines, popup_inner_width);
+                        let popup_content_height = spans
+                            .last()
+                            .map(|span| span.start + span.height)
+                            .unwrap_or(1) as u16;
+                        let popup_h = popup_content_height
+                            .saturating_add(5) // borders + padding + one action row
+                            .min(list_area.height)
+                            .max(5);
                         let popup_x = list_area.x + 4;
 
                         let below_y = list_area.y + row_in_view + 1;
@@ -442,7 +456,46 @@ impl GoalsScreen {
                             height: popup_h,
                         };
 
-                        let title = format!(" {} ", goal.title);
+                        let viewport_height = popup_h.saturating_sub(4) as usize;
+                        let max_scroll =
+                            (popup_content_height as usize).saturating_sub(viewport_height);
+                        let mut modal_scroll = if self.mode == Mode::Modal {
+                            self.modal_scroll.min(max_scroll)
+                        } else {
+                            0
+                        };
+                        let selected_span = content
+                            .selected_line
+                            .and_then(|line_index| spans.get(line_index).copied());
+                        if let Some(span) = selected_span {
+                            let scroll_span = if self.modal_selected == 0 {
+                                VisualSpan {
+                                    start: 0,
+                                    height: span.start + span.height,
+                                }
+                            } else {
+                                span
+                            };
+                            modal_scroll =
+                                keep_span_visible(modal_scroll, viewport_height, scroll_span)
+                                    .min(max_scroll);
+                            self.modal_scroll = modal_scroll;
+                        }
+
+                        let above = modal_scroll > 0;
+                        let below = modal_scroll < max_scroll;
+                        let overflow = match (above, below) {
+                            (true, true) => " ↑↓",
+                            (true, false) => " ↑",
+                            (false, true) => " ↓",
+                            (false, false) => "",
+                        };
+                        let title = format!(" {}{} ", goal.title, overflow);
+                        let border_color = if self.mode == Mode::Modal {
+                            ACCENT
+                        } else {
+                            BORDER_COLOR
+                        };
                         let block = Block::default()
                             .title(Span::styled(
                                 title,
@@ -451,32 +504,33 @@ impl GoalsScreen {
                             .borders(Borders::ALL)
                             .padding(Padding::uniform(1))
                             .border_type(BorderType::Rounded)
-                            .border_style(Style::default().fg(BORDER_COLOR));
+                            .border_style(Style::default().fg(border_color));
 
                         let inner = block.inner(popup_rect);
                         frame.render_widget(Clear, popup_rect);
                         frame.render_widget(block, popup_rect);
 
-                        let modal_scroll = if self.mode == Mode::Modal {
-                            self.modal_scroll as u16
-                        } else {
-                            0
-                        };
                         frame.render_widget(
-                            Paragraph::new(popup_lines.clone())
-                                .scroll((modal_scroll, 0))
+                            Paragraph::new(content.lines.clone())
+                                .scroll((modal_scroll as u16, 0))
                                 .wrap(Wrap { trim: false }),
                             inner,
                         );
 
-                        // Highlight selected milestone in modal mode
-                        if self.mode == Mode::Modal
-                            && !goal.milestones.is_empty()
-                            && self.modal_mode != ModalMode::AddMilestone
-                        {
-                            let sel_line = (self.modal_selected + 1) as u16; // +1 for gauge line
-                            if sel_line >= modal_scroll && sel_line < modal_scroll + inner.height {
-                                highlight_row(frame, inner, sel_line - modal_scroll);
+                        if self.mode == Mode::Modal {
+                            if let Some(span) = selected_span {
+                                for row in 0..span.height {
+                                    let visual_row = span.start + row;
+                                    if visual_row >= modal_scroll
+                                        && visual_row < modal_scroll + viewport_height
+                                    {
+                                        highlight_row(
+                                            frame,
+                                            inner,
+                                            (visual_row - modal_scroll) as u16,
+                                        );
+                                    }
+                                }
                             }
                         }
 
@@ -617,8 +671,9 @@ impl GoalsScreen {
         frame.render_widget(Paragraph::new(footer), chunks[2]);
     }
 
-    fn build_modal_lines(&self, goal: &Goal) -> Vec<Line<'static>> {
+    fn build_modal_content(&self, goal: &Goal) -> ModalContent {
         let mut lines: Vec<Line> = Vec::new();
+        let mut selected_line = None;
         lines.push(goal_gauge(goal));
 
         if goal.milestones.is_empty() && self.modal_mode == ModalMode::Browse {
@@ -630,6 +685,9 @@ impl GoalsScreen {
 
         for (i, ms) in goal.milestones.iter().enumerate() {
             let is_sel = i == self.modal_selected;
+            if is_sel && self.modal_mode != ModalMode::AddMilestone {
+                selected_line = Some(lines.len());
+            }
 
             if is_sel && self.modal_mode == ModalMode::EditMilestone {
                 let check = if ms.completed { "✓ " } else { "⏳ " };
@@ -692,7 +750,10 @@ impl GoalsScreen {
             ]));
         }
 
-        lines
+        ModalContent {
+            lines,
+            selected_line,
+        }
     }
 
     // ── Key handling ──
@@ -1241,6 +1302,22 @@ fn goal_gauge(goal: &Goal) -> Line<'static> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ratatui::{backend::TestBackend, Terminal};
+
+    fn render_screen(screen: &mut GoalsScreen, width: u16, height: u16) -> String {
+        let backend = TestBackend::new(width, height);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| screen.render(frame)).unwrap();
+        let buffer = terminal.backend().buffer();
+        let mut output = String::new();
+        for y in 0..height {
+            for x in 0..width {
+                output.push_str(buffer[(x, y)].symbol());
+            }
+            output.push('\n');
+        }
+        output
+    }
 
     fn make_goal_with_milestones(states: &[bool]) -> Goal {
         Goal {
@@ -1387,5 +1464,51 @@ mod tests {
                 },
             ]
         );
+    }
+
+    #[test]
+    fn preview_shows_four_milestones_at_minimum_terminal_size() {
+        let db = Database::open_in_memory().unwrap();
+        let goal_id = db.create_goal("Goal").unwrap();
+        for title in ["01", "02", "03", "04"] {
+            db.create_milestone(goal_id, title).unwrap();
+        }
+        let mut screen = GoalsScreen::new(&db).unwrap();
+        let output = render_screen(&mut screen, 80, 24);
+
+        for title in ["01", "02", "03", "04"] {
+            assert!(
+                output.contains(title),
+                "missing milestone {title}\n{output}"
+            );
+        }
+    }
+
+    #[test]
+    fn focused_panel_keeps_selected_milestone_visible() {
+        let db = Database::open_in_memory().unwrap();
+        let goal_id = db.create_goal("Goal").unwrap();
+        for number in 1..=20 {
+            db.create_milestone(goal_id, &format!("Milestone {number:02}"))
+                .unwrap();
+        }
+        let mut screen = GoalsScreen::new(&db).unwrap();
+        screen.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE), &db);
+
+        for _ in 1..20 {
+            screen.handle_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE), &db);
+            render_screen(&mut screen, 80, 24);
+        }
+
+        let output = render_screen(&mut screen, 80, 24);
+        assert!(screen.modal_scroll > 0);
+        assert!(output.contains("Milestone 20"), "{output}");
+
+        for _ in 1..20 {
+            screen.handle_key(KeyEvent::new(KeyCode::Char('k'), KeyModifiers::NONE), &db);
+            render_screen(&mut screen, 80, 24);
+        }
+
+        assert_eq!(screen.modal_scroll, 0);
     }
 }
