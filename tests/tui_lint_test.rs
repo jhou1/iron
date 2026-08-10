@@ -29,12 +29,6 @@ fn paragraph_widgets_must_wrap_user_content() {
         "practices.rs:212",
         "practices.rs:312",
         "practices.rs:397",
-        "trends.rs:99",
-        "trends.rs:135",
-        "trends.rs:184",
-        "trends.rs:249",
-        "trends.rs:257",
-        "trends.rs:317",
     ]
     .into_iter()
     .collect();

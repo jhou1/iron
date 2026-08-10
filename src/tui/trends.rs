@@ -1,17 +1,24 @@
 use chrono::Datelike;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Padding, Paragraph},
+    widgets::{Block, Borders, Padding, Paragraph, Wrap},
     Frame,
 };
 
 use unicode_width::UnicodeWidthStr;
 
 use super::widgets::sparkline::Sparkline;
-use super::{centered_area, highlight_row, Action, Screen, BORDER_COLOR, CONTENT_WIDTH};
+use super::{
+    centered_area,
+    framework::{
+        move_selection, render_shortcuts, truncate_to_width, EdgeBehavior, Shortcut, TextInput,
+        ViewportState, VisualSpan,
+    },
+    highlight_row, render_status_line, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
+};
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
 use crate::model::{LogEntry, Practice};
@@ -24,16 +31,15 @@ const RED: Color = Color::Red;
 pub struct TrendsScreen {
     practices: Vec<Practice>,
     filtered_indices: Vec<usize>,
-    filter_text: String,
-    filter_cursor: usize,
+    filter: TextInput,
     filtering: bool,
     selected: usize,
-    scroll: usize,
-    list_height: usize,
+    list_viewport: ViewportState,
     chosen_practice: Option<Practice>,
     days_window: i64,
     entries: Vec<LogEntry>,
     needs_refresh: bool,
+    status_msg: StatusMessage,
 }
 
 impl TrendsScreen {
@@ -44,16 +50,15 @@ impl TrendsScreen {
         Ok(Self {
             practices,
             filtered_indices,
-            filter_text: String::new(),
-            filter_cursor: 0,
+            filter: TextInput::new(),
             filtering: false,
             selected: 0,
-            scroll: 0,
-            list_height: 0,
+            list_viewport: ViewportState::default(),
             chosen_practice: chosen,
             days_window: 90,
             entries: Vec::new(),
             needs_refresh: true,
+            status_msg: None,
         })
     }
 
@@ -65,7 +70,8 @@ impl TrendsScreen {
             .constraints([
                 Constraint::Length(1),      // filter bar
                 Constraint::Percentage(40), // practice list
-                Constraint::Percentage(60), // sparkline chart
+                Constraint::Min(5),         // sparkline chart
+                Constraint::Length(1),      // status
                 Constraint::Length(1),      // footer
             ])
             .split(area);
@@ -73,30 +79,17 @@ impl TrendsScreen {
         self.render_practice_list(frame, chunks[0], chunks[1]);
         self.render_sparkline_panel(frame, chunks[2]);
 
-        // Footer
-        let footer = Line::from(vec![
-            Span::styled(" [j/k]", Style::default().fg(ACCENT)),
-            Span::styled(
-                format!(" {}  ", tr("key-navigate")),
-                Style::default().fg(Color::DarkGray),
-            ),
-            Span::styled("[h/l]", Style::default().fg(ACCENT)),
-            Span::styled(
-                format!(" {}  ", tr("key-window")),
-                Style::default().fg(Color::DarkGray),
-            ),
-            Span::styled("[/]", Style::default().fg(ACCENT)),
-            Span::styled(
-                format!(" {}  ", tr("key-filter")),
-                Style::default().fg(Color::DarkGray),
-            ),
-            Span::styled("[Esc]", Style::default().fg(ACCENT)),
-            Span::styled(
-                format!(" {}", tr("key-back")),
-                Style::default().fg(Color::DarkGray),
-            ),
-        ]);
-        frame.render_widget(Paragraph::new(footer), chunks[3]);
+        render_status_line(frame, chunks[3], &self.status_msg);
+        render_shortcuts(
+            frame,
+            chunks[4],
+            &[
+                Shortcut::new("j/k", tr("key-navigate")),
+                Shortcut::new("h/l", tr("key-window")),
+                Shortcut::new("/", tr("key-filter")),
+                Shortcut::new("Esc", tr("key-back")),
+            ],
+        );
     }
 
     fn render_practice_list(
@@ -105,42 +98,54 @@ impl TrendsScreen {
         filter_area: ratatui::layout::Rect,
         list_area: ratatui::layout::Rect,
     ) {
-        let max_name_len = self
-            .practices
-            .iter()
-            .map(|p| p.name.width())
-            .max()
-            .unwrap_or(0);
-        let col_width = max_name_len + 4;
-
         let name_header = tr("practices-col-name");
         let type_header = tr("practices-col-type");
-        let header_padding = col_width.saturating_sub(name_header.width());
 
         // Filter bar
-        let filter_display = if self.filtering {
-            let (before, after) = self.filter_text.split_at(self.filter_cursor);
-            format!(" /{}{}{}", before, "\u{2588}", after)
-        } else if !self.filter_text.is_empty() {
-            format!(" /{}", self.filter_text)
-        } else {
-            format!(" {}", tr("log-press-filter"))
-        };
         let filter_style = if self.filtering {
             Style::default().fg(ACCENT)
         } else {
             Style::default().fg(Color::Gray)
         };
+        let mut filter_spans = if self.filtering || !self.filter.value().is_empty() {
+            vec![Span::styled(" /", filter_style)]
+        } else {
+            vec![Span::styled(
+                format!(" {}", tr("log-press-filter")),
+                filter_style,
+            )]
+        };
+        if self.filtering {
+            filter_spans.extend(self.filter.visible_spans(filter_area.width, 2, ACCENT));
+        } else if !self.filter.value().is_empty() {
+            filter_spans.push(Span::styled(self.filter.value().to_owned(), filter_style));
+        }
         frame.render_widget(
-            Paragraph::new(Line::from(Span::styled(filter_display, filter_style))),
+            Paragraph::new(Line::from(filter_spans)).wrap(Wrap { trim: false }),
             filter_area,
         );
 
         // Bordered list
+        let visible_rows = list_area.height.saturating_sub(5) as usize;
+        self.list_viewport.set_height(visible_rows);
+        if !self.filtered_indices.is_empty() {
+            self.list_viewport.reveal(VisualSpan {
+                start: self.selected,
+                height: 1,
+            });
+        }
+        self.list_viewport.clamp(self.filtered_indices.len());
+        let overflow = self
+            .list_viewport
+            .overflow(self.filtered_indices.len())
+            .suffix();
         let block = Block::default()
             .title(Line::from(vec![
                 Span::styled("── ", Style::default().fg(BORDER_COLOR)),
-                Span::styled(tr("trends-title"), Style::default().fg(Color::White).bold()),
+                Span::styled(
+                    format!("{}{}", tr("trends-title"), overflow),
+                    Style::default().fg(Color::White).bold(),
+                ),
                 Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
             ]))
             .borders(Borders::ALL)
@@ -148,6 +153,18 @@ impl TrendsScreen {
             .border_style(Style::default().fg(BORDER_COLOR));
         let inner = block.inner(list_area);
         frame.render_widget(block, list_area);
+
+        let max_name_width = inner.width.saturating_sub(type_header.width() as u16 + 5) as usize;
+        let desired_name_width = self
+            .practices
+            .iter()
+            .map(|practice| practice.name.width())
+            .max()
+            .unwrap_or(0)
+            .max(name_header.width());
+        let name_width = desired_name_width.min(max_name_width);
+        let col_width = name_width.saturating_add(2);
+        let header_padding = col_width.saturating_sub(name_header.width());
 
         let hdr_style = Style::default().fg(Color::White).bold();
         let mut all_lines = vec![Line::from(vec![
@@ -157,11 +174,10 @@ impl TrendsScreen {
             Span::styled(&type_header, hdr_style),
         ])];
 
-        let visible_rows = inner.height.saturating_sub(1) as usize; // -1 for header
-        self.list_height = visible_rows;
-        let end = (self.scroll + visible_rows).min(self.filtered_indices.len());
+        let scroll = self.list_viewport.offset();
+        let end = (scroll + visible_rows).min(self.filtered_indices.len());
 
-        for i in self.scroll..end {
+        for i in scroll..end {
             let idx = self.filtered_indices[i];
             let practice = &self.practices[idx];
             let marker = if i == self.selected { "> " } else { "  " };
@@ -170,10 +186,11 @@ impl TrendsScreen {
             } else {
                 Style::default().fg(Color::White)
             };
-            let padding = col_width.saturating_sub(practice.name.width());
+            let name = truncate_to_width(&practice.name, name_width);
+            let padding = col_width.saturating_sub(name.width());
             all_lines.push(Line::from(vec![
                 Span::styled(marker, name_style),
-                Span::styled(&practice.name, name_style),
+                Span::styled(name, name_style),
                 Span::raw(" ".repeat(padding)),
                 Span::styled(
                     practice.practice_type.label(),
@@ -181,11 +198,10 @@ impl TrendsScreen {
                 ),
             ]));
         }
-        frame.render_widget(Paragraph::new(all_lines), inner);
+        frame.render_widget(Paragraph::new(all_lines).wrap(Wrap { trim: false }), inner);
 
-        if !self.filtered_indices.is_empty() && self.selected >= self.scroll && self.selected < end
-        {
-            highlight_row(frame, inner, (self.selected - self.scroll) as u16 + 1);
+        if !self.filtered_indices.is_empty() && self.selected >= scroll && self.selected < end {
+            highlight_row(frame, inner, (self.selected - scroll) as u16 + 1);
         }
     }
 
@@ -246,7 +262,10 @@ impl TrendsScreen {
             ),
             Style::default().fg(Color::Gray),
         ));
-        frame.render_widget(Paragraph::new(subtitle), inner_chunks[0]);
+        frame.render_widget(
+            Paragraph::new(subtitle).wrap(Wrap { trim: false }),
+            inner_chunks[0],
+        );
 
         // Chart
         if self.entries.is_empty() {
@@ -254,7 +273,10 @@ impl TrendsScreen {
                 format!("  {}", tr("trends-no-data")),
                 Style::default().fg(Color::Gray),
             ));
-            frame.render_widget(Paragraph::new(msg), inner_chunks[1]);
+            frame.render_widget(
+                Paragraph::new(msg).wrap(Wrap { trim: false }),
+                inner_chunks[1],
+            );
         } else {
             let chart_data: Vec<(String, f64)> = self
                 .entries
@@ -314,83 +336,21 @@ impl TrendsScreen {
                     Style::default().fg(trend_color),
                 ),
             ]);
-            frame.render_widget(Paragraph::new(stats_line), inner_chunks[2]);
+            frame.render_widget(
+                Paragraph::new(stats_line).wrap(Wrap { trim: false }),
+                inner_chunks[2],
+            );
         }
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) -> Action {
+        self.status_msg = None;
         if self.filtering {
             match key.code {
                 KeyCode::Esc | KeyCode::Enter => {
                     self.filtering = false;
                 }
-                KeyCode::Char('b') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                    if self.filter_cursor > 0 {
-                        self.filter_cursor = self.filter_text[..self.filter_cursor]
-                            .char_indices()
-                            .next_back()
-                            .map(|(i, _)| i)
-                            .unwrap_or(0);
-                    }
-                }
-                KeyCode::Left => {
-                    if self.filter_cursor > 0 {
-                        self.filter_cursor = self.filter_text[..self.filter_cursor]
-                            .char_indices()
-                            .next_back()
-                            .map(|(i, _)| i)
-                            .unwrap_or(0);
-                    }
-                }
-                KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                    if self.filter_cursor < self.filter_text.len() {
-                        self.filter_cursor = self.filter_text[self.filter_cursor..]
-                            .char_indices()
-                            .nth(1)
-                            .map(|(i, _)| self.filter_cursor + i)
-                            .unwrap_or(self.filter_text.len());
-                    }
-                }
-                KeyCode::Right => {
-                    if self.filter_cursor < self.filter_text.len() {
-                        self.filter_cursor = self.filter_text[self.filter_cursor..]
-                            .char_indices()
-                            .nth(1)
-                            .map(|(i, _)| self.filter_cursor + i)
-                            .unwrap_or(self.filter_text.len());
-                    }
-                }
-                KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                    self.filter_cursor = 0;
-                }
-                KeyCode::Home => {
-                    self.filter_cursor = 0;
-                }
-                KeyCode::Char('e') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                    self.filter_cursor = self.filter_text.len();
-                }
-                KeyCode::End => {
-                    self.filter_cursor = self.filter_text.len();
-                }
-                KeyCode::Backspace => {
-                    if self.filter_cursor > 0 {
-                        let prev = self.filter_text[..self.filter_cursor]
-                            .char_indices()
-                            .next_back()
-                            .map(|(i, _)| i)
-                            .unwrap_or(0);
-                        self.filter_text.remove(prev);
-                        self.filter_cursor = prev;
-                        self.apply_filter();
-                    }
-                }
-                KeyCode::Char('k') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                    self.filter_text.truncate(self.filter_cursor);
-                    self.apply_filter();
-                }
-                KeyCode::Char(c) => {
-                    self.filter_text.insert(self.filter_cursor, c);
-                    self.filter_cursor += c.len_utf8();
+                _ if self.filter.handle_key(key) => {
                     self.apply_filter();
                 }
                 _ => {}
@@ -402,25 +362,28 @@ impl TrendsScreen {
             KeyCode::Esc => Action::Navigate(Screen::Dashboard),
             KeyCode::Char('/') => {
                 self.filtering = true;
-                self.filter_cursor = self.filter_text.len();
                 Action::None
             }
             KeyCode::Char('j') | KeyCode::Down => {
                 if !self.filtered_indices.is_empty() {
-                    self.selected = (self.selected + 1) % self.filtered_indices.len();
-                    self.adjust_scroll();
+                    self.selected = move_selection(
+                        self.selected,
+                        self.filtered_indices.len(),
+                        1,
+                        EdgeBehavior::Wrap,
+                    );
                     self.sync_chosen();
                 }
                 Action::None
             }
             KeyCode::Char('k') | KeyCode::Up => {
                 if !self.filtered_indices.is_empty() {
-                    self.selected = if self.selected == 0 {
-                        self.filtered_indices.len() - 1
-                    } else {
-                        self.selected - 1
-                    };
-                    self.adjust_scroll();
+                    self.selected = move_selection(
+                        self.selected,
+                        self.filtered_indices.len(),
+                        -1,
+                        EdgeBehavior::Wrap,
+                    );
                     self.sync_chosen();
                 }
                 Action::None
@@ -446,14 +409,6 @@ impl TrendsScreen {
         }
     }
 
-    fn adjust_scroll(&mut self) {
-        if self.selected < self.scroll {
-            self.scroll = self.selected;
-        } else if self.selected >= self.scroll + self.list_height {
-            self.scroll = self.selected + 1 - self.list_height;
-        }
-    }
-
     fn sync_chosen(&mut self) {
         if let Some(&idx) = self.filtered_indices.get(self.selected) {
             self.chosen_practice = Some(self.practices[idx].clone());
@@ -462,7 +417,7 @@ impl TrendsScreen {
     }
 
     fn apply_filter(&mut self) {
-        let lower = self.filter_text.to_lowercase();
+        let lower = self.filter.value().to_lowercase();
         self.filtered_indices = self
             .practices
             .iter()
@@ -471,7 +426,7 @@ impl TrendsScreen {
             .map(|(i, _)| i)
             .collect();
         self.selected = 0;
-        self.scroll = 0;
+        self.list_viewport.set_offset(0);
         self.sync_chosen();
     }
 
@@ -488,8 +443,8 @@ impl TrendsScreen {
                     entries.sort_by_key(|a| a.log.logged_at);
                     self.entries = entries;
                 }
-                Err(_) => {
-                    self.entries.clear();
+                Err(error) => {
+                    self.status_msg = Some((format!("Error: {error}"), true));
                 }
             }
         }
@@ -529,6 +484,16 @@ impl TrendsScreen {
 mod tests {
     use super::*;
     use crate::model::PracticeType;
+    use crate::tui::framework::test_support::render_to_string;
+    use crossterm::event::KeyModifiers;
+
+    fn key(code: KeyCode) -> KeyEvent {
+        KeyEvent::new(code, KeyModifiers::NONE)
+    }
+
+    fn render_trends(screen: &mut TrendsScreen, width: u16, height: u16) -> String {
+        render_to_string(width, height, |frame| screen.render(frame))
+    }
 
     fn make_screen(count: usize, list_height: usize) -> TrendsScreen {
         let practices: Vec<Practice> = (0..count)
@@ -544,17 +509,24 @@ mod tests {
         TrendsScreen {
             practices,
             filtered_indices,
-            filter_text: String::new(),
-            filter_cursor: 0,
+            filter: TextInput::new(),
             filtering: false,
             selected: 0,
-            scroll: 0,
-            list_height,
+            list_viewport: ViewportState::new(list_height),
             chosen_practice: None,
             days_window: 90,
             entries: Vec::new(),
             needs_refresh: false,
+            status_msg: None,
         }
+    }
+
+    fn reveal_selection(screen: &mut TrendsScreen) {
+        screen.list_viewport.reveal(VisualSpan {
+            start: screen.selected,
+            height: 1,
+        });
+        screen.list_viewport.clamp(screen.filtered_indices.len());
     }
 
     #[test]
@@ -562,50 +534,67 @@ mod tests {
         let mut s = make_screen(20, 5);
         // Select last visible item — no scroll needed
         s.selected = 4;
-        s.adjust_scroll();
-        assert_eq!(s.scroll, 0);
+        reveal_selection(&mut s);
+        assert_eq!(s.list_viewport.offset(), 0);
 
         // One past the viewport
         s.selected = 5;
-        s.adjust_scroll();
-        assert_eq!(s.scroll, 1);
+        reveal_selection(&mut s);
+        assert_eq!(s.list_viewport.offset(), 1);
     }
 
     #[test]
     fn scroll_follows_selection_up() {
         let mut s = make_screen(20, 5);
         s.selected = 10;
-        s.scroll = 10;
+        s.list_viewport.set_offset(10);
         // Move up above scroll
         s.selected = 8;
-        s.adjust_scroll();
-        assert_eq!(s.scroll, 8);
+        reveal_selection(&mut s);
+        assert_eq!(s.list_viewport.offset(), 8);
     }
 
     #[test]
     fn scroll_stays_at_zero_when_all_fit() {
         let mut s = make_screen(5, 10);
         s.selected = 4;
-        s.adjust_scroll();
-        assert_eq!(s.scroll, 0);
+        reveal_selection(&mut s);
+        assert_eq!(s.list_viewport.offset(), 0);
     }
 
     #[test]
     fn scroll_wraps_to_top() {
         let mut s = make_screen(20, 5);
         s.selected = 19;
-        s.scroll = 15;
+        s.list_viewport.set_offset(15);
         // Wrap to top
         s.selected = 0;
-        s.adjust_scroll();
-        assert_eq!(s.scroll, 0);
+        reveal_selection(&mut s);
+        assert_eq!(s.list_viewport.offset(), 0);
     }
 
     #[test]
     fn scroll_last_item_visible() {
         let mut s = make_screen(20, 5);
         s.selected = 19;
-        s.adjust_scroll();
-        assert_eq!(s.scroll, 15);
+        reveal_selection(&mut s);
+        assert_eq!(s.list_viewport.offset(), 15);
+    }
+
+    #[test]
+    fn trends_long_filter_and_last_practice_remain_visible() {
+        let mut screen = make_screen(30, 5);
+        screen.filtering = true;
+        screen.filter = TextInput::from("X".repeat(100));
+        let filter_output = render_trends(&mut screen, 80, 24);
+        assert!(filter_output.contains('_'));
+        assert!(filter_output.matches('X').count() < 80);
+
+        screen.filtering = false;
+        for _ in 1..30 {
+            screen.handle_key(key(KeyCode::Down));
+        }
+        let list_output = render_trends(&mut screen, 80, 24);
+        assert!(list_output.contains("Practice 30"), "{list_output}");
     }
 }

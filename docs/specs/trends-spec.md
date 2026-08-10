@@ -2,35 +2,22 @@
 
 View training progress over time with sparkline charts and summary statistics.
 
-## Phases
+## Layout
 
-```
-SelectPractice -> ViewChart
-```
+Trends shows a bounded active-practice list above a specialized sparkline chart. Changing the selected practice immediately changes the chart; there is no separate phase transition.
 
-## Phase 1: SelectPractice
+The practice list uses the shared viewport. Selection wraps at both ends, remains visible, and the title shows `↑`, `↓`, or `↑↓` when more rows exist. Long practice names are truncated by terminal display width so the type column remains inside its panel.
 
-**Purpose:** Choose which practice to view trends for.
+The `/` filter uses the shared bounded input with Unicode-safe Emacs cursor movement. Long filter text scrolls horizontally to keep the cursor visible.
 
-**Display:**
-- Title: "Select practice to view trends"
-- Filter bar
-- List of active practices
-
-**Behavior:**
-- `j/k` — navigate
-- `/` — filter by name
-- `Enter` — select, advance to ViewChart
-- `Esc` — back to Dashboard
-
-## Phase 2: ViewChart
+## Chart panel
 
 **Display (top to bottom):**
 1. Title: "[Practice Name] — [N] days"
 2. Sparkline chart (fills available space)
 3. Stats summary: average, peak, trend percentage
-4. Status line
-5. Footer
+4. Visible error status line
+5. Mode-accurate shortcut row
 
 ### Sparkline Chart
 
@@ -60,8 +47,8 @@ SelectPractice -> ViewChart
 
 | Key | Action |
 |-----|--------|
-| `j/k` | Navigate practice list (Phase 1) |
-| `/` | Filter practices (Phase 1) or switch practice (Phase 2) |
+| `j/k` | Navigate the practice list (wraps at both ends) |
+| `/` | Filter practices by name |
 | `h` | Shrink time window -30 days |
 | `l` | Expand time window +30 days |
 | `?` | Help overlay |
@@ -72,3 +59,4 @@ SelectPractice -> ViewChart
 - Query: `list_logs_for_practice(practice_id, days_window)`
 - Sorted chronologically (oldest first) for chart rendering
 - Each data point: (date label, total metric value)
+- Query failures retain the last successful chart and appear in the reserved status row
