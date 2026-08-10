@@ -8,8 +8,8 @@ use ratatui::{
 };
 
 use super::{
-    centered_area, highlight_row, render_gauge_line, render_status_line, Action, Screen,
-    StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
+    centered_area, highlight_row, render_gauge_line, render_status_line, visible_input_spans,
+    Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
 };
 use crate::db::Database;
 use crate::i18n::tr;
@@ -54,6 +54,19 @@ fn keep_span_visible(scroll: usize, viewport: usize, span: VisualSpan) -> usize 
     } else {
         scroll
     }
+}
+
+fn owned_visible_input_spans(
+    text: &str,
+    cursor: usize,
+    max_width: u16,
+    prefix_width: u16,
+    color: Color,
+) -> Vec<Span<'static>> {
+    visible_input_spans(text, cursor, max_width, prefix_width, color)
+        .into_iter()
+        .map(|span| Span::styled(span.content.into_owned(), span.style))
+        .collect()
 }
 
 fn goal_gauge_ratio(goal: &Goal) -> f64 {
@@ -102,6 +115,7 @@ enum GoalUndoData {
 struct ModalContent {
     lines: Vec<Line<'static>>,
     selected_line: Option<usize>,
+    selected_line_count: usize,
 }
 
 pub struct GoalsScreen {
@@ -294,12 +308,16 @@ impl GoalsScreen {
 
         // AddGoal input at top
         if self.mode == Mode::AddGoal {
-            lines.push(Line::from(vec![
-                Span::styled("⏳ ", Style::default().fg(Color::Yellow)),
-                Span::styled(&self.input[..self.cursor], Style::default().fg(GREEN)),
-                Span::styled("\u{2588}", Style::default().fg(GREEN)),
-                Span::styled(&self.input[self.cursor..], Style::default().fg(GREEN)),
-            ]));
+            let prefix = "⏳ ";
+            let mut input_spans = vec![Span::styled(prefix, Style::default().fg(Color::Yellow))];
+            input_spans.extend(visible_input_spans(
+                &self.input,
+                self.cursor,
+                list_area.width,
+                Line::from(prefix).width() as u16,
+                GREEN,
+            ));
+            lines.push(Line::from(input_spans));
         }
 
         if self.goals.is_empty() && self.mode == Mode::Browse {
@@ -318,12 +336,17 @@ impl GoalsScreen {
 
             if is_selected && self.mode == Mode::EditGoal {
                 // Replace title line with edit input
-                lines.push(Line::from(vec![
-                    Span::styled("⏳ ", Style::default().fg(Color::Yellow)),
-                    Span::styled(&self.input[..self.cursor], Style::default().fg(GREEN)),
-                    Span::styled("\u{2588}", Style::default().fg(GREEN)),
-                    Span::styled(&self.input[self.cursor..], Style::default().fg(GREEN)),
-                ]));
+                let prefix = "⏳ ";
+                let mut input_spans =
+                    vec![Span::styled(prefix, Style::default().fg(Color::Yellow))];
+                input_spans.extend(visible_input_spans(
+                    &self.input,
+                    self.cursor,
+                    list_area.width,
+                    Line::from(prefix).width() as u16,
+                    GREEN,
+                ));
+                lines.push(Line::from(input_spans));
                 // Still show gauge below
                 lines.push(goal_gauge(goal));
                 lines.push(Line::default());
@@ -335,15 +358,17 @@ impl GoalsScreen {
                     Span::styled(&goal.title, Style::default().fg(GREEN)),
                 ]));
                 // Date input
-                lines.push(Line::from(vec![
-                    Span::styled(
-                        format!("  {} ", tr("dashboard-date-prompt")),
-                        Style::default().fg(ACCENT),
-                    ),
-                    Span::styled(&self.input[..self.cursor], Style::default().fg(GREEN)),
-                    Span::styled("\u{2588}", Style::default().fg(GREEN)),
-                    Span::styled(&self.input[self.cursor..], Style::default().fg(GREEN)),
-                ]));
+                let prefix = format!("  {} ", tr("dashboard-date-prompt"));
+                let prefix_width = Line::from(prefix.as_str()).width() as u16;
+                let mut input_spans = vec![Span::styled(prefix, Style::default().fg(ACCENT))];
+                input_spans.extend(visible_input_spans(
+                    &self.input,
+                    self.cursor,
+                    list_area.width,
+                    prefix_width,
+                    GREEN,
+                ));
+                lines.push(Line::from(input_spans));
                 // Gauge
                 lines.push(goal_gauge(goal));
                 lines.push(Line::default());
@@ -415,9 +440,11 @@ impl GoalsScreen {
                     if let Some((visual_row, sel_rows)) = sel_visual {
                         let scroll_offset = self.scroll as u16;
                         let row_in_view = visual_row + sel_rows - scroll_offset;
+                        let popup_w = list_area.width.saturating_sub(8).max(30);
+                        let popup_inner_width = popup_w.saturating_sub(4).max(1);
 
                         let content = if self.mode == Mode::Modal {
-                            self.build_modal_content(&goal)
+                            self.build_modal_content(&goal, popup_inner_width)
                         } else {
                             let mut lines_out: Vec<Line> = Vec::new();
                             lines_out.push(goal_gauge(&goal));
@@ -427,11 +454,10 @@ impl GoalsScreen {
                             ModalContent {
                                 lines: lines_out,
                                 selected_line: None,
+                                selected_line_count: 0,
                             }
                         };
 
-                        let popup_w = list_area.width.saturating_sub(8).max(30);
-                        let popup_inner_width = popup_w.saturating_sub(4).max(1);
                         let spans = visual_spans(&content.lines, popup_inner_width);
                         let popup_content_height = spans
                             .last()
@@ -464,11 +490,18 @@ impl GoalsScreen {
                         } else {
                             0
                         };
-                        let selected_span = content
-                            .selected_line
-                            .and_then(|line_index| spans.get(line_index).copied());
+                        let selected_span = content.selected_line.and_then(|line_index| {
+                            let first = spans.get(line_index).copied()?;
+                            let last_index = line_index
+                                .saturating_add(content.selected_line_count.saturating_sub(1));
+                            let last = spans.get(last_index).copied().unwrap_or(first);
+                            Some(VisualSpan {
+                                start: first.start,
+                                height: last.start + last.height - first.start,
+                            })
+                        });
                         if let Some(span) = selected_span {
-                            let scroll_span = if self.modal_selected == 0 {
+                            let scroll_span = if content.selected_line == Some(1) {
                                 VisualSpan {
                                     start: 0,
                                     height: span.start + span.height,
@@ -546,11 +579,12 @@ impl GoalsScreen {
                                         width: popup_w,
                                         height: 1,
                                     };
+                                    let status_line = Line::from(Span::styled(
+                                        msg.as_str(),
+                                        Style::default().fg(color),
+                                    ));
                                     frame.render_widget(
-                                        Paragraph::new(Line::from(Span::styled(
-                                            msg.as_str(),
-                                            Style::default().fg(color),
-                                        ))),
+                                        Paragraph::new(status_line).wrap(Wrap { trim: false }),
                                         status_rect,
                                     );
                                 }
@@ -571,6 +605,11 @@ impl GoalsScreen {
                     Span::styled(" [a]", Style::default().fg(ACCENT)),
                     Span::styled(
                         format!(" {}  ", tr("key-add-goal")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                    Span::styled("[m]", Style::default().fg(ACCENT)),
+                    Span::styled(
+                        format!(" {}  ", tr("key-milestone")),
                         Style::default().fg(Color::DarkGray),
                     ),
                     Span::styled("[e]", Style::default().fg(ACCENT)),
@@ -668,12 +707,13 @@ impl GoalsScreen {
             }
         };
         let footer = Line::from(footer_spans);
-        frame.render_widget(Paragraph::new(footer), chunks[2]);
+        frame.render_widget(Paragraph::new(footer).wrap(Wrap { trim: false }), chunks[2]);
     }
 
-    fn build_modal_content(&self, goal: &Goal) -> ModalContent {
+    fn build_modal_content(&self, goal: &Goal, inner_width: u16) -> ModalContent {
         let mut lines: Vec<Line> = Vec::new();
         let mut selected_line = None;
+        let mut selected_line_count = 1;
         lines.push(goal_gauge(goal));
 
         if goal.milestones.is_empty() && self.modal_mode == ModalMode::Browse {
@@ -692,31 +732,37 @@ impl GoalsScreen {
             if is_sel && self.modal_mode == ModalMode::EditMilestone {
                 let check = if ms.completed { "✓ " } else { "⏳ " };
                 let check_color = if ms.completed { GREEN } else { Color::Yellow };
-                let before = self.input[..self.cursor].to_string();
-                let after = self.input[self.cursor..].to_string();
-                lines.push(Line::from(vec![
-                    Span::styled(check.to_string(), Style::default().fg(check_color)),
-                    Span::styled(before, Style::default().fg(GREEN)),
-                    Span::styled("\u{2588}", Style::default().fg(GREEN)),
-                    Span::styled(after, Style::default().fg(GREEN)),
-                ]));
+                let mut input_spans = vec![Span::styled(
+                    check.to_string(),
+                    Style::default().fg(check_color),
+                )];
+                input_spans.extend(owned_visible_input_spans(
+                    &self.input,
+                    self.cursor,
+                    inner_width,
+                    Line::from(check).width() as u16,
+                    GREEN,
+                ));
+                lines.push(Line::from(input_spans));
             } else if is_sel && self.modal_mode == ModalMode::EditMilestoneDate {
+                selected_line_count = 2;
                 lines.push(Line::from(vec![
                     Span::styled("✓ ".to_string(), Style::default().fg(GREEN)),
                     Span::styled(ms.title.clone(), Style::default().fg(GREEN)),
                 ]));
-                let before = self.input[..self.cursor].to_string();
-                let after = self.input[self.cursor..].to_string();
-                lines.push(Line::from(vec![
-                    Span::styled(
-                        format!("  {} ", tr("dashboard-date-prompt")),
-                        Style::default().fg(ACCENT),
-                    ),
-                    Span::styled(before, Style::default().fg(GREEN)),
-                    Span::styled("\u{2588}", Style::default().fg(GREEN)),
-                    Span::styled(after, Style::default().fg(GREEN)),
-                ]));
+                let prefix = format!("  {} ", tr("dashboard-date-prompt"));
+                let prefix_width = Line::from(prefix.as_str()).width() as u16;
+                let mut input_spans = vec![Span::styled(prefix, Style::default().fg(ACCENT))];
+                input_spans.extend(owned_visible_input_spans(
+                    &self.input,
+                    self.cursor,
+                    inner_width,
+                    prefix_width,
+                    GREEN,
+                ));
+                lines.push(Line::from(input_spans));
             } else if is_sel && self.modal_mode == ModalMode::ConfirmDeleteMilestone {
+                selected_line_count = 2;
                 lines.push(render_milestone_line(ms, true));
                 lines.push(Line::from(vec![
                     Span::styled(
@@ -740,19 +786,23 @@ impl GoalsScreen {
         }
 
         if self.modal_mode == ModalMode::AddMilestone {
-            let before = self.input[..self.cursor].to_string();
-            let after = self.input[self.cursor..].to_string();
-            lines.push(Line::from(vec![
-                Span::styled("⏳ ", Style::default().fg(Color::Yellow)),
-                Span::styled(before, Style::default().fg(GREEN)),
-                Span::styled("\u{2588}", Style::default().fg(GREEN)),
-                Span::styled(after, Style::default().fg(GREEN)),
-            ]));
+            selected_line = Some(lines.len());
+            let prefix = "⏳ ";
+            let mut input_spans = vec![Span::styled(prefix, Style::default().fg(Color::Yellow))];
+            input_spans.extend(owned_visible_input_spans(
+                &self.input,
+                self.cursor,
+                inner_width,
+                Line::from(prefix).width() as u16,
+                GREEN,
+            ));
+            lines.push(Line::from(input_spans));
         }
 
         ModalContent {
             lines,
             selected_line,
+            selected_line_count,
         }
     }
 
@@ -803,6 +853,20 @@ impl GoalsScreen {
                 }
                 Action::None
             }
+            KeyCode::Char('m') => {
+                if !self.goals.is_empty() {
+                    self.mode = Mode::Modal;
+                    self.modal_goal_idx = self.selected;
+                    self.modal_selected = 0;
+                    self.modal_scroll = 0;
+                    self.modal_mode = ModalMode::AddMilestone;
+                    self.modal_status_msg = None;
+                    self.modal_last_deleted = None;
+                    self.input.clear();
+                    self.cursor = 0;
+                }
+                Action::None
+            }
             KeyCode::Char('a') => {
                 self.input.clear();
                 self.cursor = 0;
@@ -819,10 +883,15 @@ impl GoalsScreen {
             }
             KeyCode::Char(' ') => {
                 if let Some(goal) = self.goals.get(self.selected) {
-                    if let Err(e) = db.toggle_goal(goal.id) {
-                        self.status_msg = Some((format!("Error: {}", e), true));
+                    if goal.milestones.is_empty() {
+                        if let Err(e) = db.toggle_goal(goal.id) {
+                            self.status_msg = Some((format!("Error: {}", e), true));
+                        } else if let Err(e) = self.reload_goals(db) {
+                            self.status_msg = Some((format!("Error: {}", e), true));
+                        }
+                    } else {
+                        self.status_msg = Some((tr("goals-progress-from-milestones"), false));
                     }
-                    let _ = self.reload_goals(db);
                 }
                 Action::None
             }
@@ -851,10 +920,14 @@ impl GoalsScreen {
                         }
                     };
                     match result {
-                        Ok(()) => {
-                            let _ = self.reload_goals(db);
-                            self.status_msg = Some((tr("status-restored"), false));
-                        }
+                        Ok(()) => match self.reload_goals(db) {
+                            Ok(()) => {
+                                self.status_msg = Some((tr("status-restored"), false));
+                            }
+                            Err(e) => {
+                                self.status_msg = Some((format!("Error: {}", e), true));
+                            }
+                        },
                         Err(e) => {
                             self.last_deleted = Some(undo_data);
                             self.status_msg = Some((format!("Restore failed: {}", e), true));
@@ -873,16 +946,24 @@ impl GoalsScreen {
             KeyCode::Enter => {
                 let title = self.input.trim().to_string();
                 if !title.is_empty() {
-                    if let Err(e) = db.create_goal(&title) {
-                        self.status_msg = Some((format!("Error: {}", e), true));
+                    match db.create_goal(&title) {
+                        Ok(_) => match self.reload_goals(db) {
+                            Ok(()) => {
+                                self.input.clear();
+                                self.cursor = 0;
+                                self.selected = 0;
+                                self.scroll = 0;
+                                self.mode = Mode::Browse;
+                            }
+                            Err(e) => {
+                                self.status_msg = Some((format!("Error: {}", e), true));
+                            }
+                        },
+                        Err(e) => {
+                            self.status_msg = Some((format!("Error: {}", e), true));
+                        }
                     }
-                    let _ = self.reload_goals(db);
                 }
-                self.input.clear();
-                self.cursor = 0;
-                self.selected = 0;
-                self.scroll = 0;
-                self.mode = Mode::Browse;
                 Action::None
             }
             KeyCode::Esc => {
@@ -903,16 +984,24 @@ impl GoalsScreen {
             KeyCode::Enter => {
                 let title = self.input.trim().to_string();
                 if !title.is_empty() {
-                    if let Some(goal) = self.goals.get(self.selected) {
-                        if let Err(e) = db.update_goal(goal.id, &title) {
-                            self.status_msg = Some((format!("Error: {}", e), true));
+                    if let Some(goal_id) = self.goals.get(self.selected).map(|goal| goal.id) {
+                        match db.update_goal(goal_id, &title) {
+                            Ok(()) => match self.reload_goals(db) {
+                                Ok(()) => {
+                                    self.input.clear();
+                                    self.cursor = 0;
+                                    self.mode = Mode::Browse;
+                                }
+                                Err(e) => {
+                                    self.status_msg = Some((format!("Error: {}", e), true));
+                                }
+                            },
+                            Err(e) => {
+                                self.status_msg = Some((format!("Error: {}", e), true));
+                            }
                         }
-                        let _ = self.reload_goals(db);
                     }
                 }
-                self.input.clear();
-                self.cursor = 0;
-                self.mode = Mode::Browse;
                 Action::None
             }
             KeyCode::Esc => {
@@ -931,18 +1020,31 @@ impl GoalsScreen {
     fn handle_edit_goal_date(&mut self, key: KeyEvent, db: &Database) -> Action {
         match key.code {
             KeyCode::Enter => {
-                if let Ok(date) = chrono::NaiveDate::parse_from_str(&self.input, "%Y-%m-%d") {
-                    let completed_at = date.and_hms_opt(0, 0, 0).unwrap();
-                    if let Some(goal) = self.goals.get(self.selected) {
-                        if let Err(e) = db.set_goal_completed_at(goal.id, &completed_at) {
+                let date = match chrono::NaiveDate::parse_from_str(&self.input, "%Y-%m-%d") {
+                    Ok(date) => date,
+                    Err(_) => {
+                        self.status_msg = Some((tr("goals-invalid-date"), true));
+                        return Action::None;
+                    }
+                };
+                let completed_at = date.and_hms_opt(0, 0, 0).unwrap();
+                if let Some(goal_id) = self.goals.get(self.selected).map(|goal| goal.id) {
+                    match db.set_goal_completed_at(goal_id, &completed_at) {
+                        Ok(()) => match self.reload_goals(db) {
+                            Ok(()) => {
+                                self.input.clear();
+                                self.cursor = 0;
+                                self.mode = Mode::Browse;
+                            }
+                            Err(e) => {
+                                self.status_msg = Some((format!("Error: {}", e), true));
+                            }
+                        },
+                        Err(e) => {
                             self.status_msg = Some((format!("Error: {}", e), true));
                         }
-                        let _ = self.reload_goals(db);
                     }
                 }
-                self.input.clear();
-                self.cursor = 0;
-                self.mode = Mode::Browse;
                 Action::None
             }
             KeyCode::Esc => {
@@ -965,13 +1067,19 @@ impl GoalsScreen {
                     match db.delete_goal(goal.id) {
                         Ok(()) => {
                             self.last_deleted = Some(GoalUndoData::Goal(goal));
-                            self.status_msg = Some((tr("status-deleted-undo"), false));
+                            match self.reload_goals(db) {
+                                Ok(()) => {
+                                    self.status_msg = Some((tr("status-deleted-undo"), false));
+                                }
+                                Err(e) => {
+                                    self.status_msg = Some((format!("Error: {}", e), true));
+                                }
+                            }
                         }
                         Err(e) => {
                             self.status_msg = Some((format!("Delete failed: {}", e), true));
                         }
                     }
-                    let _ = self.reload_goals(db);
                     if self.selected >= self.goals.len() && !self.goals.is_empty() {
                         self.selected = self.goals.len() - 1;
                     }
@@ -1029,7 +1137,7 @@ impl GoalsScreen {
                 self.modal_mode = ModalMode::AddMilestone;
                 Action::None
             }
-            KeyCode::Char('e') => {
+            KeyCode::Enter | KeyCode::Char('e') => {
                 if let Some(goal) = self.goals.get(self.modal_goal_idx) {
                     if let Some(ms) = goal.milestones.get(self.modal_selected) {
                         self.input = ms.title.clone();
@@ -1040,12 +1148,21 @@ impl GoalsScreen {
                 Action::None
             }
             KeyCode::Char(' ') => {
-                if let Some(goal) = self.goals.get(self.modal_goal_idx) {
-                    if let Some(ms) = goal.milestones.get(self.modal_selected) {
-                        if let Err(e) = db.toggle_milestone(ms.id) {
+                let milestone_id = self
+                    .goals
+                    .get(self.modal_goal_idx)
+                    .and_then(|goal| goal.milestones.get(self.modal_selected))
+                    .map(|milestone| milestone.id);
+                if let Some(milestone_id) = milestone_id {
+                    match db.toggle_milestone(milestone_id) {
+                        Ok(()) => {
+                            if let Err(e) = self.reload_goals(db) {
+                                self.modal_status_msg = Some((format!("Error: {}", e), true));
+                            }
+                        }
+                        Err(e) => {
                             self.modal_status_msg = Some((format!("Error: {}", e), true));
                         }
-                        let _ = self.reload_goals(db);
                     }
                 }
                 Action::None
@@ -1077,10 +1194,14 @@ impl GoalsScreen {
                         }
                     };
                     match result {
-                        Ok(()) => {
-                            let _ = self.reload_goals(db);
-                            self.modal_status_msg = Some((tr("status-restored"), false));
-                        }
+                        Ok(()) => match self.reload_goals(db) {
+                            Ok(()) => {
+                                self.modal_status_msg = Some((tr("status-restored"), false));
+                            }
+                            Err(e) => {
+                                self.modal_status_msg = Some((format!("Error: {}", e), true));
+                            }
+                        },
                         Err(e) => {
                             self.modal_last_deleted = Some(undo_data);
                             self.modal_status_msg = Some((format!("Restore failed: {}", e), true));
@@ -1102,16 +1223,26 @@ impl GoalsScreen {
             KeyCode::Enter => {
                 let title = self.input.trim().to_string();
                 if !title.is_empty() {
-                    if let Some(goal) = self.goals.get(self.modal_goal_idx) {
-                        if let Err(e) = db.create_milestone(goal.id, &title) {
-                            self.modal_status_msg = Some((format!("Error: {}", e), true));
+                    if let Some(goal_id) = self.goals.get(self.modal_goal_idx).map(|goal| goal.id) {
+                        match db.create_milestone(goal_id, &title) {
+                            Ok(_) => match self.reload_goals(db) {
+                                Ok(()) => {
+                                    self.modal_selected =
+                                        self.modal_milestone_count().saturating_sub(1);
+                                    self.input.clear();
+                                    self.cursor = 0;
+                                    self.modal_mode = ModalMode::Browse;
+                                }
+                                Err(e) => {
+                                    self.modal_status_msg = Some((format!("Error: {}", e), true));
+                                }
+                            },
+                            Err(e) => {
+                                self.modal_status_msg = Some((format!("Error: {}", e), true));
+                            }
                         }
-                        let _ = self.reload_goals(db);
                     }
                 }
-                self.input.clear();
-                self.cursor = 0;
-                self.modal_mode = ModalMode::Browse;
                 Action::None
             }
             KeyCode::Esc => {
@@ -1132,18 +1263,29 @@ impl GoalsScreen {
             KeyCode::Enter => {
                 let title = self.input.trim().to_string();
                 if !title.is_empty() {
-                    if let Some(goal) = self.goals.get(self.modal_goal_idx) {
-                        if let Some(ms) = goal.milestones.get(self.modal_selected) {
-                            if let Err(e) = db.update_milestone(ms.id, &title) {
+                    let milestone_id = self
+                        .goals
+                        .get(self.modal_goal_idx)
+                        .and_then(|goal| goal.milestones.get(self.modal_selected))
+                        .map(|milestone| milestone.id);
+                    if let Some(milestone_id) = milestone_id {
+                        match db.update_milestone(milestone_id, &title) {
+                            Ok(()) => match self.reload_goals(db) {
+                                Ok(()) => {
+                                    self.input.clear();
+                                    self.cursor = 0;
+                                    self.modal_mode = ModalMode::Browse;
+                                }
+                                Err(e) => {
+                                    self.modal_status_msg = Some((format!("Error: {}", e), true));
+                                }
+                            },
+                            Err(e) => {
                                 self.modal_status_msg = Some((format!("Error: {}", e), true));
                             }
-                            let _ = self.reload_goals(db);
                         }
                     }
                 }
-                self.input.clear();
-                self.cursor = 0;
-                self.modal_mode = ModalMode::Browse;
                 Action::None
             }
             KeyCode::Esc => {
@@ -1162,20 +1304,36 @@ impl GoalsScreen {
     fn handle_modal_edit_milestone_date(&mut self, key: KeyEvent, db: &Database) -> Action {
         match key.code {
             KeyCode::Enter => {
-                if let Ok(date) = chrono::NaiveDate::parse_from_str(&self.input, "%Y-%m-%d") {
-                    let completed_at = date.and_hms_opt(0, 0, 0).unwrap();
-                    if let Some(goal) = self.goals.get(self.modal_goal_idx) {
-                        if let Some(ms) = goal.milestones.get(self.modal_selected) {
-                            if let Err(e) = db.set_milestone_completed_at(ms.id, &completed_at) {
+                let date = match chrono::NaiveDate::parse_from_str(&self.input, "%Y-%m-%d") {
+                    Ok(date) => date,
+                    Err(_) => {
+                        self.modal_status_msg = Some((tr("goals-invalid-date"), true));
+                        return Action::None;
+                    }
+                };
+                let completed_at = date.and_hms_opt(0, 0, 0).unwrap();
+                let milestone_id = self
+                    .goals
+                    .get(self.modal_goal_idx)
+                    .and_then(|goal| goal.milestones.get(self.modal_selected))
+                    .map(|milestone| milestone.id);
+                if let Some(milestone_id) = milestone_id {
+                    match db.set_milestone_completed_at(milestone_id, &completed_at) {
+                        Ok(()) => match self.reload_goals(db) {
+                            Ok(()) => {
+                                self.input.clear();
+                                self.cursor = 0;
+                                self.modal_mode = ModalMode::Browse;
+                            }
+                            Err(e) => {
                                 self.modal_status_msg = Some((format!("Error: {}", e), true));
                             }
-                            let _ = self.reload_goals(db);
+                        },
+                        Err(e) => {
+                            self.modal_status_msg = Some((format!("Error: {}", e), true));
                         }
                     }
                 }
-                self.input.clear();
-                self.cursor = 0;
-                self.modal_mode = ModalMode::Browse;
                 Action::None
             }
             KeyCode::Esc => {
@@ -1203,14 +1361,22 @@ impl GoalsScreen {
                                     goal_id,
                                     milestone: ms,
                                 });
-                                self.modal_status_msg = Some((tr("status-deleted-undo"), false));
+                                match self.reload_goals(db) {
+                                    Ok(()) => {
+                                        self.modal_status_msg =
+                                            Some((tr("status-deleted-undo"), false));
+                                    }
+                                    Err(e) => {
+                                        self.modal_status_msg =
+                                            Some((format!("Error: {}", e), true));
+                                    }
+                                }
                             }
                             Err(e) => {
                                 self.modal_status_msg =
                                     Some((format!("Delete failed: {}", e), true));
                             }
                         }
-                        let _ = self.reload_goals(db);
                         // Adjust selected index after deletion
                         let new_count = self.modal_milestone_count();
                         if new_count == 0 {
@@ -1510,5 +1676,108 @@ mod tests {
         }
 
         assert_eq!(screen.modal_scroll, 0);
+    }
+
+    #[test]
+    fn m_opens_selected_goal_directly_in_add_milestone_mode() {
+        let db = Database::open_in_memory().unwrap();
+        db.create_goal("Goal").unwrap();
+        let mut screen = GoalsScreen::new(&db).unwrap();
+
+        screen.handle_key(KeyEvent::new(KeyCode::Char('m'), KeyModifiers::NONE), &db);
+
+        assert_eq!(screen.mode, Mode::Modal);
+        assert_eq!(screen.modal_mode, ModalMode::AddMilestone);
+    }
+
+    #[test]
+    fn adding_milestone_selects_new_row_and_keeps_panel_focused() {
+        let db = Database::open_in_memory().unwrap();
+        db.create_goal("Goal").unwrap();
+        let mut screen = GoalsScreen::new(&db).unwrap();
+        screen.handle_key(KeyEvent::new(KeyCode::Char('m'), KeyModifiers::NONE), &db);
+        screen.input = "New milestone".to_string();
+        screen.cursor = screen.input.len();
+
+        screen.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE), &db);
+
+        assert_eq!(screen.mode, Mode::Modal);
+        assert_eq!(screen.modal_mode, ModalMode::Browse);
+        assert_eq!(screen.modal_selected, 0);
+        assert_eq!(screen.goals[0].milestones[0].title, "New milestone");
+    }
+
+    #[test]
+    fn space_on_goal_with_milestones_explains_derived_progress() {
+        let db = Database::open_in_memory().unwrap();
+        let goal_id = db.create_goal("Goal").unwrap();
+        db.create_milestone(goal_id, "Milestone").unwrap();
+        let mut screen = GoalsScreen::new(&db).unwrap();
+
+        screen.handle_key(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE), &db);
+
+        assert!(!screen.goals[0].completed);
+        assert!(screen.status_msg.is_some());
+        assert!(!screen.status_msg.as_ref().unwrap().1);
+    }
+
+    #[test]
+    fn long_milestone_input_scrolls_horizontally_inside_panel() {
+        let db = Database::open_in_memory().unwrap();
+        db.create_goal("Goal").unwrap();
+        let mut screen = GoalsScreen::new(&db).unwrap();
+        screen.handle_key(KeyEvent::new(KeyCode::Char('m'), KeyModifiers::NONE), &db);
+        screen.input = "X".repeat(200);
+        screen.cursor = screen.input.len();
+
+        let output = render_screen(&mut screen, 80, 24);
+
+        assert!(output.matches('X').count() < 80, "{output}");
+        assert!(
+            output.contains('_'),
+            "cursor should remain visible\n{output}"
+        );
+    }
+
+    #[test]
+    fn delete_confirmation_for_last_milestone_stays_visible() {
+        let db = Database::open_in_memory().unwrap();
+        let goal_id = db.create_goal("Goal").unwrap();
+        for number in 1..=20 {
+            db.create_milestone(goal_id, &format!("Milestone {number:02}"))
+                .unwrap();
+        }
+        let mut screen = GoalsScreen::new(&db).unwrap();
+        screen.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE), &db);
+        for _ in 1..20 {
+            screen.handle_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE), &db);
+        }
+        screen.handle_key(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE), &db);
+
+        let output = render_screen(&mut screen, 80, 24);
+
+        assert!(output.contains(&tr("dashboard-delete-confirm")), "{output}");
+    }
+
+    #[test]
+    fn invalid_milestone_date_keeps_input_open_with_error() {
+        let db = Database::open_in_memory().unwrap();
+        let goal_id = db.create_goal("Goal").unwrap();
+        let milestone_id = db.create_milestone(goal_id, "Milestone").unwrap();
+        db.toggle_milestone(milestone_id).unwrap();
+        let mut screen = GoalsScreen::new(&db).unwrap();
+        screen.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE), &db);
+        screen.handle_key(KeyEvent::new(KeyCode::Char('D'), KeyModifiers::NONE), &db);
+        screen.input = "not-a-date".to_string();
+        screen.cursor = screen.input.len();
+
+        screen.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE), &db);
+
+        assert_eq!(screen.modal_mode, ModalMode::EditMilestoneDate);
+        assert_eq!(screen.input, "not-a-date");
+        assert!(screen
+            .modal_status_msg
+            .as_ref()
+            .is_some_and(|(_, error)| *error));
     }
 }

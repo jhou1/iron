@@ -19,8 +19,6 @@ fn paragraph_widgets_must_wrap_user_content() {
         "dashboard.rs:510",
         "dashboard.rs:530",
         "dashboard.rs:565",
-        "goals.rs:451",
-        "goals.rs:572",
         "history.rs:136",
         "history.rs:259",
         "history.rs:305",

@@ -58,6 +58,8 @@ dashboard-quit-confirm = Quit iron?
 goals-title = Goals
 goals-no-milestones = No milestones — press [a] to add one
 goals-press-enter = Press [Enter] to manage milestones
+goals-progress-from-milestones = Goal completion is controlled by milestones
+goals-invalid-date = Invalid date; use YYYY-MM-DD
 
 # ── Log Entry ──
 log-select-practice = Select Practice

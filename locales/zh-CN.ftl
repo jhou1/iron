@@ -58,6 +58,8 @@ dashboard-quit-confirm = 退出 iron？
 goals-title = 目标
 goals-no-milestones = 暂无里程碑 — 按 [a] 添加
 goals-press-enter = 按 [Enter] 管理里程碑
+goals-progress-from-milestones = 目标完成状态由里程碑决定
+goals-invalid-date = 日期无效，请使用 YYYY-MM-DD
 
 # ── 记录条目 ──
 log-select-practice = 选择练习项目
