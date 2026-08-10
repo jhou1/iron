@@ -50,7 +50,7 @@ impl QuotesScreen {
         Ok(Self {
             quotes,
             selected: 0,
-            list_viewport: ViewportState::default(),
+            list_viewport: ViewportState::new(0),
             detail_state: DetailPanelState::new(false),
             detail_content_height: 0,
             mode: Mode::Browse,

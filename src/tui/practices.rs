@@ -50,7 +50,7 @@ impl PracticesScreen {
         Ok(Self {
             practices,
             selected: 0,
-            list_viewport: ViewportState::default(),
+            list_viewport: ViewportState::new(0),
             mode: Mode::Browse,
             input: TextInput::new(),
             type_selected: 0,

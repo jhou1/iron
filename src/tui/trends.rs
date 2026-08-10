@@ -53,7 +53,7 @@ impl TrendsScreen {
             filter: TextInput::new(),
             filtering: false,
             selected: 0,
-            list_viewport: ViewportState::default(),
+            list_viewport: ViewportState::new(0),
             chosen_practice: chosen,
             days_window: 90,
             entries: Vec::new(),

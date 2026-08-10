@@ -16,6 +16,7 @@ impl TextInput {
         Self::default()
     }
 
+    #[allow(dead_code)]
     pub fn from(value: impl Into<String>) -> Self {
         let value = value.into();
         let cursor = value.len();
@@ -26,6 +27,7 @@ impl TextInput {
         &self.value
     }
 
+    #[allow(dead_code)]
     pub fn cursor(&self) -> usize {
         self.cursor
     }
