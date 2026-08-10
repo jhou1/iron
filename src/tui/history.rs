@@ -12,8 +12,8 @@ use unicode_width::UnicodeWidthStr;
 use super::{
     centered_area,
     framework::{
-        render_detail_panel, render_shortcuts, visual_spans, DetailPanelState, Shortcut, TextInput,
-        ViewportState, VisualSpan,
+        fit_rect, render_detail_panel, render_shortcuts, shortcut_height, visual_spans,
+        DetailPanelState, Shortcut, TextInput, ViewportState, VisualSpan,
     },
     highlight_row, render_status_line, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
 };
@@ -83,8 +83,40 @@ impl HistoryScreen {
         self.list_viewport.set_offset(0);
     }
 
+    fn active_shortcuts(&self) -> Vec<Shortcut> {
+        let mut shortcuts = match self.mode {
+            Mode::ConfirmDelete => vec![
+                Shortcut::new(
+                    "y",
+                    format!("{} · {}", tr("history-delete-confirm"), tr("key-yes")),
+                ),
+                Shortcut::new("any", tr("key-cancel")),
+            ],
+            Mode::Detail => vec![
+                Shortcut::new("j/k", tr("key-scroll")),
+                Shortcut::new("Esc", tr("key-back")),
+            ],
+            Mode::Browse => vec![
+                Shortcut::new("j/k", tr("key-navigate")),
+                Shortcut::new("Enter", tr("key-details")),
+                Shortcut::new("/", tr("key-filter")),
+                Shortcut::new("e", tr("key-edit")),
+                Shortcut::new("d", tr("key-delete")),
+            ],
+        };
+        if self.mode == Mode::Browse && self.last_deleted.is_some() {
+            shortcuts.push(Shortcut::new("u", tr("key-undo")));
+        }
+        if self.mode == Mode::Browse {
+            shortcuts.push(Shortcut::new("Esc", tr("key-back")));
+        }
+        shortcuts
+    }
+
     pub fn render(&mut self, frame: &mut Frame) {
         let area = centered_area(frame.area(), CONTENT_WIDTH);
+        let shortcuts = self.active_shortcuts();
+        let shortcut_rows = shortcut_height(&shortcuts, area.width);
 
         let max_name_len = self
             .filtered_indices
@@ -119,10 +151,10 @@ impl HistoryScreen {
         let v_chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1), // [0] filter
-                Constraint::Min(1),    // [1] main content area (list + detail side by side)
+                Constraint::Length(1),             // [0] filter
+                Constraint::Min(1), // [1] main content area (list + detail side by side)
                 Constraint::Length(1), // [2] status line
-                Constraint::Length(1), // [3] shortcuts
+                Constraint::Length(shortcut_rows), // [3] shortcuts
             ])
             .split(area);
 
@@ -168,7 +200,12 @@ impl HistoryScreen {
         if let Some(entry) = self.selected_entry().cloned() {
             let row_in_list = self.selected.saturating_sub(self.list_viewport.offset()) as u16 + 1; // +1 for header
             let popup_content = self.build_detail_lines(&entry);
-            let popup_w = list_area.width.saturating_sub(8).max(30);
+            let popup_x = list_area.x + 4.min(list_area.width);
+            let popup_w = list_area
+                .width
+                .saturating_sub(8)
+                .max(30)
+                .min(list_area.right().saturating_sub(popup_x));
             let popup_inner_width = popup_w.saturating_sub(2).max(1);
             let detail_spans = visual_spans(&popup_content, popup_inner_width);
             self.detail_content_height = detail_spans
@@ -179,10 +216,9 @@ impl HistoryScreen {
                 list_area.height
             } else {
                 (self.detail_content_height as u16 + 2)
-                    .min(list_area.height / 2)
                     .max(4)
+                    .min(list_area.height / 2)
             };
-            let popup_x = list_area.x + 4;
 
             // Position below selected row; flip above if near bottom
             let popup_y = if self.mode == Mode::Detail {
@@ -195,12 +231,15 @@ impl HistoryScreen {
                     below_y
                 }
             };
-            let popup_rect = ratatui::layout::Rect {
-                x: popup_x,
-                y: popup_y,
-                width: popup_w,
-                height: popup_h,
-            };
+            let popup_rect = fit_rect(
+                list_area,
+                ratatui::layout::Rect {
+                    x: popup_x,
+                    y: popup_y,
+                    width: popup_w,
+                    height: popup_h,
+                },
+            );
 
             let rpe = entry
                 .log
@@ -229,32 +268,6 @@ impl HistoryScreen {
         }
 
         // Status + shortcuts
-        let mut shortcuts = match self.mode {
-            Mode::ConfirmDelete => vec![
-                Shortcut::new(
-                    "y",
-                    format!("{} · {}", tr("history-delete-confirm"), tr("key-yes")),
-                ),
-                Shortcut::new("any", tr("key-cancel")),
-            ],
-            Mode::Detail => vec![
-                Shortcut::new("j/k", tr("key-scroll")),
-                Shortcut::new("Esc", tr("key-back")),
-            ],
-            Mode::Browse => vec![
-                Shortcut::new("j/k", tr("key-navigate")),
-                Shortcut::new("Enter", tr("key-details")),
-                Shortcut::new("/", tr("key-filter")),
-                Shortcut::new("e", tr("key-edit")),
-                Shortcut::new("d", tr("key-delete")),
-            ],
-        };
-        if self.mode == Mode::Browse && self.last_deleted.is_some() {
-            shortcuts.push(Shortcut::new("u", tr("key-undo")));
-        }
-        if self.mode == Mode::Browse {
-            shortcuts.push(Shortcut::new("Esc", tr("key-back")));
-        }
         render_status_line(frame, v_chunks[2], &self.status_msg);
         render_shortcuts(frame, v_chunks[3], &shortcuts);
     }
@@ -753,5 +766,27 @@ mod tests {
 
         assert!(output.contains('_'), "{output}");
         assert!(output.matches("练习").count() < 30, "{output}");
+    }
+
+    #[test]
+    fn history_popup_stays_inside_small_terminal() {
+        let db = history_db_with_long_entry(1);
+        let mut screen = HistoryScreen::new(&db).unwrap();
+
+        let output = render_history(&mut screen, 24, 10);
+
+        assert!(!output.is_empty());
+    }
+
+    #[test]
+    fn history_reserves_wrapped_shortcuts_after_delete() {
+        let db = history_db_with_long_entry(1);
+        let mut screen = HistoryScreen::new(&db).unwrap();
+        screen.last_deleted = screen.entries.first().cloned();
+
+        let output = render_history(&mut screen, 80, 24);
+
+        assert!(output.contains("[u] Undo"), "{output}");
+        assert!(output.contains("[Esc] Back"), "{output}");
     }
 }

@@ -12,8 +12,8 @@ use unicode_width::UnicodeWidthStr;
 use super::{
     centered_area,
     framework::{
-        move_selection, render_shortcuts, truncate_to_width, EdgeBehavior, Shortcut, TextInput,
-        ViewportState, VisualSpan,
+        move_selection, render_shortcuts, shortcut_height, truncate_to_width, EdgeBehavior,
+        Shortcut, TextInput, ViewportState, VisualSpan,
     },
     highlight_row, render_status_line, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
 };
@@ -74,8 +74,36 @@ impl PracticesScreen {
         Ok(())
     }
 
+    fn active_shortcuts(&self) -> Vec<Shortcut> {
+        match &self.mode {
+            Mode::Browse => vec![
+                Shortcut::new("j/k", tr("key-navigate")),
+                Shortcut::new("a", tr("key-add")),
+                Shortcut::new("e", tr("key-edit")),
+                Shortcut::new("Space", tr("key-toggle")),
+                Shortcut::new("d", tr("key-delete")),
+                Shortcut::new("Esc", tr("key-back")),
+            ],
+            Mode::AddName | Mode::EditName => vec![
+                Shortcut::new("Enter", tr("key-confirm")),
+                Shortcut::new("Esc", tr("key-cancel")),
+            ],
+            Mode::AddType => vec![
+                Shortcut::new("j/k", tr("key-select")),
+                Shortcut::new("Enter", tr("key-confirm")),
+                Shortcut::new("Esc", tr("key-cancel")),
+            ],
+            Mode::ConfirmDelete => vec![
+                Shortcut::new("y", tr("key-yes")),
+                Shortcut::new("n", tr("key-no")),
+            ],
+        }
+    }
+
     pub fn render(&mut self, frame: &mut Frame) {
         let area = centered_area(frame.area(), CONTENT_WIDTH);
+        let shortcuts = self.active_shortcuts();
+        let shortcut_rows = shortcut_height(&shortcuts, area.width);
 
         let action_height: u16 = match &self.mode {
             Mode::Browse => 0,
@@ -88,7 +116,7 @@ impl PracticesScreen {
                 Constraint::Length(1),             // spacer
                 Constraint::Length(action_height), // input/action area
                 Constraint::Length(1),             // status message
-                Constraint::Length(1),             // shortcuts
+                Constraint::Length(shortcut_rows), // shortcuts
             ])
             .split(area);
 
@@ -314,29 +342,6 @@ impl PracticesScreen {
         render_status_line(frame, chunks[3], &self.status_msg);
 
         // ── Shortcuts ──
-        let shortcuts = match &self.mode {
-            Mode::Browse => vec![
-                Shortcut::new("j/k", tr("key-navigate")),
-                Shortcut::new("a", tr("key-add")),
-                Shortcut::new("e", tr("key-edit")),
-                Shortcut::new("Space", tr("key-toggle")),
-                Shortcut::new("d", tr("key-delete")),
-                Shortcut::new("Esc", tr("key-back")),
-            ],
-            Mode::AddName | Mode::EditName => vec![
-                Shortcut::new("Enter", tr("key-confirm")),
-                Shortcut::new("Esc", tr("key-cancel")),
-            ],
-            Mode::AddType => vec![
-                Shortcut::new("j/k", tr("key-select")),
-                Shortcut::new("Enter", tr("key-confirm")),
-                Shortcut::new("Esc", tr("key-cancel")),
-            ],
-            Mode::ConfirmDelete => vec![
-                Shortcut::new("y", tr("key-yes")),
-                Shortcut::new("n", tr("key-no")),
-            ],
-        };
         render_shortcuts(frame, chunks[4], &shortcuts);
     }
 
@@ -593,5 +598,16 @@ mod tests {
         let output = render_practices(&mut screen, 80, 24);
 
         assert!(output.contains("Practice 30"), "{output}");
+    }
+
+    #[test]
+    fn practices_reserve_wrapped_browse_shortcuts() {
+        let db = practices_db(1);
+        let mut screen = PracticesScreen::new(&db).unwrap();
+
+        let output = render_practices(&mut screen, 80, 24);
+
+        assert!(output.contains("[d] Delete"), "{output}");
+        assert!(output.contains("[Esc] Back"), "{output}");
     }
 }

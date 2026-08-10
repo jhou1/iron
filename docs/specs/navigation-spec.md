@@ -69,7 +69,7 @@ Used in: Log Entry, History, Trends (practice selection).
 
 **Rendering:** Text input must never overflow its container. Batch 1 single-line fields use `tui::framework::TextInput`, which scrolls horizontally to keep the cursor visible within the available width.
 
-**Wrapping:** All variable-length text display (notes, descriptions, quotes) must wrap within container bounds. Only fixed-width UI elements (footers, shortcut bars) may omit wrapping.
+**Wrapping:** All variable-length text display (notes, descriptions, quotes) must wrap within container bounds. Shortcut bars wrap by complete key-and-label units and reserve every required row, so active commands are never clipped.
 
 ## Confirmation Pattern
 
@@ -80,7 +80,7 @@ Destructive actions (delete) use a two-step confirmation:
 
 ## Multi-Phase Input Pattern
 
-Used in: Log Entry (4 phases), Trends (2 phases), Practices (add = 2 phases).
+Used in: Log Entry (4 phases), Practices (add = 2 phases). Trends uses one unified filtered-list-and-chart screen.
 
 Each phase has its own render and key handler. Phase transitions:
 - Forward: `Enter` or specific key (e.g., `Ctrl+S`)

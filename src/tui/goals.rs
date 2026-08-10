@@ -10,7 +10,8 @@ use ratatui::{
 use super::{
     centered_area,
     framework::{
-        combined_span, render_detail_panel, visual_spans, DetailPanelState, TextInput, VisualSpan,
+        combined_span, fit_rect, render_detail_panel, visual_spans, DetailPanelState, TextInput,
+        ViewportState, VisualSpan,
     },
     highlight_row, render_gauge_line, render_status_line, Action, Screen, StatusMessage,
     BORDER_COLOR, CONTENT_WIDTH,
@@ -74,8 +75,7 @@ struct ModalContent {
 pub struct GoalsScreen {
     goals: Vec<Goal>,
     selected: usize,
-    scroll: usize,
-    list_height: u16,
+    list_viewport: ViewportState,
     mode: Mode,
     input: TextInput,
     status_msg: StatusMessage,
@@ -95,8 +95,7 @@ impl GoalsScreen {
         Ok(Self {
             goals,
             selected: 0,
-            scroll: 0,
-            list_height: 0,
+            list_viewport: ViewportState::new(0),
             mode: Mode::Browse,
             input: TextInput::new(),
             status_msg: None,
@@ -129,17 +128,6 @@ impl GoalsScreen {
         Ok(())
     }
 
-    fn adjust_scroll(&mut self) {
-        let lines_per_goal: usize = 3; // title + gauge + spacer
-        let sel_top = self.selected * lines_per_goal;
-        let sel_bottom = sel_top + 2; // title + gauge (don't need spacer visible)
-        if sel_top < self.scroll {
-            self.scroll = sel_top;
-        } else if sel_bottom > self.scroll + self.list_height as usize {
-            self.scroll = sel_bottom.saturating_sub(self.list_height as usize);
-        }
-    }
-
     #[allow(dead_code)]
     fn find_milestone(&self, id: i64) -> Option<(i64, Milestone)> {
         for goal in &self.goals {
@@ -150,10 +138,6 @@ impl GoalsScreen {
             }
         }
         None
-    }
-
-    fn handle_text_input(&mut self, key: KeyEvent) -> bool {
-        self.input.handle_key(key)
     }
 
     // ── Rendering ──
@@ -183,7 +167,7 @@ impl GoalsScreen {
             .border_style(Style::default().fg(BORDER_COLOR));
         let list_area = block.inner(chunks[0]);
         frame.render_widget(block, chunks[0]);
-        self.list_height = list_area.height;
+        self.list_viewport.set_height(list_area.height as usize);
 
         let mut lines: Vec<Line> = Vec::new();
         let mut sel_line_idx: Option<usize> = None;
@@ -273,8 +257,17 @@ impl GoalsScreen {
         }
 
         // Compute selected line visual position for highlighting
+        let spans = visual_spans(&lines, list_area.width);
+        let content_height = spans
+            .last()
+            .map(|span| span.start.saturating_add(span.height))
+            .unwrap_or(0);
+        let selected_span = sel_line_idx.and_then(|idx| combined_span(&spans, idx, 2));
+        if let Some(selected_span) = selected_span {
+            self.list_viewport.reveal(selected_span);
+        }
+        self.list_viewport.clamp(content_height);
         let sel_visual = sel_line_idx.map(|idx| {
-            let spans = visual_spans(&lines, list_area.width);
             let title = spans[idx];
             let gauge_height = spans.get(idx + 1).map(|span| span.height).unwrap_or(0);
             (
@@ -286,13 +279,13 @@ impl GoalsScreen {
         frame.render_widget(
             Paragraph::new(lines)
                 .wrap(Wrap { trim: false })
-                .scroll((self.scroll as u16, 0)),
+                .scroll((self.list_viewport.offset() as u16, 0)),
             list_area,
         );
 
         if let Some((visual_row, sel_rows)) = sel_visual {
             if self.mode != Mode::AddGoal {
-                let scroll = self.scroll as u16;
+                let scroll = self.list_viewport.offset() as u16;
                 for r in 0..sel_rows {
                     let abs_row = visual_row + r;
                     if abs_row >= scroll && abs_row < scroll + list_area.height {
@@ -313,9 +306,14 @@ impl GoalsScreen {
                 let show_popup = self.mode == Mode::Modal || !goal.milestones.is_empty();
                 if show_popup {
                     if let Some((visual_row, sel_rows)) = sel_visual {
-                        let scroll_offset = self.scroll as u16;
+                        let scroll_offset = self.list_viewport.offset() as u16;
                         let row_in_view = visual_row + sel_rows - scroll_offset;
-                        let popup_w = list_area.width.saturating_sub(8).max(30);
+                        let popup_x = list_area.x + 4.min(list_area.width);
+                        let popup_w = list_area
+                            .width
+                            .saturating_sub(8)
+                            .max(30)
+                            .min(list_area.right().saturating_sub(popup_x));
                         let popup_inner_width = popup_w.saturating_sub(2).max(1);
 
                         let content = if self.mode == Mode::Modal {
@@ -340,9 +338,8 @@ impl GoalsScreen {
                             .unwrap_or(1) as u16;
                         let popup_h = popup_content_height
                             .saturating_add(2)
-                            .min(list_area.height)
-                            .max(5);
-                        let popup_x = list_area.x + 4;
+                            .max(5)
+                            .min(list_area.height);
 
                         let below_y = list_area.y + row_in_view + 1;
                         let popup_y = if below_y + popup_h > list_area.y + list_area.height {
@@ -350,12 +347,15 @@ impl GoalsScreen {
                         } else {
                             below_y
                         };
-                        let popup_rect = Rect {
-                            x: popup_x,
-                            y: popup_y,
-                            width: popup_w,
-                            height: popup_h,
-                        };
+                        let popup_rect = fit_rect(
+                            list_area,
+                            Rect {
+                                x: popup_x,
+                                y: popup_y,
+                                width: popup_w,
+                                height: popup_h,
+                            },
+                        );
 
                         let selected_span = content.selected_line.and_then(|line_index| {
                             combined_span(&spans, line_index, content.selected_line_count)
@@ -621,14 +621,12 @@ impl GoalsScreen {
             KeyCode::Char('j') | KeyCode::Down => {
                 if goal_count > 0 && self.selected < goal_count - 1 {
                     self.selected += 1;
-                    self.adjust_scroll();
                 }
                 Action::None
             }
             KeyCode::Char('k') | KeyCode::Up => {
                 if self.selected > 0 {
                     self.selected -= 1;
-                    self.adjust_scroll();
                 }
                 Action::None
             }
@@ -738,7 +736,7 @@ impl GoalsScreen {
                             Ok(()) => {
                                 self.input.clear();
                                 self.selected = 0;
-                                self.scroll = 0;
+                                self.list_viewport.set_offset(0);
                                 self.mode = Mode::Browse;
                             }
                             Err(e) => {
@@ -758,7 +756,7 @@ impl GoalsScreen {
                 Action::None
             }
             _ => {
-                self.handle_text_input(key);
+                self.input.handle_key(key);
                 Action::None
             }
         }
@@ -794,7 +792,7 @@ impl GoalsScreen {
                 Action::None
             }
             _ => {
-                self.handle_text_input(key);
+                self.input.handle_key(key);
                 Action::None
             }
         }
@@ -835,7 +833,7 @@ impl GoalsScreen {
                 Action::None
             }
             _ => {
-                self.handle_text_input(key);
+                self.input.handle_key(key);
                 Action::None
             }
         }
@@ -1028,7 +1026,7 @@ impl GoalsScreen {
                 Action::None
             }
             _ => {
-                self.handle_text_input(key);
+                self.input.handle_key(key);
                 Action::None
             }
         }
@@ -1069,7 +1067,7 @@ impl GoalsScreen {
                 Action::None
             }
             _ => {
-                self.handle_text_input(key);
+                self.input.handle_key(key);
                 Action::None
             }
         }
@@ -1115,7 +1113,7 @@ impl GoalsScreen {
                 Action::None
             }
             _ => {
-                self.handle_text_input(key);
+                self.input.handle_key(key);
                 Action::None
             }
         }
@@ -1288,7 +1286,7 @@ mod tests {
         }
     }
 
-    fn make_screen(goal_count: usize, list_height: u16) -> GoalsScreen {
+    fn make_screen(goal_count: usize) -> GoalsScreen {
         let goals: Vec<Goal> = (0..goal_count)
             .map(|i| Goal {
                 id: i as i64 + 1,
@@ -1303,8 +1301,7 @@ mod tests {
         GoalsScreen {
             goals,
             selected: 0,
-            scroll: 0,
-            list_height,
+            list_viewport: ViewportState::new(0),
             mode: Mode::Browse,
             input: TextInput::new(),
             status_msg: None,
@@ -1319,63 +1316,29 @@ mod tests {
     }
 
     #[test]
-    fn scroll_follows_selection_down() {
-        // 10 goals, each 3 lines; viewport fits 9 lines (3 goals)
-        let mut s = make_screen(10, 9);
-        // Move down to goal 3 (index 2) — still visible, no scroll
-        s.selected = 2;
-        s.adjust_scroll();
-        assert_eq!(s.scroll, 0);
+    fn selected_last_goal_remains_visible() {
+        let mut screen = make_screen(30);
+        screen.selected = 29;
 
-        // Move down to goal 4 (index 3) — bottom at line 11, viewport 9
-        s.selected = 3;
-        s.adjust_scroll();
-        assert!(
-            s.scroll > 0,
-            "scroll should advance when selected goes below viewport"
-        );
-        // sel_bottom = 3*3 + 2 = 11, scroll = 11 - 9 = 2
-        assert_eq!(s.scroll, 2);
-    }
+        let output = render_screen(&mut screen, 80, 24);
 
-    #[test]
-    fn scroll_follows_selection_up() {
-        let mut s = make_screen(10, 9);
-        s.selected = 5;
-        s.scroll = 12; // scrolled past goal 5
-        s.adjust_scroll();
-        // sel_top = 5*3 = 15, which is >= scroll=12, sel_bottom = 17 > 12+9=21? no. 17 < 21.
-        // Actually sel_top=15 >= scroll=12 and sel_bottom=17 <= 12+9=21, so no change needed.
-        // Let me pick a case where scroll is too far:
-        s.selected = 1;
-        s.scroll = 10;
-        s.adjust_scroll();
-        // sel_top = 3, scroll should snap to 3
-        assert_eq!(s.scroll, 3);
-    }
-
-    #[test]
-    fn scroll_stays_at_zero_when_all_fit() {
-        // 3 goals, 9-line viewport — all fit
-        let mut s = make_screen(3, 9);
-        s.selected = 2;
-        s.adjust_scroll();
-        assert_eq!(s.scroll, 0);
-    }
-
-    #[test]
-    fn scroll_last_goal_visible() {
-        let mut s = make_screen(10, 9);
-        s.selected = 9;
-        s.adjust_scroll();
-        // sel_bottom = 9*3 + 2 = 29, scroll = 29 - 9 = 20
-        assert_eq!(s.scroll, 20);
+        assert!(output.contains("Goal 30"), "{output}");
     }
 
     #[test]
     fn progress_text_shows_completed_total_and_percentage() {
         let goal = make_goal_with_milestones(&[true, true, false, false]);
         assert_eq!(goal_progress_text(&goal), "2/4 · 50%");
+    }
+
+    #[test]
+    fn milestone_popup_stays_inside_small_terminal() {
+        let mut screen = make_screen(1);
+        screen.goals[0].milestones = make_goal_with_milestones(&[false]).milestones;
+
+        let output = render_screen(&mut screen, 24, 10);
+
+        assert!(!output.is_empty());
     }
 
     #[test]

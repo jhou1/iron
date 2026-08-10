@@ -14,8 +14,8 @@ use super::widgets::sparkline::Sparkline;
 use super::{
     centered_area,
     framework::{
-        move_selection, render_shortcuts, truncate_to_width, EdgeBehavior, Shortcut, TextInput,
-        ViewportState, VisualSpan,
+        move_selection, render_shortcuts, shortcut_height, truncate_to_width, EdgeBehavior,
+        Shortcut, TextInput, ViewportState, VisualSpan,
     },
     highlight_row, render_status_line, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
 };
@@ -64,15 +64,22 @@ impl TrendsScreen {
 
     pub fn render(&mut self, frame: &mut Frame) {
         let area = centered_area(frame.area(), CONTENT_WIDTH);
+        let shortcuts = vec![
+            Shortcut::new("j/k", tr("key-navigate")),
+            Shortcut::new("h/l", tr("key-window")),
+            Shortcut::new("/", tr("key-filter")),
+            Shortcut::new("Esc", tr("key-back")),
+        ];
+        let shortcut_rows = shortcut_height(&shortcuts, area.width);
 
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1),      // filter bar
-                Constraint::Percentage(40), // practice list
-                Constraint::Min(5),         // sparkline chart
-                Constraint::Length(1),      // status
-                Constraint::Length(1),      // footer
+                Constraint::Length(1),             // filter bar
+                Constraint::Percentage(40),        // practice list
+                Constraint::Min(5),                // sparkline chart
+                Constraint::Length(1),             // status
+                Constraint::Length(shortcut_rows), // footer
             ])
             .split(area);
 
@@ -80,16 +87,7 @@ impl TrendsScreen {
         self.render_sparkline_panel(frame, chunks[2]);
 
         render_status_line(frame, chunks[3], &self.status_msg);
-        render_shortcuts(
-            frame,
-            chunks[4],
-            &[
-                Shortcut::new("j/k", tr("key-navigate")),
-                Shortcut::new("h/l", tr("key-window")),
-                Shortcut::new("/", tr("key-filter")),
-                Shortcut::new("Esc", tr("key-back")),
-            ],
-        );
+        render_shortcuts(frame, chunks[4], &shortcuts);
     }
 
     fn render_practice_list(

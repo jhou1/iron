@@ -10,8 +10,8 @@ use ratatui::{
 use super::{
     centered_area,
     framework::{
-        render_detail_panel, render_shortcuts, truncate_to_width, visual_spans, DetailPanelState,
-        Shortcut, TextInput, ViewportState, VisualSpan,
+        fit_rect, render_detail_panel, render_shortcuts, shortcut_height, truncate_to_width,
+        visual_spans, DetailPanelState, Shortcut, TextInput, ViewportState, VisualSpan,
     },
     highlight_row, render_status_line, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
 };
@@ -74,8 +74,41 @@ impl QuotesScreen {
         Ok(())
     }
 
+    fn active_shortcuts(&self) -> Vec<Shortcut> {
+        let mut shortcuts = match &self.mode {
+            Mode::Browse => vec![
+                Shortcut::new("j/k", tr("key-navigate")),
+                Shortcut::new("Enter", tr("key-details")),
+                Shortcut::new("a", tr("key-add")),
+                Shortcut::new("e", tr("key-edit")),
+                Shortcut::new("d", tr("key-delete")),
+            ],
+            Mode::Detail => vec![
+                Shortcut::new("j/k", tr("key-scroll")),
+                Shortcut::new("Esc", tr("key-back")),
+            ],
+            Mode::Add | Mode::Edit => vec![
+                Shortcut::new("Enter", tr("key-confirm")),
+                Shortcut::new("Esc", tr("key-cancel")),
+            ],
+            Mode::ConfirmDelete => vec![
+                Shortcut::new("y", tr("key-yes")),
+                Shortcut::new("any", tr("key-cancel")),
+            ],
+        };
+        if self.mode == Mode::Browse && self.last_deleted.is_some() {
+            shortcuts.push(Shortcut::new("u", tr("key-undo")));
+        }
+        if self.mode == Mode::Browse {
+            shortcuts.push(Shortcut::new("Esc", tr("key-back")));
+        }
+        shortcuts
+    }
+
     pub fn render(&mut self, frame: &mut Frame) {
         let area = centered_area(frame.area(), CONTENT_WIDTH);
+        let shortcuts = self.active_shortcuts();
+        let shortcut_rows = shortcut_height(&shortcuts, area.width);
 
         let action_height: u16 = match &self.mode {
             Mode::Browse | Mode::Detail => 0,
@@ -88,7 +121,7 @@ impl QuotesScreen {
                 Constraint::Length(1),             // spacer
                 Constraint::Length(action_height), // input/action area
                 Constraint::Length(1),             // status message
-                Constraint::Length(1),             // shortcuts
+                Constraint::Length(shortcut_rows), // shortcuts
                 Constraint::Min(0),                // spacer
             ])
             .split(area);
@@ -162,7 +195,12 @@ impl QuotesScreen {
 
         if matches!(self.mode, Mode::Browse | Mode::Detail) {
             if let Some(quote) = self.quotes.get(self.selected) {
-                let popup_w = inner.width.saturating_sub(8).max(30);
+                let popup_x = inner.x + 4.min(inner.width);
+                let popup_w = inner
+                    .width
+                    .saturating_sub(8)
+                    .max(30)
+                    .min(inner.right().saturating_sub(popup_x));
                 let popup_inner_width = popup_w.saturating_sub(2).max(1);
                 let lines = vec![Line::from(quote.text.clone())];
                 let spans = visual_spans(&lines, popup_inner_width);
@@ -171,19 +209,22 @@ impl QuotesScreen {
                     inner.height
                 } else {
                     (self.detail_content_height as u16 + 2)
-                        .min(inner.height / 2)
                         .max(4)
+                        .min(inner.height / 2)
                 };
-                let popup_rect = ratatui::layout::Rect {
-                    x: inner.x + 4,
-                    y: if self.mode == Mode::Detail {
-                        inner.y
-                    } else {
-                        inner.y + inner.height.saturating_sub(popup_h)
+                let popup_rect = fit_rect(
+                    inner,
+                    ratatui::layout::Rect {
+                        x: popup_x,
+                        y: if self.mode == Mode::Detail {
+                            inner.y
+                        } else {
+                            inner.y + inner.height.saturating_sub(popup_h)
+                        },
+                        width: popup_w,
+                        height: popup_h,
                     },
-                    width: popup_w,
-                    height: popup_h,
-                };
+                );
                 self.detail_state.focused = self.mode == Mode::Detail;
                 if !self.detail_state.focused {
                     self.detail_state.viewport.set_offset(0);
@@ -263,33 +304,6 @@ impl QuotesScreen {
         render_status_line(frame, chunks[3], &self.status_msg);
 
         // ── Shortcuts ──
-        let mut shortcuts = match &self.mode {
-            Mode::Browse => vec![
-                Shortcut::new("j/k", tr("key-navigate")),
-                Shortcut::new("Enter", tr("key-details")),
-                Shortcut::new("a", tr("key-add")),
-                Shortcut::new("e", tr("key-edit")),
-                Shortcut::new("d", tr("key-delete")),
-            ],
-            Mode::Detail => vec![
-                Shortcut::new("j/k", tr("key-scroll")),
-                Shortcut::new("Esc", tr("key-back")),
-            ],
-            Mode::Add | Mode::Edit => vec![
-                Shortcut::new("Enter", tr("key-confirm")),
-                Shortcut::new("Esc", tr("key-cancel")),
-            ],
-            Mode::ConfirmDelete => vec![
-                Shortcut::new("y", tr("key-yes")),
-                Shortcut::new("any", tr("key-cancel")),
-            ],
-        };
-        if self.mode == Mode::Browse && self.last_deleted.is_some() {
-            shortcuts.push(Shortcut::new("u", tr("key-undo")));
-        }
-        if self.mode == Mode::Browse {
-            shortcuts.push(Shortcut::new("Esc", tr("key-back")));
-        }
         render_shortcuts(frame, chunks[4], &shortcuts);
     }
 
@@ -508,5 +522,29 @@ mod tests {
 
         assert_eq!(screen.mode, Mode::Edit);
         assert!(screen.status_msg.as_ref().is_some_and(|(_, error)| *error));
+    }
+
+    #[test]
+    fn quote_popup_stays_inside_small_terminal() {
+        let db = Database::open_in_memory().unwrap();
+        db.create_quote("Quote").unwrap();
+        let mut screen = QuotesScreen::new(&db).unwrap();
+
+        let output = render_quotes(&mut screen, 24, 10);
+
+        assert!(!output.is_empty());
+    }
+
+    #[test]
+    fn quotes_reserve_wrapped_shortcuts_after_delete() {
+        let db = Database::open_in_memory().unwrap();
+        db.create_quote("Quote").unwrap();
+        let mut screen = QuotesScreen::new(&db).unwrap();
+        screen.last_deleted = screen.quotes.first().cloned();
+
+        let output = render_quotes(&mut screen, 80, 24);
+
+        assert!(output.contains("[u] Undo"), "{output}");
+        assert!(output.contains("[Esc] Back"), "{output}");
     }
 }

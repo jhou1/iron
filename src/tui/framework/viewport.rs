@@ -1,4 +1,7 @@
-use ratatui::text::Line;
+use ratatui::{
+    text::Line,
+    widgets::{Paragraph, Wrap},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct VisualSpan {
@@ -78,13 +81,16 @@ impl ViewportState {
 }
 
 pub fn visual_spans(lines: &[Line<'_>], width: u16) -> Vec<VisualSpan> {
-    let width = width.max(1) as usize;
+    let width = width.max(1);
     let mut start = 0;
 
     lines
         .iter()
         .map(|line| {
-            let height = line.width().div_ceil(width).max(1);
+            let height = Paragraph::new(line.clone())
+                .wrap(Wrap { trim: false })
+                .line_count(width)
+                .max(1);
             let span = VisualSpan { start, height };
             start += height;
             span
@@ -145,6 +151,28 @@ mod tests {
                 VisualSpan {
                     start: 5,
                     height: 1,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn visual_spans_match_word_wrapped_paragraph_rows() {
+        let lines = vec![
+            Line::from("aaaaa bbbbb ccccc"),
+            Line::from("  indented words"),
+        ];
+
+        assert_eq!(
+            visual_spans(&lines, 10),
+            vec![
+                VisualSpan {
+                    start: 0,
+                    height: 3,
+                },
+                VisualSpan {
+                    start: 3,
+                    height: 2,
                 },
             ]
         );
