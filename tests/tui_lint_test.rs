@@ -26,9 +26,6 @@ fn paragraph_widgets_must_wrap_user_content() {
         "log_entry.rs:701",
         "log_entry.rs:771",
         "log_entry.rs:876",
-        "practices.rs:212",
-        "practices.rs:312",
-        "practices.rs:397",
     ]
     .into_iter()
     .collect();

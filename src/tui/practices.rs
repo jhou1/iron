@@ -1,24 +1,27 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Padding, Paragraph},
+    widgets::{Block, Borders, Padding, Paragraph, Wrap},
     Frame,
 };
 
 use unicode_width::UnicodeWidthStr;
 
 use super::{
-    centered_area, highlight_row, render_status_line, visible_input_spans, Action, Screen,
-    StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
+    centered_area,
+    framework::{
+        move_selection, render_shortcuts, truncate_to_width, EdgeBehavior, Shortcut, TextInput,
+        ViewportState, VisualSpan,
+    },
+    highlight_row, render_status_line, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
 };
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
 use crate::model::{Practice, PracticeType};
 use fluent_bundle::FluentValue;
 
-const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
 const RED: Color = Color::Red;
 
@@ -34,10 +37,9 @@ enum Mode {
 pub struct PracticesScreen {
     practices: Vec<Practice>,
     selected: usize,
-    scroll_offset: usize,
+    list_viewport: ViewportState,
     mode: Mode,
-    input: String,
-    input_cursor: usize,
+    input: TextInput,
     type_selected: usize,
     status_msg: StatusMessage,
 }
@@ -48,31 +50,33 @@ impl PracticesScreen {
         Ok(Self {
             practices,
             selected: 0,
-            scroll_offset: 0,
+            list_viewport: ViewportState::default(),
             mode: Mode::Browse,
-            input: String::new(),
-            input_cursor: 0,
+            input: TextInput::new(),
             type_selected: 0,
             status_msg: None,
         })
     }
 
-    fn refresh(&mut self, db: &Database) {
-        if let Ok(practices) = db.list_practices() {
-            self.practices = practices;
-            if self.selected >= self.practices.len() && !self.practices.is_empty() {
-                self.selected = self.practices.len() - 1;
-            }
-            if self.practices.is_empty() {
-                self.selected = 0;
-            }
+    fn refresh(&mut self, db: &Database) -> anyhow::Result<()> {
+        let selected_id = self
+            .practices
+            .get(self.selected)
+            .map(|practice| practice.id);
+        self.practices = db.list_practices()?;
+        self.selected = selected_id
+            .and_then(|id| self.practices.iter().position(|practice| practice.id == id))
+            .unwrap_or_else(|| self.selected.min(self.practices.len().saturating_sub(1)));
+        if self.practices.is_empty() {
+            self.selected = 0;
         }
+        self.list_viewport.clamp(self.practices.len());
+        Ok(())
     }
 
     pub fn render(&mut self, frame: &mut Frame) {
         let area = centered_area(frame.area(), CONTENT_WIDTH);
 
-        let list_height = (self.practices.len() as u16).max(1);
         let action_height: u16 = match &self.mode {
             Mode::Browse => 0,
             _ => 6,
@@ -80,41 +84,32 @@ impl PracticesScreen {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(list_height + 3), // bordered block: title/header row + list + border
-                Constraint::Length(1),               // spacer
-                Constraint::Length(action_height),   // input/action area
-                Constraint::Length(1),               // status message
-                Constraint::Length(1),               // shortcuts
-                Constraint::Min(0),                  // spacer
+                Constraint::Min(4),                // bordered list
+                Constraint::Length(1),             // spacer
+                Constraint::Length(action_height), // input/action area
+                Constraint::Length(1),             // status message
+                Constraint::Length(1),             // shortcuts
             ])
             .split(area);
 
         // ── Bordered practice list ──
-        let max_name_len = self
-            .practices
-            .iter()
-            .map(|p| p.name.width())
-            .max()
-            .unwrap_or(0);
-        let col_width = max_name_len + 4;
-
         let name_header = tr("practices-col-name");
         let type_header = tr("practices-col-type");
-        let header_padding = col_width.saturating_sub(name_header.width());
-        let type_col_width = self
-            .practices
-            .iter()
-            .map(|p| p.practice_type.label().width())
-            .max()
-            .unwrap_or(0)
-            .max(type_header.width())
-            + 2;
-
+        let visible_height = chunks[0].height.saturating_sub(5) as usize;
+        self.list_viewport.set_height(visible_height);
+        if !self.practices.is_empty() {
+            self.list_viewport.reveal(VisualSpan {
+                start: self.selected,
+                height: 1,
+            });
+        }
+        self.list_viewport.clamp(self.practices.len());
+        let overflow = self.list_viewport.overflow(self.practices.len()).suffix();
         let block = Block::default()
             .title(Line::from(vec![
                 Span::styled("── ", Style::default().fg(BORDER_COLOR)),
                 Span::styled(
-                    tr("practices-title"),
+                    format!("{}{}", tr("practices-title"), overflow),
                     Style::default()
                         .fg(Color::White)
                         .add_modifier(Modifier::BOLD),
@@ -127,6 +122,23 @@ impl PracticesScreen {
         let inner = block.inner(chunks[0]);
         frame.render_widget(block, chunks[0]);
 
+        let desired_type_width = self
+            .practices
+            .iter()
+            .map(|practice| practice.practice_type.label().width())
+            .max()
+            .unwrap_or(0)
+            .max(type_header.width());
+        let type_col_width = desired_type_width.min((inner.width as usize) / 3);
+        let name_col_width = (inner.width as usize)
+            .saturating_sub(2) // marker
+            .saturating_sub(type_col_width)
+            .saturating_sub(2); // active toggle
+        let name_header = truncate_to_width(&name_header, name_col_width);
+        let type_header = truncate_to_width(&type_header, type_col_width);
+        let header_padding = name_col_width.saturating_sub(name_header.width());
+        let type_header_padding = type_col_width.saturating_sub(type_header.width());
+
         let hdr_style = Style::default()
             .fg(Color::White)
             .add_modifier(Modifier::BOLD);
@@ -135,17 +147,8 @@ impl PracticesScreen {
             Span::styled(&name_header, hdr_style),
             Span::raw(" ".repeat(header_padding)),
             Span::styled(&type_header, hdr_style),
+            Span::raw(" ".repeat(type_header_padding + 2)),
         ]);
-
-        let visible_height = inner.height.saturating_sub(1) as usize; // -1 for header
-        if visible_height > 0 {
-            if self.selected < self.scroll_offset {
-                self.scroll_offset = self.selected;
-            }
-            if self.selected >= self.scroll_offset + visible_height {
-                self.scroll_offset = self.selected - visible_height + 1;
-            }
-        }
 
         let mut all_lines = vec![header_line];
 
@@ -159,7 +162,7 @@ impl PracticesScreen {
                 .practices
                 .iter()
                 .enumerate()
-                .skip(self.scroll_offset)
+                .skip(self.list_viewport.offset())
                 .take(visible_height)
             {
                 let marker = if i == self.selected { "> " } else { "  " };
@@ -184,8 +187,9 @@ impl PracticesScreen {
                 } else {
                     (Style::default().fg(Color::DarkGray), Color::DarkGray)
                 };
-                let padding = col_width.saturating_sub(p.name.width());
-                let type_label = p.practice_type.label();
+                let name = truncate_to_width(&p.name, name_col_width);
+                let padding = name_col_width.saturating_sub(name.width());
+                let type_label = truncate_to_width(&p.practice_type.label(), type_col_width);
                 let type_padding = type_col_width.saturating_sub(type_label.width());
                 let toggle = if p.active {
                     vec![
@@ -200,7 +204,7 @@ impl PracticesScreen {
                 };
                 let mut spans = vec![
                     Span::styled(marker, name_style),
-                    Span::styled(&p.name, name_style),
+                    Span::styled(name, name_style),
                     Span::raw(" ".repeat(padding)),
                     Span::styled(type_label, Style::default().fg(type_color)),
                     Span::raw(" ".repeat(type_padding)),
@@ -209,10 +213,10 @@ impl PracticesScreen {
                 all_lines.push(Line::from(spans));
             }
         }
-        frame.render_widget(Paragraph::new(all_lines), inner);
+        frame.render_widget(Paragraph::new(all_lines).wrap(Wrap { trim: false }), inner);
 
-        if !self.practices.is_empty() && self.selected >= self.scroll_offset {
-            let row = (self.selected - self.scroll_offset) as u16 + 1; // +1 for header row
+        if !self.practices.is_empty() && self.selected >= self.list_viewport.offset() {
+            let row = (self.selected - self.list_viewport.offset()) as u16 + 1;
             highlight_row(frame, inner, row);
         }
 
@@ -228,13 +232,7 @@ impl PracticesScreen {
             }
             Mode::AddName => {
                 let mut spans = vec![Span::styled(" > ", Style::default().fg(GREEN))];
-                spans.extend(visible_input_spans(
-                    &self.input,
-                    self.input_cursor,
-                    area.width,
-                    3,
-                    GREEN,
-                ));
+                spans.extend(self.input.visible_spans(area.width, 3, GREEN));
                 vec![
                     Line::from(Span::styled(
                         tr("practices-new-name"),
@@ -269,13 +267,7 @@ impl PracticesScreen {
             }
             Mode::EditName => {
                 let mut spans = vec![Span::styled(" > ", Style::default().fg(GREEN))];
-                spans.extend(visible_input_spans(
-                    &self.input,
-                    self.input_cursor,
-                    area.width,
-                    3,
-                    GREEN,
-                ));
+                spans.extend(self.input.visible_spans(area.width, 3, GREEN));
                 vec![
                     Line::from(Span::styled(
                         tr("practices-rename"),
@@ -309,7 +301,10 @@ impl PracticesScreen {
                 ]
             }
         };
-        frame.render_widget(Paragraph::new(action_lines), chunks[2]);
+        frame.render_widget(
+            Paragraph::new(action_lines).wrap(Wrap { trim: false }),
+            chunks[2],
+        );
 
         if self.mode == Mode::AddType {
             highlight_row(frame, chunks[2], (self.type_selected + 1) as u16);
@@ -320,81 +315,29 @@ impl PracticesScreen {
 
         // ── Shortcuts ──
         let shortcuts = match &self.mode {
-            Mode::Browse => Line::from(vec![
-                Span::styled(" [j/k]", Style::default().fg(ACCENT)),
-                Span::styled(
-                    format!(" {}  ", tr("key-navigate")),
-                    Style::default().fg(Color::DarkGray),
-                ),
-                Span::styled("[a]", Style::default().fg(ACCENT)),
-                Span::styled(
-                    format!(" {}  ", tr("key-add")),
-                    Style::default().fg(Color::DarkGray),
-                ),
-                Span::styled("[e]", Style::default().fg(ACCENT)),
-                Span::styled(
-                    format!(" {}  ", tr("key-edit")),
-                    Style::default().fg(Color::DarkGray),
-                ),
-                Span::styled("[Space]", Style::default().fg(ACCENT)),
-                Span::styled(
-                    format!(" {}  ", tr("key-toggle")),
-                    Style::default().fg(Color::DarkGray),
-                ),
-                Span::styled("[d]", Style::default().fg(ACCENT)),
-                Span::styled(
-                    format!(" {}  ", tr("key-delete")),
-                    Style::default().fg(Color::DarkGray),
-                ),
-                Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(
-                    format!(" {}", tr("key-back")),
-                    Style::default().fg(Color::DarkGray),
-                ),
-            ]),
-            Mode::AddName | Mode::EditName => Line::from(vec![
-                Span::styled(" [Enter]", Style::default().fg(ACCENT)),
-                Span::styled(
-                    format!(" {}  ", tr("key-confirm")),
-                    Style::default().fg(Color::DarkGray),
-                ),
-                Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(
-                    format!(" {}", tr("key-cancel")),
-                    Style::default().fg(Color::DarkGray),
-                ),
-            ]),
-            Mode::AddType => Line::from(vec![
-                Span::styled(" [j/k]", Style::default().fg(ACCENT)),
-                Span::styled(
-                    format!(" {}  ", tr("key-select")),
-                    Style::default().fg(Color::DarkGray),
-                ),
-                Span::styled("[Enter]", Style::default().fg(ACCENT)),
-                Span::styled(
-                    format!(" {}  ", tr("key-confirm")),
-                    Style::default().fg(Color::DarkGray),
-                ),
-                Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(
-                    format!(" {}", tr("key-cancel")),
-                    Style::default().fg(Color::DarkGray),
-                ),
-            ]),
-            Mode::ConfirmDelete => Line::from(vec![
-                Span::styled(" [y]", Style::default().fg(ACCENT)),
-                Span::styled(
-                    format!(" {}  ", tr("key-yes")),
-                    Style::default().fg(Color::DarkGray),
-                ),
-                Span::styled("[n]", Style::default().fg(ACCENT)),
-                Span::styled(
-                    format!(" {}", tr("key-no")),
-                    Style::default().fg(Color::DarkGray),
-                ),
-            ]),
+            Mode::Browse => vec![
+                Shortcut::new("j/k", tr("key-navigate")),
+                Shortcut::new("a", tr("key-add")),
+                Shortcut::new("e", tr("key-edit")),
+                Shortcut::new("Space", tr("key-toggle")),
+                Shortcut::new("d", tr("key-delete")),
+                Shortcut::new("Esc", tr("key-back")),
+            ],
+            Mode::AddName | Mode::EditName => vec![
+                Shortcut::new("Enter", tr("key-confirm")),
+                Shortcut::new("Esc", tr("key-cancel")),
+            ],
+            Mode::AddType => vec![
+                Shortcut::new("j/k", tr("key-select")),
+                Shortcut::new("Enter", tr("key-confirm")),
+                Shortcut::new("Esc", tr("key-cancel")),
+            ],
+            Mode::ConfirmDelete => vec![
+                Shortcut::new("y", tr("key-yes")),
+                Shortcut::new("n", tr("key-no")),
+            ],
         };
-        frame.render_widget(Paragraph::new(vec![shortcuts]), chunks[4]);
+        render_shortcuts(frame, chunks[4], &shortcuts);
     }
 
     pub fn handle_key(&mut self, key: KeyEvent, db: &Database) -> Action {
@@ -408,121 +351,35 @@ impl PracticesScreen {
         }
     }
 
-    fn handle_text_input(&mut self, key: KeyEvent) -> bool {
-        match key.code {
-            KeyCode::Char('b') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                if self.input_cursor > 0 {
-                    let prev = self.input[..self.input_cursor]
-                        .char_indices()
-                        .next_back()
-                        .map(|(i, _)| i)
-                        .unwrap_or(0);
-                    self.input_cursor = prev;
-                }
-                true
-            }
-            KeyCode::Left => {
-                if self.input_cursor > 0 {
-                    let prev = self.input[..self.input_cursor]
-                        .char_indices()
-                        .next_back()
-                        .map(|(i, _)| i)
-                        .unwrap_or(0);
-                    self.input_cursor = prev;
-                }
-                true
-            }
-            KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                if self.input_cursor < self.input.len() {
-                    let next = self.input[self.input_cursor..]
-                        .char_indices()
-                        .nth(1)
-                        .map(|(i, _)| self.input_cursor + i)
-                        .unwrap_or(self.input.len());
-                    self.input_cursor = next;
-                }
-                true
-            }
-            KeyCode::Right => {
-                if self.input_cursor < self.input.len() {
-                    let next = self.input[self.input_cursor..]
-                        .char_indices()
-                        .nth(1)
-                        .map(|(i, _)| self.input_cursor + i)
-                        .unwrap_or(self.input.len());
-                    self.input_cursor = next;
-                }
-                true
-            }
-            KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.input_cursor = 0;
-                true
-            }
-            KeyCode::Home => {
-                self.input_cursor = 0;
-                true
-            }
-            KeyCode::Char('e') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.input_cursor = self.input.len();
-                true
-            }
-            KeyCode::End => {
-                self.input_cursor = self.input.len();
-                true
-            }
-            KeyCode::Backspace => {
-                if self.input_cursor > 0 {
-                    let prev = self.input[..self.input_cursor]
-                        .char_indices()
-                        .next_back()
-                        .map(|(i, _)| i)
-                        .unwrap_or(0);
-                    self.input.remove(prev);
-                    self.input_cursor = prev;
-                }
-                true
-            }
-            KeyCode::Char('k') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.input.truncate(self.input_cursor);
-                true
-            }
-            KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.input.insert(self.input_cursor, c);
-                self.input_cursor += c.len_utf8();
-                true
-            }
-            _ => false,
-        }
-    }
-
     fn handle_browse(&mut self, key: KeyEvent, db: &Database) -> Action {
         match key.code {
             KeyCode::Char('j') | KeyCode::Down => {
                 if !self.practices.is_empty() {
-                    self.selected = (self.selected + 1) % self.practices.len();
+                    self.selected =
+                        move_selection(self.selected, self.practices.len(), 1, EdgeBehavior::Clamp);
                 }
                 Action::None
             }
             KeyCode::Char('k') | KeyCode::Up => {
                 if !self.practices.is_empty() {
-                    self.selected = self
-                        .selected
-                        .checked_sub(1)
-                        .unwrap_or(self.practices.len() - 1);
+                    self.selected = move_selection(
+                        self.selected,
+                        self.practices.len(),
+                        -1,
+                        EdgeBehavior::Clamp,
+                    );
                 }
                 Action::None
             }
             KeyCode::Char('a') => {
                 self.input.clear();
-                self.input_cursor = 0;
                 self.type_selected = 0;
                 self.mode = Mode::AddName;
                 Action::None
             }
             KeyCode::Char('e') => {
                 if let Some(p) = self.practices.get(self.selected) {
-                    self.input = p.name.clone();
-                    self.input_cursor = self.input.len();
+                    self.input.set(p.name.clone());
                     self.mode = Mode::EditName;
                 }
                 Action::None
@@ -530,7 +387,11 @@ impl PracticesScreen {
             KeyCode::Char(' ') => {
                 if let Some(p) = self.practices.get(self.selected) {
                     match db.set_practice_active(p.id, !p.active) {
-                        Ok(()) => self.refresh(db),
+                        Ok(()) => {
+                            if let Err(error) = self.refresh(db) {
+                                self.status_msg = Some((format!("Error: {error}"), true));
+                            }
+                        }
                         Err(e) => {
                             self.status_msg = Some((format!("Error: {}", e), true));
                         }
@@ -552,8 +413,10 @@ impl PracticesScreen {
     fn handle_add_name(&mut self, key: KeyEvent) -> Action {
         match key.code {
             KeyCode::Enter => {
-                if !self.input.trim().is_empty() {
+                if !self.input.is_empty_trimmed() {
                     self.mode = Mode::AddType;
+                } else {
+                    self.status_msg = Some((tr("practices-empty-name-error"), true));
                 }
                 Action::None
             }
@@ -562,7 +425,7 @@ impl PracticesScreen {
                 Action::None
             }
             _ => {
-                self.handle_text_input(key);
+                self.input.handle_key(key);
                 Action::None
             }
         }
@@ -583,14 +446,18 @@ impl PracticesScreen {
             }
             KeyCode::Enter => {
                 let pt = PracticeType::ALL[self.type_selected];
-                match db.create_practice(self.input.trim(), pt) {
-                    Ok(_) => {
-                        self.refresh(db);
-                        self.mode = Mode::Browse;
-                    }
+                match db.create_practice(self.input.trimmed(), pt) {
+                    Ok(_) => match self.refresh(db) {
+                        Ok(()) => {
+                            self.input.clear();
+                            self.mode = Mode::Browse;
+                        }
+                        Err(error) => {
+                            self.status_msg = Some((format!("Error: {error}"), true));
+                        }
+                    },
                     Err(e) => {
                         self.status_msg = Some((format!("Error: {}", e), true));
-                        self.mode = Mode::Browse;
                     }
                 }
                 Action::None
@@ -607,29 +474,35 @@ impl PracticesScreen {
         match key.code {
             KeyCode::Enter => {
                 if let Some(p) = self.practices.get(self.selected) {
-                    let trimmed = self.input.trim();
+                    let trimmed = self.input.trimmed();
                     if !trimmed.is_empty() {
                         match db.rename_practice(p.id, trimmed) {
-                            Ok(()) => self.refresh(db),
+                            Ok(()) => match self.refresh(db) {
+                                Ok(()) => {
+                                    self.input.clear();
+                                    self.mode = Mode::Browse;
+                                }
+                                Err(error) => {
+                                    self.status_msg = Some((format!("Error: {error}"), true));
+                                }
+                            },
                             Err(e) => {
                                 self.status_msg = Some((format!("Error: {}", e), true));
                             }
                         }
+                    } else {
+                        self.status_msg = Some((tr("practices-empty-name-error"), true));
                     }
                 }
-                self.input.clear();
-                self.input_cursor = 0;
-                self.mode = Mode::Browse;
                 Action::None
             }
             KeyCode::Esc => {
                 self.input.clear();
-                self.input_cursor = 0;
                 self.mode = Mode::Browse;
                 Action::None
             }
             _ => {
-                self.handle_text_input(key);
+                self.input.handle_key(key);
                 Action::None
             }
         }
@@ -640,13 +513,19 @@ impl PracticesScreen {
             KeyCode::Char('y') => {
                 if let Some(p) = self.practices.get(self.selected) {
                     match db.delete_practice(p.id) {
-                        Ok(()) => self.refresh(db),
+                        Ok(()) => match self.refresh(db) {
+                            Ok(()) => {
+                                self.mode = Mode::Browse;
+                            }
+                            Err(error) => {
+                                self.status_msg = Some((format!("Error: {error}"), true));
+                            }
+                        },
                         Err(e) => {
                             self.status_msg = Some((format!("Delete failed: {}", e), true));
                         }
                     }
                 }
-                self.mode = Mode::Browse;
                 Action::None
             }
             _ => {
@@ -654,5 +533,65 @@ impl PracticesScreen {
                 Action::None
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tui::framework::test_support::render_to_string;
+    use crossterm::event::KeyModifiers;
+
+    fn key(code: KeyCode) -> KeyEvent {
+        KeyEvent::new(code, KeyModifiers::NONE)
+    }
+
+    fn render_practices(screen: &mut PracticesScreen, width: u16, height: u16) -> String {
+        render_to_string(width, height, |frame| screen.render(frame))
+    }
+
+    fn practices_db(count: usize) -> Database {
+        let db = Database::open_in_memory().unwrap();
+        for number in 1..=count {
+            db.create_practice(&format!("Practice {number:02}"), PracticeType::Weighted)
+                .unwrap();
+        }
+        db
+    }
+
+    #[test]
+    fn duplicate_rename_retains_edit_mode_and_input() {
+        let db = Database::open_in_memory().unwrap();
+        db.create_practice("Existing", PracticeType::Weighted)
+            .unwrap();
+        db.create_practice("Target", PracticeType::Bodyweight)
+            .unwrap();
+        let mut screen = PracticesScreen::new(&db).unwrap();
+        screen.selected = screen
+            .practices
+            .iter()
+            .position(|practice| practice.name == "Target")
+            .unwrap();
+        screen.handle_key(key(KeyCode::Char('e')), &db);
+        screen.input.set("Existing");
+
+        screen.handle_key(key(KeyCode::Enter), &db);
+
+        assert_eq!(screen.mode, Mode::EditName);
+        assert_eq!(screen.input.value(), "Existing");
+        assert!(screen.status_msg.as_ref().is_some_and(|(_, error)| *error));
+    }
+
+    #[test]
+    fn practices_last_item_remains_visible_at_minimum_size() {
+        let db = practices_db(30);
+        let mut screen = PracticesScreen::new(&db).unwrap();
+        for _ in 1..30 {
+            screen.handle_key(key(KeyCode::Down), &db);
+        }
+
+        let output = render_practices(&mut screen, 80, 24);
+
+        assert!(output.contains("Practice 30"), "{output}");
     }
 }
