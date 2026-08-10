@@ -19,10 +19,9 @@ fn paragraph_widgets_must_wrap_user_content() {
         "dashboard.rs:502",
         "dashboard.rs:522",
         "dashboard.rs:557",
-        "log_entry.rs:449",
-        "log_entry.rs:629",
-        "log_entry.rs:728",
-        "log_entry.rs:807",
+        "log_entry.rs:517",
+        "log_entry.rs:700",
+        "log_entry.rs:799",
     ]
     .into_iter()
     .collect();

@@ -13,8 +13,8 @@ use unicode_width::UnicodeWidthStr;
 use super::{
     centered_area,
     framework::{
-        move_selection, render_shortcuts, shortcut_height, truncate_to_width, EdgeBehavior,
-        Shortcut, TextInput, ViewportState, VisualSpan,
+        fit_rect, move_selection, render_shortcuts, shortcut_height, truncate_to_width,
+        EdgeBehavior, Shortcut, TextInput, ViewportState, VisualSpan,
     },
     highlight_row, render_status_line, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
 };
@@ -186,16 +186,18 @@ impl LogEntryScreen {
         let shortcuts = self.active_select_shortcuts();
         let shortcut_rows = shortcut_height(&shortcuts, area.width);
 
-        let chunks = Layout::default()
+        let outer = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1),             // filter bar
-                Constraint::Min(1),                // bordered list
-                Constraint::Length(1),             // status line
-                Constraint::Length(shortcut_rows), // footer
-                Constraint::Min(0),                // spacer
+                Constraint::Min(0),
+                Constraint::Length(1),
+                Constraint::Length(shortcut_rows),
             ])
             .split(area);
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(1), Constraint::Min(0)])
+            .split(outer[0]);
 
         // Filter bar
         let filter_style = if self.filtering {
@@ -232,7 +234,7 @@ impl LogEntryScreen {
             .borders(Borders::ALL)
             .padding(Padding::uniform(1))
             .border_style(Style::default().fg(BORDER_COLOR));
-        let inner = block.inner(chunks[1]);
+        let inner = fit_rect(chunks[1], block.inner(chunks[1]));
         let visible_rows = inner.height.saturating_sub(1) as usize; // -1 for header
         self.list_viewport.set_height(visible_rows);
         if !self.filtered_indices.is_empty() {
@@ -272,7 +274,9 @@ impl LogEntryScreen {
             .saturating_sub(type_col_width);
         let name_header = truncate_to_width(&name_header, name_col_width);
         let type_header = truncate_to_width(&type_header, type_col_width);
-        let header_padding = name_col_width.saturating_sub(name_header.width()) + 2;
+        let header_padding = name_col_width
+            .saturating_sub(name_header.width())
+            .saturating_add(2);
 
         let mut all_lines = vec![Line::from(vec![
             Span::styled("  ", Style::default().fg(Color::DarkGray)),
@@ -282,7 +286,9 @@ impl LogEntryScreen {
         ])];
 
         let scroll = self.list_viewport.offset();
-        let end = (scroll + visible_rows).min(self.filtered_indices.len());
+        let end = scroll
+            .saturating_add(visible_rows)
+            .min(self.filtered_indices.len());
 
         for i in scroll..end {
             let idx = self.filtered_indices[i];
@@ -294,7 +300,9 @@ impl LogEntryScreen {
                 Style::default().fg(Color::White)
             };
             let name = truncate_to_width(&practice.name, name_col_width);
-            let padding = name_col_width.saturating_sub(name.width()) + 2;
+            let padding = name_col_width
+                .saturating_sub(name.width())
+                .saturating_add(2);
             let type_label = truncate_to_width(&practice.practice_type.label(), type_col_width);
             all_lines.push(Line::from(vec![
                 Span::styled(marker, name_style),
@@ -306,13 +314,17 @@ impl LogEntryScreen {
         frame.render_widget(Paragraph::new(all_lines).wrap(Wrap { trim: false }), inner);
 
         if !self.filtered_indices.is_empty() && self.selected >= scroll && self.selected < end {
-            highlight_row(frame, inner, (self.selected - scroll) as u16 + 1);
+            highlight_row(
+                frame,
+                inner,
+                ((self.selected - scroll) as u16).saturating_add(1),
+            );
             // +1 for header
         }
 
-        render_status_line(frame, chunks[2], &self.status_msg);
+        render_status_line(frame, outer[1], &self.status_msg);
 
-        render_shortcuts(frame, chunks[3], &shortcuts);
+        render_shortcuts(frame, outer[2], &shortcuts);
     }
 
     fn handle_select_practice(&mut self, key: KeyEvent) -> Action {
@@ -390,60 +402,116 @@ impl LogEntryScreen {
 
     // ── Unified Log Entry Screen ─────────────────────────────────────
 
+    fn active_enter_shortcuts(&self) -> Vec<Shortcut> {
+        if self.confirming_exit {
+            return vec![
+                Shortcut::new("y/Enter", tr("key-yes")),
+                Shortcut::new("n/Esc", tr("key-cancel")),
+            ];
+        }
+        if self.editing_date {
+            return vec![
+                Shortcut::new("Enter", tr("key-confirm")),
+                Shortcut::new("Esc", tr("key-cancel")),
+            ];
+        }
+
+        let mut shortcuts = vec![Shortcut::new("Tab", tr("key-next"))];
+        if self.focus == FocusSection::Sets {
+            let enter_label = if self.editing_set.is_some() {
+                tr("key-confirm")
+            } else {
+                tr("key-add-set")
+            };
+            shortcuts.push(Shortcut::new("Enter", enter_label));
+            if self.editing_set.is_none() && !self.sets.is_empty() {
+                shortcuts.push(Shortcut::new("j/k", tr("key-navigate")));
+            }
+            if self.selected_set.is_some() && self.editing_set.is_none() {
+                shortcuts.push(Shortcut::new("d", tr("key-delete")));
+                shortcuts.push(Shortcut::new("e", tr("key-edit")));
+            }
+        }
+        shortcuts.push(Shortcut::new("Ctrl+S", tr("key-save")));
+        if self.focus == FocusSection::Sets {
+            shortcuts.push(Shortcut::new("D", tr("key-date")));
+        }
+        shortcuts.push(Shortcut::new("Esc", tr("key-cancel")));
+        shortcuts
+    }
+
     fn render_enter_log(&mut self, frame: &mut Frame) {
         let area = centered_area(frame.area(), CONTENT_WIDTH);
         let practice = self.chosen_practice.as_ref().unwrap();
+        let shortcuts = self.active_enter_shortcuts();
+        let shortcut_rows = shortcut_height(&shortcuts, area.width);
 
-        let sets_content_lines = (self.sets.len() as u16 + 2).max(2); // committed sets + input + total
+        let sets_content_lines = u16::try_from(self.sets.len())
+            .unwrap_or(u16::MAX)
+            .saturating_add(2)
+            .max(2); // committed sets + input + total
 
+        let outer = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Min(0),
+                Constraint::Length(1),
+                Constraint::Length(shortcut_rows),
+            ])
+            .split(area);
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(5), // [0] date section (border + padding)
                 Constraint::Length(1), // [1] spacer
-                Constraint::Length(sets_content_lines + 4), // [2] sets section (border + padding)
+                Constraint::Length(sets_content_lines.saturating_add(4)), // [2] sets section
                 Constraint::Length(7), // [3] warm-up/cool-down section (border + padding)
-                Constraint::Min(3),    // [4] note section (border, grows)
-                Constraint::Length(1), // [5] status line
-                Constraint::Length(1), // [6] footer
+                Constraint::Min(0),    // [4] note section (border, grows)
             ])
-            .split(area);
+            .split(outer[0]);
 
         // ── Date section ──
         let date_border_color = BORDER_COLOR;
-        let date_title = format!(" {} ({}) ", practice.name, practice.practice_type.label());
+        let date_title = truncate_to_width(
+            &format!(" {} ({}) ", practice.name, practice.practice_type.label()),
+            chunks[0].width.saturating_sub(2) as usize,
+        );
         let date_block = Block::default()
             .title(Span::styled(date_title, Style::default().fg(ACCENT).bold()))
             .borders(Borders::ALL)
             .padding(Padding::uniform(1))
             .border_style(Style::default().fg(date_border_color));
-        let date_inner = date_block.inner(chunks[0]);
+        let date_inner = fit_rect(chunks[0], date_block.inner(chunks[0]));
         frame.render_widget(date_block, chunks[0]);
 
         let date_line = if self.editing_date {
-            let label = format!("{} ", tr("log-date-label"));
+            let label = truncate_to_width(
+                &format!("{} ", tr("log-date-label")),
+                date_inner.width as usize,
+            );
             let prefix_width = label.width() as u16;
             let mut spans = vec![Span::styled(label, Style::default().fg(Color::Gray))];
             spans.extend(
                 self.date_input
                     .visible_spans(date_inner.width, prefix_width, ACCENT),
             );
-            spans.push(Span::styled(
-                format!("  {}", tr("log-date-edit-hint")),
-                Style::default().fg(Color::Gray),
-            ));
             Line::from(spans)
         } else {
+            let label = truncate_to_width(
+                &format!("{} ", tr("log-date-label")),
+                date_inner.width as usize,
+            );
+            let date_width = date_inner.width.saturating_sub(label.width() as u16) as usize;
+            let date = truncate_to_width(&self.log_date, date_width);
+            let hint_width = date_inner
+                .width
+                .saturating_sub(label.width() as u16)
+                .saturating_sub(date.width() as u16) as usize;
+            let hint = truncate_to_width(&format!("  {}", tr("log-date-change-hint")), hint_width);
             Line::from(vec![
-                Span::styled(
-                    format!("{} ", tr("log-date-label")),
-                    Style::default().fg(Color::Gray),
-                ),
-                Span::styled(&self.log_date, Style::default().fg(Color::White)),
-                Span::styled(
-                    format!("  {}", tr("log-date-change-hint")),
-                    Style::default().fg(Color::Gray),
-                ),
+                Span::styled(label, Style::default().fg(Color::Gray)),
+                Span::styled(date, Style::default().fg(Color::White)),
+                Span::styled(hint, Style::default().fg(Color::Gray)),
             ])
         };
         frame.render_widget(Paragraph::new(date_line), date_inner);
@@ -458,17 +526,20 @@ impl LogEntryScreen {
             .borders(Borders::ALL)
             .padding(Padding::uniform(1))
             .border_style(Style::default().fg(sets_border_color));
-        let sets_inner = sets_block.inner(chunks[2]);
+        let sets_inner = fit_rect(chunks[2], sets_block.inner(chunks[2]));
         frame.render_widget(sets_block, chunks[2]);
 
         let mut sets_lines: Vec<Line> = Vec::new();
         for (i, set) in self.sets.iter().enumerate() {
-            let text = tr_args(
-                "log-set-line",
-                &[
-                    ("number", FluentValue::from((i + 1) as f64)),
-                    ("data", FluentValue::from(format_set_data(set))),
-                ],
+            let text = truncate_to_width(
+                &tr_args(
+                    "log-set-line",
+                    &[
+                        ("number", FluentValue::from((i + 1) as f64)),
+                        ("data", FluentValue::from(format_set_data(set))),
+                    ],
+                ),
+                sets_inner.width.saturating_sub(2) as usize,
             );
             let is_selected = self.selected_set == Some(i) && self.editing_set != Some(i);
             let is_editing = self.editing_set == Some(i);
@@ -622,7 +693,7 @@ impl LogEntryScreen {
             )
         };
         sets_lines.push(Line::from(Span::styled(
-            total_text,
+            truncate_to_width(&total_text, sets_inner.width as usize),
             Style::default().fg(Color::DarkGray),
         )));
 
@@ -634,7 +705,7 @@ impl LogEntryScreen {
             .borders(Borders::ALL)
             .padding(Padding::uniform(1))
             .border_style(Style::default().fg(wucd_border_color));
-        let wucd_inner = wucd_block.inner(chunks[3]);
+        let wucd_inner = fit_rect(chunks[3], wucd_block.inner(chunks[3]));
         frame.render_widget(wucd_block, chunks[3]);
 
         let wu_active = self.focus == FocusSection::WarmUp;
@@ -714,7 +785,7 @@ impl LogEntryScreen {
             .borders(Borders::ALL)
             .padding(Padding::horizontal(1))
             .border_style(Style::default().fg(note_border_color));
-        let note_inner = note_block.inner(chunks[4]);
+        let note_inner = fit_rect(chunks[4], note_block.inner(chunks[4]));
         frame.render_widget(note_block, chunks[4]);
 
         if self.focus == FocusSection::Note {
@@ -735,76 +806,14 @@ impl LogEntryScreen {
         }
 
         // ── Status line ──
-        render_status_line(frame, chunks[5], &self.status_msg);
+        if self.confirming_exit {
+            render_status_line(frame, outer[1], &Some((tr("log-cancel-confirm"), true)));
+        } else {
+            render_status_line(frame, outer[1], &self.status_msg);
+        }
 
         // ── Footer ──
-        let footer_line = if self.confirming_exit {
-            Line::from(vec![
-                Span::styled(
-                    format!(" {} ", tr("log-cancel-confirm")),
-                    Style::default().fg(Color::Red),
-                ),
-                Span::styled("[y]", Style::default().fg(ACCENT)),
-                Span::styled(
-                    format!(" {}  ", tr("key-yes")),
-                    Style::default().fg(Color::DarkGray),
-                ),
-                Span::styled("[any]", Style::default().fg(ACCENT)),
-                Span::styled(
-                    format!(" {}", tr("key-cancel")),
-                    Style::default().fg(Color::DarkGray),
-                ),
-            ])
-        } else {
-            let mut spans = vec![
-                Span::styled(" [Tab]", Style::default().fg(ACCENT)),
-                Span::styled(
-                    format!(" {}  ", tr("key-next")),
-                    Style::default().fg(Color::DarkGray),
-                ),
-                Span::styled("[Enter]", Style::default().fg(ACCENT)),
-                Span::styled(
-                    format!(" {}  ", tr("key-add-set")),
-                    Style::default().fg(Color::DarkGray),
-                ),
-            ];
-            if self.focus == FocusSection::Sets && !self.sets.is_empty() {
-                spans.push(Span::styled("[j/k]", Style::default().fg(ACCENT)));
-                spans.push(Span::styled(
-                    format!(" {}  ", tr("key-navigate")),
-                    Style::default().fg(Color::DarkGray),
-                ));
-                spans.push(Span::styled("[d]", Style::default().fg(ACCENT)));
-                spans.push(Span::styled(
-                    format!(" {}  ", tr("key-delete")),
-                    Style::default().fg(Color::DarkGray),
-                ));
-                spans.push(Span::styled("[e]", Style::default().fg(ACCENT)));
-                spans.push(Span::styled(
-                    format!(" {}  ", tr("key-edit")),
-                    Style::default().fg(Color::DarkGray),
-                ));
-            }
-            spans.extend(vec![
-                Span::styled("[Ctrl+S]", Style::default().fg(ACCENT)),
-                Span::styled(
-                    format!(" {}  ", tr("key-save")),
-                    Style::default().fg(Color::DarkGray),
-                ),
-                Span::styled("[D]", Style::default().fg(ACCENT)),
-                Span::styled(
-                    format!(" {}  ", tr("key-date")),
-                    Style::default().fg(Color::DarkGray),
-                ),
-                Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                Span::styled(
-                    format!(" {}", tr("key-cancel")),
-                    Style::default().fg(Color::DarkGray),
-                ),
-            ]);
-            Line::from(spans)
-        };
-        frame.render_widget(Paragraph::new(footer_line), chunks[6]);
+        render_shortcuts(frame, outer[2], &shortcuts);
     }
 
     fn handle_enter_log(&mut self, key: KeyEvent, db: &Database) -> Action {
@@ -1307,6 +1316,7 @@ mod tests {
     use crate::db::Database;
     use crate::tui::framework::test_support::render_to_string;
     use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+    use rusqlite::Connection;
 
     fn test_db() -> (Database, tempfile::TempDir) {
         let dir = tempfile::tempdir().expect("temp dir");
@@ -1416,6 +1426,194 @@ mod tests {
         assert!(screen.editing_date);
         assert_eq!(screen.date_input.value(), "2026-99-99");
         assert!(screen.status_msg.as_ref().is_some_and(|(_, error)| *error));
+    }
+
+    #[test]
+    fn invalid_rpe_retains_complete_form_and_focus() {
+        let db = Database::open_in_memory().unwrap();
+        let practice = db
+            .create_practice("Pull-up", PracticeType::Bodyweight)
+            .unwrap();
+        let mut screen = LogEntryScreen::new(&db).unwrap();
+        screen.phase = Phase::EnterLog;
+        screen.chosen_practice = Some(practice);
+        screen.sets.push(SetData::Bodyweight { reps: 10 });
+        screen.note.set("keep me");
+        screen.rpe_input.set("99");
+        screen.focus = FocusSection::Rpe;
+
+        let action = screen.save_log(&db);
+
+        assert!(matches!(action, Action::None));
+        assert_eq!(screen.sets, vec![SetData::Bodyweight { reps: 10 }]);
+        assert_eq!(screen.note.value(), "keep me");
+        assert_eq!(screen.rpe_input.value(), "99");
+        assert_eq!(screen.focus, FocusSection::Rpe);
+        assert!(screen.status_msg.as_ref().is_some_and(|(_, error)| *error));
+    }
+
+    #[test]
+    fn log_entry_renders_small_rectangle_without_panicking() {
+        let db = Database::open_in_memory().unwrap();
+        let mut screen = LogEntryScreen::new(&db).unwrap();
+        let output = render_log_entry(&mut screen, 24, 10);
+        assert!(!output.is_empty());
+    }
+
+    #[test]
+    fn log_entry_shortcuts_include_every_active_command_at_supported_width() {
+        let db = Database::open_in_memory().unwrap();
+        db.create_practice("Pull-up", PracticeType::Bodyweight)
+            .unwrap();
+        let mut screen = LogEntryScreen::new(&db).unwrap();
+        let output = render_log_entry(&mut screen, 80, 24);
+        for command in ["[j/k]", "[/]", "[Enter]", "[Esc]"] {
+            assert!(output.contains(command), "missing {command}\n{output}");
+        }
+    }
+
+    #[test]
+    fn database_write_failure_retains_edit_context_and_complete_form() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("locked.db");
+        let db = Database::open(&path).unwrap();
+        let practice = db
+            .create_practice("Pull-up", PracticeType::Bodyweight)
+            .unwrap();
+        db.create_log(
+            practice.id,
+            &[SetData::Bodyweight { reps: 8 }],
+            Some("original"),
+            None,
+            None,
+            Some(7),
+        )
+        .unwrap();
+        let entry = db.list_logs_all().unwrap().remove(0);
+        let mut screen = LogEntryScreen::from_existing(&db, &entry).unwrap();
+        screen.sets = vec![SetData::Bodyweight { reps: 10 }];
+        screen.note.set("keep me");
+        screen.warm_up.set("bands");
+        screen.cool_down.set("stretch");
+        screen.rpe_input.set("8");
+        screen.focus = FocusSection::Note;
+
+        let lock = Connection::open(&path).unwrap();
+        lock.execute_batch("BEGIN EXCLUSIVE").unwrap();
+
+        let action = screen.save_log(&db);
+
+        assert!(matches!(action, Action::None));
+        assert_eq!(screen.note.value(), "keep me");
+        assert_eq!(screen.warm_up.value(), "bands");
+        assert_eq!(screen.cool_down.value(), "stretch");
+        assert_eq!(screen.rpe_input.value(), "8");
+        assert_eq!(screen.sets, vec![SetData::Bodyweight { reps: 10 }]);
+        assert_eq!(screen.editing_log_id, Some(entry.log.id));
+        assert_eq!(screen.return_to, Screen::History);
+        assert_eq!(screen.focus, FocusSection::Note);
+        assert!(screen.status_msg.as_ref().is_some_and(|(_, error)| *error));
+
+        lock.execute_batch("ROLLBACK").unwrap();
+    }
+
+    #[test]
+    fn selected_set_shortcuts_include_every_active_command_at_supported_width() {
+        let db = Database::open_in_memory().unwrap();
+        let practice = db
+            .create_practice("Pull-up", PracticeType::Bodyweight)
+            .unwrap();
+        let mut screen = LogEntryScreen::new(&db).unwrap();
+        screen.phase = Phase::EnterLog;
+        screen.chosen_practice = Some(practice);
+        screen.sets.push(SetData::Bodyweight { reps: 10 });
+        screen.selected_set = Some(0);
+
+        let output = render_log_entry(&mut screen, 80, 24);
+
+        for command in [
+            "[Tab]", "[Enter]", "[j/k]", "[d]", "[e]", "[Ctrl+S]", "[D]", "[Esc]",
+        ] {
+            assert!(output.contains(command), "missing {command}\n{output}");
+        }
+    }
+
+    #[test]
+    fn set_edit_shortcuts_replace_add_and_navigation_with_confirm_cancel() {
+        let db = Database::open_in_memory().unwrap();
+        let practice = db
+            .create_practice("Pull-up", PracticeType::Bodyweight)
+            .unwrap();
+        let mut screen = LogEntryScreen::new(&db).unwrap();
+        screen.phase = Phase::EnterLog;
+        screen.chosen_practice = Some(practice);
+        screen.sets.push(SetData::Bodyweight { reps: 10 });
+        screen.selected_set = Some(0);
+        screen.editing_set = Some(0);
+        screen.field1.set("12");
+
+        let output = render_log_entry(&mut screen, 80, 24);
+
+        assert!(
+            output.contains(&format!("[Enter] {}", tr("key-confirm"))),
+            "{output}"
+        );
+        assert!(output.contains("[Esc]"), "{output}");
+        for inactive in ["[j/k]", "[d]", "[e]"] {
+            assert!(
+                !output.contains(inactive),
+                "unexpected {inactive}\n{output}"
+            );
+        }
+        assert!(!output.contains(&tr("key-add-set")), "{output}");
+    }
+
+    #[test]
+    fn date_edit_shortcuts_show_only_confirm_and_cancel() {
+        let db = Database::open_in_memory().unwrap();
+        let practice = db
+            .create_practice("Pull-up", PracticeType::Bodyweight)
+            .unwrap();
+        let mut screen = LogEntryScreen::new(&db).unwrap();
+        screen.phase = Phase::EnterLog;
+        screen.chosen_practice = Some(practice);
+        screen.editing_date = true;
+        screen.date_input.set("2026-08-10");
+
+        let output = render_log_entry(&mut screen, 80, 24);
+
+        assert!(output.contains("[Enter]"), "{output}");
+        assert!(output.contains("[Esc]"), "{output}");
+        for inactive in ["[Tab]", "[Ctrl+S]", "[D]"] {
+            assert!(
+                !output.contains(inactive),
+                "unexpected {inactive}\n{output}"
+            );
+        }
+    }
+
+    #[test]
+    fn exit_confirmation_shortcuts_show_only_confirm_and_cancel() {
+        let db = Database::open_in_memory().unwrap();
+        let practice = db
+            .create_practice("Pull-up", PracticeType::Bodyweight)
+            .unwrap();
+        let mut screen = LogEntryScreen::new(&db).unwrap();
+        screen.phase = Phase::EnterLog;
+        screen.chosen_practice = Some(practice);
+        screen.confirming_exit = true;
+
+        let output = render_log_entry(&mut screen, 80, 24);
+
+        assert!(output.contains(&tr("log-cancel-confirm")), "{output}");
+        assert!(output.contains("[y/Enter]"), "{output}");
+        assert!(output.contains("[n/Esc]"), "{output}");
+        for inactive in ["[Tab]", "[Ctrl+S]"] {
+            assert!(
+                !output.contains(inactive),
+                "unexpected {inactive}\n{output}"
+            );
+        }
     }
 
     #[test]
