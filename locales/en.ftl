@@ -182,6 +182,8 @@ key-next = Next
 key-switch-field = Switch field
 key-undo = Undo
 key-help = Help
+key-details = Details
+key-scroll = Scroll
 
 # ── Status Messages ──
 status-deleted-undo = Deleted. Press [u] to undo

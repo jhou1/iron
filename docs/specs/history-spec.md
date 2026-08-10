@@ -4,21 +4,15 @@ Browse, inspect, edit, and delete training logs.
 
 ## Layout
 
-Two-pane horizontal split:
+The History screen keeps the log list as the primary surface and opens the selected log in a floating detail panel. The panel is a read-only preview during Browse and becomes a focused, full-height viewport after `Enter`.
 
-- **Left pane:** Scrollable log list with filter
-- **Right pane:** Detail view of selected log
-
-### Left Pane (top to bottom)
+### Screen rows (top to bottom)
 1. Title + filter bar
 2. Log list (scrollable)
 3. Status line
 4. Shortcuts bar
 
-### Right Pane
-1. Practice name + date header
-2. Set details (scrollable)
-3. Notes section (if present)
+The list and detail titles append `↑`, `↓`, or `↑↓` when content exists beyond the current viewport.
 
 ## Log List
 
@@ -28,7 +22,7 @@ Two-pane horizontal split:
 
 ## Detail Panel
 
-For the currently selected log, shows:
+For the currently selected log, the preview and focused detail show:
 
 - **Header:** "[Practice Name] on [Date Time]"
 - **Sets:** numbered list with type-specific formatting
@@ -41,11 +35,14 @@ For the currently selected log, shows:
   - Cool-down text
   - Session note
 
+Press `Enter` to focus the detail panel. In focused detail, `j/k` or the arrow keys scroll by visual row so wrapped warm-up, cool-down, and note text remain reachable. `Esc` returns focus to the list without changing its selection.
+
 ## Filtering
 
 - `/` toggles filter mode
 - Type to filter log list by practice name (case-insensitive, real-time)
 - Emacs cursor keybindings in filter input
+- Long filter text scrolls horizontally and keeps the cursor visible inside the filter row
 - `Esc` or `Enter` exits filter mode
 
 ## Modes
@@ -53,6 +50,7 @@ For the currently selected log, shows:
 | Mode | Trigger | Behavior |
 |------|---------|----------|
 | Browse | default | Navigate and view logs |
+| Detail | `Enter` | Focus and scroll the complete selected log detail |
 | ConfirmDelete | `d` | Overlay: "Delete [Practice] log from [Date]? [y]/[n]" |
 
 ## Keybindings
@@ -60,6 +58,8 @@ For the currently selected log, shows:
 | Key | Action |
 |-----|--------|
 | `j/k` | Navigate log list |
+| `Enter` | Focus selected log detail |
+| `j/k`, arrows | Scroll while detail is focused |
 | `/` | Toggle filter mode |
 | `e` | Edit selected log (opens Log Entry in edit mode) |
 | `d` | Delete selected log (enter confirm mode) |
@@ -67,7 +67,7 @@ For the currently selected log, shows:
 | `y` | Confirm deletion |
 | `n` | Cancel deletion |
 | `?` | Help overlay |
-| `Esc` | Clear filter (if filtering) or back to Dashboard |
+| `Esc` | Exit filter/detail focus, clear an active filter, or return to Dashboard |
 
 ## Undo
 
