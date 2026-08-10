@@ -420,6 +420,13 @@ impl LogEntryScreen {
         if self.focus == FocusSection::Sets {
             let enter_label = if self.editing_set.is_some() {
                 tr("key-confirm")
+            } else if self.active_field == 0
+                && self
+                    .chosen_practice
+                    .as_ref()
+                    .is_some_and(|practice| practice.practice_type == PracticeType::Weighted)
+            {
+                tr("key-next")
             } else {
                 tr("key-add-set")
             };
@@ -432,7 +439,9 @@ impl LogEntryScreen {
                 shortcuts.push(Shortcut::new("e", tr("key-edit")));
             }
         }
-        shortcuts.push(Shortcut::new("Ctrl+S", tr("key-save")));
+        if !self.sets.is_empty() && self.editing_set.is_none() {
+            shortcuts.push(Shortcut::new("Ctrl+S", tr("key-save")));
+        }
         if self.focus == FocusSection::Sets {
             shortcuts.push(Shortcut::new("D", tr("key-date")));
         }
@@ -503,11 +512,15 @@ impl LogEntryScreen {
             );
             let date_width = date_inner.width.saturating_sub(label.width() as u16) as usize;
             let date = truncate_to_width(&self.log_date, date_width);
-            let hint_width = date_inner
-                .width
-                .saturating_sub(label.width() as u16)
-                .saturating_sub(date.width() as u16) as usize;
-            let hint = truncate_to_width(&format!("  {}", tr("log-date-change-hint")), hint_width);
+            let hint = if self.focus == FocusSection::Sets && !self.confirming_exit {
+                let hint_width = date_inner
+                    .width
+                    .saturating_sub(label.width() as u16)
+                    .saturating_sub(date.width() as u16) as usize;
+                truncate_to_width(&format!("  {}", tr("log-date-change-hint")), hint_width)
+            } else {
+                String::new()
+            };
             Line::from(vec![
                 Span::styled(label, Style::default().fg(Color::Gray)),
                 Span::styled(date, Style::default().fg(Color::White)),
@@ -574,29 +587,38 @@ impl LogEntryScreen {
                 PracticeType::Weighted => {
                     let weight_label = format!("{} ", tr("log-weight-label"));
                     let reps_label = format!("  {} ", tr("log-reps-label"));
+                    let fixed_width = input_label
+                        .width()
+                        .saturating_add(weight_label.width())
+                        .saturating_add(reps_label.width())
+                        .saturating_add(1); // active cursor
+                    let values_width = (sets_inner.width as usize).saturating_sub(fixed_width);
                     let mut spans = vec![
                         Span::styled(input_label.clone(), Style::default().fg(Color::White)),
                         Span::styled(weight_label.clone(), Style::default().fg(Color::Gray)),
                     ];
                     if self.active_field == 0 {
-                        let prefix_width = (input_label.width() + weight_label.width()) as u16;
+                        let inactive_reps_width = self.field2.value().width().min(values_width / 2);
+                        let active_weight_width = values_width.saturating_sub(inactive_reps_width);
+                        let prefix_width = input_label.width().saturating_add(weight_label.width());
+                        let active_max_width = prefix_width
+                            .saturating_add(active_weight_width)
+                            .saturating_add(1)
+                            .min(sets_inner.width as usize);
                         spans.extend(self.field1.visible_spans(
-                            sets_inner.width,
-                            prefix_width,
+                            active_max_width as u16,
+                            prefix_width as u16,
                             ACCENT,
                         ));
                         spans.push(Span::styled(reps_label, Style::default().fg(Color::Gray)));
                         spans.push(Span::styled(
-                            self.field2.value(),
+                            truncate_to_width(self.field2.value(), inactive_reps_width),
                             Style::default().fg(Color::White),
                         ));
                     } else {
-                        let max_field1_width = (sets_inner.width as usize)
-                            .saturating_sub(input_label.width())
-                            .saturating_sub(weight_label.width())
-                            .saturating_sub(reps_label.width())
-                            .saturating_sub(1);
-                        let field1 = truncate_to_width(self.field1.value(), max_field1_width);
+                        let inactive_weight_width =
+                            self.field1.value().width().min(values_width / 2);
+                        let field1 = truncate_to_width(self.field1.value(), inactive_weight_width);
                         spans.push(Span::styled(field1, Style::default().fg(Color::White)));
                         spans.push(Span::styled(
                             reps_label.clone(),
@@ -1559,7 +1581,7 @@ mod tests {
             "{output}"
         );
         assert!(output.contains("[Esc]"), "{output}");
-        for inactive in ["[j/k]", "[d]", "[e]"] {
+        for inactive in ["[j/k]", "[d]", "[e]", "[Ctrl+S]"] {
             assert!(
                 !output.contains(inactive),
                 "unexpected {inactive}\n{output}"
@@ -1608,12 +1630,93 @@ mod tests {
         assert!(output.contains(&tr("log-cancel-confirm")), "{output}");
         assert!(output.contains("[y/Enter]"), "{output}");
         assert!(output.contains("[n/Esc]"), "{output}");
-        for inactive in ["[Tab]", "[Ctrl+S]"] {
+        for inactive in ["[Tab]", "[Ctrl+S]", "[D]"] {
             assert!(
                 !output.contains(inactive),
                 "unexpected {inactive}\n{output}"
             );
         }
+    }
+
+    #[test]
+    fn non_sets_focus_hides_inactive_date_hint() {
+        let db = Database::open_in_memory().unwrap();
+        let practice = db
+            .create_practice("Pull-up", PracticeType::Bodyweight)
+            .unwrap();
+        let mut screen = LogEntryScreen::new(&db).unwrap();
+        screen.phase = Phase::EnterLog;
+        screen.chosen_practice = Some(practice);
+        screen.focus = FocusSection::Note;
+
+        let output = render_log_entry(&mut screen, 80, 24);
+
+        assert!(!output.contains("[D]"), "{output}");
+    }
+
+    #[test]
+    fn empty_log_hides_inactive_save_shortcut() {
+        let db = Database::open_in_memory().unwrap();
+        let practice = db
+            .create_practice("Pull-up", PracticeType::Bodyweight)
+            .unwrap();
+        let mut screen = LogEntryScreen::new(&db).unwrap();
+        screen.phase = Phase::EnterLog;
+        screen.chosen_practice = Some(practice);
+
+        let output = render_log_entry(&mut screen, 80, 24);
+
+        assert!(!output.contains("[Ctrl+S]"), "{output}");
+    }
+
+    #[test]
+    fn weighted_set_enter_shortcut_matches_immediate_action() {
+        let db = Database::open_in_memory().unwrap();
+        let practice = db
+            .create_practice("Deadlift", PracticeType::Weighted)
+            .unwrap();
+        let mut screen = LogEntryScreen::new(&db).unwrap();
+        screen.phase = Phase::EnterLog;
+        screen.chosen_practice = Some(practice);
+
+        let weight_output = render_log_entry(&mut screen, 80, 24);
+        assert!(
+            weight_output.contains(&format!("[Enter] {}", tr("key-next"))),
+            "{weight_output}"
+        );
+        assert!(
+            !weight_output.contains(&tr("key-add-set")),
+            "{weight_output}"
+        );
+
+        screen.active_field = 1;
+        let reps_output = render_log_entry(&mut screen, 80, 24);
+        assert!(
+            reps_output.contains(&format!("[Enter] {}", tr("key-add-set"))),
+            "{reps_output}"
+        );
+    }
+
+    #[test]
+    fn active_weight_budgets_space_for_bounded_inactive_reps() {
+        let db = Database::open_in_memory().unwrap();
+        let practice = db
+            .create_practice("Deadlift", PracticeType::Weighted)
+            .unwrap();
+        let mut screen = LogEntryScreen::new(&db).unwrap();
+        screen.phase = Phase::EnterLog;
+        screen.chosen_practice = Some(practice);
+        screen.active_field = 0;
+        screen.field1.set("1234567890".repeat(10));
+        screen.field2.set("9876543210".repeat(10));
+
+        let output = render_log_entry(&mut screen, 80, 24);
+
+        assert!(output.contains('_'), "{output}");
+        assert!(
+            output.contains(&format!("{} 987", tr("log-reps-label"))),
+            "{output}"
+        );
     }
 
     #[test]
