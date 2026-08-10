@@ -52,6 +52,7 @@ dashboard-hrv-label = HRV
 dashboard-hrv-edit-hint = [v] edit
 dashboard-hrv-record-hint = [v] record
 dashboard-hrv-input-hint = (0-100, Enter to save, Esc to cancel)
+dashboard-hrv-invalid = HRV must be a number from 0 to 100
 dashboard-quit-confirm = Quit iron?
 
 # ── Goals ──

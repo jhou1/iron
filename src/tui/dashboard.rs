@@ -10,8 +10,8 @@ use unicode_width::UnicodeWidthStr;
 
 use super::widgets::heatmap::Heatmap;
 use super::{
-    centered_area, render_gauge_line, render_status_line, Action, Screen, StatusMessage,
-    BORDER_COLOR, CONTENT_WIDTH,
+    centered_area, framework::TextInput, render_gauge_line, render_status_line, Action, Screen,
+    StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
 };
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
@@ -35,7 +35,7 @@ pub struct DashboardScreen {
     quotes: Vec<Quote>,
     mode: DashboardMode,
     hrv_today: Option<i32>,
-    hrv_input: String,
+    hrv_input: TextInput,
     status_msg: StatusMessage,
     no_color: bool,
     weekly_volume: f64,
@@ -68,7 +68,7 @@ impl DashboardScreen {
             quotes,
             mode: DashboardMode::Normal,
             hrv_today,
-            hrv_input: String::new(),
+            hrv_input: TextInput::new(),
             status_msg: None,
             no_color,
             weekly_volume: stats.total_volume,
@@ -361,13 +361,28 @@ impl DashboardScreen {
             "summary-consecutive",
             &[("days", FluentValue::from(self.consecutive_days))],
         );
-        let recovery_text = if let Some(hrv) = self.hrv_today {
-            tr_args(
-                "summary-recovery",
-                &[("value", FluentValue::from(hrv as i64))],
-            )
+        let recovery_spans = if self.mode == DashboardMode::HrvInput {
+            let prefix = format!("{}: ", tr("dashboard-hrv-label"));
+            let prefix_width = prefix.width() as u16;
+            let mut spans = vec![Span::styled(prefix, Style::default().fg(Color::White))];
+            spans.extend(
+                self.hrv_input
+                    .visible_spans(inner.width, prefix_width, ACCENT),
+            );
+            spans
         } else {
-            tr("summary-recovery-na")
+            let recovery_text = if let Some(hrv) = self.hrv_today {
+                tr_args(
+                    "summary-recovery",
+                    &[("value", FluentValue::from(hrv as i64))],
+                )
+            } else {
+                tr("summary-recovery-na")
+            };
+            vec![Span::styled(
+                recovery_text,
+                Style::default().fg(Color::White),
+            )]
         };
         let frequency_text = tr_args(
             "summary-frequency",
@@ -375,15 +390,18 @@ impl DashboardScreen {
         );
 
         let sep = Span::styled("  ", Style::default());
-        let mut lines = vec![Line::from(vec![
+        let mut summary_spans = vec![
             Span::styled(volume_text, Style::default().fg(Color::White)),
             sep.clone(),
             Span::styled(consecutive_text, Style::default().fg(Color::White)),
             sep.clone(),
-            Span::styled(recovery_text, Style::default().fg(Color::White)),
+        ];
+        summary_spans.extend(recovery_spans);
+        summary_spans.extend([
             sep,
             Span::styled(frequency_text, Style::default().fg(Color::White)),
-        ])];
+        ]);
+        let mut lines = vec![Line::from(summary_spans)];
 
         if !self.quote.is_empty() {
             lines.push(Line::from(""));
@@ -584,7 +602,8 @@ impl DashboardScreen {
             KeyCode::Char('g') => Action::Navigate(Screen::Goals),
             KeyCode::Char('Q') => Action::Navigate(Screen::Quotes),
             KeyCode::Char('v') => {
-                self.hrv_input = self.hrv_today.map(|v| v.to_string()).unwrap_or_default();
+                self.hrv_input
+                    .set(self.hrv_today.map(|v| v.to_string()).unwrap_or_default());
                 self.mode = DashboardMode::HrvInput;
                 Action::None
             }
@@ -599,25 +618,28 @@ impl DashboardScreen {
     fn handle_hrv_input(&mut self, key: KeyEvent, db: &Database) -> Action {
         match key.code {
             KeyCode::Enter => {
-                if let Ok(hrv) = self.hrv_input.parse::<i32>() {
-                    if (0..=100).contains(&hrv) {
+                let parsed = self.hrv_input.value().parse::<i32>();
+                match parsed {
+                    Ok(hrv) if (0..=100).contains(&hrv) => {
                         let today = chrono::Local::now().format("%Y-%m-%d").to_string();
                         match db.set_daily_hrv(&today, hrv) {
                             Ok(()) => {
                                 self.hrv_today = Some(hrv);
+                                self.hrv_input.clear();
+                                self.mode = DashboardMode::Normal;
                             }
-                            Err(e) => {
+                            Err(error) => {
                                 self.status_msg = Some((
                                     tr_args(
                                         "status-save-error",
-                                        &[("msg", FluentValue::from(e.to_string()))],
+                                        &[("msg", FluentValue::from(error.to_string()))],
                                     ),
                                     true,
                                 ));
                             }
                         }
-                        self.mode = DashboardMode::Normal;
                     }
+                    _ => self.status_msg = Some((tr("dashboard-hrv-invalid"), true)),
                 }
                 Action::None
             }
@@ -626,12 +648,10 @@ impl DashboardScreen {
                 self.mode = DashboardMode::Normal;
                 Action::None
             }
-            KeyCode::Backspace => {
-                self.hrv_input.pop();
-                Action::None
-            }
-            KeyCode::Char(c) if c.is_ascii_digit() => {
-                self.hrv_input.push(c);
+            _ if self
+                .hrv_input
+                .handle_key_if(key, |character| character.is_ascii_digit()) =>
+            {
                 Action::None
             }
             _ => Action::None,
@@ -641,8 +661,71 @@ impl DashboardScreen {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::tui::framework::test_support::render_to_string;
+    use crossterm::event::{KeyEventKind, KeyModifiers};
     use ratatui::layout::{Constraint, Direction, Layout, Rect};
     use ratatui::widgets::{Block, Borders, Padding};
+    use rusqlite::Connection;
+
+    fn key(code: KeyCode) -> KeyEvent {
+        KeyEvent {
+            code,
+            modifiers: KeyModifiers::empty(),
+            kind: KeyEventKind::Press,
+            state: crossterm::event::KeyEventState::empty(),
+        }
+    }
+
+    fn render_dashboard(screen: &DashboardScreen, width: u16, height: u16) -> String {
+        render_to_string(width, height, |frame| screen.render(frame))
+    }
+
+    #[test]
+    fn invalid_hrv_retains_input_mode_text_and_error() {
+        let db = Database::open_in_memory().unwrap();
+        let mut screen = DashboardScreen::new(&db, false).unwrap();
+        screen.handle_key(key(KeyCode::Char('v')), &db);
+        screen.hrv_input.set("101");
+
+        screen.handle_key(key(KeyCode::Enter), &db);
+
+        assert_eq!(screen.mode, DashboardMode::HrvInput);
+        assert_eq!(screen.hrv_input.value(), "101");
+        assert!(screen.status_msg.as_ref().is_some_and(|(_, error)| *error));
+    }
+
+    #[test]
+    fn long_hrv_input_keeps_cursor_visible() {
+        let db = Database::open_in_memory().unwrap();
+        let mut screen = DashboardScreen::new(&db, false).unwrap();
+        screen.mode = DashboardMode::HrvInput;
+        screen.hrv_input = TextInput::from("9".repeat(100));
+
+        let output = render_dashboard(&screen, 80, 35);
+
+        assert!(output.contains('_'), "{output}");
+    }
+
+    #[test]
+    fn database_write_failure_retains_hrv_input_mode_text_and_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("locked.db");
+        let db = Database::open(&path).unwrap();
+        let mut screen = DashboardScreen::new(&db, false).unwrap();
+        screen.handle_key(key(KeyCode::Char('v')), &db);
+        screen.hrv_input.set("75");
+        let lock = Connection::open(&path).unwrap();
+        lock.execute_batch("BEGIN EXCLUSIVE").unwrap();
+
+        screen.handle_key(key(KeyCode::Enter), &db);
+
+        assert_eq!(screen.mode, DashboardMode::HrvInput);
+        assert_eq!(screen.hrv_input.value(), "75");
+        assert!(screen.status_msg.as_ref().is_some_and(|(_, error)| *error));
+
+        lock.execute_batch("ROLLBACK").unwrap();
+    }
 
     #[test]
     fn dashboard_layout_produces_adequate_inner_areas() {
