@@ -16,9 +16,9 @@ fn paragraph_widgets_must_wrap_user_content() {
     let allowlist: HashSet<&str> = [
         "dashboard.rs:152",
         "dashboard.rs:315",
-        "dashboard.rs:520",
-        "dashboard.rs:540",
-        "dashboard.rs:575",
+        "dashboard.rs:525",
+        "dashboard.rs:545",
+        "dashboard.rs:580",
         "log_entry.rs:530",
         "log_entry.rs:722",
         "log_entry.rs:821",

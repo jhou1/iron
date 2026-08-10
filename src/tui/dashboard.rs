@@ -361,13 +361,23 @@ impl DashboardScreen {
             "summary-consecutive",
             &[("days", FluentValue::from(self.consecutive_days))],
         );
+        let frequency_text = tr_args(
+            "summary-frequency",
+            &[("days", FluentValue::from(self.training_days as i64))],
+        );
         let recovery_spans = if self.mode == DashboardMode::HrvInput {
             let prefix = format!("{}: ", tr("dashboard-hrv-label"));
-            let prefix_width = prefix.width() as u16;
+            let non_input_width = volume_text
+                .width()
+                .saturating_add(consecutive_text.width())
+                .saturating_add(prefix.width())
+                .saturating_add(frequency_text.width())
+                .saturating_add("  ".width().saturating_mul(3));
+            let non_input_width = u16::try_from(non_input_width).unwrap_or(u16::MAX);
             let mut spans = vec![Span::styled(prefix, Style::default().fg(Color::White))];
             spans.extend(
                 self.hrv_input
-                    .visible_spans(inner.width, prefix_width, ACCENT),
+                    .visible_spans(inner.width, non_input_width, ACCENT),
             );
             spans
         } else {
@@ -384,11 +394,6 @@ impl DashboardScreen {
                 Style::default().fg(Color::White),
             )]
         };
-        let frequency_text = tr_args(
-            "summary-frequency",
-            &[("days", FluentValue::from(self.training_days as i64))],
-        );
-
         let sep = Span::styled("  ", Style::default());
         let mut summary_spans = vec![
             Span::styled(volume_text, Style::default().fg(Color::White)),
@@ -708,10 +713,57 @@ mod tests {
     }
 
     #[test]
+    fn long_hrv_input_stays_on_summary_row_and_preserves_quote() {
+        let db = Database::open_in_memory().unwrap();
+        let mut screen = DashboardScreen::new(&db, false).unwrap();
+        screen.mode = DashboardMode::HrvInput;
+        screen.hrv_input = TextInput::from("9".repeat(100));
+        screen.quote = "Recovery quote remains visible".to_string();
+
+        let output = render_dashboard(&screen, 80, 35);
+        let summary_rows: Vec<&str> = output
+            .lines()
+            .filter(|line| {
+                ["This Week:", "Streak:", "HRV:", "Frequency:"]
+                    .iter()
+                    .any(|marker| line.contains(marker))
+            })
+            .collect();
+
+        assert_eq!(summary_rows.len(), 1, "{output}");
+        for marker in ["This Week:", "Streak:", "HRV:", "_", "Frequency:"] {
+            assert!(
+                summary_rows[0].contains(marker),
+                "missing {marker}\n{output}"
+            );
+        }
+        assert!(
+            output.contains("> Recovery quote remains visible"),
+            "{output}"
+        );
+    }
+
+    #[test]
+    fn parse_failure_retains_hrv_input_with_exact_validation_error() {
+        let db = Database::open_in_memory().unwrap();
+        let mut screen = DashboardScreen::new(&db, false).unwrap();
+        screen.handle_key(key(KeyCode::Char('v')), &db);
+        screen.hrv_input.set("not-a-number");
+
+        screen.handle_key(key(KeyCode::Enter), &db);
+
+        assert_eq!(screen.mode, DashboardMode::HrvInput);
+        assert_eq!(screen.hrv_input.value(), "not-a-number");
+        assert_eq!(screen.status_msg, Some((tr("dashboard-hrv-invalid"), true)));
+    }
+
+    #[test]
     fn database_write_failure_retains_hrv_input_mode_text_and_error() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("locked.db");
         let db = Database::open(&path).unwrap();
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        db.set_daily_hrv(&today, 60).unwrap();
         let mut screen = DashboardScreen::new(&db, false).unwrap();
         screen.handle_key(key(KeyCode::Char('v')), &db);
         screen.hrv_input.set("75");
@@ -722,9 +774,27 @@ mod tests {
 
         assert_eq!(screen.mode, DashboardMode::HrvInput);
         assert_eq!(screen.hrv_input.value(), "75");
+        assert_eq!(screen.hrv_today, Some(60));
         assert!(screen.status_msg.as_ref().is_some_and(|(_, error)| *error));
 
         lock.execute_batch("ROLLBACK").unwrap();
+        assert_eq!(db.get_daily_hrv(&today).unwrap(), Some(60));
+    }
+
+    #[test]
+    fn successful_hrv_save_updates_screen_database_and_exits_input_mode() {
+        let db = Database::open_in_memory().unwrap();
+        let mut screen = DashboardScreen::new(&db, false).unwrap();
+        screen.handle_key(key(KeyCode::Char('v')), &db);
+        screen.hrv_input.set("75");
+
+        screen.handle_key(key(KeyCode::Enter), &db);
+
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        assert_eq!(screen.mode, DashboardMode::Normal);
+        assert_eq!(screen.hrv_input.value(), "");
+        assert_eq!(screen.hrv_today, Some(75));
+        assert_eq!(db.get_daily_hrv(&today).unwrap(), Some(75));
     }
 
     #[test]
