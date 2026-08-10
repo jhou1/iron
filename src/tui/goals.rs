@@ -18,12 +18,62 @@ use crate::model::{Goal, Milestone};
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct VisualSpan {
+    start: usize,
+    height: usize,
+}
+
+fn visual_spans(lines: &[Line<'_>], width: u16) -> Vec<VisualSpan> {
+    let width = usize::from(width.max(1));
+    let mut start = 0;
+    lines
+        .iter()
+        .map(|line| {
+            let line_width = line.width();
+            let height = if line_width == 0 {
+                1
+            } else {
+                line_width.div_ceil(width)
+            };
+            let span = VisualSpan { start, height };
+            start += height;
+            span
+        })
+        .collect()
+}
+
+#[allow(dead_code)]
+fn keep_span_visible(scroll: usize, viewport: usize, span: VisualSpan) -> usize {
+    if viewport == 0 || span.start < scroll {
+        return span.start;
+    }
+
+    let span_bottom = span.start + span.height;
+    if span_bottom > scroll + viewport {
+        span_bottom.saturating_sub(viewport)
+    } else {
+        scroll
+    }
+}
+
 fn goal_gauge_ratio(goal: &Goal) -> f64 {
     if goal.milestones.is_empty() {
         return if goal.completed { 1.0 } else { 0.0 };
     }
     let done = goal.milestones.iter().filter(|m| m.completed).count();
     done as f64 / goal.milestones.len() as f64
+}
+
+fn goal_progress_text(goal: &Goal) -> String {
+    let ratio = goal_gauge_ratio(goal);
+    let pct = (ratio * 100.0).round() as u32;
+    if goal.milestones.is_empty() {
+        format!("{}%", pct)
+    } else {
+        let done = goal.milestones.iter().filter(|m| m.completed).count();
+        format!("{}/{} · {}%", done, goal.milestones.len(), pct)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -320,18 +370,13 @@ impl GoalsScreen {
 
         // Compute selected line visual position for highlighting
         let sel_visual = sel_line_idx.map(|idx| {
-            let w = list_area.width;
-            let mut visual_row = 0u16;
-            for (i, line) in lines.iter().enumerate() {
-                if i == idx {
-                    break;
-                }
-                let lw = line.width() as u16;
-                visual_row += if w > 0 && lw > 0 { lw.div_ceil(w) } else { 1 };
-            }
-            // Highlight both title and gauge lines (2 lines for the selected goal)
-            let sel_rows = if idx + 1 < lines.len() { 2u16 } else { 1u16 };
-            (visual_row, sel_rows)
+            let spans = visual_spans(&lines, list_area.width);
+            let title = spans[idx];
+            let gauge_height = spans.get(idx + 1).map(|span| span.height).unwrap_or(0);
+            (
+                title.start as u16,
+                (title.height + gauge_height).max(1) as u16,
+            )
         });
 
         frame.render_widget(
@@ -1186,9 +1231,8 @@ fn goal_gauge(goal: &Goal) -> Line<'static> {
     let done = goal.milestones.iter().filter(|m| m.completed).count();
     let total = goal.milestones.len();
     let mut line = render_gauge_line(ratio, done, total, 16, 4);
-    let pct = (ratio * 100.0).round() as u32;
     line.spans.push(Span::styled(
-        format!("  {}%", pct),
+        format!("  {}", goal_progress_text(goal)),
         Style::default().fg(Color::Gray),
     ));
     line
@@ -1197,6 +1241,30 @@ fn goal_gauge(goal: &Goal) -> Line<'static> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn make_goal_with_milestones(states: &[bool]) -> Goal {
+        Goal {
+            id: 1,
+            title: "Goal".to_string(),
+            completed: false,
+            position: 0,
+            created_at: chrono::NaiveDateTime::default(),
+            completed_at: None,
+            milestones: states
+                .iter()
+                .enumerate()
+                .map(|(index, completed)| Milestone {
+                    id: index as i64 + 1,
+                    goal_id: 1,
+                    title: format!("Milestone {}", index + 1),
+                    completed: *completed,
+                    position: index as i32 + 1,
+                    created_at: chrono::NaiveDateTime::default(),
+                    completed_at: completed.then(chrono::NaiveDateTime::default),
+                })
+                .collect(),
+        }
+    }
 
     fn make_screen(goal_count: usize, list_height: u16) -> GoalsScreen {
         let goals: Vec<Goal> = (0..goal_count)
@@ -1281,5 +1349,43 @@ mod tests {
         s.adjust_scroll();
         // sel_bottom = 9*3 + 2 = 29, scroll = 29 - 9 = 20
         assert_eq!(s.scroll, 20);
+    }
+
+    #[test]
+    fn progress_text_shows_completed_total_and_percentage() {
+        let goal = make_goal_with_milestones(&[true, true, false, false]);
+        assert_eq!(goal_progress_text(&goal), "2/4 · 50%");
+    }
+
+    #[test]
+    fn keep_span_visible_scrolls_down_and_back_up() {
+        let selected = VisualSpan {
+            start: 5,
+            height: 2,
+        };
+        assert_eq!(keep_span_visible(0, 4, selected), 3);
+        let first = VisualSpan {
+            start: 0,
+            height: 1,
+        };
+        assert_eq!(keep_span_visible(3, 4, first), 0);
+    }
+
+    #[test]
+    fn visual_spans_count_wrapped_rows() {
+        let lines = vec![Line::from("123456789"), Line::from("x")];
+        assert_eq!(
+            visual_spans(&lines, 4),
+            vec![
+                VisualSpan {
+                    start: 0,
+                    height: 3,
+                },
+                VisualSpan {
+                    start: 3,
+                    height: 1,
+                },
+            ]
+        );
     }
 }
