@@ -8,7 +8,7 @@ Global navigation patterns, keybinding conventions, and text input requirements.
                     Dashboard
                    /  |  |  \  \  \  \
                   /   |  |   \  \  \   \
-           LogEntry  History Trends Practices Goals QuickLog Abbreviations
+           LogEntry  History Trends Practices Goals QuickLog Quotes
 ```
 
 All screens return to Dashboard via `Esc`. History can navigate to LogEntry (edit mode), which returns to History.
@@ -23,7 +23,7 @@ All screens return to Dashboard via `Esc`. History can navigate to LogEntry (edi
 
 ## Vim-Style Navigation
 
-All list-based screens use consistent movement:
+All list-based screens use consistent movement. Each screen explicitly chooses its edge behavior instead of inheriting an accidental local implementation:
 
 | Key | Action |
 |-----|--------|
@@ -34,11 +34,18 @@ All list-based screens use consistent movement:
 | `/` | Enter filter mode |
 | `Enter` | Confirm / select / submit |
 
+| Screen | Edge behavior |
+|---|---|
+| Trends | Wrap from last to first and first to last |
+| Goals, History, Quotes, Practices | Clamp at the first and last item |
+
+The selected content must remain visible. Lists and detail panels append `↑`, `↓`, or `↑↓` to their title when visual rows exist outside the viewport. History and Quotes use `Enter` to focus the complete selected detail and `Esc` to return focus to the list.
+
 ## Text Filter Pattern
 
 Used in: Log Entry, History, Trends (practice selection).
 
-**State:** filter active flag, filter text string, cursor position.
+**State:** filter active flag plus the shared `TextInput` value and cursor.
 
 **Behavior:**
 1. `/` enters filter mode (cursor appears in filter bar)
@@ -60,7 +67,7 @@ Used in: Log Entry, History, Trends (practice selection).
 | `Backspace` | Delete character before cursor |
 | Character keys | Insert at cursor position |
 
-**Rendering:** Text input must never overflow its container. Use horizontal scrolling to keep the cursor visible within the available width.
+**Rendering:** Text input must never overflow its container. Batch 1 single-line fields use `tui::framework::TextInput`, which scrolls horizontally to keep the cursor visible within the available width.
 
 **Wrapping:** All variable-length text display (notes, descriptions, quotes) must wrap within container bounds. Only fixed-width UI elements (footers, shortcut bars) may omit wrapping.
 
@@ -78,6 +85,14 @@ Used in: Log Entry (4 phases), Trends (2 phases), Practices (add = 2 phases).
 Each phase has its own render and key handler. Phase transitions:
 - Forward: `Enter` or specific key (e.g., `Ctrl+S`)
 - Backward: `Esc`
+
+## Framework ownership
+
+Reusable interaction mechanics live in `src/tui/framework/`: visual-row measurement and viewports, single-line input, detail/status/shortcut components, and TestBackend support. Screens continue to own domain data, database calls, validation, modes, and mutation transitions.
+
+Modes and input clear only after a mutation and required reload both succeed. Failed mutations keep the relevant focus/input available and render the error in a reserved status row.
+
+Batch 1 behavior is verified at a minimum terminal size of `80x24`.
 
 ## Color Convention
 

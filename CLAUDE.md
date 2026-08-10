@@ -61,9 +61,11 @@ Vim-style throughout: `j/k` up/down, `h/l` left/right, `/` filter, `Esc` back, `
 
 All text input fields use emacs-style cursor: `Ctrl+B`/Left back, `Ctrl+F`/Right forward, `Ctrl+A`/Home start, `Ctrl+E`/End end, `Ctrl+K` kill to end of line. Characters insert at cursor, not append.
 
-**Every text input field must support the full emacs keybinding set:** `Ctrl+B`, `Ctrl+F`, `Ctrl+A`, `Ctrl+E`, `Ctrl+K`, `Left`, `Right`, `Home`, `End`, `Backspace`. This is a hard constraint — no text input may be added without these bindings. Use the `handle_text_input()` pattern from `tui/practices.rs` or `tui/abbreviations.rs` for single-line fields.
+**Every text input field must support the full emacs keybinding set:** `Ctrl+B`, `Ctrl+F`, `Ctrl+A`, `Ctrl+E`, `Ctrl+K`, `Left`, `Right`, `Home`, `End`, `Backspace`. This is a hard constraint — no text input may be added without these bindings. Use `tui::framework::TextInput` for single-line fields.
 
-**Text input must never overflow its container.** All text input rendering must use `visible_input_spans()` from `tui/mod.rs` to horizontally scroll long text within the available width. Never render raw `text[..cursor]` + cursor + `text[cursor..]` spans without width clipping.
+**Text input must never overflow its container.** New and migrated single-line inputs render with `TextInput::visible_spans()` so long text scrolls horizontally with the cursor. `visible_input_spans()` in `tui/mod.rs` remains a compatibility API for screens scheduled in later migration batches. Never render raw `text[..cursor]` + cursor + `text[cursor..]` spans without width clipping.
+
+Shared TUI mechanics live in `src/tui/framework/`: visual viewports, input state, detail/status/shortcut components, and test support. Screens own domain state, database operations, validation, and modes. Selected content must remain visible, hidden visual rows use `↑/↓` indicators, and failed mutations retain their active input/focus while showing a visible error. Batch 1 screens are verified at `80x24`.
 
 **All text content must wrap within its container.** Every `Paragraph` that renders user-entered or variable-length text (notes, names, descriptions, quotes, warm-up/cool-down) must use `.wrap(Wrap { trim: false })`. Text must never overflow the right border of its container. Only fixed-width UI elements (footers, shortcuts bars, single-line labels) may omit `.wrap()`.
 
@@ -173,4 +175,3 @@ For multi-step tasks, state a brief plan:
 ```
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
-

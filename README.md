@@ -88,11 +88,12 @@ Press `l` to open the Log Entry screen.
 
 ### History
 
-Press `h`. Left panel shows all logs; right panel shows selected log details.
+Press `h`. The list previews the selected log in a wrapped detail panel. Press `Enter` to focus and scroll the complete detail.
 
 | Key | Action |
 |---|---|
 | `j/k` | Navigate |
+| `Enter` | Focus selected detail; `j/k` scrolls it |
 | `/` | Filter by practice name |
 | `e` | Edit log |
 | `d` | Delete log |
@@ -122,6 +123,8 @@ Press `e` to manage your practice inventory.
 | `Space` | Toggle active/inactive |
 | `d` | Delete |
 | `Esc` | Back |
+
+Long practice names stay inside the list, and failed add/rename/delete operations keep the active form available with an error.
 
 ### Goals
 
@@ -154,6 +157,18 @@ Milestone panel:
 | `Esc` | Return to the goal list |
 
 Goals with milestones show `completed/total · percentage`; their completion state is derived from the milestone states.
+
+### Quotes
+
+Press `Q`. The list keeps each row compact while the selected quote is shown completely in a wrapped preview.
+
+| Key | Action |
+|---|---|
+| `j/k` | Navigate quotes |
+| `Enter` | Focus the complete preview; `j/k` scrolls it |
+| `a` / `e` | Add / edit a quote |
+| `d` / `u` | Delete / undo deletion |
+| `Esc` | Return from detail focus or go back |
 
 ### Quick Log (LLM)
 

@@ -2,6 +2,8 @@
 
 Track training goals with nested milestones and completion progress.
 
+Goals is the reference consumer of the shared interaction contract in `navigation-spec.md`: visual-row-aware viewports, bounded `TextInput`, focused detail styling, overflow indicators, reserved status, and failure-preserving mutation transitions. Goal and milestone domain rules remain owned by this screen.
+
 ## Layout
 
 The screen contains a bordered, scrollable goal list, a contextual selected-goal panel, a status line, and a shortcut bar. The selected goal's panel is shown as a read-only preview whenever it has milestones. `Enter` focuses that panel for management.
