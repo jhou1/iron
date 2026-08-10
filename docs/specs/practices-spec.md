@@ -64,7 +64,7 @@ Creates the practice on type confirmation. The screen returns to Browse and clea
 |-----|--------|
 | `j/k` | Navigate list (Browse), navigate type selector (AddType) |
 | `a` | Add new practice |
-| `Enter` | Edit practice name |
+| `e` | Edit practice name |
 | `Space` | Toggle active/inactive |
 | `d` | Delete practice (confirm) |
 | `y/n` | Confirm/cancel deletion |

@@ -119,7 +119,7 @@ Press `e` to manage your practice inventory.
 |---|---|
 | `j/k` | Navigate |
 | `a` | Add practice |
-| `Enter` | Rename |
+| `e` | Rename |
 | `Space` | Toggle active/inactive |
 | `d` | Delete |
 | `Esc` | Back |
