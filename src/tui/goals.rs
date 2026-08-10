@@ -160,7 +160,21 @@ impl GoalsScreen {
     }
 
     fn reload_goals(&mut self, db: &Database) -> anyhow::Result<()> {
+        let selected_goal_id = self.goals.get(self.selected).map(|goal| goal.id);
+        let modal_goal_id = (self.mode == Mode::Modal)
+            .then(|| self.goals.get(self.modal_goal_idx).map(|goal| goal.id))
+            .flatten();
         self.goals = db.list_goals()?;
+        if let Some(goal_id) = selected_goal_id {
+            if let Some(index) = self.goals.iter().position(|goal| goal.id == goal_id) {
+                self.selected = index;
+            }
+        }
+        if let Some(goal_id) = modal_goal_id {
+            if let Some(index) = self.goals.iter().position(|goal| goal.id == goal_id) {
+                self.modal_goal_idx = index;
+            }
+        }
         Ok(())
     }
 
@@ -566,37 +580,18 @@ impl GoalsScreen {
                                 }
                             }
                         }
-
-                        // Render modal status inside popup if in modal mode
-                        if self.mode == Mode::Modal {
-                            if let Some((msg, is_error)) = &self.modal_status_msg {
-                                let color = if *is_error { Color::Red } else { Color::Green };
-                                let status_y = popup_rect.y + popup_rect.height;
-                                if status_y < list_area.y + list_area.height {
-                                    let status_rect = Rect {
-                                        x: popup_x,
-                                        y: status_y,
-                                        width: popup_w,
-                                        height: 1,
-                                    };
-                                    let status_line = Line::from(Span::styled(
-                                        msg.as_str(),
-                                        Style::default().fg(color),
-                                    ));
-                                    frame.render_widget(
-                                        Paragraph::new(status_line).wrap(Wrap { trim: false }),
-                                        status_rect,
-                                    );
-                                }
-                            }
-                        }
                     }
                 }
             }
         }
 
         // ── Status line ──
-        render_status_line(frame, chunks[1], &self.status_msg);
+        let active_status = if self.mode == Mode::Modal {
+            &self.modal_status_msg
+        } else {
+            &self.status_msg
+        };
+        render_status_line(frame, chunks[1], active_status);
 
         // ── Footer ──
         let footer_spans = match self.mode {
@@ -1779,5 +1774,54 @@ mod tests {
             .modal_status_msg
             .as_ref()
             .is_some_and(|(_, error)| *error));
+    }
+
+    #[test]
+    fn modal_error_remains_visible_when_panel_fills_viewport() {
+        let db = Database::open_in_memory().unwrap();
+        let goal_id = db.create_goal("Goal").unwrap();
+        let mut milestone_ids = Vec::new();
+        for number in 1..=20 {
+            milestone_ids.push(
+                db.create_milestone(goal_id, &format!("Milestone {number:02}"))
+                    .unwrap(),
+            );
+        }
+        db.toggle_milestone(*milestone_ids.last().unwrap()).unwrap();
+        let mut screen = GoalsScreen::new(&db).unwrap();
+        screen.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE), &db);
+        for _ in 1..20 {
+            screen.handle_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE), &db);
+        }
+        screen.handle_key(KeyEvent::new(KeyCode::Char('D'), KeyModifiers::NONE), &db);
+        screen.input = "not-a-date".to_string();
+        screen.cursor = screen.input.len();
+        screen.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE), &db);
+
+        let output = render_screen(&mut screen, 80, 24);
+
+        assert!(output.contains(&tr("goals-invalid-date")), "{output}");
+    }
+
+    #[test]
+    fn completing_goal_in_panel_preserves_goal_identity_after_reorder() {
+        let db = Database::open_in_memory().unwrap();
+        db.create_goal("Other goal").unwrap();
+        let target_id = db.create_goal("Target goal").unwrap();
+        db.create_milestone(target_id, "Only milestone").unwrap();
+        let mut screen = GoalsScreen::new(&db).unwrap();
+        let target_index = screen
+            .goals
+            .iter()
+            .position(|goal| goal.id == target_id)
+            .unwrap();
+        screen.selected = target_index;
+        screen.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE), &db);
+
+        screen.handle_key(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE), &db);
+
+        assert_eq!(screen.goals[screen.modal_goal_idx].id, target_id);
+        assert!(screen.goals[screen.modal_goal_idx].completed);
+        assert_eq!(screen.mode, Mode::Modal);
     }
 }
