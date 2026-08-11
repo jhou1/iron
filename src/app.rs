@@ -1,6 +1,6 @@
 use anyhow::Result;
 use crossterm::{
-    event::{self, Event, KeyCode, KeyModifiers},
+    event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
@@ -13,8 +13,58 @@ use crate::db::Database;
 use crate::i18n::tr_args;
 use crate::tui::{Action, ScreenId};
 
+mod router;
 mod screens;
+use router::Router;
 use screens::ScreenStore;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ShellControl {
+    Continue,
+    Quit,
+}
+
+struct AppShell {
+    current: ScreenId,
+    screens: ScreenStore,
+    router: Router,
+}
+
+impl AppShell {
+    fn new(db: &Database, no_color: bool) -> anyhow::Result<Self> {
+        Ok(Self {
+            current: ScreenId::Dashboard,
+            screens: ScreenStore::new(db, no_color)?,
+            router: Router,
+        })
+    }
+
+    fn render(&mut self, frame: &mut Frame) {
+        self.screens.render(self.current, frame);
+    }
+
+    fn handle_key(&mut self, key: KeyEvent, db: &Database) -> anyhow::Result<ShellControl> {
+        let action = self.screens.handle_key(self.current, key, db);
+        self.apply_action(action, db)
+    }
+
+    fn apply_action(&mut self, action: Action, db: &Database) -> anyhow::Result<ShellControl> {
+        match action {
+            Action::Quit => Ok(ShellControl::Quit),
+            Action::Navigate(intent) => {
+                self.router
+                    .transition(&mut self.current, &mut self.screens, intent, db)?;
+                Ok(ShellControl::Continue)
+            }
+            Action::None => Ok(ShellControl::Continue),
+        }
+    }
+
+    #[cfg(test)]
+    fn current_for_test(&self) -> ScreenId {
+        self.current
+    }
+}
 
 pub fn run() -> Result<()> {
     let db = Database::open_default()?;
@@ -32,8 +82,7 @@ fn run_app(
     db: &Database,
 ) -> Result<()> {
     let no_color = std::env::var("NO_COLOR").is_ok();
-    let mut current_screen = ScreenId::Dashboard;
-    let mut screens = ScreenStore::new(db, no_color)?;
+    let mut shell = AppShell::new(db, no_color)?;
 
     loop {
         terminal.draw(|frame| {
@@ -49,7 +98,7 @@ fn run_app(
                 frame.render_widget(paragraph, msg_area);
                 return;
             }
-            screens.render(current_screen, frame);
+            shell.render(frame);
         })?;
 
         if let Event::Key(key) = event::read()? {
@@ -60,17 +109,9 @@ fn run_app(
                 break;
             }
 
-            let action = screens.handle_key(current_screen, key, db);
-
-            match action {
-                Action::Quit => break,
-                Action::Navigate(intent) => {
-                    let prepared = screens.prepare(intent, db)?;
-                    let target = prepared.target();
-                    screens.install(prepared);
-                    current_screen = target;
-                }
-                Action::None => {}
+            match shell.handle_key(key, db)? {
+                ShellControl::Quit => break,
+                ShellControl::Continue => {}
             }
         }
     }
@@ -82,9 +123,6 @@ fn run_app(
 mod tests {
     use super::*;
     use crate::model::{PracticeType, SetData};
-    use crate::tui::{
-        history::HistoryScreen, log_entry::LogEntryScreen, ModuleId, NavigationIntent,
-    };
     use chrono::NaiveDate;
     use crossterm::event::{KeyEvent, KeyEventKind, KeyEventState};
 
@@ -106,15 +144,15 @@ mod tests {
         }
     }
 
-    fn history_with_filtered_nonzero_target() -> (Database, HistoryScreen, i64) {
+    fn lifecycle_shell_fixture() -> (Database, AppShell, i64) {
         let db = Database::open_in_memory().unwrap();
-        let bench_press = db
+        let bench = db
             .create_practice("Bench Press", PracticeType::Bodyweight)
             .unwrap();
-        let leg_press = db
+        let leg = db
             .create_practice("Leg Press", PracticeType::Bodyweight)
             .unwrap();
-        let pull_up = db
+        let pull = db
             .create_practice("Pull-up", PracticeType::Bodyweight)
             .unwrap();
         let sets = [SetData::Bodyweight { reps: 10 }];
@@ -125,7 +163,7 @@ mod tests {
                 .unwrap()
         };
         db.create_log_at(
-            bench_press.id,
+            bench.id,
             &logged_at(12),
             &sets,
             Some("newest press"),
@@ -136,7 +174,7 @@ mod tests {
         .unwrap();
         let target_id = db
             .create_log_at(
-                leg_press.id,
+                leg.id,
                 &logged_at(11),
                 &sets,
                 Some("original target"),
@@ -146,7 +184,7 @@ mod tests {
             )
             .unwrap();
         db.create_log_at(
-            pull_up.id,
+            pull.id,
             &logged_at(10),
             &sets,
             Some("outside filter"),
@@ -155,109 +193,100 @@ mod tests {
             Some(7),
         )
         .unwrap();
+        let shell = AppShell::new(&db, false).unwrap();
+        (db, shell, target_id)
+    }
 
-        let mut history = HistoryScreen::new(&db).unwrap();
-        history.handle_key(key(KeyCode::Char('/')), &db);
+    fn open_filtered_second_history_log(shell: &mut AppShell, db: &Database) {
+        assert_eq!(
+            shell.handle_key(key(KeyCode::Char('h')), db).unwrap(),
+            ShellControl::Continue
+        );
+        assert_eq!(
+            shell.handle_key(key(KeyCode::Char('/')), db).unwrap(),
+            ShellControl::Continue
+        );
         for character in "press".chars() {
-            history.handle_key(key(KeyCode::Char(character)), &db);
+            assert_eq!(
+                shell.handle_key(key(KeyCode::Char(character)), db).unwrap(),
+                ShellControl::Continue
+            );
         }
-        history.handle_key(key(KeyCode::Enter), &db);
-        history.handle_key(key(KeyCode::Char('j')), &db);
-        assert_eq!(history.selected_entry().unwrap().log.id, target_id);
-        (db, history, target_id)
+        shell.handle_key(key(KeyCode::Enter), db).unwrap();
+        shell.handle_key(key(KeyCode::Char('j')), db).unwrap();
+        shell.handle_key(key(KeyCode::Char('e')), db).unwrap();
     }
 
-    fn replace_note(screen: &mut LogEntryScreen, db: &Database, note: &str) {
+    #[test]
+    fn app_shell_routes_dashboard_to_goals_and_back() {
+        let db = Database::open_in_memory().unwrap();
+        let mut shell = AppShell::new(&db, false).unwrap();
+
+        assert_eq!(shell.current_for_test(), ScreenId::Dashboard);
+        assert_eq!(
+            shell.handle_key(key(KeyCode::Char('g')), &db).unwrap(),
+            ShellControl::Continue
+        );
+        assert_eq!(shell.current_for_test(), ScreenId::Goals);
+        assert_eq!(
+            shell.handle_key(key(KeyCode::Esc), &db).unwrap(),
+            ShellControl::Continue
+        );
+        assert_eq!(shell.current_for_test(), ScreenId::Dashboard);
+    }
+
+    #[test]
+    fn shell_history_save_returns_to_same_refreshed_log() {
+        let (db, mut shell, target_id) = lifecycle_shell_fixture();
+        open_filtered_second_history_log(&mut shell, &db);
+        assert_eq!(shell.current_for_test(), ScreenId::LogEntry);
+        assert_eq!(
+            shell.screens.log_entry_for_test().identity_for_test().0,
+            Some(target_id)
+        );
         for _ in 0..4 {
-            screen.handle_key(key(KeyCode::Tab), db);
+            shell.handle_key(key(KeyCode::Tab), &db).unwrap();
         }
-        screen.handle_key(ctrl_key('a'), db);
-        screen.handle_key(ctrl_key('k'), db);
-        for character in note.chars() {
-            screen.handle_key(key(KeyCode::Char(character)), db);
+        shell.handle_key(ctrl_key('a'), &db).unwrap();
+        shell.handle_key(ctrl_key('k'), &db).unwrap();
+        for character in "updated target".chars() {
+            shell
+                .handle_key(key(KeyCode::Char(character)), &db)
+                .unwrap();
         }
-    }
+        shell.handle_key(ctrl_key('s'), &db).unwrap();
 
-    #[test]
-    fn returning_from_filtered_nonzero_log_edit_refreshes_same_entry_before_second_edit() {
-        let (db, mut history, target_id) = history_with_filtered_nonzero_target();
-        let open_action = history.handle_key(key(KeyCode::Char('e')), &db);
-        let open_log_id = match open_action {
-            Action::Navigate(NavigationIntent::EditHistoryLog { log_id }) => log_id,
-            _ => panic!("History edit must navigate with the selected log ID"),
-        };
-        assert_eq!(open_log_id, target_id);
-        let entry = db.get_log_by_id(open_log_id).unwrap().unwrap();
-        let mut first_edit = LogEntryScreen::from_existing(&db, &entry).unwrap();
-        replace_note(&mut first_edit, &db, "updated target");
-
-        let save_action = first_edit.handle_key(ctrl_key('s'), &db);
-        let target = match save_action {
-            Action::Navigate(NavigationIntent::Open(ModuleId::History)) => ScreenId::History,
-            _ => panic!("successful History edit must navigate back to History"),
-        };
-        history.refresh_preserving_context(&db).unwrap();
-        let current_screen = target;
-
-        assert_eq!(current_screen, ScreenId::History);
-        assert_eq!(history.selected_entry().unwrap().log.id, target_id);
+        assert_eq!(shell.current_for_test(), ScreenId::History);
         assert_eq!(
-            history.selected_entry().unwrap().log.note.as_deref(),
-            Some("updated target")
+            shell.screens.history_context_for_test(),
+            (
+                Some(target_id),
+                Some("updated target".into()),
+                "press".into()
+            )
         );
-
-        let reopen_action = history.handle_key(key(KeyCode::Char('e')), &db);
-        let reopen_log_id = match reopen_action {
-            Action::Navigate(NavigationIntent::EditHistoryLog { log_id }) => log_id,
-            _ => panic!("History re-edit must navigate with the selected log ID"),
-        };
-        assert_eq!(reopen_log_id, target_id);
-        let entry = db.get_log_by_id(reopen_log_id).unwrap().unwrap();
-        let mut second_edit = LogEntryScreen::from_existing(&db, &entry).unwrap();
-        let second_save = second_edit.handle_key(ctrl_key('s'), &db);
-        assert!(matches!(
-            second_save,
-            Action::Navigate(NavigationIntent::Open(ModuleId::History))
-        ));
+        shell.handle_key(key(KeyCode::Char('e')), &db).unwrap();
         assert_eq!(
-            db.list_logs_all()
-                .unwrap()
-                .into_iter()
-                .find(|entry| entry.log.id == target_id)
-                .unwrap()
-                .log
-                .note
-                .as_deref(),
-            Some("updated target")
+            shell.screens.log_entry_for_test().identity_for_test().0,
+            Some(target_id)
         );
     }
 
     #[test]
-    fn canceling_filtered_nonzero_log_edit_preserves_history_context() {
-        let (db, mut history, target_id) = history_with_filtered_nonzero_target();
-        let entry = db.get_log_by_id(target_id).unwrap().unwrap();
-        let mut edit = LogEntryScreen::from_existing(&db, &entry).unwrap();
-        replace_note(&mut edit, &db, "discarded target");
+    fn shell_history_cancel_returns_to_same_unmodified_log() {
+        let (db, mut shell, target_id) = lifecycle_shell_fixture();
+        open_filtered_second_history_log(&mut shell, &db);
+        shell.handle_key(key(KeyCode::Esc), &db).unwrap();
+        shell.handle_key(key(KeyCode::Char('y')), &db).unwrap();
 
-        assert!(matches!(
-            edit.handle_key(key(KeyCode::Esc), &db),
-            Action::None
-        ));
-        let cancel_action = edit.handle_key(key(KeyCode::Char('y')), &db);
-        assert!(matches!(
-            cancel_action,
-            Action::Navigate(NavigationIntent::Open(ModuleId::History))
-        ));
-        history.refresh_preserving_context(&db).unwrap();
-
-        assert_eq!(history.selected_entry().unwrap().log.id, target_id);
+        assert_eq!(shell.current_for_test(), ScreenId::History);
         assert_eq!(
-            history.selected_entry().unwrap().log.note.as_deref(),
-            Some("original target")
+            shell.screens.history_context_for_test(),
+            (
+                Some(target_id),
+                Some("original target".into()),
+                "press".into()
+            )
         );
-        assert!(matches!(
-            history.handle_key(key(KeyCode::Esc), &db),
-            Action::None
-        ));
     }
 }
