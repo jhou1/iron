@@ -438,7 +438,11 @@ impl TrendsScreen {
 
     fn load_chart(&mut self, db: &Database) -> anyhow::Result<()> {
         self.entries = match &self.chosen_practice {
-            Some(practice) => db.list_logs_for_practice(practice.id, self.days_window)?,
+            Some(practice) => {
+                let mut entries = db.list_logs_for_practice(practice.id, self.days_window)?;
+                entries.sort_by_key(|entry| entry.log.logged_at);
+                entries
+            }
             None => Vec::new(),
         };
         self.needs_refresh = false;
@@ -584,6 +588,28 @@ mod tests {
         db
     }
 
+    fn trends_db_with_improving_press_logs() -> Database {
+        let db = Database::open_in_memory().unwrap();
+        let press = db
+            .create_practice("Bench Press", PracticeType::Bodyweight)
+            .unwrap();
+        let now = chrono::Local::now().naive_local();
+        for (days_ago, reps) in [(4, 10), (3, 20), (2, 30), (1, 40)] {
+            let logged_at = now - chrono::Duration::days(days_ago);
+            db.create_log_at(
+                press.id,
+                &logged_at,
+                &[SetData::Bodyweight { reps }],
+                None,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+        }
+        db
+    }
+
     fn reveal_selection(screen: &mut TrendsScreen) {
         screen.list_viewport.reveal(VisualSpan {
             start: screen.selected,
@@ -612,6 +638,23 @@ mod tests {
         assert!(!next.needs_refresh);
         assert!(!next.entries.is_empty());
         assert!(next.status_msg.is_none());
+    }
+
+    #[test]
+    fn multi_log_chart_keeps_improving_trend_chronological() {
+        let db = trends_db_with_improving_press_logs();
+        let mut screen = TrendsScreen::new(&db).unwrap();
+
+        screen.load_chart(&db).unwrap();
+
+        let metrics = screen
+            .entries
+            .iter()
+            .map(LogEntry::total_metric)
+            .collect::<Vec<_>>();
+        let (_, _, trend_pct) = screen.stats();
+        assert_eq!(metrics, vec![10.0, 20.0, 30.0, 40.0]);
+        assert!(trend_pct > 0.0, "expected improvement, got {trend_pct}");
     }
 
     #[test]
