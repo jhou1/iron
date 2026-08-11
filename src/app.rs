@@ -28,11 +28,6 @@ pub fn run() -> Result<()> {
     result
 }
 
-fn refresh_history_for_navigation(db: &Database, history: &mut HistoryScreen) -> Result<()> {
-    *history = HistoryScreen::new(db)?;
-    Ok(())
-}
-
 fn run_app(
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     db: &Database,
@@ -112,7 +107,7 @@ fn run_app(
                             }
                         }
                         Screen::History => {
-                            refresh_history_for_navigation(db, &mut history)?;
+                            history.refresh_preserving_context(db)?;
                         }
                         Screen::Trends => trends = TrendsScreen::new(db)?,
                         Screen::Practices => practices = PracticesScreen::new(db)?,
@@ -134,6 +129,7 @@ fn run_app(
 mod tests {
     use super::*;
     use crate::model::{PracticeType, SetData};
+    use chrono::NaiveDate;
     use crossterm::event::{KeyEvent, KeyEventKind, KeyEventState};
 
     fn key(code: KeyCode) -> KeyEvent {
@@ -154,52 +150,100 @@ mod tests {
         }
     }
 
-    #[test]
-    fn returning_from_log_edit_refreshes_history_before_second_edit() {
+    fn history_with_filtered_nonzero_target() -> (Database, HistoryScreen, i64) {
         let db = Database::open_in_memory().unwrap();
-        let practice = db
+        let bench_press = db
+            .create_practice("Bench Press", PracticeType::Bodyweight)
+            .unwrap();
+        let leg_press = db
+            .create_practice("Leg Press", PracticeType::Bodyweight)
+            .unwrap();
+        let pull_up = db
             .create_practice("Pull-up", PracticeType::Bodyweight)
             .unwrap();
-        db.create_log(
-            practice.id,
-            &[SetData::Bodyweight { reps: 10 }],
-            Some("original note"),
+        let sets = [SetData::Bodyweight { reps: 10 }];
+        let logged_at = |day| {
+            NaiveDate::from_ymd_opt(2026, 8, day)
+                .unwrap()
+                .and_hms_opt(12, 0, 0)
+                .unwrap()
+        };
+        db.create_log_at(
+            bench_press.id,
+            &logged_at(12),
+            &sets,
+            Some("newest press"),
             None,
             None,
             Some(7),
         )
         .unwrap();
-        let mut history = HistoryScreen::new(&db).unwrap();
-        assert_eq!(
-            history.selected_entry().unwrap().log.note.as_deref(),
-            Some("original note")
-        );
+        let target_id = db
+            .create_log_at(
+                leg_press.id,
+                &logged_at(11),
+                &sets,
+                Some("original target"),
+                None,
+                None,
+                Some(7),
+            )
+            .unwrap();
+        db.create_log_at(
+            pull_up.id,
+            &logged_at(10),
+            &sets,
+            Some("outside filter"),
+            None,
+            None,
+            Some(7),
+        )
+        .unwrap();
 
+        let mut history = HistoryScreen::new(&db).unwrap();
+        history.handle_key(key(KeyCode::Char('/')), &db);
+        for character in "press".chars() {
+            history.handle_key(key(KeyCode::Char(character)), &db);
+        }
+        history.handle_key(key(KeyCode::Enter), &db);
+        history.handle_key(key(KeyCode::Char('j')), &db);
+        assert_eq!(history.selected_entry().unwrap().log.id, target_id);
+        (db, history, target_id)
+    }
+
+    fn replace_note(screen: &mut LogEntryScreen, db: &Database, note: &str) {
+        for _ in 0..4 {
+            screen.handle_key(key(KeyCode::Tab), db);
+        }
+        screen.handle_key(ctrl_key('a'), db);
+        screen.handle_key(ctrl_key('k'), db);
+        for character in note.chars() {
+            screen.handle_key(key(KeyCode::Char(character)), db);
+        }
+    }
+
+    #[test]
+    fn returning_from_filtered_nonzero_log_edit_refreshes_same_entry_before_second_edit() {
+        let (db, mut history, target_id) = history_with_filtered_nonzero_target();
         let open_action = history.handle_key(key(KeyCode::Char('e')), &db);
         assert!(matches!(open_action, Action::Navigate(Screen::LogEntry)));
         let mut first_edit =
             LogEntryScreen::from_existing(&db, history.selected_entry().unwrap()).unwrap();
-        for _ in 0..4 {
-            first_edit.handle_key(key(KeyCode::Tab), &db);
-        }
-        first_edit.handle_key(ctrl_key('a'), &db);
-        first_edit.handle_key(ctrl_key('k'), &db);
-        for character in "new note".chars() {
-            first_edit.handle_key(key(KeyCode::Char(character)), &db);
-        }
+        replace_note(&mut first_edit, &db, "updated target");
 
         let save_action = first_edit.handle_key(ctrl_key('s'), &db);
         let target = match save_action {
             Action::Navigate(Screen::History) => Screen::History,
             _ => panic!("successful History edit must navigate back to History"),
         };
-        refresh_history_for_navigation(&db, &mut history).unwrap();
+        history.refresh_preserving_context(&db).unwrap();
         let current_screen = target;
 
         assert_eq!(current_screen, Screen::History);
+        assert_eq!(history.selected_entry().unwrap().log.id, target_id);
         assert_eq!(
             history.selected_entry().unwrap().log.note.as_deref(),
-            Some("new note")
+            Some("updated target")
         );
 
         let reopen_action = history.handle_key(key(KeyCode::Char('e')), &db);
@@ -209,8 +253,41 @@ mod tests {
         let second_save = second_edit.handle_key(ctrl_key('s'), &db);
         assert!(matches!(second_save, Action::Navigate(Screen::History)));
         assert_eq!(
-            db.list_logs_all().unwrap().remove(0).log.note.as_deref(),
-            Some("new note")
+            db.list_logs_all()
+                .unwrap()
+                .into_iter()
+                .find(|entry| entry.log.id == target_id)
+                .unwrap()
+                .log
+                .note
+                .as_deref(),
+            Some("updated target")
         );
+    }
+
+    #[test]
+    fn canceling_filtered_nonzero_log_edit_preserves_history_context() {
+        let (db, mut history, target_id) = history_with_filtered_nonzero_target();
+        let mut edit =
+            LogEntryScreen::from_existing(&db, history.selected_entry().unwrap()).unwrap();
+        replace_note(&mut edit, &db, "discarded target");
+
+        assert!(matches!(
+            edit.handle_key(key(KeyCode::Esc), &db),
+            Action::None
+        ));
+        let cancel_action = edit.handle_key(key(KeyCode::Char('y')), &db);
+        assert!(matches!(cancel_action, Action::Navigate(Screen::History)));
+        history.refresh_preserving_context(&db).unwrap();
+
+        assert_eq!(history.selected_entry().unwrap().log.id, target_id);
+        assert_eq!(
+            history.selected_entry().unwrap().log.note.as_deref(),
+            Some("original target")
+        );
+        assert!(matches!(
+            history.handle_key(key(KeyCode::Esc), &db),
+            Action::None
+        ));
     }
 }

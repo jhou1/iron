@@ -587,7 +587,7 @@ impl HistoryScreen {
             KeyCode::Char('u') => {
                 if let Some(entry) = self.last_deleted.take() {
                     match db.restore_log(&entry) {
-                        Ok(_) => match self.reload_entries_preserving_selection(db) {
+                        Ok(_) => match self.refresh_preserving_context(db) {
                             Ok(()) => {
                                 self.status_msg = Some((tr("status-restored"), false));
                             }
@@ -647,7 +647,7 @@ impl HistoryScreen {
                 match db.delete_log(log_id) {
                     Ok(()) => {
                         self.last_deleted = Some(entry_clone);
-                        match self.reload_entries_preserving_selection(db) {
+                        match self.refresh_preserving_context(db) {
                             Ok(()) => {
                                 self.status_msg = Some((tr("status-deleted-undo"), false));
                                 self.mode = Mode::Browse;
@@ -668,7 +668,7 @@ impl HistoryScreen {
         Action::None
     }
 
-    fn reload_entries_preserving_selection(&mut self, db: &Database) -> anyhow::Result<()> {
+    pub(crate) fn refresh_preserving_context(&mut self, db: &Database) -> anyhow::Result<()> {
         let selected_id = self.selected_entry().map(|entry| entry.log.id);
         self.entries = db.list_logs_all()?;
         let lower = self.filter.value().to_lowercase();
@@ -788,5 +788,107 @@ mod tests {
 
         assert!(output.contains("[u] Undo"), "{output}");
         assert!(output.contains("[Esc] Back"), "{output}");
+    }
+
+    #[test]
+    fn refresh_preserves_history_context_while_reloading_selected_entry() {
+        let db = Database::open_in_memory().unwrap();
+        let bench_press = db
+            .create_practice("Bench Press", PracticeType::Bodyweight)
+            .unwrap();
+        let leg_press = db
+            .create_practice("Leg Press", PracticeType::Bodyweight)
+            .unwrap();
+        let pull_up = db
+            .create_practice("Pull-up", PracticeType::Bodyweight)
+            .unwrap();
+        let sets = [SetData::Bodyweight { reps: 10 }];
+        let logged_at = |day| {
+            chrono::NaiveDate::from_ymd_opt(2026, 8, day)
+                .unwrap()
+                .and_hms_opt(12, 0, 0)
+                .unwrap()
+        };
+        db.create_log_at(
+            bench_press.id,
+            &logged_at(12),
+            &sets,
+            Some("newest press"),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        let target_id = db
+            .create_log_at(
+                leg_press.id,
+                &logged_at(11),
+                &sets,
+                Some("original target"),
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+        db.create_log_at(
+            pull_up.id,
+            &logged_at(10),
+            &sets,
+            Some("outside filter"),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+        let mut screen = HistoryScreen::new(&db).unwrap();
+        screen.filter = TextInput::from("press");
+        screen.filtering = true;
+        screen.apply_filter();
+        screen.selected = 1;
+        screen.list_viewport.set_height(1);
+        screen.list_viewport.set_offset(1);
+        screen.mode = Mode::Detail;
+        screen.detail_state.focused = true;
+        screen.detail_state.viewport.set_offset(3);
+        screen.detail_content_height = 8;
+        screen.status_msg = Some(("preserve status".to_string(), false));
+        screen.last_deleted = screen
+            .entries
+            .iter()
+            .find(|entry| entry.log.id != target_id)
+            .cloned();
+        let deleted_id = screen.last_deleted.as_ref().unwrap().log.id;
+
+        db.update_log(
+            target_id,
+            &[SetData::Bodyweight { reps: 12 }],
+            Some("updated target"),
+            None,
+            None,
+            None,
+            Some(8),
+        )
+        .unwrap();
+        screen.refresh_preserving_context(&db).unwrap();
+
+        assert_eq!(screen.filter.value(), "press");
+        assert!(screen.filtering);
+        assert_eq!(screen.selected, 1);
+        assert_eq!(screen.selected_entry().unwrap().log.id, target_id);
+        assert_eq!(
+            screen.selected_entry().unwrap().log.note.as_deref(),
+            Some("updated target")
+        );
+        assert_eq!(screen.list_viewport.offset(), 1);
+        assert_eq!(screen.mode, Mode::Detail);
+        assert!(screen.detail_state.focused);
+        assert_eq!(screen.detail_state.viewport.offset(), 3);
+        assert_eq!(screen.detail_content_height, 8);
+        assert_eq!(
+            screen.status_msg,
+            Some(("preserve status".to_string(), false))
+        );
+        assert_eq!(screen.last_deleted.as_ref().unwrap().log.id, deleted_id);
     }
 }
