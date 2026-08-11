@@ -577,19 +577,27 @@ mod tests {
     }
 
     #[test]
-    fn quotes_reentry_returns_edit_mode_to_browse_and_clears_editing_id() {
+    fn quotes_reentry_clears_every_transient_mode_and_field() {
         let db = Database::open_in_memory().unwrap();
         let quote = db.create_quote("Quote").unwrap();
-        let mut screen = QuotesScreen::new(&db).unwrap();
-        screen.mode = Mode::Edit;
-        screen.input.set("discard me");
-        screen.editing_id = Some(quote.id);
 
-        let next = screen.reenter(&db).unwrap();
+        for mode in [Mode::Add, Mode::Edit, Mode::ConfirmDelete] {
+            let mut screen = QuotesScreen::new(&db).unwrap();
+            screen.mode = mode.clone();
+            screen.input.set("discard me");
+            screen.editing_id = Some(quote.id);
+            screen.status_msg = Some(("old status".into(), true));
+            screen.last_deleted = Some(screen.quotes[0].clone());
 
-        assert_eq!(next.mode, Mode::Browse);
-        assert!(next.input.value().is_empty());
-        assert!(next.editing_id.is_none());
+            let next = screen.reenter(&db).unwrap();
+
+            assert_eq!(next.quotes[next.selected].id, quote.id, "{mode:?}");
+            assert_eq!(next.mode, Mode::Browse, "{mode:?}");
+            assert!(next.input.value().is_empty(), "{mode:?}");
+            assert!(next.editing_id.is_none(), "{mode:?}");
+            assert!(next.status_msg.is_none(), "{mode:?}");
+            assert!(next.last_deleted.is_none(), "{mode:?}");
+        }
     }
 
     #[test]

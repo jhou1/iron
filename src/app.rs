@@ -387,6 +387,70 @@ mod tests {
     }
 
     #[test]
+    fn new_log_save_return_failure_retries_without_duplicate_insert() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        let db = Database::open(temp.path()).unwrap();
+        let practice = db
+            .create_practice("Pull-up", PracticeType::Bodyweight)
+            .unwrap();
+        let mut shell = AppShell::new(&db, false).unwrap();
+
+        shell.handle_key(key(KeyCode::Char('l')), &db);
+        shell.handle_key(key(KeyCode::Enter), &db);
+        for character in "10".chars() {
+            shell.handle_key(key(KeyCode::Char(character)), &db);
+        }
+        shell.handle_key(key(KeyCode::Enter), &db);
+        for _ in 0..4 {
+            shell.handle_key(key(KeyCode::Tab), &db);
+        }
+        for character in "persist once".chars() {
+            shell.handle_key(key(KeyCode::Char(character)), &db);
+        }
+        rusqlite::Connection::open(temp.path())
+            .unwrap()
+            .execute("DROP TABLE daily_metrics", [])
+            .unwrap();
+
+        assert_eq!(shell.handle_key(ctrl_key('s'), &db), ShellControl::Continue);
+        assert_eq!(shell.current_for_test(), ScreenId::LogEntry);
+        let logs_after_first_save = db.list_logs_all().unwrap();
+        assert_eq!(logs_after_first_save.len(), 1);
+        let created_id = logs_after_first_save[0].log.id;
+        assert_eq!(logs_after_first_save[0].log.practice_id, practice.id);
+        assert_eq!(
+            logs_after_first_save[0].log.note.as_deref(),
+            Some("persist once")
+        );
+        assert!(render_shell(&mut shell, 80, 24).contains("Unable to open screen"));
+
+        shell.handle_key(ctrl_key('a'), &db);
+        shell.handle_key(ctrl_key('k'), &db);
+        for character in "update existing".chars() {
+            shell.handle_key(key(KeyCode::Char(character)), &db);
+        }
+        assert_eq!(shell.handle_key(ctrl_key('s'), &db), ShellControl::Continue);
+
+        let logs_after_retry = db.list_logs_all().unwrap();
+        assert_eq!(logs_after_retry.len(), 1);
+        assert_eq!(logs_after_retry[0].log.id, created_id);
+        assert_eq!(
+            logs_after_retry[0].log.note.as_deref(),
+            Some("update existing")
+        );
+        assert_eq!(
+            shell.screens.log_entry_for_test().identity_for_test(),
+            (Some(created_id), ModuleId::Dashboard)
+        );
+        assert_eq!(
+            shell.screens.log_entry_for_test().form_value_for_test().0,
+            "update existing"
+        );
+        assert_eq!(shell.current_for_test(), ScreenId::LogEntry);
+        assert!(render_shell(&mut shell, 80, 24).contains("Unable to open screen"));
+    }
+
+    #[test]
     fn shell_history_save_returns_to_same_refreshed_log() {
         let (db, mut shell, target_id) = lifecycle_shell_fixture();
         open_filtered_second_history_log(&mut shell, &db);

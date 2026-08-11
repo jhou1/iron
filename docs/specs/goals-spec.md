@@ -91,6 +91,6 @@ Goal and milestone deletion each support one level of undo. Milestone restore pr
 
 ## Re-entry
 
-Opening Goals reloads current goals and milestones before the route changes. The selected goal is restored by stable goal ID. If the milestone panel was focused, its goal and selected milestone are restored by their stable IDs and the panel remains focused when that goal still exists. List and detail viewport context is retained and then bounded by the measured rendered content.
+Opening Goals reloads current goals and milestones before the route changes. The selected goal is restored by stable goal ID when possible; if that goal disappeared, its prior index is clamped to the remaining list. If the milestone panel was focused, its goal and selected milestone are restored by stable IDs when possible, with clamped index fallbacks when either disappeared. The panel remains focused while any goal remains, including when its original goal disappeared. List and detail viewport context is retained and then bounded by the measured rendered content.
 
 All goal or milestone add/edit/date/delete-confirmation modes return to Browse on cross-page re-entry. Shared input, normal and modal status messages, and both goal and milestone undo payloads clear. If preparation fails, navigation stays on the source screen, the cached Goals screen is not replaced, and the source shows the error.

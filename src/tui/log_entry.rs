@@ -1290,7 +1290,9 @@ impl LogEntryScreen {
                 cool_down,
                 rpe,
             )
-            .map(|_| ())
+            .map(|log_id| {
+                self.editing_log_id = Some(log_id);
+            })
         };
         match result {
             Ok(_) => Action::Navigate(NavigationIntent::Open(self.return_to)),

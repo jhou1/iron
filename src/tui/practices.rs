@@ -644,6 +644,35 @@ mod tests {
     }
 
     #[test]
+    fn practices_reentry_clears_every_transient_mode_and_field() {
+        let db = Database::open_in_memory().unwrap();
+        let selected = db
+            .create_practice("Selected", PracticeType::Bodyweight)
+            .unwrap();
+
+        for mode in [
+            Mode::AddName,
+            Mode::AddType,
+            Mode::EditName,
+            Mode::ConfirmDelete,
+        ] {
+            let mut screen = PracticesScreen::new(&db).unwrap();
+            screen.mode = mode.clone();
+            screen.input.set("discard me");
+            screen.type_selected = PracticeType::ALL.len() - 1;
+            screen.status_msg = Some(("old status".into(), true));
+
+            let next = screen.reenter(&db).unwrap();
+
+            assert_eq!(next.practices[next.selected].id, selected.id, "{mode:?}");
+            assert_eq!(next.mode, Mode::Browse, "{mode:?}");
+            assert!(next.input.value().is_empty(), "{mode:?}");
+            assert_eq!(next.type_selected, 0, "{mode:?}");
+            assert!(next.status_msg.is_none(), "{mode:?}");
+        }
+    }
+
+    #[test]
     fn practices_reentry_clamps_selection_and_viewport_after_selected_deletion() {
         let db = Database::open_in_memory().unwrap();
         db.create_practice("First", PracticeType::Bodyweight)

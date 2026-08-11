@@ -20,16 +20,18 @@ Single Rust binary. Three layers: **model** (domain types) → **db** (SQLite vi
 ```
 src/
   main.rs              — clap CLI entry point, dispatches to TUI or export/import
-  app.rs               — terminal-independent AppShell plus event loop/setup/teardown
+  app.rs               — AppShell route/action ownership plus event loop/setup/teardown
   app/
     router.rs           — atomic prepare/install/route transitions
-    screens.rs          — concrete screen storage and lifecycle preparation
+    screens.rs          — ScreenStore concrete screen ownership and lifecycle preparation
   model.rs             — PracticeType, Practice, Log, Set, SetData, LogEntry
   db.rs                — Database struct wrapping rusqlite, all CRUD + queries
   export.rs            — JSON export/import with duplicate detection
   lib.rs               — re-exports model, db, export for integration tests
   tui/
-    mod.rs             — Screen enum, Action enum
+    mod.rs             — shared TUI exports, layout helpers, and modules
+    navigation.rs      — typed screen/module IDs, navigation intents, and actions
+    lifecycle.rs       — static re-entry and navigation-status contracts
     framework/         — shared viewport, input, status, shortcut, and test primitives
     dashboard.rs       — heatmap + summary + recent logs + goals + quote + HRV
     log_entry.rs       — practice picker + set-by-set form + date + RPE + notes
