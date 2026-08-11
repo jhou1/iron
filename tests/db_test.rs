@@ -11,19 +11,92 @@ fn opening_database_drops_abbreviations_and_preserves_training_data() {
     let legacy = Connection::open(&path).unwrap();
     legacy
         .execute_batch(
-            "CREATE TABLE abbreviations (
+            "PRAGMA foreign_keys = ON;
+
+             CREATE TABLE practices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                type TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                active INTEGER NOT NULL DEFAULT 1
+             );
+             CREATE TABLE training_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                practice_id INTEGER NOT NULL REFERENCES practices(id),
+                date TEXT NOT NULL,
+                warm_up TEXT,
+                cool_down TEXT,
+                rpe INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                note TEXT
+             );
+             CREATE TABLE training_sets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                training_session_id INTEGER NOT NULL REFERENCES training_sessions(id) ON DELETE CASCADE,
+                set_number INTEGER NOT NULL,
+                weight REAL,
+                reps INTEGER,
+                distance REAL,
+                duration REAL
+             );
+             CREATE TABLE abbreviations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 short TEXT NOT NULL UNIQUE COLLATE NOCASE,
                 full_name TEXT NOT NULL
              );
+
+             INSERT INTO practices (id, name, type, created_at, active)
+             VALUES (41, 'Deadlift', 'weighted', '2026-08-09 07:30:00', 1);
+             INSERT INTO training_sessions
+                (id, practice_id, date, warm_up, cool_down, rpe, created_at, note)
+             VALUES
+                (73, 41, '2026-08-09 08:00:00', 'Band pull-aparts', 'Easy walk', 8,
+                 '2026-08-09 09:00:00', 'Legacy session note');
+             INSERT INTO training_sets
+                (id, training_session_id, set_number, weight, reps, distance, duration)
+             VALUES (101, 73, 1, 142.5, 5, NULL, NULL);
              INSERT INTO abbreviations (short, full_name) VALUES ('DL', 'Deadlift');",
         )
         .unwrap();
     drop(legacy);
 
     let db = Database::open(&path).unwrap();
-    db.create_practice("Deadlift", PracticeType::Weighted)
-        .unwrap();
+    let practices = db.list_practices().unwrap();
+    assert_eq!(practices.len(), 1);
+    assert_eq!(practices[0].id, 41);
+    assert_eq!(practices[0].name, "Deadlift");
+    assert_eq!(practices[0].practice_type, PracticeType::Weighted);
+    assert_eq!(
+        practices[0].created_at,
+        NaiveDateTime::parse_from_str("2026-08-09 07:30:00", "%Y-%m-%d %H:%M:%S").unwrap()
+    );
+    assert!(practices[0].active);
+
+    let logs = db.list_logs_all().unwrap();
+    assert_eq!(logs.len(), 1);
+    assert_eq!(logs[0].log.id, 73);
+    assert_eq!(logs[0].log.practice_id, 41);
+    assert_eq!(logs[0].practice_name, "Deadlift");
+    assert_eq!(logs[0].practice_type, PracticeType::Weighted);
+    assert_eq!(
+        logs[0].log.logged_at,
+        NaiveDateTime::parse_from_str("2026-08-09 08:00:00", "%Y-%m-%d %H:%M:%S").unwrap()
+    );
+    assert_eq!(logs[0].log.warm_up.as_deref(), Some("Band pull-aparts"));
+    assert_eq!(logs[0].log.cool_down.as_deref(), Some("Easy walk"));
+    assert_eq!(logs[0].log.rpe, Some(8));
+    assert_eq!(logs[0].log.note.as_deref(), Some("Legacy session note"));
+    assert_eq!(logs[0].sets.len(), 1);
+    assert_eq!(logs[0].sets[0].id, 101);
+    assert_eq!(logs[0].sets[0].log_id, 73);
+    assert_eq!(logs[0].sets[0].set_number, 1);
+    assert_eq!(
+        logs[0].sets[0].data,
+        SetData::Weighted {
+            weight: 142.5,
+            reps: 5,
+        }
+    );
     drop(db);
 
     let raw = Connection::open(&path).unwrap();
@@ -34,12 +107,8 @@ fn opening_database_drops_abbreviations_and_preserves_training_data() {
             |row| row.get(0),
         )
         .unwrap();
-    let practices: i64 = raw
-        .query_row("SELECT count(*) FROM practices", [], |row| row.get(0))
-        .unwrap();
 
     assert_eq!(abbreviation_tables, 0);
-    assert_eq!(practices, 1);
 }
 
 #[test]
