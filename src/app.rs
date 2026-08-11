@@ -344,6 +344,49 @@ mod tests {
     }
 
     #[test]
+    fn confirmed_cancel_refresh_failure_keeps_form_and_renders_navigation_error() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        let db = Database::open(temp.path()).unwrap();
+        let practice = db
+            .create_practice("Pull-up", PracticeType::Bodyweight)
+            .unwrap();
+        let log_id = db
+            .create_log(
+                practice.id,
+                &[SetData::Bodyweight { reps: 10 }],
+                Some("keep form"),
+                None,
+                None,
+                Some(7),
+            )
+            .unwrap();
+        let mut shell = AppShell::new(&db, false).unwrap();
+        shell.handle_key(key(KeyCode::Char('h')), &db);
+        let history_before = shell.screens.history_context_for_test();
+        shell.handle_key(key(KeyCode::Char('e')), &db);
+        let form_before = shell.screens.log_entry_context_for_test();
+        assert_eq!(
+            shell.screens.log_entry_for_test().identity_for_test().0,
+            Some(log_id)
+        );
+
+        shell.handle_key(key(KeyCode::Esc), &db);
+        rusqlite::Connection::open(temp.path())
+            .unwrap()
+            .execute("DROP TABLE training_sessions", [])
+            .unwrap();
+        shell.handle_key(key(KeyCode::Char('y')), &db);
+
+        assert_eq!(shell.current_for_test(), ScreenId::LogEntry);
+        assert_eq!(shell.screens.log_entry_context_for_test(), form_before);
+        assert_eq!(shell.screens.history_context_for_test(), history_before);
+        let rendered = render_shell(&mut shell, 80, 24);
+        assert!(rendered.contains("Unable to open screen"), "{rendered}");
+        assert!(rendered.contains("[y/Enter]"), "{rendered}");
+        assert!(rendered.contains("[n/Esc]"), "{rendered}");
+    }
+
+    #[test]
     fn shell_history_save_returns_to_same_refreshed_log() {
         let (db, mut shell, target_id) = lifecycle_shell_fixture();
         open_filtered_second_history_log(&mut shell, &db);

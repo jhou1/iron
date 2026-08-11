@@ -842,7 +842,7 @@ impl LogEntryScreen {
         }
 
         // ── Status line ──
-        if self.confirming_exit {
+        if self.confirming_exit && self.status_msg.is_none() {
             render_status_line(frame, outer[1], &Some((tr("log-cancel-confirm"), true)));
         } else {
             render_status_line(frame, outer[1], &self.status_msg);
