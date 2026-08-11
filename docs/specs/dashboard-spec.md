@@ -1,99 +1,74 @@
 # Dashboard Spec
 
-Home screen. Shows training overview at a glance: heatmap, recent activity, goals, daily quote, and HRV.
+Dashboard is the home screen. It presents the 52-week training heatmap, weekly summary and streak information, daily quote, today's HRV, recent entries, active goals, status, and navigation.
 
-## Layout
+Quick Log is permanently absent and has no replacement on Dashboard. The former `w` command is not handled or rendered.
 
-Vertical stack, top to bottom:
+## Responsive Layout
 
-1. **Header** — app logo + version, rounded border
-2. **Heatmap** — GitHub-style contribution grid (fixed 10 lines)
-3. **Quote** — daily motivational quote (variable height, min 2 lines), centered
-4. **HRV row** — today's Heart Rate Variability reading (3 lines)
-5. **Split pane** — left: recent entries, right: active goals (fills remaining space)
-6. **Status line** — success/error messages (1 line)
-7. **Footer** — contextual keyboard shortcuts (1 line)
+Dashboard is a bounded vertical stack:
 
-## Heatmap
+1. logo/header
+2. 52-week heatmap
+3. summary panel containing weekly volume, streak, HRV, training frequency, and daily quote
+4. split Recent/Goals region
+5. reserved status row
+6. active-mode shortcut footer
 
-Displays a year-long (52 weeks x 7 days) grid of training activity.
+The status and complete shortcut rows are reserved before content panels receive the remaining height. Layout is recalculated from the current frame on every render. `80x35` is the primary acceptance size; smaller direct-render rectangles, including `40x16`, do not panic. Every block-derived inner rectangle is clamped to its parent.
 
-- Data: `heatmap_counts(365)` — one count per day
-- Visual: circles/blocks in a 5-level green intensity scale
-  - 0 sessions: gray
-  - 1: dark green
-  - 2: medium green
-  - 3: bright green
-  - 4+: vivid green
-- Layout: day labels (Mon-Sun) on left, month labels on top
-- Tab key cycles through heatmap view modes (map is the primary view)
+Long practice names, metric suffixes, goal titles, percentages, quotes, and localized labels are truncated or wrapped within their real panel width. Recent and Goals stop rendering at their inner bottom edge.
 
-## Quote Display
+## Heatmap and Summary
 
-- Shows one quote from the user's quote collection, randomly selected
-- If no quotes exist: shows placeholder text prompting user to add quotes
-- Wrapped text, centered in container
+- The heatmap renders up to 52 weeks of daily session counts from `heatmap_counts(365)` using the existing intensity scale.
+- The summary shows weekly volume, current streak, today's HRV (or unavailable state), and seven-day training frequency.
+- One randomly selected user quote is wrapped inside the Summary panel; an empty quote collection produces no quote line.
 
-## HRV Display
+## Recent Entries and Active Goals
 
-- Shows today's HRV value if recorded: "HRV: 42"
-- If not recorded: "HRV: --" with hint to press `v` to record
-- Input: numeric 0-100, validated on entry
+- Recent shows logs from the last seven days, grouped by date, most recent first.
+- Each recent row budgets the practice name and total metric against the pane's actual width.
+- Goals shows incomplete goals only.
+- Goal titles are bounded; each goal renders a progress gauge with a percentage suffix.
 
-## Recent Entries (Left Pane)
+## Modes and Shortcuts
 
-- Shows logs from the last 7 days
-- Each row: date, practice name, total metric with unit
-- Styled list, most recent first
+| Mode | Entry | Active commands |
+|---|---|---|
+| Normal | default | `l`, `h`, `t`, `e`, `g`, `Q`, `v`, `Esc` |
+| HrvInput | `v` | `Enter`, `Esc` |
+| ConfirmQuit | `Esc` | `y`, any other key to cancel |
 
-## Active Goals (Right Pane)
-
-- Shows incomplete goals only
-- Each goal shows: title + progress gauge
-- Gauge: `[=====     ] 3/5` (completed milestones / total)
-
-## Modes
-
-| Mode | Trigger | Behavior |
-|------|---------|----------|
-| Normal | default | Navigation shortcuts visible |
-| ConfirmQuit | `q` | Shows "Really quit? [y]/[any]" |
-| QuotesManage | `Q` | Modal overlay listing all quotes |
-| QuotesEdit | `a`/`e` in QuotesManage | Text input for quote text |
-| QuotesConfirmDelete | `d` in QuotesManage | Confirm quote deletion |
-| HrvInput | `v` | Text input for HRV value |
-
-## Quote Management (Modal)
-
-Triggered by `Q`. Overlay with scrollable list of all quotes.
-
-- `j/k` — navigate
-- `a` — add new quote (text input)
-- `e` or `Enter` — edit selected quote
-- `d` — delete selected quote (with confirmation)
-- `Esc` — close modal
-
-## Navigation
+Normal-mode navigation is:
 
 | Key | Action |
-|-----|--------|
-| `l` | Go to Log Entry |
-| `h` | Go to History |
-| `t` | Go to Trends |
-| `e` | Go to Practices |
-| `g` | Go to Goals |
-| `Tab` | Cycle heatmap view |
-| `Q` | Manage quotes |
-| `v` | Record/edit HRV |
-| `?` | Help overlay |
-| `q` | Quit (with confirmation) |
+|---|---|
+| `l` | Log Entry |
+| `h` | History |
+| `t` | Trends |
+| `e` | Practices |
+| `g` | Goals |
+| `Q` | Quotes |
+| `v` | Record or edit today's HRV |
+| `Esc` | Enter quit confirmation |
+
+The footer is rendered from the current mode with shared `Shortcut` components. It wraps by complete key-label units when needed. HRV input and quit confirmation do not advertise inactive navigation commands.
+
+## HRV Input and Failure Retention
+
+Pressing `v` enters `HrvInput` and preloads today's value when present. The shared single-line `TextInput` keeps its Unicode-safe cursor visible inside the complete summary row.
+
+- `Enter` accepts only an integer in the inclusive range `0..=100`.
+- Parse or range validation failure keeps `HrvInput`, its text, and an error in the reserved status row.
+- Database write failure keeps `HrvInput`, its text, and the previously displayed/database value while showing the write error.
+- Only a successful `set_daily_hrv` updates the displayed value, clears the input, and returns to Normal mode.
+- `Esc` cancels, clears the editor, and returns to Normal mode.
 
 ## Data Refresh
 
-When returning to Dashboard from any screen, reload: heatmap data, recent entries, stats, quotes, goals, HRV.
+When navigation returns to Dashboard, it reloads heatmap data, recent entries, quotes, goals, HRV, weekly volume, training frequency, and streak information.
 
-## Status Messages
+## Removal Contract
 
-- Green text for success (e.g., "Log saved")
-- Red text for errors
-- Displayed in status line, cleared on next action
+Dashboard exposes no Quick Log navigation or LLM-backed logging path. The supporting LLM configuration/runtime and Abbreviations API/data have been permanently removed from the application; opening an existing database drops the `abbreviations` table without altering unrelated training data.

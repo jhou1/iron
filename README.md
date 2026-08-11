@@ -46,7 +46,7 @@ LANG=zh_CN.UTF-8 iron  # Chinese
 
 ### Dashboard
 
-The home screen shows the heatmap, training summary, recent activity, active goals, and a daily quote.
+The home screen shows the 52-week heatmap, weekly summary and streak, recent activity, active goals, a daily quote, and today's HRV. The responsive layout keeps each section inside its panel at the supported `80x35` size and remains bounded in smaller direct-render rectangles.
 
 | Key   | Action                  |
 |-------|-------------------------|
@@ -58,6 +58,8 @@ The home screen shows the heatmap, training summary, recent activity, active goa
 | `Q`   | Quotes                  |
 | `v`   | Record today's HRV      |
 | `Esc` | Quit                    |
+
+The footer always describes the active mode. While entering HRV it shows only confirm/cancel, and quit confirmation shows only its confirmation actions. HRV must be an integer from 0 to 100; validation or database-save failures leave the editor and entered value in place with an error status.
 
 ### First Time Setup
 
@@ -78,11 +80,13 @@ Press `l` to open the Log Entry screen.
 2. Enter sets:
    - Type weight, Tab to reps, type reps, Enter to commit
    - For weighted practices, weight carries forward; just type reps and Enter
-3. `Tab` cycles sections: sets → warm-up → cool-down → note
+3. `Tab` cycles sections: sets → warm-up → cool-down → RPE → note
 4. `j/k` to navigate committed sets; `e` to edit, `d` to delete
 5. `D` to change the log date
 6. `Ctrl+S` to save from any section
 7. `Esc` to cancel
+
+The practice selector clamps at the first and last result and adds `↑`, `↓`, or `↑↓` to its title when results are outside the visible viewport. Every single-line field scrolls horizontally to keep its Unicode cursor visible. The footer changes with the active filter, field, set-edit, date-edit, and exit-confirmation mode. Validation and database-save failures retain the form, cursor, focus, and return destination while showing an error status.
 
 ### History
 
@@ -178,6 +182,8 @@ iron import backup.json    # skips duplicates
 ```
 
 The app auto-migrates data from the old `~/.ironcli/` directory on first launch.
+
+Quick Log and its LLM configuration/runtime have been permanently removed without a replacement workflow. The supporting Abbreviations API and table are also removed: opening an existing database drops the `abbreviations` table and permanently deletes those rows while preserving training logs, practices, goals, quotes, HRV, and other unrelated data.
 
 ## Keyboard Reference
 

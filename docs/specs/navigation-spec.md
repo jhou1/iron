@@ -1,64 +1,53 @@
 # Navigation & Input Spec
 
-Global navigation patterns, keybinding conventions, and text input requirements.
+Global navigation patterns, keybinding conventions, and shared TUI interaction requirements.
 
 ## Screen Flow
 
-```
+```text
                     Dashboard
-                   /  |  |  \  \  \  \
-                  /   |  |   \  \  \   \
-           LogEntry  History Trends Practices Goals Quotes
+              /    /   |   \    \    \
+      LogEntry History Trends Practices Goals Quotes
+                   \
+                    LogEntry (edit existing log)
 ```
 
-All screens return to Dashboard via `Esc`. History can navigate to LogEntry (edit mode), which returns to History.
+Dashboard reaches Log Entry (`l`), History (`h`), Trends (`t`), Practices (`e`), Goals (`g`), and Quotes (`Q`). There is no Quick Log screen, route, or shortcut and no `w` action. Feature-specific screens return to Dashboard via `Esc`; Log Entry opened from History returns to History after a successful edit.
 
 ## Global Keys
 
 | Key | Action | Scope |
-|-----|--------|-------|
-| `Esc` | Back to previous screen / cancel current action | All screens |
-| `Ctrl+C` | Force quit | Event loop |
-| `?` | Toggle help overlay | All screens |
+|---|---|---|
+| `Esc` | Back, cancel, or enter the current screen's explicit exit flow | Screen-owned |
+| `Ctrl+C` | Force quit | Application event loop |
 
-## Vim-Style Navigation
+## List Navigation and Overflow
 
-All list-based screens use consistent movement. Each screen explicitly chooses its edge behavior instead of inheriting an accidental local implementation:
+List screens explicitly choose clamp or wrap edge behavior.
 
-| Key | Action |
-|-----|--------|
-| `j` | Move down / next item |
-| `k` | Move up / previous item |
-| `h` | Left (time window shrink in Trends) |
-| `l` | Right (time window expand in Trends) |
-| `/` | Enter filter mode |
-| `Enter` | Confirm / select / submit |
-
-| Screen | Edge behavior |
+| Screen/list | Edge behavior |
 |---|---|
-| Trends | Wrap from last to first and first to last |
-| Goals, History, Quotes, Practices | Clamp at the first and last item |
+| Log Entry practice selector | Clamp |
+| Goals, History, Quotes, Practices | Clamp |
+| Trends | Wrap |
 
-The selected content must remain visible. Lists and detail panels append `↑`, `↓`, or `↑↓` to their title when visual rows exist outside the viewport. History and Quotes use `Enter` to focus the complete selected detail and `Esc` to return focus to the list.
+`j/k` navigates lists, with arrow-key support where implemented by the screen. The selected item or selected visual span remains visible. When visual rows exist outside a viewport, the panel title adds `↑`, `↓`, or `↑↓`. History and Quotes use `Enter` to focus the complete selected detail and `Esc` to return focus to the list.
 
 ## Text Filter Pattern
 
-Used in: Log Entry, History, Trends (practice selection).
+Log Entry, History, and Trends filter practice names with a shared `TextInput` value and cursor.
 
-**State:** filter active flag plus the shared `TextInput` value and cursor.
+1. `/` enters filter mode and reveals the cursor.
+2. Typing applies a case-insensitive substring filter in real time.
+3. `Enter` or `Esc` exits filter mode.
+4. The filter footer advertises only the actions active in filter mode.
 
-**Behavior:**
-1. `/` enters filter mode (cursor appears in filter bar)
-2. Typing filters the list in real-time (case-insensitive substring match)
-3. `Enter` or `Esc` exits filter mode
-4. Full emacs cursor keybindings in filter input
+## Single-Line Text Input
 
-## Text Input Requirements
-
-**Every text input field** must support:
+Every single-line input uses `tui::framework::TextInput` and supports:
 
 | Key | Action |
-|-----|--------|
+|---|---|
 | `Ctrl+B` or `Left` | Move cursor back one character |
 | `Ctrl+F` or `Right` | Move cursor forward one character |
 | `Ctrl+A` or `Home` | Move cursor to start of line |
@@ -67,37 +56,32 @@ Used in: Log Entry, History, Trends (practice selection).
 | `Backspace` | Delete character before cursor |
 | Character keys | Insert at cursor position |
 
-**Rendering:** Text input must never overflow its container. Batch 1 single-line fields use `tui::framework::TextInput`, which scrolls horizontally to keep the cursor visible within the available width.
+`TextInput::visible_spans` measures display width, clips to the real inner rectangle, and horizontally scrolls long Unicode text to keep the cursor visible. This contract is single-line only; Iron does not provide a multi-line input buffer.
 
-**Wrapping:** All variable-length text display (notes, descriptions, quotes) must wrap within container bounds. Shortcut bars wrap by complete key-and-label units and reserve every required row, so active commands are never clipped.
+Variable-length display content wraps or truncates inside its container. Shortcut bars wrap only at complete key-label boundaries and reserve every required row, so active commands do not overwrite content.
 
-## Confirmation Pattern
+## Mode, Confirmation, and Mutation Rules
 
-Destructive actions (delete) use a two-step confirmation:
+Screens own their modes and expose shortcuts only for commands active in the current mode. Examples include filter confirmation, Log Entry set/date/exit states, Dashboard HRV input, and Dashboard quit confirmation.
 
-1. Press `d` — enters confirm mode, shows "[y] Yes [n] No"
-2. Press `y` to confirm or `n`/`Esc` to cancel
+Destructive actions use an explicit confirmation before mutation. Modes and inputs clear only after the required database mutation and reload succeed. Validation and mutation failures keep the relevant value, Unicode cursor, focus, selection or return target and render the error in a reserved status row.
 
-## Multi-Phase Input Pattern
+## Framework Ownership and Supported Layouts
 
-Used in: Log Entry (4 phases), Practices (add = 2 phases). Trends uses one unified filtered-list-and-chart screen.
+Reusable mechanics live in `src/tui/framework/`: visual-row measurement and viewport state, shared single-line input, bounded rectangle helpers, status and shortcut components, and TestBackend support. Screens continue to own domain data, database calls, validation, and mode transitions.
 
-Each phase has its own render and key handler. Phase transitions:
-- Forward: `Enter` or specific key (e.g., `Ctrl+S`)
-- Backward: `Esc`
+- Batch 1 list/detail screens and Log Entry are verified at `80x24`.
+- Dashboard's complete content and remaining navigation are verified at `80x35`.
+- Log Entry and Dashboard direct renderers tolerate smaller rectangles without panicking or drawing derived inner regions outside their parents.
 
-## Framework ownership
+## Removed Interfaces
 
-Reusable interaction mechanics live in `src/tui/framework/`: visual-row measurement and viewports, single-line input, detail/status/shortcut components, and TestBackend support. Screens continue to own domain data, database calls, validation, modes, and mutation transitions.
-
-Modes and input clear only after a mutation and required reload both succeed. Failed mutations keep the relevant focus/input available and render the error in a reserved status row.
-
-Batch 1 behavior is verified at a minimum terminal size of `80x24`.
+Quick Log was removed permanently without a replacement. Its LLM configuration/runtime, Abbreviations models and CRUD API, locale and dependency interfaces, and application route no longer exist. Database initialization drops the obsolete `abbreviations` table while preserving unrelated data.
 
 ## Color Convention
 
 | Role | Color |
-|------|-------|
+|---|---|
 | Accent (titles, shortcut keys) | Cyan |
 | Active/selected items | Green |
 | Bright highlight | LightGreen |
@@ -105,4 +89,4 @@ Batch 1 behavior is verified at a minimum terminal size of `80x24`.
 | Errors, delete actions | Red |
 | Notes, secondary text | Yellow |
 
-Uses ANSI terminal colors only (no hardcoded RGB) for theme compatibility.
+Iron uses ANSI terminal colors rather than hardcoded RGB theme colors.

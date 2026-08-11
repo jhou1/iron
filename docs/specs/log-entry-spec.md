@@ -1,109 +1,71 @@
 # Log Entry Spec
 
-Multi-phase form for recording a training session. Guides the user through practice selection, set-by-set data entry, optional warm-up/cool-down notes, and a session note.
+The Log Entry screen records or edits a training session through two top-level phases: practice selection and a unified entry form.
 
-## Phases
+## Top-Level Flow
 
+```text
+SelectPractice -> EnterLog -> save
 ```
-SelectPractice -> EnterSets -> EnterWarmUpCoolDown -> EnterNote -> [save]
-```
 
-Each phase has its own layout and keybindings. `Esc` moves backward through phases (or exits the screen from phase 1).
+New logs return to Dashboard after a successful save. Logs opened for editing from History keep the original log identity and return to History after a successful update.
 
-## Phase 1: SelectPractice
+## Practice Selection
 
-**Purpose:** Choose which practice to log.
+The selector shows active practices in Name and Type columns above a reserved status row and active-mode shortcut footer.
 
-**Display:**
-- Title: "Log practice"
-- Filter bar with text input
-- Table: Name | Type columns
-- Only active practices shown
+- `j/k` or arrow keys move through matching practices and clamp at the first and last item.
+- `/` enters filter mode; the shared single-line input filters names in real time, case-insensitively.
+- `Enter` leaves filter mode while filtering, or selects the highlighted practice while navigating.
+- `Esc` leaves filter mode while filtering, or returns to Dashboard while navigating.
+- The selected practice is always revealed through `ViewportState`.
+- The list title adds `↑`, `↓`, or `↑↓` when matching practices exist outside the visible viewport.
+- Practice names, type labels, and columns are truncated to the actual inner width.
 
-**Behavior:**
-- `j/k` — navigate practice list
-- `/` — toggle filter mode (type to filter by name, case-insensitive)
-- `Enter` — select practice, advance to Phase 2
-- `Esc` — exit to Dashboard
+The footer shows navigation/filter/select/back only in navigation mode and confirm/cancel only in filter mode.
 
-**Filtering:** Standard text filter with emacs cursor keybindings. Filters practice list in real-time as user types.
+## Unified Entry Form
 
-## Phase 2: EnterSets
+The form contains the log date, committed and active set fields, warm-up, cool-down, RPE, and note. `Tab` and `Shift+Tab` cycle the active field or section; the active input has a visible cursor and accent treatment.
 
-**Purpose:** Add sets one at a time with type-specific fields.
+### Set Fields
 
-**Display:**
-- Title: "Log sets for [Practice Name]"
-- Current log date (YYYY-MM-DD) with edit hint
-- Table of entered sets: Set# | value(s)
-- Active input field(s) for next set
+| Practice type | Fields | Enter behavior |
+|---|---|---|
+| Weighted | weight (kg), reps | Weight advances to reps; reps adds or confirms the set |
+| Bodyweight | reps | Adds or confirms the set |
+| Distance | distance (km) | Adds or confirms the set |
+| Endurance | duration (min) | Adds or confirms the set |
 
-**Input fields by practice type:**
+For weighted practices, the previous set's weight carries forward. When a committed set is selected, `e` edits it and `d` deletes it. `j/k` navigates committed sets only when set navigation is active.
 
-| Type | Fields | Flow |
-|------|--------|------|
-| Weighted | weight (kg), reps | Tab between fields, Enter adds set |
-| Bodyweight | reps | Enter adds set |
-| Distance | distance (km) | Enter adds set |
-| Endurance | duration (min) | Enter adds set |
+### Other Fields and Actions
 
-**Weight carry-forward:** For weighted practices, the weight from the previous set pre-fills the next set's weight field. User can accept (Enter) or overtype.
+- Warm-up, cool-down, RPE, and note are single-line inputs in the same form.
+- `D` opens the single-line `YYYY-MM-DD` date editor while the Sets section is active.
+- `Ctrl+S` saves only when at least one set exists and no set edit is active.
+- `Esc` opens an explicit exit confirmation; confirmation returns to the form's origin without saving.
 
-**Keys:**
-- `Tab` — switch between weight/reps fields (weighted only)
-- `Enter` — confirm field value / add set
-- `Ctrl+S` — finish sets, advance to Phase 3
-- `D` — edit log date (opens date input overlay, format YYYY-MM-DD)
-- `d` — delete last set (only when input fields are empty)
-- `Esc` — cancel, return to origin screen
+The footer is generated from the active state. It changes the `Enter` label between next/add/confirm, shows set navigation and edit/delete only when available, hides save for an empty log or active set edit, hides date outside Sets, and shows only confirm/cancel during date editing or exit confirmation. At `80x24`, every active command is rendered in complete key-label units.
 
-## Phase 3: EnterWarmUpCoolDown
+## Text Input and Layout Contract
 
-**Purpose:** Optional warm-up and cool-down notes.
+The practice filter, both set fields, warm-up, cool-down, RPE, note, and date editor use the shared `TextInput` state.
 
-**Display:**
-- Two text input fields, vertically stacked
-- Active field highlighted
-- Labels: "Warm-up:" and "Cool-down:"
+- `Ctrl+B/F/A/E/K`, Left, Right, Home, End, Backspace, and insertion at the cursor are supported.
+- `TextInput::visible_spans` horizontally scrolls long Unicode values so the cursor remains visible.
+- Inputs and inactive companion values are budgeted against the real inner rectangle.
+- Variable practice names and form content remain inside their borders.
+- The renderer does not panic for rectangles smaller than the application's `80x24` minimum; direct rendering at `24x10` is covered.
 
-**Behavior:**
-- `j/k` or `Tab` — switch between fields
-- `Enter` — confirm field, advance (warm-up -> cool-down -> Phase 4)
-- Emacs cursor keybindings in both fields
-- `Esc` — back to Phase 2
+This is single-line input behavior. No multi-line input buffer is provided.
 
-## Phase 4: EnterNote
+## Saving and Failure Retention
 
-**Purpose:** Optional free-text session note.
+New entries call `create_log_at`; existing entries call `update_log`.
 
-**Display:**
-- Single text input field
-- Label: "Note:"
-
-**Behavior:**
-- `Enter` — save log to database
-- `Esc` — back to Phase 3
-
-## Saving
-
-On save:
-- **New log:** `create_log_at(practice_id, logged_at, sets, note, warm_up, cool_down)`
-- **Editing existing:** `update_log(log_id, sets, note, logged_at, warm_up, cool_down)` — deletes old sets, inserts new ones
-
-Returns to Dashboard (new log) or History (editing).
-
-## Editing Mode
-
-Constructed with `from_existing(log_entry)`:
-- Skips Phase 1 (practice already known)
-- Pre-fills all fields from existing log data
-- Starts in Phase 2
-- On save, updates instead of creating
-- Returns to History screen
-
-## Text Input Constraints
-
-All text fields must support:
-- Emacs cursor: Ctrl+B/F/A/E/K, Left, Right, Home, End, Backspace
-- Horizontal scroll for long text (never overflow container)
-- Characters insert at cursor position
+- Invalid date input keeps the date editor and exact value active with an error status.
+- Invalid RPE keeps the complete form and current focus with an error status.
+- A database create or update failure keeps every set and input, its cursor/focus, the editing log identity, and the Dashboard or History return target.
+- Form state clears and navigation occurs only after the database mutation succeeds.
+- Status always uses the reserved status row instead of replacing form content.

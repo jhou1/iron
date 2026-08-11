@@ -1,7 +1,7 @@
 # TUI Consistency Framework Design
 
 **Date:** 2026-08-10
-**Status:** Superseded for Batch 2 by [the Batch 2 design](2026-08-10-tui-consistency-batch-2-design.md)
+**Status:** Batch 2 complete; its final scope is defined by [the Batch 2 design](2026-08-10-tui-consistency-batch-2-design.md)
 **Branch:** `codex/tui-consistency`
 **Base:** validated Goals milestone-management implementation (`0069c04`)
 
@@ -11,12 +11,12 @@ The validated Goals redesign established observable interaction guarantees that 
 
 The audit of Dashboard, History, Trends, Practices, Quotes, and Log Entry found repeated local implementations of selection, scrolling, input editing, status lines, and shortcut bars. Those implementations have drifted. Examples include logical-row scrolling for wrapped content, detail popups without their own viewport, raw cursor rendering, result scrolling without a known viewport height, lists without overflow signaling, and edit modes that close after a failed database write.
 
-The project will replace those repeated interaction mechanisms with a unified TUI framework. Migration will be incremental rather than a big-bang rewrite.
+The project has replaced those repeated interaction mechanisms with a unified TUI framework through incremental delivery batches.
 
 ## Goals
 
 1. Provide reusable interaction and rendering primitives for list, detail, input, status, and shortcut behavior.
-2. Migrate every applicable screen in three independently testable batches.
+2. Migrate every applicable screen through independently testable delivery batches.
 3. Preserve each module's domain state machine and specialized layout.
 4. Make selection, overflow, focus, input, errors, and shortcuts predictable throughout the application.
 5. Remove superseded local implementations after their consumers migrate.
@@ -25,13 +25,13 @@ The project will replace those repeated interaction mechanisms with a unified TU
 
 - The framework will not own database connections, domain models, queries, or screen routing.
 - Charts, heatmaps, forms, tables, and popups will not be forced into one generic widget.
-- The database schema and on-disk format will not change.
+- The framework primitives do not own schema changes. Batch 2 separately and intentionally removes the obsolete `abbreviations` table while preserving unrelated data.
 - Existing keyboard commands will not be renamed unless current documentation and implementation contradict each other; those cases will be resolved explicitly in the migration batch.
 - The visual theme will not be redesigned.
 
 ## Architecture
 
-Create `src/tui/framework/` with four focused units.
+`src/tui/framework/` provides four focused units.
 
 ### `viewport.rs`
 
@@ -129,34 +129,32 @@ Stable database IDs, not array positions, preserve selection across reloads and 
 - Shortcut bars are generated from the active mode and remain consistent with README and specifications.
 - Long shortcut bars may use multiple reserved lines, but may not silently overwrite content.
 
-## Three Migration Batches
+## Migration Delivery Status
 
-### Batch 1: Framework Foundation and List/Detail Screens
+### Batch 1: Framework Foundation and List/Detail Screens — Complete
 
-Build the framework's visual viewport, single-line input, list/detail, status, shortcut, and test primitives. Add characterization tests around the accepted Goals behavior, move Goals to the framework without changing its observable behavior, then migrate History, Trends, Practices, and Quotes.
+Batch 1 built the framework's visual viewport, single-line input, list/detail, status, shortcut, and test primitives. It added characterization tests around the accepted Goals behavior, moved Goals to the framework without changing its observable behavior, then migrated History, Trends, Practices, and Quotes.
 
 - History: filter input becomes bounded; the selected log detail becomes a focusable, scrollable panel; list selection and detail overflow remain visible.
 - Quotes: the list remains compact while the selected quote has a complete preview/focused view; long quote input remains visible.
 - Trends: practice list, filtering, selection, and footer migrate; chart-specific rendering remains specialized.
 - Practices: selection, long names, input, status, footer, and mutation transitions migrate; the type selector remains module-specific content inside a framework panel.
 
-Batch 1 acceptance requires Goals regression parity plus list/detail verification at `80x24`.
+Batch 1 completed with Goals regression parity plus list/detail verification at `80x24`.
 
-### Batch 2: Superseded
+### Batch 2: Log Entry, Dashboard, and Permanent Removal — Complete
 
-Batch 2 is superseded by [the Batch 2 design](2026-08-10-tui-consistency-batch-2-design.md), which defines the approved Log Entry and Dashboard migration and removal scope.
+The [approved Batch 2 design](2026-08-10-tui-consistency-batch-2-design.md) superseded this document's original sequencing and moved Dashboard into Batch 2. The shipped batch:
 
-### Batch 3: Dashboard and Framework Consolidation
+- migrates Log Entry's filter, practice selector, set fields, warm-up, cool-down, RPE, note, date editor, status, and active-mode shortcuts to shared framework primitives;
+- keeps the selected practice visible with overflow indicators and bounds all Log Entry content to actual inner rectangles, including smaller direct-render sizes;
+- retains Log Entry form, cursor, focus, editing identity, and return target on validation or database failure;
+- migrates Dashboard HRV input, status, shortcuts, and responsive bounded layout, with complete remaining navigation at `80x35` and no stale `w` command;
+- retains Dashboard HRV mode and input on validation or write failure and clears them only after a successful write;
+- renders Dashboard shortcuts dynamically for Normal, HRV input, and quit-confirmation modes; and
+- permanently removes Quick Log without a replacement, along with its LLM configuration/runtime, Abbreviations models and CRUD API, locale/test/dependency interfaces, and `abbreviations` table data.
 
-Migrate Dashboard status, shortcuts, HRV input, and bounded content panels. Keep Heatmap and summary calculations specialized.
-
-- Dashboard Goals display `completed/total · percentage` using the same progress formatting as Goals.
-- Recent entries, goals, and quote content remain inside their panels and expose overflow when applicable.
-- HRV uses the shared input behavior; invalid or failed saves preserve input and show status.
-- Remove local input, viewport, status, and footer code made obsolete by completed migrations.
-- Update all specifications, English and Chinese README sections, `CLAUDE.md`, and architectural documentation.
-
-Batch 3 acceptance uses `80x35` for Dashboard. Smaller terminals must degrade without panicking or drawing outside their assigned rectangles.
+Database initialization executes `DROP TABLE IF EXISTS abbreviations`. Existing abbreviation rows are irreversibly deleted on first open by the updated application; training logs, practices, goals, quotes, daily metrics, and other unrelated data are preserved.
 
 ## Testing Strategy
 
@@ -167,7 +165,7 @@ Batch 3 acceptance uses `80x35` for Dashboard. Smaller terminals must degrade wi
 - selection moving below and above the viewport
 - overflow state at first, middle, and last positions
 - Unicode cursor movement and deletion
-- horizontal and vertical input scrolling
+- horizontal single-line input scrolling
 - focused and preview component rendering
 
 ### Screen Tests
@@ -184,7 +182,8 @@ Before migration, record the behavior that must remain. After migration, use Tes
 ### Data Tests
 
 - selection identity after database-driven reorder or reload
-- no database schema change
+- new databases contain no `abbreviations` table
+- existing databases drop `abbreviations` while preserving unrelated rows
 
 Every batch must pass:
 
@@ -199,7 +198,7 @@ cargo build
 
 - Work continues on `codex/tui-consistency`, based on the validated Goals commit.
 - Each framework unit and each migrated screen receives an independently reviewable commit.
-- Each batch is delivered for manual acceptance before the next batch begins.
+- Each batch is delivered for manual acceptance before any later batch begins.
 - Old and new implementations may coexist only while a batch is in progress. Once a screen passes its batch acceptance, its superseded local implementation is removed.
 - Commit boundaries allow an individual screen migration to be reverted without discarding the framework or previously accepted screens.
 - The final release version is `3.3.0`.
@@ -210,6 +209,6 @@ cargo build
 
 Navigate long Goals, History, Trends, Practices, and Quotes collections; verify every item and detail is reachable, focus is visible, overflow is signaled, long filters/edits retain the cursor, and mutation errors retain context.
 
-### Batch 3
+### Batch 2
 
-Verify Dashboard panels, Goals progress, HRV validation, status, and footer behavior at `80x35` and during terminal resizing; confirm every README shortcut matches the application.
+Verify Log Entry selection overflow, bounded Unicode cursors, active-mode shortcuts, and failure retention at `80x24`. Verify Dashboard Heatmap, Summary, Recent, Goals, quote, HRV, status, and mode-specific shortcuts at `80x35` and during resizing. Confirm `w`, Quick Log, LLM configuration/runtime, and Abbreviations interfaces are absent, and confirm opening an existing database removes only the obsolete `abbreviations` table.
