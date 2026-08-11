@@ -13,7 +13,8 @@ use super::{
         fit_rect, render_detail_panel, render_shortcuts, shortcut_height, truncate_to_width,
         visual_spans, DetailPanelState, Shortcut, TextInput, ViewportState, VisualSpan,
     },
-    highlight_row, render_status_line, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
+    highlight_row, render_status_line, Action, ModuleId, NavigationIntent, StatusMessage,
+    BORDER_COLOR, CONTENT_WIDTH,
 };
 use crate::db::Database;
 use crate::i18n::tr;
@@ -378,7 +379,7 @@ impl QuotesScreen {
                 }
                 Action::None
             }
-            KeyCode::Esc => Action::Navigate(Screen::Dashboard),
+            KeyCode::Esc => Action::Navigate(NavigationIntent::Open(ModuleId::Dashboard)),
             _ => Action::None,
         }
     }

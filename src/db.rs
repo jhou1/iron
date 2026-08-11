@@ -569,6 +569,13 @@ impl Database {
         Ok(entries)
     }
 
+    pub fn get_log_by_id(&self, log_id: i64) -> Result<Option<LogEntry>> {
+        Ok(self
+            .list_logs_all()?
+            .into_iter()
+            .find(|entry| entry.log.id == log_id))
+    }
+
     pub fn list_logs_recent(&self, days: i64) -> Result<Vec<LogEntry>> {
         let cutoff = Local::now().naive_local() - chrono::Duration::days(days);
         let mut stmt = self.conn.prepare(

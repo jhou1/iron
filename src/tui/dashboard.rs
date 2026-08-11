@@ -14,8 +14,8 @@ use super::{
     framework::{
         fit_rect, render_shortcuts, shortcut_height, truncate_to_width, Shortcut, TextInput,
     },
-    render_gauge_line, render_status_line, Action, Screen, StatusMessage, BORDER_COLOR,
-    CONTENT_WIDTH,
+    render_gauge_line, render_status_line, Action, ModuleId, NavigationIntent, StatusMessage,
+    BORDER_COLOR, CONTENT_WIDTH,
 };
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
@@ -514,12 +514,16 @@ impl DashboardScreen {
 
     fn handle_normal(&mut self, key: KeyEvent) -> Action {
         match key.code {
-            KeyCode::Char('l') => Action::Navigate(Screen::LogEntry),
-            KeyCode::Char('h') => Action::Navigate(Screen::History),
-            KeyCode::Char('t') => Action::Navigate(Screen::Trends),
-            KeyCode::Char('e') => Action::Navigate(Screen::Practices),
-            KeyCode::Char('g') => Action::Navigate(Screen::Goals),
-            KeyCode::Char('Q') => Action::Navigate(Screen::Quotes),
+            KeyCode::Char('l') => Action::Navigate(NavigationIntent::NewLog),
+            KeyCode::Char('h') => {
+                Action::Navigate(NavigationIntent::Open(ModuleId::History))
+            }
+            KeyCode::Char('t') => Action::Navigate(NavigationIntent::Open(ModuleId::Trends)),
+            KeyCode::Char('e') => {
+                Action::Navigate(NavigationIntent::Open(ModuleId::Practices))
+            }
+            KeyCode::Char('g') => Action::Navigate(NavigationIntent::Open(ModuleId::Goals)),
+            KeyCode::Char('Q') => Action::Navigate(NavigationIntent::Open(ModuleId::Quotes)),
             KeyCode::Char('v') => {
                 self.hrv_input
                     .set(self.hrv_today.map(|v| v.to_string()).unwrap_or_default());

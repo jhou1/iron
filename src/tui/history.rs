@@ -15,7 +15,8 @@ use super::{
         fit_rect, render_detail_panel, render_shortcuts, shortcut_height, visual_spans,
         DetailPanelState, Shortcut, TextInput, ViewportState, VisualSpan,
     },
-    highlight_row, render_status_line, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
+    highlight_row, render_status_line, Action, ModuleId, NavigationIntent, StatusMessage,
+    BORDER_COLOR, CONTENT_WIDTH,
 };
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
@@ -580,7 +581,9 @@ impl HistoryScreen {
             }
             KeyCode::Char('e') => {
                 if !self.filtered_indices.is_empty() {
-                    return Action::Navigate(Screen::LogEntry);
+                    return Action::Navigate(NavigationIntent::EditHistoryLog {
+                        log_id: self.selected_entry().expect("selected entry").log.id,
+                    });
                 }
                 Action::None
             }
@@ -609,7 +612,7 @@ impl HistoryScreen {
                     self.apply_filter();
                     Action::None
                 } else {
-                    Action::Navigate(Screen::Dashboard)
+                    Action::Navigate(NavigationIntent::Open(ModuleId::Dashboard))
                 }
             }
             _ => Action::None,

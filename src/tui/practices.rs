@@ -15,7 +15,8 @@ use super::{
         move_selection, render_shortcuts, shortcut_height, truncate_to_width, EdgeBehavior,
         Shortcut, TextInput, ViewportState, VisualSpan,
     },
-    highlight_row, render_status_line, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
+    highlight_row, render_status_line, Action, ModuleId, NavigationIntent, StatusMessage,
+    BORDER_COLOR, CONTENT_WIDTH,
 };
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
@@ -410,7 +411,7 @@ impl PracticesScreen {
                 }
                 Action::None
             }
-            KeyCode::Esc => Action::Navigate(Screen::Dashboard),
+            KeyCode::Esc => Action::Navigate(NavigationIntent::Open(ModuleId::Dashboard)),
             _ => Action::None,
         }
     }

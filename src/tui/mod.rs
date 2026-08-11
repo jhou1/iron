@@ -3,6 +3,7 @@ pub mod framework;
 pub mod goals;
 pub mod history;
 pub mod log_entry;
+pub mod navigation;
 pub mod practices;
 pub mod quotes;
 pub mod quotes_screen;
@@ -17,6 +18,7 @@ use ratatui::{
 };
 
 pub use framework::components::{render_status_line, StatusMessage};
+pub use navigation::{Action, ModuleId, NavigationIntent, ScreenId};
 
 const HIGHLIGHT_BG: Color = Color::Rgb(204, 163, 0);
 const HIGHLIGHT_FG: Color = Color::Black;
@@ -50,23 +52,6 @@ pub fn highlight_row(frame: &mut Frame, area: Rect, row: u16) {
             }
         }
     }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Screen {
-    Dashboard,
-    LogEntry,
-    History,
-    Trends,
-    Practices,
-    Goals,
-    Quotes,
-}
-
-pub enum Action {
-    None,
-    Navigate(Screen),
-    Quit,
 }
 
 pub fn render_gauge_line<'a>(

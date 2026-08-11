@@ -14,7 +14,7 @@ use crate::i18n::tr_args;
 use crate::tui::{
     dashboard::DashboardScreen, goals::GoalsScreen, history::HistoryScreen,
     log_entry::LogEntryScreen, practices::PracticesScreen, quotes_screen::QuotesScreen,
-    trends::TrendsScreen, Action, Screen,
+    trends::TrendsScreen, Action, ModuleId, NavigationIntent, ScreenId,
 };
 
 pub fn run() -> Result<()> {
@@ -33,7 +33,7 @@ fn run_app(
     db: &Database,
 ) -> Result<()> {
     let no_color = std::env::var("NO_COLOR").is_ok();
-    let mut current_screen = Screen::Dashboard;
+    let mut current_screen = ScreenId::Dashboard;
     let mut dashboard = DashboardScreen::new(db, no_color)?;
     let mut goals_screen = GoalsScreen::new(db)?;
     let mut log_entry = LogEntryScreen::new(db)?;
@@ -57,13 +57,13 @@ fn run_app(
                 return;
             }
             match current_screen {
-                Screen::Dashboard => dashboard.render(frame),
-                Screen::Goals => goals_screen.render(frame),
-                Screen::LogEntry => log_entry.render(frame),
-                Screen::History => history.render(frame),
-                Screen::Trends => trends.render(frame),
-                Screen::Practices => practices.render(frame),
-                Screen::Quotes => quotes_screen.render(frame),
+                ScreenId::Dashboard => dashboard.render(frame),
+                ScreenId::Goals => goals_screen.render(frame),
+                ScreenId::LogEntry => log_entry.render(frame),
+                ScreenId::History => history.render(frame),
+                ScreenId::Trends => trends.render(frame),
+                ScreenId::Practices => practices.render(frame),
+                ScreenId::Quotes => quotes_screen.render(frame),
             }
         })?;
 
@@ -76,46 +76,42 @@ fn run_app(
             }
 
             let action = match current_screen {
-                Screen::Dashboard => dashboard.handle_key(key, db),
-                Screen::Goals => goals_screen.handle_key(key, db),
-                Screen::LogEntry => log_entry.handle_key(key, db),
-                Screen::History => history.handle_key(key, db),
-                Screen::Trends => {
+                ScreenId::Dashboard => dashboard.handle_key(key, db),
+                ScreenId::Goals => goals_screen.handle_key(key, db),
+                ScreenId::LogEntry => log_entry.handle_key(key, db),
+                ScreenId::History => history.handle_key(key, db),
+                ScreenId::Trends => {
                     let action = trends.handle_key(key);
                     trends.refresh_chart(db);
                     action
                 }
-                Screen::Practices => practices.handle_key(key, db),
-                Screen::Quotes => quotes_screen.handle_key(key, db),
+                ScreenId::Practices => practices.handle_key(key, db),
+                ScreenId::Quotes => quotes_screen.handle_key(key, db),
             };
 
             match action {
                 Action::Quit => break,
-                Action::Navigate(screen) => {
-                    match &screen {
-                        Screen::Dashboard => dashboard.refresh(db)?,
-                        Screen::Goals => goals_screen = GoalsScreen::new(db)?,
-                        Screen::LogEntry => {
-                            if current_screen == Screen::History {
-                                if let Some(entry) = history.selected_entry() {
-                                    log_entry = LogEntryScreen::from_existing(db, entry)?;
-                                } else {
-                                    log_entry = LogEntryScreen::new(db)?;
-                                }
-                            } else {
-                                log_entry = LogEntryScreen::new(db)?;
-                            }
+                Action::Navigate(intent) => {
+                    match intent {
+                        NavigationIntent::Open(module) => match module {
+                            ModuleId::Dashboard => dashboard.refresh(db)?,
+                            ModuleId::Goals => goals_screen = GoalsScreen::new(db)?,
+                            ModuleId::History => history.refresh_preserving_context(db)?,
+                            ModuleId::Trends => trends = TrendsScreen::new(db)?,
+                            ModuleId::Practices => practices = PracticesScreen::new(db)?,
+                            ModuleId::Quotes => quotes_screen = QuotesScreen::new(db)?,
+                        },
+                        NavigationIntent::NewLog => {
+                            log_entry = LogEntryScreen::new(db)?;
                         }
-                        Screen::History => {
-                            history.refresh_preserving_context(db)?;
-                        }
-                        Screen::Trends => trends = TrendsScreen::new(db)?,
-                        Screen::Practices => practices = PracticesScreen::new(db)?,
-                        Screen::Quotes => {
-                            quotes_screen = QuotesScreen::new(db)?;
+                        NavigationIntent::EditHistoryLog { log_id } => {
+                            let entry = db
+                                .get_log_by_id(log_id)?
+                                .ok_or_else(|| anyhow::anyhow!("log {log_id} no longer exists"))?;
+                            log_entry = LogEntryScreen::from_existing(db, &entry)?;
                         }
                     }
-                    current_screen = screen;
+                    current_screen = intent.target();
                 }
                 Action::None => {}
             }
@@ -226,20 +222,24 @@ mod tests {
     fn returning_from_filtered_nonzero_log_edit_refreshes_same_entry_before_second_edit() {
         let (db, mut history, target_id) = history_with_filtered_nonzero_target();
         let open_action = history.handle_key(key(KeyCode::Char('e')), &db);
-        assert!(matches!(open_action, Action::Navigate(Screen::LogEntry)));
-        let mut first_edit =
-            LogEntryScreen::from_existing(&db, history.selected_entry().unwrap()).unwrap();
+        let open_log_id = match open_action {
+            Action::Navigate(NavigationIntent::EditHistoryLog { log_id }) => log_id,
+            _ => panic!("History edit must navigate with the selected log ID"),
+        };
+        assert_eq!(open_log_id, target_id);
+        let entry = db.get_log_by_id(open_log_id).unwrap().unwrap();
+        let mut first_edit = LogEntryScreen::from_existing(&db, &entry).unwrap();
         replace_note(&mut first_edit, &db, "updated target");
 
         let save_action = first_edit.handle_key(ctrl_key('s'), &db);
         let target = match save_action {
-            Action::Navigate(Screen::History) => Screen::History,
+            Action::Navigate(NavigationIntent::Open(ModuleId::History)) => ScreenId::History,
             _ => panic!("successful History edit must navigate back to History"),
         };
         history.refresh_preserving_context(&db).unwrap();
         let current_screen = target;
 
-        assert_eq!(current_screen, Screen::History);
+        assert_eq!(current_screen, ScreenId::History);
         assert_eq!(history.selected_entry().unwrap().log.id, target_id);
         assert_eq!(
             history.selected_entry().unwrap().log.note.as_deref(),
@@ -247,11 +247,18 @@ mod tests {
         );
 
         let reopen_action = history.handle_key(key(KeyCode::Char('e')), &db);
-        assert!(matches!(reopen_action, Action::Navigate(Screen::LogEntry)));
-        let mut second_edit =
-            LogEntryScreen::from_existing(&db, history.selected_entry().unwrap()).unwrap();
+        let reopen_log_id = match reopen_action {
+            Action::Navigate(NavigationIntent::EditHistoryLog { log_id }) => log_id,
+            _ => panic!("History re-edit must navigate with the selected log ID"),
+        };
+        assert_eq!(reopen_log_id, target_id);
+        let entry = db.get_log_by_id(reopen_log_id).unwrap().unwrap();
+        let mut second_edit = LogEntryScreen::from_existing(&db, &entry).unwrap();
         let second_save = second_edit.handle_key(ctrl_key('s'), &db);
-        assert!(matches!(second_save, Action::Navigate(Screen::History)));
+        assert!(matches!(
+            second_save,
+            Action::Navigate(NavigationIntent::Open(ModuleId::History))
+        ));
         assert_eq!(
             db.list_logs_all()
                 .unwrap()
@@ -268,8 +275,8 @@ mod tests {
     #[test]
     fn canceling_filtered_nonzero_log_edit_preserves_history_context() {
         let (db, mut history, target_id) = history_with_filtered_nonzero_target();
-        let mut edit =
-            LogEntryScreen::from_existing(&db, history.selected_entry().unwrap()).unwrap();
+        let entry = db.get_log_by_id(target_id).unwrap().unwrap();
+        let mut edit = LogEntryScreen::from_existing(&db, &entry).unwrap();
         replace_note(&mut edit, &db, "discarded target");
 
         assert!(matches!(
@@ -277,7 +284,10 @@ mod tests {
             Action::None
         ));
         let cancel_action = edit.handle_key(key(KeyCode::Char('y')), &db);
-        assert!(matches!(cancel_action, Action::Navigate(Screen::History)));
+        assert!(matches!(
+            cancel_action,
+            Action::Navigate(NavigationIntent::Open(ModuleId::History))
+        ));
         history.refresh_preserving_context(&db).unwrap();
 
         assert_eq!(history.selected_entry().unwrap().log.id, target_id);

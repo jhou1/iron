@@ -1112,3 +1112,38 @@ fn reconciles_existing_goal_completion_on_open() {
     assert!(goals[0].completed);
     assert_eq!(goals[0].completed_at, Some(completed_at));
 }
+
+#[test]
+fn get_log_by_id_returns_exact_entry_or_none() {
+    let db = Database::open_in_memory().unwrap();
+    let practice = db
+        .create_practice("Pull-up", PracticeType::Bodyweight)
+        .unwrap();
+    let first = db
+        .create_log(
+            practice.id,
+            &[SetData::Bodyweight { reps: 10 }],
+            Some("first"),
+            None,
+            None,
+            Some(7),
+        )
+        .unwrap();
+    let second = db
+        .create_log(
+            practice.id,
+            &[SetData::Bodyweight { reps: 12 }],
+            Some("second"),
+            None,
+            None,
+            Some(8),
+        )
+        .unwrap();
+
+    assert_eq!(
+        db.get_log_by_id(second).unwrap().unwrap().log.note.as_deref(),
+        Some("second")
+    );
+    assert_eq!(db.get_log_by_id(first).unwrap().unwrap().log.id, first);
+    assert!(db.get_log_by_id(i64::MAX).unwrap().is_none());
+}

@@ -16,7 +16,7 @@ use super::{
         fit_rect, move_selection, render_shortcuts, shortcut_height, truncate_to_width,
         EdgeBehavior, Shortcut, TextInput, ViewportState, VisualSpan,
     },
-    highlight_row, render_status_line, Action, Screen, StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
+    highlight_row, render_status_line, Action, ModuleId, NavigationIntent, StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
 };
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
@@ -65,7 +65,7 @@ pub struct LogEntryScreen {
     editing_date: bool,
     date_input: TextInput,
     confirming_exit: bool,
-    return_to: Screen,
+    return_to: ModuleId,
     status_msg: StatusMessage,
 }
 
@@ -99,7 +99,7 @@ impl LogEntryScreen {
             editing_date: false,
             date_input: TextInput::new(),
             confirming_exit: false,
-            return_to: Screen::Dashboard,
+            return_to: ModuleId::Dashboard,
             status_msg: None,
         })
     }
@@ -143,7 +143,7 @@ impl LogEntryScreen {
             editing_date: false,
             date_input: TextInput::new(),
             confirming_exit: false,
-            return_to: Screen::History,
+            return_to: ModuleId::History,
             status_msg: None,
         })
     }
@@ -342,7 +342,7 @@ impl LogEntryScreen {
         }
 
         match key.code {
-            KeyCode::Esc => Action::Navigate(self.return_to.clone()),
+            KeyCode::Esc => Action::Navigate(NavigationIntent::Open(self.return_to)),
             KeyCode::Char('/') => {
                 self.filtering = true;
                 Action::None
@@ -842,7 +842,7 @@ impl LogEntryScreen {
         if self.confirming_exit {
             match key.code {
                 KeyCode::Char('y') | KeyCode::Char('Y') | KeyCode::Enter => {
-                    return Action::Navigate(self.return_to.clone());
+                    return Action::Navigate(NavigationIntent::Open(self.return_to));
                 }
                 KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
                     self.confirming_exit = false;
@@ -1279,7 +1279,7 @@ impl LogEntryScreen {
             .map(|_| ())
         };
         match result {
-            Ok(_) => Action::Navigate(self.return_to.clone()),
+            Ok(_) => Action::Navigate(NavigationIntent::Open(self.return_to)),
             Err(e) => {
                 self.status_msg = Some((format!("Error: {}", e), true));
                 Action::None
@@ -1532,7 +1532,7 @@ mod tests {
         assert_eq!(screen.rpe_input.value(), "8");
         assert_eq!(screen.sets, vec![SetData::Bodyweight { reps: 10 }]);
         assert_eq!(screen.editing_log_id, Some(entry.log.id));
-        assert_eq!(screen.return_to, Screen::History);
+        assert_eq!(screen.return_to, ModuleId::History);
         assert_eq!(screen.focus, FocusSection::Note);
         assert!(screen.status_msg.as_ref().is_some_and(|(_, error)| *error));
 
@@ -1639,7 +1639,7 @@ mod tests {
         assert_eq!(screen.active_field, 1);
         assert_eq!(screen.note.value(), "pending note");
         assert_eq!(screen.focus, FocusSection::Sets);
-        assert_eq!(screen.return_to, Screen::History);
+        assert_eq!(screen.return_to, ModuleId::History);
     }
 
     #[test]

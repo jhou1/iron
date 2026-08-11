@@ -13,8 +13,8 @@ use super::{
         combined_span, fit_rect, render_detail_panel, visual_spans, DetailPanelState, TextInput,
         ViewportState, VisualSpan,
     },
-    highlight_row, render_gauge_line, render_status_line, Action, Screen, StatusMessage,
-    BORDER_COLOR, CONTENT_WIDTH,
+    highlight_row, render_gauge_line, render_status_line, Action, ModuleId, NavigationIntent,
+    StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
 };
 use crate::db::Database;
 use crate::i18n::tr;
@@ -721,7 +721,7 @@ impl GoalsScreen {
                 }
                 Action::None
             }
-            KeyCode::Esc => Action::Navigate(Screen::Dashboard),
+            KeyCode::Esc => Action::Navigate(NavigationIntent::Open(ModuleId::Dashboard)),
             _ => Action::None,
         }
     }
