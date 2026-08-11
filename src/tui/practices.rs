@@ -9,6 +9,7 @@ use ratatui::{
 
 use unicode_width::UnicodeWidthStr;
 
+use super::lifecycle::{NavigationStatus, Reenter};
 use super::{
     centered_area,
     framework::{
@@ -542,10 +543,42 @@ impl PracticesScreen {
     }
 }
 
+impl Reenter for PracticesScreen {
+    fn reenter(&self, db: &Database) -> anyhow::Result<Self> {
+        let selected_id = self
+            .practices
+            .get(self.selected)
+            .map(|practice| practice.id);
+        let mut next = Self::new(db)?;
+
+        next.selected = selected_id
+            .and_then(|id| next.practices.iter().position(|practice| practice.id == id))
+            .unwrap_or_else(|| self.selected.min(next.practices.len().saturating_sub(1)));
+        if next.practices.is_empty() {
+            next.selected = 0;
+        }
+
+        next.list_viewport = self.list_viewport;
+        next.list_viewport.clamp(next.practices.len());
+        next.mode = Mode::Browse;
+        next.input.clear();
+        next.status_msg = None;
+
+        Ok(next)
+    }
+}
+
+impl NavigationStatus for PracticesScreen {
+    fn set_navigation_error(&mut self, message: String) {
+        self.status_msg = Some((message, true));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::tui::framework::test_support::render_to_string;
+    use crate::tui::lifecycle::{NavigationStatus, Reenter};
     use crossterm::event::KeyModifiers;
 
     fn key(code: KeyCode) -> KeyEvent {
@@ -563,6 +596,79 @@ mod tests {
                 .unwrap();
         }
         db
+    }
+
+    #[test]
+    fn practices_reentry_preserves_selection_and_clears_edit_state() {
+        let db = Database::open_in_memory().unwrap();
+        let first = db
+            .create_practice("First", PracticeType::Bodyweight)
+            .unwrap();
+        let second = db
+            .create_practice("Second", PracticeType::Weighted)
+            .unwrap();
+        let mut screen = PracticesScreen::new(&db).unwrap();
+        screen.selected = screen
+            .practices
+            .iter()
+            .position(|p| p.id == second.id)
+            .unwrap();
+        screen.mode = Mode::EditName;
+        screen.list_viewport.set_height(1);
+        screen.list_viewport.set_offset(1);
+        screen.input.set("discard me");
+        screen.status_msg = Some(("old".into(), true));
+        db.rename_practice(first.id, "First changed").unwrap();
+
+        let next = screen.reenter(&db).unwrap();
+
+        assert_eq!(next.practices[next.selected].id, second.id);
+        assert_eq!(next.list_viewport.offset(), 1);
+        assert_eq!(next.mode, Mode::Browse);
+        assert!(next.input.value().is_empty());
+        assert!(next.status_msg.is_none());
+        assert_eq!(
+            next.practices
+                .iter()
+                .find(|p| p.id == first.id)
+                .unwrap()
+                .name,
+            "First changed"
+        );
+    }
+
+    #[test]
+    fn practices_reentry_clamps_selection_and_viewport_after_selected_deletion() {
+        let db = Database::open_in_memory().unwrap();
+        db.create_practice("First", PracticeType::Bodyweight)
+            .unwrap();
+        let second = db
+            .create_practice("Second", PracticeType::Weighted)
+            .unwrap();
+        let third = db
+            .create_practice("Third", PracticeType::Endurance)
+            .unwrap();
+        let mut screen = PracticesScreen::new(&db).unwrap();
+        screen.selected = 2;
+        screen.list_viewport.set_height(1);
+        screen.list_viewport.set_offset(2);
+        db.delete_practice(third.id).unwrap();
+
+        let next = screen.reenter(&db).unwrap();
+
+        assert_eq!(next.selected, 1);
+        assert_eq!(next.practices[next.selected].id, second.id);
+        assert_eq!(next.list_viewport.offset(), 1);
+    }
+
+    #[test]
+    fn practices_navigation_error_uses_status_line() {
+        let db = Database::open_in_memory().unwrap();
+        let mut screen = PracticesScreen::new(&db).unwrap();
+
+        screen.set_navigation_error("navigation failed".into());
+
+        assert_eq!(screen.status_msg, Some(("navigation failed".into(), true)));
     }
 
     #[test]

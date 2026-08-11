@@ -7,6 +7,7 @@ use ratatui::{
     Frame,
 };
 
+use super::lifecycle::{NavigationStatus, Reenter};
 use super::{
     centered_area,
     framework::{
@@ -480,10 +481,50 @@ impl QuotesScreen {
     }
 }
 
+impl Reenter for QuotesScreen {
+    fn reenter(&self, db: &Database) -> anyhow::Result<Self> {
+        let selected_id = self.quotes.get(self.selected).map(|quote| quote.id);
+        let mut next = Self::new(db)?;
+
+        next.selected = selected_id
+            .and_then(|id| next.quotes.iter().position(|quote| quote.id == id))
+            .unwrap_or_else(|| self.selected.min(next.quotes.len().saturating_sub(1)));
+        if next.quotes.is_empty() {
+            next.selected = 0;
+        }
+
+        next.list_viewport = self.list_viewport;
+        next.list_viewport.clamp(next.quotes.len());
+        next.detail_state.viewport = self.detail_state.viewport;
+        next.detail_content_height = self.detail_content_height;
+        next.detail_state.viewport.clamp(next.detail_content_height);
+
+        next.mode = if self.mode == Mode::Detail && !next.quotes.is_empty() {
+            Mode::Detail
+        } else {
+            Mode::Browse
+        };
+        next.detail_state.focused = next.mode == Mode::Detail;
+        next.input.clear();
+        next.editing_id = None;
+        next.status_msg = None;
+        next.last_deleted = None;
+
+        Ok(next)
+    }
+}
+
+impl NavigationStatus for QuotesScreen {
+    fn set_navigation_error(&mut self, message: String) {
+        self.status_msg = Some((message, true));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::tui::framework::test_support::render_to_string;
+    use crate::tui::lifecycle::{NavigationStatus, Reenter};
     use crossterm::event::KeyModifiers;
 
     fn key(code: KeyCode) -> KeyEvent {
@@ -492,6 +533,100 @@ mod tests {
 
     fn render_quotes(screen: &mut QuotesScreen, width: u16, height: u16) -> String {
         render_to_string(width, height, |frame| screen.render(frame))
+    }
+
+    #[test]
+    fn quotes_reentry_preserves_detail_context_and_clears_mutations() {
+        let db = Database::open_in_memory().unwrap();
+        let first = db.create_quote("First quote").unwrap();
+        let second = db.create_quote("Second quote").unwrap();
+        let mut screen = QuotesScreen::new(&db).unwrap();
+        screen.selected = screen
+            .quotes
+            .iter()
+            .position(|quote| quote.id == second.id)
+            .unwrap();
+        screen.mode = Mode::Detail;
+        screen.list_viewport.set_height(1);
+        screen.list_viewport.set_offset(1);
+        screen.detail_state.focused = true;
+        screen.detail_state.viewport.set_height(1);
+        screen.detail_state.viewport.set_offset(2);
+        screen.detail_content_height = 4;
+        screen.input.set("discard me");
+        screen.status_msg = Some(("old".into(), true));
+        screen.last_deleted = Some(screen.quotes[0].clone());
+        db.update_quote(first.id, "First changed").unwrap();
+
+        let next = screen.reenter(&db).unwrap();
+
+        assert_eq!(next.quotes[next.selected].id, second.id);
+        assert_eq!(next.list_viewport.offset(), 1);
+        assert_eq!(next.mode, Mode::Detail);
+        assert!(next.detail_state.focused);
+        assert_eq!(next.detail_state.viewport.offset(), 2);
+        assert_eq!(next.detail_content_height, 4);
+        assert!(next.input.value().is_empty());
+        assert!(next.editing_id.is_none());
+        assert!(next.status_msg.is_none());
+        assert!(next.last_deleted.is_none());
+        assert_eq!(
+            next.quotes.iter().find(|q| q.id == first.id).unwrap().text,
+            "First changed"
+        );
+    }
+
+    #[test]
+    fn quotes_reentry_returns_edit_mode_to_browse_and_clears_editing_id() {
+        let db = Database::open_in_memory().unwrap();
+        let quote = db.create_quote("Quote").unwrap();
+        let mut screen = QuotesScreen::new(&db).unwrap();
+        screen.mode = Mode::Edit;
+        screen.input.set("discard me");
+        screen.editing_id = Some(quote.id);
+
+        let next = screen.reenter(&db).unwrap();
+
+        assert_eq!(next.mode, Mode::Browse);
+        assert!(next.input.value().is_empty());
+        assert!(next.editing_id.is_none());
+    }
+
+    #[test]
+    fn quotes_reentry_clamps_selection_and_viewports_after_selected_deletion() {
+        let db = Database::open_in_memory().unwrap();
+        db.create_quote("First quote").unwrap();
+        let second = db.create_quote("Second quote").unwrap();
+        let third = db.create_quote("Third quote").unwrap();
+        let mut screen = QuotesScreen::new(&db).unwrap();
+        screen.selected = 2;
+        screen.mode = Mode::Detail;
+        screen.detail_state.focused = true;
+        screen.list_viewport.set_height(1);
+        screen.list_viewport.set_offset(2);
+        screen.detail_state.viewport.set_height(1);
+        screen.detail_state.viewport.set_offset(4);
+        screen.detail_content_height = 4;
+        db.delete_quote(third.id).unwrap();
+
+        let next = screen.reenter(&db).unwrap();
+
+        assert_eq!(next.selected, 1);
+        assert_eq!(next.quotes[next.selected].id, second.id);
+        assert_eq!(next.list_viewport.offset(), 1);
+        assert_eq!(next.detail_state.viewport.offset(), 3);
+        assert_eq!(next.mode, Mode::Detail);
+        assert!(next.detail_state.focused);
+    }
+
+    #[test]
+    fn quotes_navigation_error_uses_status_line() {
+        let db = Database::open_in_memory().unwrap();
+        let mut screen = QuotesScreen::new(&db).unwrap();
+
+        screen.set_navigation_error("navigation failed".into());
+
+        assert_eq!(screen.status_msg, Some(("navigation failed".into(), true)));
     }
 
     #[test]
