@@ -78,11 +78,6 @@ impl DashboardScreen {
         })
     }
 
-    pub fn refresh(&mut self, db: &Database) -> anyhow::Result<()> {
-        *self = self.reenter(db)?;
-        Ok(())
-    }
-
     fn active_shortcuts(&self) -> Vec<Shortcut> {
         match self.mode {
             DashboardMode::Normal => vec![

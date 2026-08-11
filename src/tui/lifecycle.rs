@@ -1,5 +1,7 @@
 use crate::db::Database;
 
+// Concrete app storage consumes this contract in the binary target.
+#[allow(dead_code)]
 pub(crate) trait Reenter: Sized {
     fn reenter(&self, db: &Database) -> anyhow::Result<Self>;
 }

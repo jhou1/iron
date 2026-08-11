@@ -700,6 +700,17 @@ impl HistoryScreen {
         self.list_viewport.clamp(self.filtered_indices.len());
         Ok(())
     }
+
+    #[cfg(test)]
+    #[allow(dead_code)]
+    pub(crate) fn context_for_test(&self) -> (Option<i64>, Option<String>, String) {
+        (
+            self.selected_entry().map(|entry| entry.log.id),
+            self.selected_entry()
+                .and_then(|entry| entry.log.note.clone()),
+            self.filter.value().to_owned(),
+        )
+    }
 }
 
 impl Reenter for HistoryScreen {

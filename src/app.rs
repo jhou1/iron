@@ -11,11 +11,10 @@ use std::io::stdout;
 
 use crate::db::Database;
 use crate::i18n::tr_args;
-use crate::tui::{
-    dashboard::DashboardScreen, goals::GoalsScreen, history::HistoryScreen, lifecycle::Reenter,
-    log_entry::LogEntryScreen, practices::PracticesScreen, quotes_screen::QuotesScreen,
-    trends::TrendsScreen, Action, ModuleId, NavigationIntent, ScreenId,
-};
+use crate::tui::{Action, ScreenId};
+
+mod screens;
+use screens::ScreenStore;
 
 pub fn run() -> Result<()> {
     let db = Database::open_default()?;
@@ -34,13 +33,7 @@ fn run_app(
 ) -> Result<()> {
     let no_color = std::env::var("NO_COLOR").is_ok();
     let mut current_screen = ScreenId::Dashboard;
-    let mut dashboard = DashboardScreen::new(db, no_color)?;
-    let mut goals_screen = GoalsScreen::new(db)?;
-    let mut log_entry = LogEntryScreen::new(db)?;
-    let mut history = HistoryScreen::new(db)?;
-    let mut trends = TrendsScreen::new(db)?;
-    let mut practices = PracticesScreen::new(db)?;
-    let mut quotes_screen = QuotesScreen::new(db)?;
+    let mut screens = ScreenStore::new(db, no_color)?;
 
     loop {
         terminal.draw(|frame| {
@@ -56,15 +49,7 @@ fn run_app(
                 frame.render_widget(paragraph, msg_area);
                 return;
             }
-            match current_screen {
-                ScreenId::Dashboard => dashboard.render(frame),
-                ScreenId::Goals => goals_screen.render(frame),
-                ScreenId::LogEntry => log_entry.render(frame),
-                ScreenId::History => history.render(frame),
-                ScreenId::Trends => trends.render(frame),
-                ScreenId::Practices => practices.render(frame),
-                ScreenId::Quotes => quotes_screen.render(frame),
-            }
+            screens.render(current_screen, frame);
         })?;
 
         if let Event::Key(key) = event::read()? {
@@ -75,39 +60,15 @@ fn run_app(
                 break;
             }
 
-            let action = match current_screen {
-                ScreenId::Dashboard => dashboard.handle_key(key, db),
-                ScreenId::Goals => goals_screen.handle_key(key, db),
-                ScreenId::LogEntry => log_entry.handle_key(key, db),
-                ScreenId::History => history.handle_key(key, db),
-                ScreenId::Trends => trends.handle_key(key, db),
-                ScreenId::Practices => practices.handle_key(key, db),
-                ScreenId::Quotes => quotes_screen.handle_key(key, db),
-            };
+            let action = screens.handle_key(current_screen, key, db);
 
             match action {
                 Action::Quit => break,
                 Action::Navigate(intent) => {
-                    match intent {
-                        NavigationIntent::Open(module) => match module {
-                            ModuleId::Dashboard => dashboard.refresh(db)?,
-                            ModuleId::Goals => goals_screen = GoalsScreen::new(db)?,
-                            ModuleId::History => history.refresh_preserving_context(db)?,
-                            ModuleId::Trends => trends = trends.reenter(db)?,
-                            ModuleId::Practices => practices = PracticesScreen::new(db)?,
-                            ModuleId::Quotes => quotes_screen = QuotesScreen::new(db)?,
-                        },
-                        NavigationIntent::NewLog => {
-                            log_entry = LogEntryScreen::new(db)?;
-                        }
-                        NavigationIntent::EditHistoryLog { log_id } => {
-                            let entry = db
-                                .get_log_by_id(log_id)?
-                                .ok_or_else(|| anyhow::anyhow!("log {log_id} no longer exists"))?;
-                            log_entry = LogEntryScreen::from_existing(db, &entry)?;
-                        }
-                    }
-                    current_screen = intent.target();
+                    let prepared = screens.prepare(intent, db)?;
+                    let target = prepared.target();
+                    screens.install(prepared);
+                    current_screen = target;
                 }
                 Action::None => {}
             }
@@ -121,6 +82,9 @@ fn run_app(
 mod tests {
     use super::*;
     use crate::model::{PracticeType, SetData};
+    use crate::tui::{
+        history::HistoryScreen, log_entry::LogEntryScreen, ModuleId, NavigationIntent,
+    };
     use chrono::NaiveDate;
     use crossterm::event::{KeyEvent, KeyEventKind, KeyEventState};
 

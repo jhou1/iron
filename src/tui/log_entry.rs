@@ -10,13 +10,15 @@ use ratatui::{
 
 use unicode_width::UnicodeWidthStr;
 
+use super::lifecycle::NavigationStatus;
 use super::{
     centered_area,
     framework::{
         fit_rect, move_selection, render_shortcuts, shortcut_height, truncate_to_width,
         EdgeBehavior, Shortcut, TextInput, ViewportState, VisualSpan,
     },
-    highlight_row, render_status_line, Action, ModuleId, NavigationIntent, StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
+    highlight_row, render_status_line, Action, ModuleId, NavigationIntent, StatusMessage,
+    BORDER_COLOR, CONTENT_WIDTH,
 };
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
@@ -146,6 +148,18 @@ impl LogEntryScreen {
             return_to: ModuleId::History,
             status_msg: None,
         })
+    }
+
+    #[cfg(test)]
+    #[allow(dead_code)]
+    pub(crate) fn identity_for_test(&self) -> (Option<i64>, ModuleId) {
+        (self.editing_log_id, self.return_to)
+    }
+
+    #[cfg(test)]
+    #[allow(dead_code)]
+    pub(crate) fn form_value_for_test(&self) -> (&str, &str) {
+        (self.note.value(), self.rpe_input.value())
     }
 
     pub fn render(&mut self, frame: &mut Frame) {
@@ -1288,6 +1302,12 @@ impl LogEntryScreen {
     }
 }
 
+impl NavigationStatus for LogEntryScreen {
+    fn set_navigation_error(&mut self, message: String) {
+        self.status_msg = Some((message, true));
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 enum TextFieldTarget {
     WarmUp,
@@ -1337,6 +1357,7 @@ mod tests {
     use super::*;
     use crate::db::Database;
     use crate::tui::framework::test_support::render_to_string;
+    use crate::tui::lifecycle::NavigationStatus;
     use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
     use rusqlite::Connection;
 
@@ -1375,6 +1396,23 @@ mod tests {
 
     fn render_log_entry(screen: &mut LogEntryScreen, width: u16, height: u16) -> String {
         render_to_string(width, height, |frame| screen.render(frame))
+    }
+
+    #[test]
+    fn navigation_error_retains_log_entry_form_fields() {
+        let db = Database::open_in_memory().unwrap();
+        let mut screen = LogEntryScreen::new(&db).unwrap();
+        screen.note.set("keep note");
+        screen.rpe_input.set("8");
+
+        screen.set_navigation_error("target disappeared".to_owned());
+
+        assert_eq!(screen.note.value(), "keep note");
+        assert_eq!(screen.rpe_input.value(), "8");
+        assert_eq!(
+            screen.status_msg,
+            Some(("target disappeared".to_owned(), true))
+        );
     }
 
     #[test]

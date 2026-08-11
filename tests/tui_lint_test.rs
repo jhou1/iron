@@ -14,13 +14,13 @@ fn paragraph_widgets_must_wrap_user_content() {
     // Format: "filename:line_number"
     // When adding entries, include a brief reason.
     let allowlist: HashSet<&str> = [
-        "dashboard.rs:141",
-        "dashboard.rs:415",
-        "dashboard.rs:435",
-        "dashboard.rs:470",
-        "log_entry.rs:530",
-        "log_entry.rs:722",
-        "log_entry.rs:821",
+        "dashboard.rs:136",
+        "dashboard.rs:410",
+        "dashboard.rs:430",
+        "dashboard.rs:465",
+        "log_entry.rs:544",
+        "log_entry.rs:736",
+        "log_entry.rs:835",
     ]
     .into_iter()
     .collect();

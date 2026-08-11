@@ -1167,6 +1167,22 @@ impl GoalsScreen {
             }
         }
     }
+
+    #[cfg(test)]
+    #[allow(dead_code)]
+    pub(crate) fn titles_for_test(&self) -> Vec<String> {
+        self.goals.iter().map(|goal| goal.title.clone()).collect()
+    }
+
+    #[cfg(test)]
+    #[allow(dead_code)]
+    pub(crate) fn context_for_test(&self) -> (Option<i64>, usize, bool) {
+        (
+            self.goals.get(self.selected).map(|goal| goal.id),
+            self.list_viewport.offset(),
+            self.mode == Mode::Modal,
+        )
+    }
 }
 
 impl Reenter for GoalsScreen {

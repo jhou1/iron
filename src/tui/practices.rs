@@ -541,6 +541,12 @@ impl PracticesScreen {
             }
         }
     }
+
+    #[cfg(test)]
+    #[allow(dead_code)]
+    pub(crate) fn ids_for_test(&self) -> Vec<i64> {
+        self.practices.iter().map(|practice| practice.id).collect()
+    }
 }
 
 impl Reenter for PracticesScreen {
