@@ -9,6 +9,7 @@ use ratatui::{
 
 use unicode_width::UnicodeWidthStr;
 
+use super::lifecycle::{NavigationStatus, Reenter};
 use super::{
     centered_area,
     framework::{
@@ -701,9 +702,57 @@ impl HistoryScreen {
     }
 }
 
+impl Reenter for HistoryScreen {
+    fn reenter(&self, db: &Database) -> anyhow::Result<Self> {
+        let selected_id = self.selected_entry().map(|entry| entry.log.id);
+        let mut next = Self::new(db)?;
+
+        next.filter = TextInput::from(self.filter.value().to_owned());
+        next.apply_filter();
+        next.selected = selected_id
+            .and_then(|id| {
+                next.filtered_indices
+                    .iter()
+                    .position(|index| next.entries[*index].log.id == id)
+            })
+            .unwrap_or_else(|| {
+                self.selected
+                    .min(next.filtered_indices.len().saturating_sub(1))
+            });
+        if next.filtered_indices.is_empty() {
+            next.selected = 0;
+        }
+
+        next.list_viewport = self.list_viewport;
+        next.list_viewport.clamp(next.filtered_indices.len());
+        next.detail_state.viewport = self.detail_state.viewport;
+        next.detail_content_height = self.detail_content_height;
+        next.detail_state.viewport.clamp(next.detail_content_height);
+
+        next.mode = if self.mode == Mode::Detail && next.selected_entry().is_some() {
+            Mode::Detail
+        } else {
+            Mode::Browse
+        };
+        next.detail_state.focused = next.mode == Mode::Detail;
+        next.filtering = false;
+        next.status_msg = None;
+        next.last_deleted = None;
+
+        Ok(next)
+    }
+}
+
+impl NavigationStatus for HistoryScreen {
+    fn set_navigation_error(&mut self, message: String) {
+        self.status_msg = Some((message, true));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tui::lifecycle::Reenter;
     use crate::{model::PracticeType, tui::framework::test_support::render_to_string};
     use crossterm::event::KeyModifiers;
 
@@ -740,6 +789,98 @@ mod tests {
         )
         .unwrap();
         db
+    }
+
+    fn history_db_with_multiple_filtered_entries() -> Database {
+        let db = Database::open_in_memory().unwrap();
+        let bench = db
+            .create_practice("Bench Press", PracticeType::Bodyweight)
+            .unwrap();
+        let leg = db
+            .create_practice("Leg Press", PracticeType::Bodyweight)
+            .unwrap();
+        for (practice, note) in [(&bench, "bench"), (&leg, "leg")] {
+            db.create_log(
+                practice.id,
+                &[SetData::Bodyweight { reps: 10 }],
+                Some(note),
+                None,
+                None,
+                Some(7),
+            )
+            .unwrap();
+        }
+        db
+    }
+
+    fn enter_press_filter_and_select_second(screen: &mut HistoryScreen, db: &Database) {
+        screen.handle_key(key(KeyCode::Char('/')), db);
+        for character in "press".chars() {
+            screen.handle_key(key(KeyCode::Char(character)), db);
+        }
+        screen.handle_key(key(KeyCode::Enter), db);
+        screen.handle_key(key(KeyCode::Char('j')), db);
+    }
+
+    #[test]
+    fn history_reentry_preserves_browsing_context_and_clears_transients() {
+        let db = history_db_with_multiple_filtered_entries();
+        let mut screen = HistoryScreen::new(&db).unwrap();
+        enter_press_filter_and_select_second(&mut screen, &db);
+        let selected_id = screen.selected_entry().unwrap().log.id;
+        screen.mode = Mode::Detail;
+        screen.detail_state.focused = true;
+        screen.list_viewport.set_offset(1);
+        screen.detail_state.viewport.set_offset(2);
+        screen.status_msg = Some(("old status".into(), false));
+        screen.last_deleted = Some(screen.selected_entry().unwrap().clone());
+
+        db.update_log(
+            selected_id,
+            &[SetData::Bodyweight { reps: 15 }],
+            Some("fresh note"),
+            None,
+            None,
+            None,
+            Some(8),
+        )
+        .unwrap();
+        let next = screen.reenter(&db).unwrap();
+
+        assert_eq!(next.selected_entry().unwrap().log.id, selected_id);
+        assert_eq!(
+            next.selected_entry().unwrap().log.note.as_deref(),
+            Some("fresh note")
+        );
+        assert_eq!(next.filter.value(), "press");
+        assert!(!next.filtering);
+        assert_eq!(next.mode, Mode::Detail);
+        assert!(next.detail_state.focused);
+        assert!(next.status_msg.is_none());
+        assert!(next.last_deleted.is_none());
+    }
+
+    #[test]
+    fn history_reentry_clamps_selection_after_selected_logs_are_deleted() {
+        let db = history_db_with_multiple_filtered_entries();
+        let mut screen = HistoryScreen::new(&db).unwrap();
+        enter_press_filter_and_select_second(&mut screen, &db);
+        let selected_id = screen.selected_entry().unwrap().log.id;
+
+        db.delete_log(selected_id).unwrap();
+        let next = screen.reenter(&db).unwrap();
+
+        assert!(!next.filtered_indices.is_empty());
+        assert!(next.selected < next.filtered_indices.len());
+        assert!(next.selected_entry().is_some());
+
+        let remaining_id = next.selected_entry().unwrap().log.id;
+        db.delete_log(remaining_id).unwrap();
+        let empty = next.reenter(&db).unwrap();
+
+        assert!(empty.filtered_indices.is_empty());
+        assert_eq!(empty.selected, 0);
+        assert!(empty.selected_entry().is_none());
     }
 
     #[test]

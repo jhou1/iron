@@ -8,6 +8,7 @@ use ratatui::{
 };
 use unicode_width::UnicodeWidthStr;
 
+use super::lifecycle::{NavigationStatus, Reenter};
 use super::widgets::heatmap::Heatmap;
 use super::{
     centered_area,
@@ -19,7 +20,7 @@ use super::{
 };
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
-use crate::model::{Goal, LogEntry, Quote};
+use crate::model::{Goal, LogEntry};
 use fluent_bundle::FluentValue;
 
 const ACCENT: Color = Color::Cyan;
@@ -40,7 +41,6 @@ pub struct DashboardScreen {
     recent_entries: Vec<LogEntry>,
     quote: String,
     goals: Vec<Goal>,
-    quotes: Vec<Quote>,
     mode: DashboardMode,
     hrv_today: Option<i32>,
     hrv_input: TextInput,
@@ -60,20 +60,13 @@ impl DashboardScreen {
         let goals = db.list_goals()?;
         let today = chrono::Local::now().format("%Y-%m-%d").to_string();
         let hrv_today = db.get_daily_hrv(&today)?;
-        let stats = db.aggregate_stats(7).unwrap_or(crate::db::AggregateStats {
-            sessions: 0,
-            total_volume: 0.0,
-            total_reps: 0.0,
-            total_distance: 0.0,
-            total_duration: 0.0,
-        });
+        let stats = db.aggregate_stats(7)?;
         let (training_days, consecutive_days) = Self::compute_streak(&heatmap_data);
         Ok(Self {
             heatmap_data,
             recent_entries,
             quote,
             goals,
-            quotes,
             mode: DashboardMode::Normal,
             hrv_today,
             hrv_input: TextInput::new(),
@@ -86,24 +79,7 @@ impl DashboardScreen {
     }
 
     pub fn refresh(&mut self, db: &Database) -> anyhow::Result<()> {
-        self.heatmap_data = db.heatmap_counts(365)?;
-        self.recent_entries = db.list_logs_recent(7)?;
-        self.quotes = db.list_quotes()?;
-        self.quote = super::quotes::pick_random_quote(&self.quotes);
-        self.goals = db.list_goals()?;
-        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-        self.hrv_today = db.get_daily_hrv(&today)?;
-        let stats = db.aggregate_stats(7).unwrap_or(crate::db::AggregateStats {
-            sessions: 0,
-            total_volume: 0.0,
-            total_reps: 0.0,
-            total_distance: 0.0,
-            total_duration: 0.0,
-        });
-        let (td, cd) = Self::compute_streak(&self.heatmap_data);
-        self.weekly_volume = stats.total_volume;
-        self.training_days = td;
-        self.consecutive_days = cd;
+        *self = self.reenter(db)?;
         Ok(())
     }
 
@@ -582,11 +558,24 @@ impl DashboardScreen {
     }
 }
 
+impl Reenter for DashboardScreen {
+    fn reenter(&self, db: &Database) -> anyhow::Result<Self> {
+        Self::new(db, self.no_color)
+    }
+}
+
+impl NavigationStatus for DashboardScreen {
+    fn set_navigation_error(&mut self, message: String) {
+        self.status_msg = Some((message, true));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::model::{PracticeType, SetData};
     use crate::tui::framework::test_support::render_to_string;
+    use crate::tui::lifecycle::Reenter;
     use crossterm::event::{KeyEventKind, KeyModifiers};
     use rusqlite::Connection;
 
@@ -601,6 +590,42 @@ mod tests {
 
     fn render_dashboard(screen: &DashboardScreen, width: u16, height: u16) -> String {
         render_to_string(width, height, |frame| screen.render(frame))
+    }
+
+    #[test]
+    fn dashboard_reentry_loads_fresh_data_and_clears_transient_state() {
+        let db = Database::open_in_memory().unwrap();
+        let mut screen = DashboardScreen::new(&db, true).unwrap();
+        screen.mode = DashboardMode::HrvInput;
+        screen.hrv_input.set("88");
+        screen.status_msg = Some(("old status".into(), true));
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        db.set_daily_hrv(&today, 64).unwrap();
+
+        let next = screen.reenter(&db).unwrap();
+
+        assert_eq!(next.mode, DashboardMode::Normal);
+        assert_eq!(next.hrv_today, Some(64));
+        assert!(next.hrv_input.value().is_empty());
+        assert!(next.status_msg.is_none());
+        assert!(next.no_color);
+    }
+
+    #[test]
+    fn failed_dashboard_reentry_does_not_mutate_cached_screen() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        let db = Database::open(temp.path()).unwrap();
+        let mut screen = DashboardScreen::new(&db, false).unwrap();
+        screen.mode = DashboardMode::HrvInput;
+        screen.hrv_input.set("77");
+        rusqlite::Connection::open(temp.path())
+            .unwrap()
+            .execute("DROP TABLE quotes", [])
+            .unwrap();
+
+        assert!(screen.reenter(&db).is_err());
+        assert_eq!(screen.mode, DashboardMode::HrvInput);
+        assert_eq!(screen.hrv_input.value(), "77");
     }
 
     #[test]

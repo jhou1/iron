@@ -2,6 +2,7 @@ pub mod dashboard;
 pub mod framework;
 pub mod goals;
 pub mod history;
+pub(crate) mod lifecycle;
 pub mod log_entry;
 pub mod navigation;
 pub mod practices;
