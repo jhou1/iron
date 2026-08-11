@@ -13,8 +13,10 @@ use super::{
         combined_span, fit_rect, render_detail_panel, visual_spans, DetailPanelState, TextInput,
         ViewportState, VisualSpan,
     },
-    highlight_row, render_gauge_line, render_status_line, Action, ModuleId, NavigationIntent,
-    StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
+    highlight_row,
+    lifecycle::{NavigationStatus, Reenter},
+    render_gauge_line, render_status_line, Action, ModuleId, NavigationIntent, StatusMessage,
+    BORDER_COLOR, CONTENT_WIDTH,
 };
 use crate::db::Database;
 use crate::i18n::tr;
@@ -1167,6 +1169,83 @@ impl GoalsScreen {
     }
 }
 
+impl Reenter for GoalsScreen {
+    fn reenter(&self, db: &Database) -> anyhow::Result<Self> {
+        let selected_goal_id = self.goals.get(self.selected).map(|goal| goal.id);
+        let modal_goal_id = (self.mode == Mode::Modal)
+            .then(|| self.goals.get(self.modal_goal_idx).map(|goal| goal.id))
+            .flatten();
+        let selected_milestone_id = (self.mode == Mode::Modal)
+            .then(|| {
+                self.goals
+                    .get(self.modal_goal_idx)
+                    .and_then(|goal| goal.milestones.get(self.modal_selected))
+                    .map(|milestone| milestone.id)
+            })
+            .flatten();
+        let mut next = GoalsScreen::new(db)?;
+
+        next.selected = selected_goal_id
+            .and_then(|id| next.goals.iter().position(|goal| goal.id == id))
+            .unwrap_or_else(|| self.selected.min(next.goals.len().saturating_sub(1)));
+        if next.goals.is_empty() {
+            next.selected = 0;
+        }
+
+        next.modal_goal_idx = modal_goal_id
+            .and_then(|id| next.goals.iter().position(|goal| goal.id == id))
+            .unwrap_or_else(|| self.modal_goal_idx.min(next.goals.len().saturating_sub(1)));
+        if next.goals.is_empty() {
+            next.modal_goal_idx = 0;
+        }
+        let milestone_count = next
+            .goals
+            .get(next.modal_goal_idx)
+            .map(|goal| goal.milestones.len())
+            .unwrap_or(0);
+        next.modal_selected = selected_milestone_id
+            .and_then(|id| {
+                next.goals.get(next.modal_goal_idx).and_then(|goal| {
+                    goal.milestones
+                        .iter()
+                        .position(|milestone| milestone.id == id)
+                })
+            })
+            .unwrap_or_else(|| self.modal_selected.min(milestone_count.saturating_sub(1)));
+        if milestone_count == 0 {
+            next.modal_selected = 0;
+        }
+
+        next.list_viewport = self.list_viewport;
+        next.detail_state.viewport = self.detail_state.viewport;
+
+        next.mode = if self.mode == Mode::Modal && !next.goals.is_empty() {
+            Mode::Modal
+        } else {
+            Mode::Browse
+        };
+        next.detail_state.focused = next.mode == Mode::Modal;
+        next.modal_mode = ModalMode::Browse;
+        next.input.clear();
+        next.status_msg = None;
+        next.modal_status_msg = None;
+        next.last_deleted = None;
+        next.modal_last_deleted = None;
+
+        Ok(next)
+    }
+}
+
+impl NavigationStatus for GoalsScreen {
+    fn set_navigation_error(&mut self, message: String) {
+        if self.mode == Mode::Modal {
+            self.modal_status_msg = Some((message, true));
+        } else {
+            self.status_msg = Some((message, true));
+        }
+    }
+}
+
 fn render_goal_lines(goal: &Goal, is_selected: bool) -> Vec<Line<'static>> {
     let mut result = Vec::new();
     let marker = if is_selected { "» " } else { "  " };
@@ -1242,6 +1321,7 @@ mod tests {
     use ratatui::{backend::TestBackend, Terminal};
 
     use crate::tui::framework::ViewportState;
+    use crate::tui::lifecycle::{NavigationStatus, Reenter};
 
     fn key(code: KeyCode) -> KeyEvent {
         KeyEvent::new(code, KeyModifiers::NONE)
@@ -1313,6 +1393,161 @@ mod tests {
             modal_status_msg: None,
             modal_last_deleted: None,
         }
+    }
+
+    #[test]
+    fn goals_reentry_preserves_stable_browse_identity_and_clears_transients() {
+        let db = Database::open_in_memory().unwrap();
+        let first = db.create_goal("First").unwrap();
+        let second = db.create_goal("Second").unwrap();
+        let earlier = db.create_milestone(second, "Earlier").unwrap();
+        let milestone = db.create_milestone(second, "Target").unwrap();
+        db.create_milestone(second, "Later").unwrap();
+        let mut screen = GoalsScreen::new(&db).unwrap();
+        screen.selected = screen
+            .goals
+            .iter()
+            .position(|goal| goal.id == second)
+            .unwrap();
+        screen.mode = Mode::Modal;
+        screen.modal_goal_idx = screen.selected;
+        screen.modal_selected = screen.goals[screen.modal_goal_idx]
+            .milestones
+            .iter()
+            .position(|item| item.id == milestone)
+            .unwrap();
+        screen.modal_mode = ModalMode::EditMilestone;
+        screen.input.set("discard me");
+        screen.status_msg = Some(("old".into(), false));
+        screen.last_deleted = Some(GoalUndoData::Goal(screen.goals[0].clone()));
+        screen.modal_status_msg = Some(("old modal".into(), false));
+        screen.modal_last_deleted = Some(GoalUndoData::Milestone {
+            goal_id: second,
+            milestone: screen.goals[screen.modal_goal_idx].milestones[0].clone(),
+        });
+        screen.list_viewport = ViewportState::new(1);
+        screen.list_viewport.set_offset(1);
+        screen.detail_state.viewport = ViewportState::new(1);
+        screen.detail_state.viewport.set_offset(1);
+
+        db.create_goal("New").unwrap();
+        db.delete_milestone(earlier).unwrap();
+        db.update_goal(first, "First changed").unwrap();
+        let next = screen.reenter(&db).unwrap();
+
+        assert_eq!(next.goals[next.modal_goal_idx].id, second);
+        assert_eq!(
+            next.goals[next.modal_goal_idx].milestones[next.modal_selected].id,
+            milestone
+        );
+        assert_eq!(next.mode, Mode::Modal);
+        assert_eq!(next.modal_mode, ModalMode::Browse);
+        assert!(next.detail_state.focused);
+        assert!(next.input.value().is_empty());
+        assert!(next.status_msg.is_none());
+        assert!(next.modal_status_msg.is_none());
+        assert!(next.last_deleted.is_none());
+        assert!(next.modal_last_deleted.is_none());
+        assert_eq!(next.list_viewport.offset(), 1);
+        assert_eq!(next.detail_state.viewport.offset(), 1);
+        assert_eq!(
+            next.goals
+                .iter()
+                .find(|goal| goal.id == first)
+                .unwrap()
+                .title,
+            "First changed"
+        );
+    }
+
+    #[test]
+    fn goals_reentry_preserves_wrapped_content_viewports_until_measured_render() {
+        let db = Database::open_in_memory().unwrap();
+        let goal_id = db.create_goal(&"Long goal ".repeat(30)).unwrap();
+        db.create_milestone(goal_id, &"Long milestone ".repeat(30))
+            .unwrap();
+        let mut screen = GoalsScreen::new(&db).unwrap();
+        screen.mode = Mode::Modal;
+        render_screen(&mut screen, 24, 10);
+        screen.list_viewport.set_offset(4);
+        screen.detail_state.viewport.set_offset(3);
+
+        let next = screen.reenter(&db).unwrap();
+
+        assert_eq!(next.list_viewport.offset(), 4);
+        assert_eq!(next.detail_state.viewport.offset(), 3);
+    }
+
+    #[test]
+    fn goals_reentry_leaves_add_mode_and_restores_selected_goal_identity() {
+        let db = Database::open_in_memory().unwrap();
+        let first = db.create_goal("First").unwrap();
+        let second = db.create_goal("Second").unwrap();
+        let mut screen = GoalsScreen::new(&db).unwrap();
+        screen.selected = screen
+            .goals
+            .iter()
+            .position(|goal| goal.id == first)
+            .unwrap();
+        screen.mode = Mode::AddGoal;
+        screen.input.set("discard me");
+
+        db.toggle_goal(second).unwrap();
+        let next = screen.reenter(&db).unwrap();
+
+        assert_eq!(next.mode, Mode::Browse);
+        assert_eq!(next.goals[next.selected].id, first);
+        assert!(next.input.value().is_empty());
+    }
+
+    #[test]
+    fn goals_reentry_clamps_indices_and_viewports_after_selected_goal_is_deleted() {
+        let db = Database::open_in_memory().unwrap();
+        let deleted = db.create_goal("Deleted").unwrap();
+        db.create_goal("Remaining").unwrap();
+        db.create_milestone(deleted, "One").unwrap();
+        db.create_milestone(deleted, "Two").unwrap();
+        let mut screen = GoalsScreen::new(&db).unwrap();
+        screen.selected = screen
+            .goals
+            .iter()
+            .position(|goal| goal.id == deleted)
+            .unwrap();
+        screen.mode = Mode::Modal;
+        screen.modal_goal_idx = screen.selected;
+        screen.modal_selected = 1;
+        screen.list_viewport = ViewportState::new(1);
+        screen.list_viewport.set_offset(5);
+        screen.detail_state.viewport = ViewportState::new(1);
+        screen.detail_state.viewport.set_offset(2);
+
+        db.delete_goal(deleted).unwrap();
+        let mut next = screen.reenter(&db).unwrap();
+
+        assert_eq!(next.selected, 0);
+        assert_eq!(next.modal_goal_idx, 0);
+        assert_eq!(next.modal_selected, 0);
+        assert_eq!(next.mode, Mode::Modal);
+        assert_eq!(next.list_viewport.offset(), 5);
+        assert_eq!(next.detail_state.viewport.offset(), 2);
+
+        render_screen(&mut next, 80, 24);
+
+        assert_eq!(next.list_viewport.offset(), 0);
+        assert_eq!(next.detail_state.viewport.offset(), 0);
+    }
+
+    #[test]
+    fn goals_navigation_error_uses_the_active_status_surface() {
+        let mut screen = make_screen(1);
+
+        screen.set_navigation_error("browse error".into());
+        assert_eq!(screen.status_msg, Some(("browse error".into(), true)));
+        assert!(screen.modal_status_msg.is_none());
+
+        screen.mode = Mode::Modal;
+        screen.set_navigation_error("modal error".into());
+        assert_eq!(screen.modal_status_msg, Some(("modal error".into(), true)));
     }
 
     #[test]
