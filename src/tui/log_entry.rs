@@ -861,7 +861,7 @@ impl LogEntryScreen {
 
         // Ctrl+S — save from any section
         if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('s') {
-            if !self.sets.is_empty() {
+            if !self.sets.is_empty() && self.editing_set.is_none() {
                 return self.save_log(db);
             }
             return Action::None;
@@ -1588,6 +1588,58 @@ mod tests {
             );
         }
         assert!(!output.contains(&tr("key-add-set")), "{output}");
+    }
+
+    #[test]
+    fn ctrl_s_during_set_edit_preserves_pending_state_without_writing() {
+        let db = Database::open_in_memory().unwrap();
+        let practice = db
+            .create_practice("Deadlift", PracticeType::Weighted)
+            .unwrap();
+        db.create_log(
+            practice.id,
+            &[SetData::Weighted {
+                weight: 50.0,
+                reps: 10,
+            }],
+            Some("original note"),
+            None,
+            None,
+            Some(7),
+        )
+        .unwrap();
+        let entry = db.list_logs_all().unwrap().remove(0);
+        let mut screen = LogEntryScreen::from_existing(&db, &entry).unwrap();
+        screen.selected_set = Some(0);
+        screen.editing_set = Some(0);
+        screen.field1.set("55");
+        screen.field2.set("12");
+        screen.active_field = 1;
+        screen.note.set("pending note");
+        screen.focus = FocusSection::Sets;
+
+        let action = screen.handle_key(ctrl_key('s'), &db);
+        let persisted = db.list_logs_all().unwrap().remove(0);
+
+        assert_eq!(persisted.log.note.as_deref(), Some("original note"));
+        assert_eq!(
+            persisted.sets[0].data,
+            SetData::Weighted {
+                weight: 50.0,
+                reps: 10,
+            }
+        );
+        assert!(matches!(action, Action::None));
+        assert_eq!(screen.phase, Phase::EnterLog);
+        assert_eq!(screen.selected_set, Some(0));
+        assert_eq!(screen.editing_set, Some(0));
+        assert_eq!(screen.editing_log_id, Some(entry.log.id));
+        assert_eq!(screen.field1.value(), "55");
+        assert_eq!(screen.field2.value(), "12");
+        assert_eq!(screen.active_field, 1);
+        assert_eq!(screen.note.value(), "pending note");
+        assert_eq!(screen.focus, FocusSection::Sets);
+        assert_eq!(screen.return_to, Screen::History);
     }
 
     #[test]
