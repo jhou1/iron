@@ -12,7 +12,7 @@ use std::io::stdout;
 use crate::db::Database;
 use crate::i18n::tr_args;
 use crate::tui::{
-    dashboard::DashboardScreen, goals::GoalsScreen, history::HistoryScreen,
+    dashboard::DashboardScreen, goals::GoalsScreen, history::HistoryScreen, lifecycle::Reenter,
     log_entry::LogEntryScreen, practices::PracticesScreen, quotes_screen::QuotesScreen,
     trends::TrendsScreen, Action, ModuleId, NavigationIntent, ScreenId,
 };
@@ -80,11 +80,7 @@ fn run_app(
                 ScreenId::Goals => goals_screen.handle_key(key, db),
                 ScreenId::LogEntry => log_entry.handle_key(key, db),
                 ScreenId::History => history.handle_key(key, db),
-                ScreenId::Trends => {
-                    let action = trends.handle_key(key);
-                    trends.refresh_chart(db);
-                    action
-                }
+                ScreenId::Trends => trends.handle_key(key, db),
                 ScreenId::Practices => practices.handle_key(key, db),
                 ScreenId::Quotes => quotes_screen.handle_key(key, db),
             };
@@ -97,7 +93,7 @@ fn run_app(
                             ModuleId::Dashboard => dashboard.refresh(db)?,
                             ModuleId::Goals => goals_screen = GoalsScreen::new(db)?,
                             ModuleId::History => history.refresh_preserving_context(db)?,
-                            ModuleId::Trends => trends = TrendsScreen::new(db)?,
+                            ModuleId::Trends => trends = trends.reenter(db)?,
                             ModuleId::Practices => practices = PracticesScreen::new(db)?,
                             ModuleId::Quotes => quotes_screen = QuotesScreen::new(db)?,
                         },

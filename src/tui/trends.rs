@@ -10,6 +10,7 @@ use ratatui::{
 
 use unicode_width::UnicodeWidthStr;
 
+use super::lifecycle::{NavigationStatus, Reenter};
 use super::widgets::sparkline::Sparkline;
 use super::{
     centered_area,
@@ -342,7 +343,7 @@ impl TrendsScreen {
         }
     }
 
-    pub fn handle_key(&mut self, key: KeyEvent) -> Action {
+    pub fn handle_key(&mut self, key: KeyEvent, db: &Database) -> Action {
         self.status_msg = None;
         if self.filtering {
             match key.code {
@@ -351,6 +352,7 @@ impl TrendsScreen {
                 }
                 _ if self.filter.handle_key(key) => {
                     self.apply_filter();
+                    self.load_chart_with_status(db);
                 }
                 _ => {}
             }
@@ -372,6 +374,7 @@ impl TrendsScreen {
                         EdgeBehavior::Wrap,
                     );
                     self.sync_chosen();
+                    self.load_chart_with_status(db);
                 }
                 Action::None
             }
@@ -384,6 +387,7 @@ impl TrendsScreen {
                         EdgeBehavior::Wrap,
                     );
                     self.sync_chosen();
+                    self.load_chart_with_status(db);
                 }
                 Action::None
             }
@@ -391,6 +395,7 @@ impl TrendsScreen {
                 if self.days_window > 30 {
                     self.days_window -= 30;
                     self.needs_refresh = true;
+                    self.load_chart_with_status(db);
                 }
                 Action::None
             }
@@ -401,6 +406,7 @@ impl TrendsScreen {
                         self.days_window = 365;
                     }
                     self.needs_refresh = true;
+                    self.load_chart_with_status(db);
                 }
                 Action::None
             }
@@ -409,10 +415,11 @@ impl TrendsScreen {
     }
 
     fn sync_chosen(&mut self) {
-        if let Some(&idx) = self.filtered_indices.get(self.selected) {
-            self.chosen_practice = Some(self.practices[idx].clone());
-            self.needs_refresh = true;
-        }
+        self.chosen_practice = self
+            .filtered_indices
+            .get(self.selected)
+            .map(|&idx| self.practices[idx].clone());
+        self.needs_refresh = true;
     }
 
     fn apply_filter(&mut self) {
@@ -429,23 +436,18 @@ impl TrendsScreen {
         self.sync_chosen();
     }
 
-    /// Called by app.rs after handle_key to reload chart data from the database.
-    pub fn refresh_chart(&mut self, db: &Database) {
-        if !self.needs_refresh {
-            return;
-        }
+    fn load_chart(&mut self, db: &Database) -> anyhow::Result<()> {
+        self.entries = match &self.chosen_practice {
+            Some(practice) => db.list_logs_for_practice(practice.id, self.days_window)?,
+            None => Vec::new(),
+        };
         self.needs_refresh = false;
+        Ok(())
+    }
 
-        if let Some(ref practice) = self.chosen_practice {
-            match db.list_logs_for_practice(practice.id, self.days_window) {
-                Ok(mut entries) => {
-                    entries.sort_by_key(|a| a.log.logged_at);
-                    self.entries = entries;
-                }
-                Err(error) => {
-                    self.status_msg = Some((format!("Error: {error}"), true));
-                }
-            }
+    fn load_chart_with_status(&mut self, db: &Database) {
+        if let Err(error) = self.load_chart(db) {
+            self.status_msg = Some((format!("Error: {error}"), true));
         }
     }
 
@@ -479,11 +481,51 @@ impl TrendsScreen {
     }
 }
 
+impl Reenter for TrendsScreen {
+    fn reenter(&self, db: &Database) -> anyhow::Result<Self> {
+        let selected_id = self.chosen_practice.as_ref().map(|practice| practice.id);
+        let mut next = Self::new(db)?;
+
+        next.filter = TextInput::from(self.filter.value().to_owned());
+        next.days_window = self.days_window;
+        next.apply_filter();
+        next.selected = selected_id
+            .and_then(|id| {
+                next.filtered_indices
+                    .iter()
+                    .position(|index| next.practices[*index].id == id)
+            })
+            .unwrap_or_else(|| {
+                self.selected
+                    .min(next.filtered_indices.len().saturating_sub(1))
+            });
+        if next.filtered_indices.is_empty() {
+            next.selected = 0;
+        }
+        next.sync_chosen();
+
+        next.list_viewport = self.list_viewport;
+        next.list_viewport.clamp(next.filtered_indices.len());
+        next.filtering = false;
+        next.status_msg = None;
+        next.load_chart(db)?;
+
+        Ok(next)
+    }
+}
+
+impl NavigationStatus for TrendsScreen {
+    fn set_navigation_error(&mut self, message: String) {
+        self.status_msg = Some((message, true));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::PracticeType;
+    use crate::model::{PracticeType, SetData};
     use crate::tui::framework::test_support::render_to_string;
+    use crate::tui::lifecycle::{NavigationStatus, Reenter};
     use crossterm::event::KeyModifiers;
 
     fn key(code: KeyCode) -> KeyEvent {
@@ -520,12 +562,188 @@ mod tests {
         }
     }
 
+    fn trends_db_with_press_and_pull_logs() -> Database {
+        let db = Database::open_in_memory().unwrap();
+        let press = db
+            .create_practice("Bench Press", PracticeType::Bodyweight)
+            .unwrap();
+        let pull = db
+            .create_practice("Pull-up", PracticeType::Bodyweight)
+            .unwrap();
+        for practice in [&press, &pull] {
+            db.create_log(
+                practice.id,
+                &[SetData::Bodyweight { reps: 10 }],
+                Some("trend fixture"),
+                None,
+                None,
+                Some(7),
+            )
+            .unwrap();
+        }
+        db
+    }
+
     fn reveal_selection(screen: &mut TrendsScreen) {
         screen.list_viewport.reveal(VisualSpan {
             start: screen.selected,
             height: 1,
         });
         screen.list_viewport.clamp(screen.filtered_indices.len());
+    }
+
+    #[test]
+    fn trends_reentry_preserves_filter_practice_window_and_loads_chart() {
+        let db = trends_db_with_press_and_pull_logs();
+        let mut screen = TrendsScreen::new(&db).unwrap();
+        screen.filter.set("press");
+        screen.filtering = true;
+        screen.apply_filter();
+        screen.days_window = 30;
+        let selected_id = screen.chosen_practice.as_ref().unwrap().id;
+        screen.status_msg = Some(("old".into(), true));
+
+        let next = screen.reenter(&db).unwrap();
+
+        assert_eq!(next.filter.value(), "press");
+        assert!(!next.filtering);
+        assert_eq!(next.chosen_practice.as_ref().unwrap().id, selected_id);
+        assert_eq!(next.days_window, 30);
+        assert!(!next.needs_refresh);
+        assert!(!next.entries.is_empty());
+        assert!(next.status_msg.is_none());
+    }
+
+    #[test]
+    fn trends_reentry_selects_valid_filtered_practice_when_previous_is_inactive() {
+        let db = trends_db_with_press_and_pull_logs();
+        let mut screen = TrendsScreen::new(&db).unwrap();
+        screen.filter.set("p");
+        screen.apply_filter();
+        let selected_id = screen.chosen_practice.as_ref().unwrap().id;
+        db.set_practice_active(selected_id, false).unwrap();
+
+        let next = screen.reenter(&db).unwrap();
+
+        assert_eq!(next.filter.value(), "p");
+        assert_eq!(next.filtered_indices.len(), 1);
+        assert_ne!(next.chosen_practice.as_ref().unwrap().id, selected_id);
+        assert_eq!(next.chosen_practice.as_ref().unwrap().name, "Pull-up");
+        assert!(!next.entries.is_empty());
+    }
+
+    #[test]
+    fn trends_reentry_failure_leaves_cached_screen_unchanged() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        let db = Database::open(temp.path()).unwrap();
+        let press = db
+            .create_practice("Bench Press", PracticeType::Bodyweight)
+            .unwrap();
+        db.create_log(
+            press.id,
+            &[SetData::Bodyweight { reps: 10 }],
+            Some("cached trend"),
+            None,
+            None,
+            Some(7),
+        )
+        .unwrap();
+        let mut screen = TrendsScreen::new(&db).unwrap();
+        screen.filter.set("press");
+        screen.filtering = true;
+        screen.apply_filter();
+        screen.days_window = 30;
+        screen.load_chart(&db).unwrap();
+        screen.status_msg = Some(("cached status".into(), false));
+        let selected_id = screen.chosen_practice.as_ref().unwrap().id;
+        let entries_len = screen.entries.len();
+
+        rusqlite::Connection::open(temp.path())
+            .unwrap()
+            .execute("DROP TABLE training_sessions", [])
+            .unwrap();
+
+        assert!(screen.reenter(&db).is_err());
+        assert_eq!(screen.filter.value(), "press");
+        assert!(screen.filtering);
+        assert_eq!(screen.chosen_practice.as_ref().unwrap().id, selected_id);
+        assert_eq!(screen.days_window, 30);
+        assert_eq!(screen.entries.len(), entries_len);
+        assert_eq!(screen.status_msg, Some(("cached status".into(), false)));
+    }
+
+    #[test]
+    fn failed_in_place_chart_load_keeps_context_and_cached_entries() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        let db = Database::open(temp.path()).unwrap();
+        let press = db
+            .create_practice("Bench Press", PracticeType::Bodyweight)
+            .unwrap();
+        db.create_log(
+            press.id,
+            &[SetData::Bodyweight { reps: 10 }],
+            Some("cached trend"),
+            None,
+            None,
+            Some(7),
+        )
+        .unwrap();
+        let mut screen = TrendsScreen::new(&db).unwrap();
+        screen.load_chart(&db).unwrap();
+        let selected_id = screen.chosen_practice.as_ref().unwrap().id;
+        let entry_ids = screen
+            .entries
+            .iter()
+            .map(|entry| entry.log.id)
+            .collect::<Vec<_>>();
+
+        rusqlite::Connection::open(temp.path())
+            .unwrap()
+            .execute("DROP TABLE training_sessions", [])
+            .unwrap();
+
+        let action = screen.handle_key(key(KeyCode::Right), &db);
+
+        assert_eq!(action, Action::None);
+        assert_eq!(screen.chosen_practice.as_ref().unwrap().id, selected_id);
+        assert_eq!(screen.days_window, 120);
+        assert_eq!(
+            screen
+                .entries
+                .iter()
+                .map(|entry| entry.log.id)
+                .collect::<Vec<_>>(),
+            entry_ids
+        );
+        assert!(screen.status_msg.as_ref().is_some_and(|(_, error)| *error));
+    }
+
+    #[test]
+    fn trends_navigation_error_uses_status_line() {
+        let db = Database::open_in_memory().unwrap();
+        let mut screen = TrendsScreen::new(&db).unwrap();
+
+        screen.set_navigation_error("navigation failed".into());
+
+        assert_eq!(screen.status_msg, Some(("navigation failed".into(), true)));
+    }
+
+    #[test]
+    fn filtering_to_no_practice_clears_selection_and_chart() {
+        let db = trends_db_with_press_and_pull_logs();
+        let mut screen = TrendsScreen::new(&db).unwrap();
+        screen.load_chart(&db).unwrap();
+        assert!(!screen.entries.is_empty());
+        screen.filtering = true;
+
+        for character in "missing".chars() {
+            screen.handle_key(key(KeyCode::Char(character)), &db);
+        }
+
+        assert!(screen.filtered_indices.is_empty());
+        assert!(screen.chosen_practice.is_none());
+        assert!(screen.entries.is_empty());
+        assert!(!screen.needs_refresh);
     }
 
     #[test]
@@ -582,6 +800,7 @@ mod tests {
 
     #[test]
     fn trends_long_filter_and_last_practice_remain_visible() {
+        let db = Database::open_in_memory().unwrap();
         let mut screen = make_screen(30, 5);
         screen.filtering = true;
         screen.filter = TextInput::from("X".repeat(100));
@@ -591,7 +810,7 @@ mod tests {
 
         screen.filtering = false;
         for _ in 1..30 {
-            screen.handle_key(key(KeyCode::Down));
+            screen.handle_key(key(KeyCode::Down), &db);
         }
         let list_output = render_trends(&mut screen, 80, 24);
         assert!(list_output.contains("Practice 30"), "{list_output}");
