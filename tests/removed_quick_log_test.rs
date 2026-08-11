@@ -77,6 +77,31 @@ fn contains_token(source: &str, expected: &str) -> bool {
         .any(|token| token.eq_ignore_ascii_case(expected))
 }
 
+// Match the removed acronym at an identifier start or a real CamelCase word
+// boundary. This catches LlmConfig, LLMError, llmclient, and SomeLlmClient
+// without treating an incidental lowercase sequence such as AllMetrics as LLM.
+fn contains_llm_identifier(source: &str) -> bool {
+    source
+        .split(|character: char| !character.is_alphanumeric())
+        .filter(|identifier| !identifier.is_empty())
+        .any(|identifier| {
+            let characters: Vec<char> = identifier.chars().collect();
+            (0..characters.len().saturating_sub(2)).any(|index| {
+                let is_llm = characters[index].eq_ignore_ascii_case(&'l')
+                    && characters[index + 1].eq_ignore_ascii_case(&'l')
+                    && characters[index + 2].eq_ignore_ascii_case(&'m');
+                if !is_llm {
+                    return false;
+                }
+                index == 0
+                    || (characters[index].is_uppercase()
+                        && (characters[index - 1].is_lowercase()
+                            || characters[index - 1].is_numeric()
+                            || characters[index + 1].is_lowercase()))
+            })
+        })
+}
+
 fn has_adjacent_tokens(source: &str, first: &str, second: &str) -> bool {
     let tokens: Vec<String> = source
         .split(|character: char| !character.is_alphanumeric())
@@ -96,11 +121,36 @@ fn has_toml_dependency(path: &str, source: &str) -> bool {
         let trimmed = line.trim();
         if let Some((name, _)) = trimmed.split_once('=') {
             let dependency_name = name.split('.').next().unwrap_or(name);
-            return compact_alphanumeric(dependency_name) == "toml";
+            if compact_alphanumeric(dependency_name) == "toml" {
+                return true;
+            }
         }
-        trimmed.starts_with('[')
+        if trimmed.starts_with('[')
             && trimmed.ends_with(']')
             && compact_alphanumeric(trimmed).ends_with("dependenciestoml")
+        {
+            return true;
+        }
+
+        // Cargo aliases can hide the removed package behind any dependency key.
+        // Parse comma/brace-delimited inline fields (and standalone package
+        // lines) and compare the quoted/unquoted package value case-insensitively.
+        line.split([',', '{', '}']).any(|field| {
+            let Some((name, value)) = field.split_once('=') else {
+                return false;
+            };
+            if compact_alphanumeric(name) != "package" {
+                return false;
+            }
+            let value = value.trim_start().trim_start_matches(['\'', '"']);
+            let package: String = value
+                .chars()
+                .take_while(|character| {
+                    character.is_alphanumeric() || matches!(character, '_' | '-')
+                })
+                .collect();
+            package.eq_ignore_ascii_case("toml")
+        })
     })
 }
 
@@ -112,7 +162,7 @@ fn content_marker(path: &str, source: &str) -> Option<&'static str> {
     if source.contains("快捷记录") {
         return Some("translated quick log content");
     }
-    if contains_token(&source, "llm") {
+    if contains_llm_identifier(&source) {
         return Some("LLM content");
     }
     if has_adjacent_tokens(&source, "mod", "config")
@@ -175,6 +225,26 @@ fn banned_marker_scan_rejects_live_content_and_path_variants() {
         ),
         ("llm module", "src/lib.rs", "mod llm;"),
         ("spaced llm import", "src/lib.rs", "use crate :: LLM;"),
+        (
+            "camel case LLM config identifier",
+            "src/client.rs",
+            "struct LlmConfig;",
+        ),
+        (
+            "acronym LLM error identifier",
+            "src/client.rs",
+            "enum LLMError {}",
+        ),
+        (
+            "lowercase concatenated LLM identifier",
+            "src/client.rs",
+            "struct llmclient;",
+        ),
+        (
+            "embedded CamelCase LLM identifier",
+            "src/client.rs",
+            "struct SomeLlmClient;",
+        ),
         ("config module", "src/lib.rs", "mod config ;"),
         ("spaced config import", "src/lib.rs", "use crate :: CONFIG;"),
         ("uppercase HTTP dependency", "Cargo.toml", "UREQ = \"2\""),
@@ -187,6 +257,11 @@ fn banned_marker_scan_rejects_live_content_and_path_variants() {
             "workspace TOML dependency",
             "Cargo.toml",
             "toml.workspace = true",
+        ),
+        (
+            "aliased TOML package dependency",
+            "Cargo.toml",
+            "parser = { package = \"toml\", version = \"0.8\" }",
         ),
         (
             "singular abbreviation model",
@@ -272,6 +347,21 @@ fn banned_marker_scan_rejects_live_content_and_path_variants() {
             "audit accepted {label}: {path}: {source}"
         );
     }
+}
+
+#[test]
+fn toml_package_alias_is_rejected() {
+    let source = "parser = { package = \"toml\", version = \"0.8\" }";
+    assert!(
+        removed_marker("Cargo.toml", source).is_some(),
+        "audit accepted aliased TOML package: {source}"
+    );
+}
+
+#[test]
+fn llm_identifier_matching_avoids_unrelated_lowercase_substrings() {
+    let source = "struct AllMetrics;";
+    assert_eq!(removed_marker("src/metrics.rs", source), None, "{source}");
 }
 
 #[test]
