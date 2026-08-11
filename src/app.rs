@@ -28,6 +28,11 @@ pub fn run() -> Result<()> {
     result
 }
 
+fn refresh_history_for_navigation(db: &Database, history: &mut HistoryScreen) -> Result<()> {
+    *history = HistoryScreen::new(db)?;
+    Ok(())
+}
+
 fn run_app(
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     db: &Database,
@@ -107,9 +112,7 @@ fn run_app(
                             }
                         }
                         Screen::History => {
-                            if current_screen != Screen::LogEntry {
-                                history = HistoryScreen::new(db)?;
-                            }
+                            refresh_history_for_navigation(db, &mut history)?;
                         }
                         Screen::Trends => trends = TrendsScreen::new(db)?,
                         Screen::Practices => practices = PracticesScreen::new(db)?,
@@ -125,4 +128,89 @@ fn run_app(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::{PracticeType, SetData};
+    use crossterm::event::{KeyEvent, KeyEventKind, KeyEventState};
+
+    fn key(code: KeyCode) -> KeyEvent {
+        KeyEvent {
+            code,
+            modifiers: KeyModifiers::NONE,
+            kind: KeyEventKind::Press,
+            state: KeyEventState::NONE,
+        }
+    }
+
+    fn ctrl_key(character: char) -> KeyEvent {
+        KeyEvent {
+            code: KeyCode::Char(character),
+            modifiers: KeyModifiers::CONTROL,
+            kind: KeyEventKind::Press,
+            state: KeyEventState::NONE,
+        }
+    }
+
+    #[test]
+    fn returning_from_log_edit_refreshes_history_before_second_edit() {
+        let db = Database::open_in_memory().unwrap();
+        let practice = db
+            .create_practice("Pull-up", PracticeType::Bodyweight)
+            .unwrap();
+        db.create_log(
+            practice.id,
+            &[SetData::Bodyweight { reps: 10 }],
+            Some("original note"),
+            None,
+            None,
+            Some(7),
+        )
+        .unwrap();
+        let mut history = HistoryScreen::new(&db).unwrap();
+        assert_eq!(
+            history.selected_entry().unwrap().log.note.as_deref(),
+            Some("original note")
+        );
+
+        let open_action = history.handle_key(key(KeyCode::Char('e')), &db);
+        assert!(matches!(open_action, Action::Navigate(Screen::LogEntry)));
+        let mut first_edit =
+            LogEntryScreen::from_existing(&db, history.selected_entry().unwrap()).unwrap();
+        for _ in 0..4 {
+            first_edit.handle_key(key(KeyCode::Tab), &db);
+        }
+        first_edit.handle_key(ctrl_key('a'), &db);
+        first_edit.handle_key(ctrl_key('k'), &db);
+        for character in "new note".chars() {
+            first_edit.handle_key(key(KeyCode::Char(character)), &db);
+        }
+
+        let save_action = first_edit.handle_key(ctrl_key('s'), &db);
+        let target = match save_action {
+            Action::Navigate(Screen::History) => Screen::History,
+            _ => panic!("successful History edit must navigate back to History"),
+        };
+        refresh_history_for_navigation(&db, &mut history).unwrap();
+        let current_screen = target;
+
+        assert_eq!(current_screen, Screen::History);
+        assert_eq!(
+            history.selected_entry().unwrap().log.note.as_deref(),
+            Some("new note")
+        );
+
+        let reopen_action = history.handle_key(key(KeyCode::Char('e')), &db);
+        assert!(matches!(reopen_action, Action::Navigate(Screen::LogEntry)));
+        let mut second_edit =
+            LogEntryScreen::from_existing(&db, history.selected_entry().unwrap()).unwrap();
+        let second_save = second_edit.handle_key(ctrl_key('s'), &db);
+        assert!(matches!(second_save, Action::Navigate(Screen::History)));
+        assert_eq!(
+            db.list_logs_all().unwrap().remove(0).log.note.as_deref(),
+            Some("new note")
+        );
+    }
 }
