@@ -191,6 +191,7 @@ status-deleted-undo = 已删除。按 [u] 撤销
 status-restored = 已恢复
 status-save-error = 错误：{ $msg }
 status-delete-error = 删除失败：{ $msg }
+navigation-refresh-error = 无法打开页面：{ $msg }
 
 # ── 帮助 ──
 help-title = 快捷键

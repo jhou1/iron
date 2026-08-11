@@ -123,8 +123,6 @@ impl ScreenStore {
         }
     }
 
-    // The Router consumes this forward-facing method in the next lifecycle task.
-    #[allow(dead_code)]
     pub(crate) fn set_navigation_error(&mut self, source: ScreenId, message: String) {
         match source {
             ScreenId::Dashboard => self.dashboard.set_navigation_error(message),

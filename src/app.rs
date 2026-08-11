@@ -43,20 +43,31 @@ impl AppShell {
         self.screens.render(self.current, frame);
     }
 
-    fn handle_key(&mut self, key: KeyEvent, db: &Database) -> anyhow::Result<ShellControl> {
+    fn handle_key(&mut self, key: KeyEvent, db: &Database) -> ShellControl {
         let action = self.screens.handle_key(self.current, key, db);
         self.apply_action(action, db)
     }
 
-    fn apply_action(&mut self, action: Action, db: &Database) -> anyhow::Result<ShellControl> {
+    fn apply_action(&mut self, action: Action, db: &Database) -> ShellControl {
         match action {
-            Action::Quit => Ok(ShellControl::Quit),
+            Action::Quit => ShellControl::Quit,
             Action::Navigate(intent) => {
-                self.router
-                    .transition(&mut self.current, &mut self.screens, intent, db)?;
-                Ok(ShellControl::Continue)
+                let source = self.current;
+                if let Err(error) =
+                    self.router
+                        .transition(&mut self.current, &mut self.screens, intent, db)
+                {
+                    self.screens.set_navigation_error(
+                        source,
+                        tr_args(
+                            "navigation-refresh-error",
+                            &[("msg", FluentValue::from(error.to_string()))],
+                        ),
+                    );
+                }
+                ShellControl::Continue
             }
-            Action::None => Ok(ShellControl::Continue),
+            Action::None => ShellControl::Continue,
         }
     }
 
@@ -109,7 +120,7 @@ fn run_app(
                 break;
             }
 
-            match shell.handle_key(key, db)? {
+            match shell.handle_key(key, db) {
                 ShellControl::Quit => break,
                 ShellControl::Continue => {}
             }
@@ -123,6 +134,7 @@ fn run_app(
 mod tests {
     use super::*;
     use crate::model::{PracticeType, SetData};
+    use crate::tui::{ModuleId, NavigationIntent};
     use chrono::NaiveDate;
     use crossterm::event::{KeyEvent, KeyEventKind, KeyEventState};
 
@@ -133,6 +145,12 @@ mod tests {
             kind: KeyEventKind::Press,
             state: KeyEventState::NONE,
         }
+    }
+
+    fn render_shell(shell: &mut AppShell, width: u16, height: u16) -> String {
+        crate::tui::framework::test_support::render_to_string(width, height, |frame| {
+            shell.render(frame)
+        })
     }
 
     fn ctrl_key(character: char) -> KeyEvent {
@@ -199,22 +217,22 @@ mod tests {
 
     fn open_filtered_second_history_log(shell: &mut AppShell, db: &Database) {
         assert_eq!(
-            shell.handle_key(key(KeyCode::Char('h')), db).unwrap(),
+            shell.handle_key(key(KeyCode::Char('h')), db),
             ShellControl::Continue
         );
         assert_eq!(
-            shell.handle_key(key(KeyCode::Char('/')), db).unwrap(),
+            shell.handle_key(key(KeyCode::Char('/')), db),
             ShellControl::Continue
         );
         for character in "press".chars() {
             assert_eq!(
-                shell.handle_key(key(KeyCode::Char(character)), db).unwrap(),
+                shell.handle_key(key(KeyCode::Char(character)), db),
                 ShellControl::Continue
             );
         }
-        shell.handle_key(key(KeyCode::Enter), db).unwrap();
-        shell.handle_key(key(KeyCode::Char('j')), db).unwrap();
-        shell.handle_key(key(KeyCode::Char('e')), db).unwrap();
+        shell.handle_key(key(KeyCode::Enter), db);
+        shell.handle_key(key(KeyCode::Char('j')), db);
+        shell.handle_key(key(KeyCode::Char('e')), db);
     }
 
     #[test]
@@ -224,15 +242,105 @@ mod tests {
 
         assert_eq!(shell.current_for_test(), ScreenId::Dashboard);
         assert_eq!(
-            shell.handle_key(key(KeyCode::Char('g')), &db).unwrap(),
+            shell.handle_key(key(KeyCode::Char('g')), &db),
             ShellControl::Continue
         );
         assert_eq!(shell.current_for_test(), ScreenId::Goals);
         assert_eq!(
-            shell.handle_key(key(KeyCode::Esc), &db).unwrap(),
+            shell.handle_key(key(KeyCode::Esc), &db),
             ShellControl::Continue
         );
         assert_eq!(shell.current_for_test(), ScreenId::Dashboard);
+    }
+
+    #[test]
+    fn dashboard_navigation_failure_stays_put_and_preserves_cached_target() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        let db = Database::open(temp.path()).unwrap();
+        let mut shell = AppShell::new(&db, false).unwrap();
+        let target_before = shell.screens.practices_identity_for_test();
+        rusqlite::Connection::open(temp.path())
+            .unwrap()
+            .execute("DROP TABLE practices", [])
+            .unwrap();
+
+        assert_eq!(
+            shell.handle_key(key(KeyCode::Char('e')), &db),
+            ShellControl::Continue
+        );
+        assert_eq!(shell.current_for_test(), ScreenId::Dashboard);
+        assert_eq!(shell.screens.practices_identity_for_test(), target_before);
+        assert!(render_shell(&mut shell, 80, 35).contains("Unable to open screen"));
+    }
+
+    #[test]
+    fn goals_navigation_failure_preserves_source_browse_context() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        let db = Database::open(temp.path()).unwrap();
+        db.create_goal("Keep selected").unwrap();
+        let mut shell = AppShell::new(&db, false).unwrap();
+        assert_eq!(
+            shell.handle_key(key(KeyCode::Char('g')), &db),
+            ShellControl::Continue
+        );
+        let source_before = shell.screens.goals_context_for_test();
+        rusqlite::Connection::open(temp.path())
+            .unwrap()
+            .execute("DROP TABLE daily_metrics", [])
+            .unwrap();
+
+        assert_eq!(
+            shell.handle_key(key(KeyCode::Esc), &db),
+            ShellControl::Continue
+        );
+
+        assert_eq!(shell.current_for_test(), ScreenId::Goals);
+        assert_eq!(shell.screens.goals_context_for_test(), source_before);
+        assert!(render_shell(&mut shell, 80, 24).contains("Unable to open screen"));
+    }
+
+    #[test]
+    fn log_entry_return_failure_preserves_request_scoped_form() {
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        let db = Database::open(temp.path()).unwrap();
+        let practice = db
+            .create_practice("Pull-up", PracticeType::Bodyweight)
+            .unwrap();
+        db.create_log(
+            practice.id,
+            &[SetData::Bodyweight { reps: 10 }],
+            Some("keep form"),
+            None,
+            None,
+            Some(7),
+        )
+        .unwrap();
+        let mut shell = AppShell::new(&db, false).unwrap();
+        assert_eq!(
+            shell.handle_key(key(KeyCode::Char('h')), &db),
+            ShellControl::Continue
+        );
+        assert_eq!(
+            shell.handle_key(key(KeyCode::Char('e')), &db),
+            ShellControl::Continue
+        );
+        let form_before = shell.screens.log_entry_context_for_test();
+        rusqlite::Connection::open(temp.path())
+            .unwrap()
+            .execute("DROP TABLE training_sessions", [])
+            .unwrap();
+
+        assert_eq!(
+            shell.apply_action(
+                Action::Navigate(NavigationIntent::Open(ModuleId::History)),
+                &db,
+            ),
+            ShellControl::Continue
+        );
+
+        assert_eq!(shell.current_for_test(), ScreenId::LogEntry);
+        assert_eq!(shell.screens.log_entry_context_for_test(), form_before);
+        assert!(render_shell(&mut shell, 80, 24).contains("Unable to open screen"));
     }
 
     #[test]
@@ -245,16 +353,14 @@ mod tests {
             Some(target_id)
         );
         for _ in 0..4 {
-            shell.handle_key(key(KeyCode::Tab), &db).unwrap();
+            shell.handle_key(key(KeyCode::Tab), &db);
         }
-        shell.handle_key(ctrl_key('a'), &db).unwrap();
-        shell.handle_key(ctrl_key('k'), &db).unwrap();
+        shell.handle_key(ctrl_key('a'), &db);
+        shell.handle_key(ctrl_key('k'), &db);
         for character in "updated target".chars() {
-            shell
-                .handle_key(key(KeyCode::Char(character)), &db)
-                .unwrap();
+            shell.handle_key(key(KeyCode::Char(character)), &db);
         }
-        shell.handle_key(ctrl_key('s'), &db).unwrap();
+        shell.handle_key(ctrl_key('s'), &db);
 
         assert_eq!(shell.current_for_test(), ScreenId::History);
         assert_eq!(
@@ -265,7 +371,7 @@ mod tests {
                 "press".into()
             )
         );
-        shell.handle_key(key(KeyCode::Char('e')), &db).unwrap();
+        shell.handle_key(key(KeyCode::Char('e')), &db);
         assert_eq!(
             shell.screens.log_entry_for_test().identity_for_test().0,
             Some(target_id)
@@ -276,8 +382,8 @@ mod tests {
     fn shell_history_cancel_returns_to_same_unmodified_log() {
         let (db, mut shell, target_id) = lifecycle_shell_fixture();
         open_filtered_second_history_log(&mut shell, &db);
-        shell.handle_key(key(KeyCode::Esc), &db).unwrap();
-        shell.handle_key(key(KeyCode::Char('y')), &db).unwrap();
+        shell.handle_key(key(KeyCode::Esc), &db);
+        shell.handle_key(key(KeyCode::Char('y')), &db);
 
         assert_eq!(shell.current_for_test(), ScreenId::History);
         assert_eq!(

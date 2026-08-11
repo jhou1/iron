@@ -191,6 +191,7 @@ status-deleted-undo = Deleted. Press [u] to undo
 status-restored = Restored
 status-save-error = Error: { $msg }
 status-delete-error = Delete failed: { $msg }
+navigation-refresh-error = Unable to open screen: { $msg }
 
 # ── Help ──
 help-title = Keyboard Shortcuts
