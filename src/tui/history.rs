@@ -830,8 +830,11 @@ mod tests {
         let selected_id = screen.selected_entry().unwrap().log.id;
         screen.mode = Mode::Detail;
         screen.detail_state.focused = true;
+        screen.list_viewport.set_height(1);
         screen.list_viewport.set_offset(1);
+        screen.detail_state.viewport.set_height(2);
         screen.detail_state.viewport.set_offset(2);
+        screen.detail_content_height = 5;
         screen.status_msg = Some(("old status".into(), false));
         screen.last_deleted = Some(screen.selected_entry().unwrap().clone());
 
@@ -856,6 +859,9 @@ mod tests {
         assert!(!next.filtering);
         assert_eq!(next.mode, Mode::Detail);
         assert!(next.detail_state.focused);
+        assert_eq!(next.list_viewport.offset(), 1);
+        assert_eq!(next.detail_state.viewport.offset(), 2);
+        assert_eq!(next.detail_content_height, 5);
         assert!(next.status_msg.is_none());
         assert!(next.last_deleted.is_none());
     }
@@ -866,6 +872,11 @@ mod tests {
         let mut screen = HistoryScreen::new(&db).unwrap();
         enter_press_filter_and_select_second(&mut screen, &db);
         let selected_id = screen.selected_entry().unwrap().log.id;
+        screen.list_viewport.set_height(1);
+        screen.list_viewport.set_offset(1);
+        screen.detail_state.viewport.set_height(2);
+        screen.detail_state.viewport.set_offset(4);
+        screen.detail_content_height = 5;
 
         db.delete_log(selected_id).unwrap();
         let next = screen.reenter(&db).unwrap();
@@ -873,6 +884,8 @@ mod tests {
         assert!(!next.filtered_indices.is_empty());
         assert!(next.selected < next.filtered_indices.len());
         assert!(next.selected_entry().is_some());
+        assert_eq!(next.list_viewport.offset(), 0);
+        assert_eq!(next.detail_state.viewport.offset(), 3);
 
         let remaining_id = next.selected_entry().unwrap().log.id;
         db.delete_log(remaining_id).unwrap();
