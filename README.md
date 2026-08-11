@@ -83,7 +83,7 @@ Press `l` to open the Log Entry screen.
 3. `Tab` cycles sections: sets → warm-up → cool-down → RPE → note
 4. `j/k` to navigate committed sets; `e` to edit, `d` to delete
 5. `D` to change the log date
-6. `Ctrl+S` to save from any section
+6. `Ctrl+S` saves only after at least one set is committed and no set or date edit is pending
 7. `Esc` to cancel
 
 The practice selector clamps at the first and last result and adds `↑`, `↓`, or `↑↓` to its title when results are outside the visible viewport. Every single-line field scrolls horizontally to keep its Unicode cursor visible. The footer changes with the active filter, field, set-edit, date-edit, and exit-confirmation mode. Validation and database-save failures retain the form, cursor, focus, and return destination while showing an error status.

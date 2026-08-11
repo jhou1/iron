@@ -142,7 +142,7 @@ Stage one is complete only after automated verification passes and the user has 
 
 Stage two begins only after explicit user acceptance of stage one. It starts with an audit rather than automatically copying Goals code into every screen.
 
-The audit covers History, Trends, Quotes, Practices, Log Entry, Quick Log, Dashboard, and any other interactive TUI view. For each applicable screen, compare:
+The audit originally covered History, Trends, Quotes, Practices, Log Entry, Quick Log, Dashboard, and any other interactive TUI view. Quick Log is a historical Stage Two reference only: Batch 2 permanently removed that module, so it is not a live or future rollout target. For each applicable screen, compare:
 
 - Selection always remains visible while navigating.
 - Borders and padding are included through actual inner rectangles.
