@@ -20,7 +20,10 @@ Single Rust binary. Three layers: **model** (domain types) → **db** (SQLite vi
 ```
 src/
   main.rs              — clap CLI entry point, dispatches to TUI or export/import
-  app.rs               — event loop, screen routing, terminal setup/teardown
+  app.rs               — terminal-independent AppShell plus event loop/setup/teardown
+  app/
+    router.rs           — atomic prepare/install/route transitions
+    screens.rs          — concrete screen storage and lifecycle preparation
   model.rs             — PracticeType, Practice, Log, Set, SetData, LogEntry
   db.rs                — Database struct wrapping rusqlite, all CRUD + queries
   export.rs            — JSON export/import with duplicate detection
@@ -66,6 +69,10 @@ Quick Log has been permanently removed with no replacement. Its LLM-only configu
 ## Navigation
 
 Vim-style navigation includes `j/k` up/down, `h/l` left/right, `/` filter, `Esc` back/cancel (or Dashboard quit), `Enter` confirm, `Ctrl+S` save log, `D` edit date, and `d` delete.
+
+Screen actions use typed `NavigationIntent` values. Ordinary module navigation prepares a freshly loaded replacement before changing the route; approved browse context such as stable-ID selection, filters, viewports, focused detail, and the Trends window survives where applicable. Unfinished edit/confirmation state, prior status, and cross-page undo payloads clear on re-entry. History edit intents carry the selected log's stable database ID, and Log Entry is built from that exact ID rather than an application-side selection lookup.
+
+Navigation preparation is atomic: if target loading fails, neither the current route nor the cached target changes, and the source screen shows the localized error while retaining its in-place state. The navigation topology and shortcuts are unchanged. Batch 3A provides this concrete lifecycle routing; Batch 3B UI component extraction is not shipped.
 
 All text input fields use emacs-style cursor: `Ctrl+B`/Left back, `Ctrl+F`/Right forward, `Ctrl+A`/Home start, `Ctrl+E`/End end, `Ctrl+K` kill to end of line. Characters insert at cursor, not append.
 

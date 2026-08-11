@@ -78,6 +78,14 @@ Press `Enter` to focus the detail panel. In focused detail, `j/k` or the arrow k
 ## Edit Flow
 
 Pressing `e` on a selected log:
-1. Opens Log Entry screen with `from_existing(log_entry)`
-2. All fields pre-populated
-3. On save, returns to History with refreshed list
+1. Emits an edit intent containing the selected log's stable database ID
+2. Resolves that exact ID and opens a pre-populated Log Entry form
+3. Keeps the edit identity and History return target inside the form
+4. On save, returns to History with refreshed data and the same filtered selected log when it still exists
+5. On cancel, returns to History with the same filtered selected log; a later edit reloads the latest saved data
+
+## Re-entry
+
+Opening History reloads current logs before the route changes. It preserves filter text, restores the selected log by stable ID when possible, retains bounded list/detail viewports, and keeps Detail focus only when a selected log remains. Filter-input mode, delete confirmation, old status, and the cross-page undo payload clear.
+
+This cross-page lifecycle is distinct from History's in-place delete/undo refresh, which retains the operation's local context. If target preparation fails, navigation stays on the source screen, the cached History screen is unchanged, and the source shows the error.

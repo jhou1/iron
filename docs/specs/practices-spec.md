@@ -74,3 +74,9 @@ Creates the practice on type confirmation. The screen returns to Browse and clea
 ## Text Input Constraints
 
 Name input uses the shared Unicode-safe Emacs keybindings and horizontal scrolling. It never overflows the action panel. Every mode renders only its active shortcuts through the shared shortcut component.
+
+## Re-entry
+
+Opening Practices reloads all current practices before the route changes. It restores the selected practice by stable ID when possible and preserves a bounded list viewport. Cross-page re-entry always resumes Browse and clears unfinished add/name/type/edit/delete-confirmation state, input, and old status.
+
+This reset does not apply to an in-place mutation failure: failed add, rename, or delete operations retain their active mode and input as described above. If cross-page preparation fails, navigation stays on the source screen, the cached Practices screen is unchanged, and the source shows the error.

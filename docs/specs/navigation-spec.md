@@ -14,6 +14,20 @@ Global navigation patterns, keybinding conventions, and shared TUI interaction r
 
 Dashboard reaches Log Entry (`l`), History (`h`), Trends (`t`), Practices (`e`), Goals (`g`), and Quotes (`Q`). There is no Quick Log screen, route, or shortcut and no `w` action. Feature-specific screens return to Dashboard via `Esc`; Log Entry opened from History returns to History after a successful edit.
 
+Batch 3A does not change this topology or any screen shortcut. It changes how those existing transitions identify and prepare their targets. Batch 3B UI component extraction is not shipped.
+
+## Typed Routing and Re-entry
+
+Screens emit typed navigation intents:
+
+- `NavigationIntent::Open(ModuleId)` opens an ordinary cached module.
+- `NavigationIntent::NewLog` creates a request-scoped Log Entry form that returns to Dashboard.
+- `NavigationIntent::EditHistoryLog { log_id }` carries the selected log's stable database ID; target preparation resolves that exact ID with `Database::get_log_by_id` and creates an edit form that returns to History.
+
+Every intent has a static `ScreenId` target. Ordinary modules re-read current database data on entry while preserving their approved browse context by stable entity ID: selection, filters, viewports, focused detail, and the Trends time window where applicable. Re-entry leaves filter/edit/date/delete-confirmation modes, old status, inputs used by those transient modes, and cross-page undo payloads behind.
+
+Target preparation is atomic. `ScreenStore` constructs a complete replacement before `Router` installs it and commits the route. If any target read or construction fails, the route and cached target remain unchanged; the source screen remains active, retains its in-place state, and receives the localized navigation error on its existing status surface. The terminal event loop contains no concrete screen construction or refresh policy.
+
 ## Global Keys
 
 | Key | Action | Scope |

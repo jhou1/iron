@@ -8,7 +8,7 @@ The Log Entry screen records or edits a training session through two top-level p
 SelectPractice -> EnterLog -> save
 ```
 
-New logs return to Dashboard after a successful save. Logs opened for editing from History keep the original log identity and return to History after a successful update.
+New logs return to Dashboard after a successful save. History emits `EditHistoryLog { log_id }`; target preparation resolves that exact stable database ID before constructing the edit form. Logs opened this way keep the original log identity and return to History after a successful update or confirmed cancellation.
 
 ## Practice Selection
 
@@ -69,3 +69,9 @@ New entries call `create_log_at`; existing entries call `update_log`.
 - A database create or update failure keeps every set and input, its cursor/focus, the editing log identity, and the Dashboard or History return target.
 - Form state clears and navigation occurs only after the database mutation succeeds.
 - Status always uses the reserved status row instead of replacing form content.
+
+## Navigation Lifecycle
+
+Log Entry is request-scoped rather than an ordinary cached module re-entry: `NewLog` creates a fresh form, while `EditHistoryLog { log_id }` creates a form from the exact requested record. There is no application-side read of History selection during target preparation.
+
+If preparing Log Entry or its Dashboard/History return target fails, the route and cached target remain unchanged. A failed return leaves the complete current form, cursor, focus, edit identity, and return target in place and shows the navigation error on Log Entry. The existing Dashboard/History routes and shortcuts are unchanged.

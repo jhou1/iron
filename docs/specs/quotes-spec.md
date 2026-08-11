@@ -27,3 +27,9 @@ Successful deletion stores one quote for `u` undo. Failed delete or restore oper
 ## Shortcuts
 
 The shortcut row always describes the active mode: Browse lists navigation, detail, add, edit, delete, optional undo, and back; Detail lists scrolling and back; Add/Edit list confirm and cancel; ConfirmDelete lists yes and cancel.
+
+## Re-entry
+
+Opening Quotes reloads current quotes before the route changes. It restores the selected quote by stable ID when possible, preserves bounded list/detail viewports, and keeps Detail focus only when a quote remains. Add, Edit, and ConfirmDelete return to Browse; input, editing identity, old status, and the cross-page undo payload clear.
+
+In-place mutation failures still retain their active mode and input. If cross-page preparation fails, navigation stays on the source screen, the cached Quotes screen is unchanged, and the source shows the error.

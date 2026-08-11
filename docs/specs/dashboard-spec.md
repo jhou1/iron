@@ -65,9 +65,11 @@ Pressing `v` enters `HrvInput` and preloads today's value when present. The shar
 - Only a successful `set_daily_hrv` updates the displayed value, clears the input, and returns to Normal mode.
 - `Esc` cancels, clears the editor, and returns to Normal mode.
 
-## Data Refresh
+## Re-entry and Navigation Failures
 
-When navigation returns to Dashboard, it reloads heatmap data, recent entries, quotes, goals, HRV, weekly volume, training frequency, and streak information.
+Ordinary navigation back to Dashboard prepares a fresh screen and reloads heatmap data, recent entries, quotes, goals, HRV, weekly volume, training frequency, and streak information. Dashboard has no cross-page browse selection to restore; re-entry returns it to Normal mode and clears unfinished HRV or quit-confirmation state, input, and old status.
+
+Preparation completes before Dashboard replaces its cached instance. A failed incoming refresh therefore leaves the source route and cached Dashboard unchanged and reports the error on the source screen. Likewise, if Dashboard cannot prepare an outgoing target, Dashboard stays active with its existing source state and a visible error; the cached target is unchanged.
 
 ## Removal Contract
 

@@ -1,7 +1,7 @@
 # TUI Consistency Framework Design
 
 **Date:** 2026-08-10
-**Status:** Batch 2 complete; its final scope is defined by [the Batch 2 design](2026-08-10-tui-consistency-batch-2-design.md)
+**Status:** Batches 1, 2, and 3A complete; Batch 3B UI component extraction is not shipped
 **Branch:** `codex/tui-consistency`
 **Base:** validated Goals milestone-management implementation (`0069c04`)
 
@@ -156,6 +156,19 @@ The [approved Batch 2 design](2026-08-10-tui-consistency-batch-2-design.md) supe
 
 Database initialization executes `DROP TABLE IF EXISTS abbreviations`. Existing abbreviation rows are irreversibly deleted on first open by the updated application; training logs, practices, goals, quotes, daily metrics, and other unrelated data are preserved.
 
+### Batch 3A: Typed Navigation and Screen Lifecycle — Complete
+
+Batch 3A preserves the existing navigation topology and shortcuts while making transitions typed and transactional:
+
+- screens emit ordinary module, new-log, or stable-ID History edit intents;
+- History edit preparation resolves the exact requested log ID instead of consulting a current screen selection;
+- Dashboard, Goals, History, Trends, Practices, and Quotes reload current database data on ordinary entry while preserving their approved stable-ID browse context, filters, viewports, focused detail, and Trends window where applicable;
+- unfinished edit/date/delete-confirmation modes, old status, and cross-page undo payloads clear on re-entry, while in-place mutation failures continue to retain their active state;
+- a concrete `ScreenStore` prepares a complete replacement before a `Router` installs it and commits the route; and
+- preparation failure leaves the route and cached target unchanged and reports a localized error on the source screen without resetting it.
+
+The terminal loop now delegates screen behavior to a terminal-independent application shell and contains no concrete screen construction or refresh policy. Batch 3B's proposed UI component extraction has not been implemented or shipped.
+
 ## Testing Strategy
 
 ### Framework Tests
@@ -212,3 +225,7 @@ Navigate long Goals, History, Trends, Practices, and Quotes collections; verify 
 ### Batch 2
 
 Verify Log Entry selection overflow, bounded Unicode cursors, active-mode shortcuts, and failure retention at `80x24`. Verify Dashboard Heatmap, Summary, Recent, Goals, quote, HRV, status, and mode-specific shortcuts at `80x35` and during resizing. Confirm `w`, Quick Log, LLM configuration/runtime, and Abbreviations interfaces are absent, and confirm opening an existing database removes only the obsolete `abbreviations` table.
+
+### Batch 3A
+
+Verify every ordinary module reloads external database changes while retaining its approved stable selection, filter, viewport, detail focus, and Trends window. Confirm unfinished cross-page mutation state, prior status, and undo payloads clear; History save/cancel returns to the same filtered selected log and a second edit uses refreshed data; and a forced preparation failure stays on the source screen with a visible error and unchanged cached target. Confirm all existing routes, shortcuts, Batch 1/2 layouts, and permanent removal guarantees remain unchanged. Do not begin Batch 3B until Batch 3A receives explicit manual acceptance.

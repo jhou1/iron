@@ -88,3 +88,9 @@ Text-entry modes use `Enter` to save and `Esc` to cancel. Delete confirmation ac
 ## Undo and Deletion
 
 Goal and milestone deletion each support one level of undo. Milestone restore preserves its original position, creation timestamp, completion state, and completion date. Deleting a goal cascades to its milestones.
+
+## Re-entry
+
+Opening Goals reloads current goals and milestones before the route changes. The selected goal is restored by stable goal ID. If the milestone panel was focused, its goal and selected milestone are restored by their stable IDs and the panel remains focused when that goal still exists. List and detail viewport context is retained and then bounded by the measured rendered content.
+
+All goal or milestone add/edit/date/delete-confirmation modes return to Browse on cross-page re-entry. Shared input, normal and modal status messages, and both goal and milestone undo payloads clear. If preparation fails, navigation stays on the source screen, the cached Goals screen is not replaced, and the source shows the error.

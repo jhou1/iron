@@ -60,3 +60,9 @@ The `/` filter uses the shared bounded input with Unicode-safe Emacs cursor move
 - Sorted chronologically (oldest first) for chart rendering
 - Each data point: (date label, total metric value)
 - Query failures retain the last successful chart and appear in the reserved status row
+
+## Re-entry
+
+Opening Trends reloads the active-practice list and chart before the route changes. Filter text, the selected practice's stable ID, the bounded list viewport, and the 30–365 day window are restored; filter-input mode and old status clear. The refreshed chart remains chronological.
+
+An in-place chart query failure keeps the selected practice, changed window, and last successful chart while showing an error. A cross-page preparation failure is atomic: navigation stays on the source screen, the cached Trends target is unchanged, and the source shows the error.
