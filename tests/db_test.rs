@@ -1141,7 +1141,12 @@ fn get_log_by_id_returns_exact_entry_or_none() {
         .unwrap();
 
     assert_eq!(
-        db.get_log_by_id(second).unwrap().unwrap().log.note.as_deref(),
+        db.get_log_by_id(second)
+            .unwrap()
+            .unwrap()
+            .log
+            .note
+            .as_deref(),
         Some("second")
     );
     assert_eq!(db.get_log_by_id(first).unwrap().unwrap().log.id, first);

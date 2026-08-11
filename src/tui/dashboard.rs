@@ -486,13 +486,9 @@ impl DashboardScreen {
     fn handle_normal(&mut self, key: KeyEvent) -> Action {
         match key.code {
             KeyCode::Char('l') => Action::Navigate(NavigationIntent::NewLog),
-            KeyCode::Char('h') => {
-                Action::Navigate(NavigationIntent::Open(ModuleId::History))
-            }
+            KeyCode::Char('h') => Action::Navigate(NavigationIntent::Open(ModuleId::History)),
             KeyCode::Char('t') => Action::Navigate(NavigationIntent::Open(ModuleId::Trends)),
-            KeyCode::Char('e') => {
-                Action::Navigate(NavigationIntent::Open(ModuleId::Practices))
-            }
+            KeyCode::Char('e') => Action::Navigate(NavigationIntent::Open(ModuleId::Practices)),
             KeyCode::Char('g') => Action::Navigate(NavigationIntent::Open(ModuleId::Goals)),
             KeyCode::Char('Q') => Action::Navigate(NavigationIntent::Open(ModuleId::Quotes)),
             KeyCode::Char('v') => {
