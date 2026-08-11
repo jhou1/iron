@@ -89,4 +89,4 @@ Quick Log was removed permanently without a replacement. Its LLM configuration/r
 | Errors, delete actions | Red |
 | Notes, secondary text | Yellow |
 
-Iron uses ANSI terminal colors rather than hardcoded RGB theme colors.
+Iron primarily uses ANSI terminal colors. The shared selected-row highlight intentionally uses `Rgb(204, 163, 0)` with a Black foreground, and empty gauge cells use `Indexed(240)`.

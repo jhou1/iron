@@ -59,7 +59,7 @@ Core tables in `~/.iron/iron.db` include:
 - `quotes`
 - `daily_metrics` (including HRV)
 
-Nullable fields on `sets` — only the relevant ones are filled based on practice type.
+Nullable fields on `training_sets` — only the relevant ones are filled based on practice type.
 
 Quick Log has been permanently removed with no replacement. Its LLM-only configuration/runtime, abbreviation models and CRUD API, and direct `ureq`/`toml` dependencies must not be reintroduced. `Database::init_schema` intentionally runs `DROP TABLE IF EXISTS abbreviations`; opening an upgraded database permanently deletes abbreviation rows while preserving unrelated application data.
 
@@ -83,12 +83,14 @@ Dashboard navigation is limited to Log Entry (`l`), History (`h`), Trends (`t`),
 
 ## Color Scheme
 
-Uses ANSI terminal colors (not hardcoded RGB) for theme compatibility:
+Most theme roles use ANSI terminal colors. The shared selected-row highlight intentionally uses an RGB background, and the empty gauge fill uses an indexed terminal color:
 
 | Role | Color |
 |---|---|
 | Accent (titles, shortcuts) | Cyan |
-| Active/selected items | Green |
+| Active input/selected text | Green |
+| Shared selected-row background | `Rgb(204, 163, 0)` with Black foreground |
+| Empty gauge fill | `Indexed(240)` |
 | Bright highlight | LightGreen |
 | Labels, borders | DarkGray |
 | Error, delete | Red |
