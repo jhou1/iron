@@ -28,7 +28,7 @@ pub fn render_scrollable_list_panel<'a>(
     let geometry = Block::default()
         .borders(Borders::ALL)
         .padding(Padding::uniform(1));
-    let inner = geometry.inner(area);
+    let inner = fit_rect(area, geometry.inner(area));
     let content = build_content(inner);
     let header_height = usize::from(content.header.is_some());
     let visible_height = (inner.height as usize).saturating_sub(header_height);
@@ -162,5 +162,47 @@ mod tests {
             );
         });
         assert_eq!(viewport.offset(), 0);
+    }
+
+    #[test]
+    fn list_panel_content_area_stays_inside_tiny_edge_targets() {
+        let mut viewport = ViewportState::new(0);
+        let mut zero_inner = None;
+        let mut one_cell_inner = None;
+        render_to_buffer(6, 6, |frame| {
+            render_scrollable_list_panel(
+                frame,
+                Rect::new(5, 5, 0, 0),
+                "Empty",
+                &mut viewport,
+                |inner| {
+                    zero_inner = Some(inner);
+                    ListPanelContent {
+                        header: None,
+                        rows: Vec::new(),
+                        empty: None,
+                        selected: None,
+                    }
+                },
+            );
+            render_scrollable_list_panel(
+                frame,
+                Rect::new(5, 5, 1, 1),
+                "Empty",
+                &mut viewport,
+                |inner| {
+                    one_cell_inner = Some(inner);
+                    ListPanelContent {
+                        header: None,
+                        rows: Vec::new(),
+                        empty: None,
+                        selected: None,
+                    }
+                },
+            );
+        });
+
+        assert_eq!(zero_inner, Some(Rect::new(5, 5, 0, 0)));
+        assert_eq!(one_cell_inner, Some(Rect::new(6, 6, 0, 0)));
     }
 }
