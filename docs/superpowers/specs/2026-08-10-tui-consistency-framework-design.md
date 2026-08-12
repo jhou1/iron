@@ -1,7 +1,7 @@
 # TUI Consistency Framework Design
 
 **Date:** 2026-08-10
-**Status:** Batches 1, 2, and 3A complete; Batch 3B UI component extraction is not shipped
+**Status:** Batches 1, 2, 3A, and 3B-1 complete; later Batch 3B slices are not shipped
 **Branch:** `codex/tui-consistency`
 **Base:** validated Goals milestone-management implementation (`0069c04`)
 
@@ -167,7 +167,13 @@ Batch 3A preserves the existing navigation topology and shortcuts while making t
 - a concrete `ScreenStore` prepares a complete replacement before a `Router` installs it and commits the route; and
 - preparation failure leaves the route and cached target unchanged and reports a localized error on the source screen without resetting it.
 
-The terminal loop now delegates screen behavior to a terminal-independent application shell and contains no concrete screen construction or refresh policy. Batch 3B's proposed UI component extraction has not been implemented or shipped.
+The terminal loop now delegates screen behavior to a terminal-independent application shell and contains no concrete screen construction or refresh policy.
+
+### Batch 3B-1: Practices Presentation Components — Complete
+
+Batch 3B-1 adds presentation-only `ScreenFrame`, `ScrollableListPanel`, and `ActionPanel` components and migrates only Practices to them. The frame reserves status and shortcut rows; the list panel owns border, overflow, viewport reveal and clamp, and selected-row highlight; and the action panel owns bounded contextual rendering. Practices retains all domain line formatting, modes, database operations, validation, shortcuts, and lifecycle behavior. Five immutable styled-buffer fixtures preserve exact output across Browse, AddName, AddType, EditName, and ConfirmDelete.
+
+Quotes, Trends, History, Goals popups, Dashboard responsive layout, and Log Entry forms remain unshipped later component-extraction work. This slice does not establish that the three components are suitable for those screens.
 
 ## Testing Strategy
 

@@ -152,7 +152,6 @@ fn screens_must_have_bordered_blocks() {
         "goals.rs",
         "trends.rs",
         "history.rs",
-        "practices.rs",
         "quotes_screen.rs",
         "log_entry.rs",
     ];
@@ -171,5 +170,18 @@ fn screens_must_have_bordered_blocks() {
         missing.is_empty(),
         "\nScreens missing bordered blocks for visual consistency:\n{}\n",
         missing.join("\n")
+    );
+
+    let practices_source = std::fs::read_to_string(tui_dir.join("practices.rs")).unwrap();
+    assert!(
+        practices_source.contains("render_scrollable_list_panel("),
+        "Practices must delegate its bordered list to ScrollableListPanel"
+    );
+
+    let list_panel_source =
+        std::fs::read_to_string(tui_dir.join("framework/list_panel.rs")).unwrap();
+    assert!(
+        list_panel_source.contains(".borders(Borders::ALL)"),
+        "ScrollableListPanel must own the Practices bordered-list contract"
     );
 }

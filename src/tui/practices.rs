@@ -1,9 +1,8 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
-    layout::{Constraint, Direction, Layout},
+    layout::{Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Padding, Paragraph, Wrap},
     Frame,
 };
 
@@ -11,13 +10,11 @@ use unicode_width::UnicodeWidthStr;
 
 use super::lifecycle::{NavigationStatus, Reenter};
 use super::{
-    centered_area,
     framework::{
-        move_selection, render_shortcuts, shortcut_height, truncate_to_width, EdgeBehavior,
-        Shortcut, TextInput, ViewportState, VisualSpan,
+        move_selection, render_action_panel, render_screen_frame, render_scrollable_list_panel,
+        truncate_to_width, EdgeBehavior, ListPanelContent, Shortcut, TextInput, ViewportState,
     },
-    highlight_row, render_status_line, Action, ModuleId, NavigationIntent, StatusMessage,
-    BORDER_COLOR, CONTENT_WIDTH,
+    Action, ModuleId, NavigationIntent, StatusMessage, CONTENT_WIDTH,
 };
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
@@ -26,6 +23,107 @@ use fluent_bundle::FluentValue;
 
 const GREEN: Color = Color::Green;
 const RED: Color = Color::Red;
+
+fn practice_list_content(
+    practices: &[Practice],
+    selected: usize,
+    inner: Rect,
+) -> ListPanelContent<'static> {
+    let name_header = tr("practices-col-name");
+    let type_header = tr("practices-col-type");
+    let desired_type_width = practices
+        .iter()
+        .map(|practice| practice.practice_type.label().width())
+        .max()
+        .unwrap_or(0)
+        .max(type_header.width());
+    let type_col_width = desired_type_width.min((inner.width as usize) / 3);
+    let name_col_width = (inner.width as usize)
+        .saturating_sub(2)
+        .saturating_sub(type_col_width)
+        .saturating_sub(2);
+    let name_header = truncate_to_width(&name_header, name_col_width);
+    let type_header = truncate_to_width(&type_header, type_col_width);
+    let header_padding = name_col_width.saturating_sub(name_header.width());
+    let type_header_padding = type_col_width.saturating_sub(type_header.width());
+    let header_style = Style::default()
+        .fg(Color::White)
+        .add_modifier(Modifier::BOLD);
+    let header = Line::from(vec![
+        Span::raw("  "),
+        Span::styled(name_header, header_style),
+        Span::raw(" ".repeat(header_padding)),
+        Span::styled(type_header, header_style),
+        Span::raw(" ".repeat(type_header_padding + 2)),
+    ]);
+
+    let rows = practices
+        .iter()
+        .enumerate()
+        .map(|(index, practice)| {
+            let marker = if index == selected { "> " } else { "  " };
+            let (name_style, type_color) = if index == selected {
+                if practice.active {
+                    (
+                        Style::default()
+                            .fg(Color::White)
+                            .add_modifier(Modifier::BOLD),
+                        Color::Gray,
+                    )
+                } else {
+                    (
+                        Style::default()
+                            .fg(Color::DarkGray)
+                            .add_modifier(Modifier::BOLD),
+                        Color::DarkGray,
+                    )
+                }
+            } else if practice.active {
+                (Style::default().fg(Color::White), Color::Gray)
+            } else {
+                (Style::default().fg(Color::DarkGray), Color::DarkGray)
+            };
+            let name = truncate_to_width(&practice.name, name_col_width);
+            let name_padding = name_col_width.saturating_sub(name.width());
+            let type_label = truncate_to_width(&practice.practice_type.label(), type_col_width);
+            let type_padding = type_col_width.saturating_sub(type_label.width());
+            let mut spans = vec![
+                Span::styled(marker, name_style),
+                Span::styled(name, name_style),
+                Span::raw(" ".repeat(name_padding)),
+                Span::styled(type_label, Style::default().fg(type_color)),
+                Span::raw(" ".repeat(type_padding)),
+            ];
+            if practice.active {
+                spans.push(Span::styled("\u{25B0}", Style::default().fg(GREEN)));
+                spans.push(Span::styled(
+                    "\u{25B1}",
+                    Style::default().fg(Color::DarkGray),
+                ));
+            } else {
+                spans.push(Span::styled(
+                    "\u{25B1}",
+                    Style::default().fg(Color::DarkGray),
+                ));
+                spans.push(Span::styled(
+                    "\u{25B0}",
+                    Style::default().fg(Color::DarkGray),
+                ));
+            }
+            Line::from(spans)
+        })
+        .collect();
+
+    ListPanelContent {
+        header: Some(header),
+        rows,
+        empty: Some(Line::from(Span::styled(
+            tr("practices-no-items"),
+            Style::default().fg(Color::Gray),
+        ))),
+        selected: (!practices.is_empty()).then_some(selected),
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 enum Mode {
@@ -103,184 +201,70 @@ impl PracticesScreen {
     }
 
     pub fn render(&mut self, frame: &mut Frame) {
-        let area = centered_area(frame.area(), CONTENT_WIDTH);
         let shortcuts = self.active_shortcuts();
-        let shortcut_rows = shortcut_height(&shortcuts, area.width);
+        let area = frame.area();
+        let screen = render_screen_frame(frame, area, CONTENT_WIDTH, &self.status_msg, &shortcuts);
+        let action_height = if self.mode == Mode::Browse { 0 } else { 6 };
+        let body = Layout::vertical([
+            Constraint::Min(4),
+            Constraint::Length(1),
+            Constraint::Length(action_height),
+        ])
+        .split(screen.body);
 
-        let action_height: u16 = match &self.mode {
-            Mode::Browse => 0,
-            _ => 6,
-        };
-        let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Min(4),                // bordered list
-                Constraint::Length(1),             // spacer
-                Constraint::Length(action_height), // input/action area
-                Constraint::Length(1),             // status message
-                Constraint::Length(shortcut_rows), // shortcuts
-            ])
-            .split(area);
+        let practices = &self.practices;
+        let selected = self.selected;
+        render_scrollable_list_panel(
+            frame,
+            body[0],
+            tr("practices-title"),
+            &mut self.list_viewport,
+            |inner| practice_list_content(practices, selected, inner),
+        );
 
-        // ── Bordered practice list ──
-        let name_header = tr("practices-col-name");
-        let type_header = tr("practices-col-type");
-        let visible_height = chunks[0].height.saturating_sub(5) as usize;
-        self.list_viewport.set_height(visible_height);
-        if !self.practices.is_empty() {
-            self.list_viewport.reveal(VisualSpan {
-                start: self.selected,
-                height: 1,
-            });
-        }
-        self.list_viewport.clamp(self.practices.len());
-        let overflow = self.list_viewport.overflow(self.practices.len()).suffix();
-        let block = Block::default()
-            .title(Line::from(vec![
-                Span::styled("── ", Style::default().fg(BORDER_COLOR)),
-                Span::styled(
-                    format!("{}{}", tr("practices-title"), overflow),
-                    Style::default()
-                        .fg(Color::White)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
-            ]))
-            .borders(Borders::ALL)
-            .padding(Padding::uniform(1))
-            .border_style(Style::default().fg(BORDER_COLOR));
-        let inner = block.inner(chunks[0]);
-        frame.render_widget(block, chunks[0]);
+        let (action_lines, selected_action) = self.action_content(screen.area.width);
+        render_action_panel(frame, body[2], action_lines, selected_action);
+    }
 
-        let desired_type_width = self
-            .practices
-            .iter()
-            .map(|practice| practice.practice_type.label().width())
-            .max()
-            .unwrap_or(0)
-            .max(type_header.width());
-        let type_col_width = desired_type_width.min((inner.width as usize) / 3);
-        let name_col_width = (inner.width as usize)
-            .saturating_sub(2) // marker
-            .saturating_sub(type_col_width)
-            .saturating_sub(2); // active toggle
-        let name_header = truncate_to_width(&name_header, name_col_width);
-        let type_header = truncate_to_width(&type_header, type_col_width);
-        let header_padding = name_col_width.saturating_sub(name_header.width());
-        let type_header_padding = type_col_width.saturating_sub(type_header.width());
-
-        let hdr_style = Style::default()
-            .fg(Color::White)
-            .add_modifier(Modifier::BOLD);
-        let header_line = Line::from(vec![
-            Span::raw("  "),
-            Span::styled(&name_header, hdr_style),
-            Span::raw(" ".repeat(header_padding)),
-            Span::styled(&type_header, hdr_style),
-            Span::raw(" ".repeat(type_header_padding + 2)),
-        ]);
-
-        let mut all_lines = vec![header_line];
-
-        if self.practices.is_empty() {
-            all_lines.push(Line::from(Span::styled(
-                tr("practices-no-items"),
-                Style::default().fg(Color::Gray),
-            )));
-        } else {
-            for (i, p) in self
-                .practices
-                .iter()
-                .enumerate()
-                .skip(self.list_viewport.offset())
-                .take(visible_height)
-            {
-                let marker = if i == self.selected { "> " } else { "  " };
-                let (name_style, type_color) = if i == self.selected {
-                    if p.active {
-                        (
-                            Style::default()
-                                .fg(Color::White)
-                                .add_modifier(Modifier::BOLD),
-                            Color::Gray,
-                        )
-                    } else {
-                        (
-                            Style::default()
-                                .fg(Color::DarkGray)
-                                .add_modifier(Modifier::BOLD),
-                            Color::DarkGray,
-                        )
-                    }
-                } else if p.active {
-                    (Style::default().fg(Color::White), Color::Gray)
-                } else {
-                    (Style::default().fg(Color::DarkGray), Color::DarkGray)
-                };
-                let name = truncate_to_width(&p.name, name_col_width);
-                let padding = name_col_width.saturating_sub(name.width());
-                let type_label = truncate_to_width(&p.practice_type.label(), type_col_width);
-                let type_padding = type_col_width.saturating_sub(type_label.width());
-                let toggle = if p.active {
-                    vec![
-                        Span::styled("\u{25B0}", Style::default().fg(GREEN)),
-                        Span::styled("\u{25B1}", Style::default().fg(Color::DarkGray)),
-                    ]
-                } else {
-                    vec![
-                        Span::styled("\u{25B1}", Style::default().fg(Color::DarkGray)),
-                        Span::styled("\u{25B0}", Style::default().fg(Color::DarkGray)),
-                    ]
-                };
-                let mut spans = vec![
-                    Span::styled(marker, name_style),
-                    Span::styled(name, name_style),
-                    Span::raw(" ".repeat(padding)),
-                    Span::styled(type_label, Style::default().fg(type_color)),
-                    Span::raw(" ".repeat(type_padding)),
-                ];
-                spans.extend(toggle);
-                all_lines.push(Line::from(spans));
-            }
-        }
-        frame.render_widget(Paragraph::new(all_lines).wrap(Wrap { trim: false }), inner);
-
-        if !self.practices.is_empty() && self.selected >= self.list_viewport.offset() {
-            let row = (self.selected - self.list_viewport.offset()) as u16 + 1;
-            highlight_row(frame, inner, row);
-        }
-
-        // ── Input/action area ──
-        let action_lines = match &self.mode {
-            Mode::Browse => {
+    fn action_content(&self, width: u16) -> (Vec<Line<'static>>, Option<usize>) {
+        match &self.mode {
+            Mode::Browse => (
                 vec![
                     Line::from(""),
                     Line::from(""),
                     Line::from(""),
                     Line::from(""),
-                ]
-            }
+                ],
+                None,
+            ),
             Mode::AddName => {
                 let mut spans = vec![Span::styled(" > ", Style::default().fg(GREEN))];
-                spans.extend(self.input.visible_spans(area.width, 3, GREEN));
-                vec![
-                    Line::from(Span::styled(
-                        tr("practices-new-name"),
-                        Style::default().fg(Color::White),
-                    )),
-                    Line::from(spans),
-                    Line::from(""),
-                    Line::from(""),
-                ]
+                spans.extend(self.input.visible_spans(width, 3, GREEN));
+                (
+                    vec![
+                        Line::from(Span::styled(
+                            tr("practices-new-name"),
+                            Style::default().fg(Color::White),
+                        )),
+                        Line::from(spans),
+                        Line::from(""),
+                        Line::from(""),
+                    ],
+                    None,
+                )
             }
             Mode::AddType => {
-                let mut lines: Vec<Line> = vec![Line::from(Span::styled(
+                let mut lines = vec![Line::from(Span::styled(
                     tr("practices-select-type"),
                     Style::default().fg(Color::White),
                 ))];
-                for (i, pt) in PracticeType::ALL.iter().enumerate() {
-                    let marker = if i == self.type_selected { "> " } else { "  " };
-                    let style = if i == self.type_selected {
+                for (index, practice_type) in PracticeType::ALL.iter().enumerate() {
+                    let marker = if index == self.type_selected {
+                        "> "
+                    } else {
+                        "  "
+                    };
+                    let style = if index == self.type_selected {
                         Style::default()
                             .fg(Color::White)
                             .add_modifier(Modifier::BOLD)
@@ -288,65 +272,55 @@ impl PracticesScreen {
                         Style::default().fg(Color::Gray)
                     };
                     lines.push(Line::from(Span::styled(
-                        format!(" {}{}", marker, pt.label()),
+                        format!(" {marker}{}", practice_type.label()),
                         style,
                     )));
                 }
-                // 1 header + 4 types = 5 lines, fits in the 6-line action area
-                lines
+                (lines, Some(self.type_selected + 1))
             }
             Mode::EditName => {
                 let mut spans = vec![Span::styled(" > ", Style::default().fg(GREEN))];
-                spans.extend(self.input.visible_spans(area.width, 3, GREEN));
-                vec![
-                    Line::from(Span::styled(
-                        tr("practices-rename"),
-                        Style::default().fg(Color::White),
-                    )),
-                    Line::from(spans),
-                    Line::from(""),
-                    Line::from(""),
-                ]
+                spans.extend(self.input.visible_spans(width, 3, GREEN));
+                (
+                    vec![
+                        Line::from(Span::styled(
+                            tr("practices-rename"),
+                            Style::default().fg(Color::White),
+                        )),
+                        Line::from(spans),
+                        Line::from(""),
+                        Line::from(""),
+                    ],
+                    None,
+                )
             }
             Mode::ConfirmDelete => {
                 let name = self
                     .practices
                     .get(self.selected)
-                    .map(|p| p.name.as_str())
+                    .map(|practice| practice.name.as_str())
                     .unwrap_or("?");
-                vec![
-                    Line::from(Span::styled(
-                        tr_args(
-                            "practices-delete-confirm",
-                            &[("name", FluentValue::from(name.to_string()))],
-                        ),
-                        Style::default().fg(RED),
-                    )),
-                    Line::from(Span::styled(
-                        tr("practices-delete-cascade-warning"),
-                        Style::default().fg(RED),
-                    )),
-                    Line::from(""),
-                    Line::from(""),
-                ]
+                (
+                    vec![
+                        Line::from(Span::styled(
+                            tr_args(
+                                "practices-delete-confirm",
+                                &[("name", FluentValue::from(name.to_string()))],
+                            ),
+                            Style::default().fg(RED),
+                        )),
+                        Line::from(Span::styled(
+                            tr("practices-delete-cascade-warning"),
+                            Style::default().fg(RED),
+                        )),
+                        Line::from(""),
+                        Line::from(""),
+                    ],
+                    None,
+                )
             }
-        };
-        frame.render_widget(
-            Paragraph::new(action_lines).wrap(Wrap { trim: false }),
-            chunks[2],
-        );
-
-        if self.mode == Mode::AddType {
-            highlight_row(frame, chunks[2], (self.type_selected + 1) as u16);
         }
-
-        // ── Status line ──
-        render_status_line(frame, chunks[3], &self.status_msg);
-
-        // ── Shortcuts ──
-        render_shortcuts(frame, chunks[4], &shortcuts);
     }
-
     pub fn handle_key(&mut self, key: KeyEvent, db: &Database) -> Action {
         self.status_msg = None;
         match &self.mode {
@@ -684,6 +658,44 @@ mod tests {
                 "Practices {name} buffer changed"
             );
         }
+    }
+
+    #[test]
+    fn practices_all_modes_render_in_tiny_terminals_without_panicking() {
+        for mode in [
+            Mode::Browse,
+            Mode::AddName,
+            Mode::AddType,
+            Mode::EditName,
+            Mode::ConfirmDelete,
+        ] {
+            for (width, height) in [(1, 1), (12, 4), (24, 10)] {
+                let mut screen = golden_screen(mode.clone());
+                let _ = render_practices(&mut screen, width, height);
+            }
+        }
+    }
+
+    #[test]
+    fn practices_long_name_keeps_toggle_inside_the_bordered_panel() {
+        let db = Database::open_in_memory().unwrap();
+        db.create_practice(
+            "一个很长的练习名称 mixed with a deliberately long ASCII suffix",
+            PracticeType::Endurance,
+        )
+        .unwrap();
+        let mut screen = PracticesScreen::new(&db).unwrap();
+
+        let buffer = crate::tui::framework::test_support::render_to_buffer(40, 12, |frame| {
+            screen.render(frame)
+        });
+
+        let data_row = (0..40).map(|x| buffer[(x, 3)].symbol()).collect::<String>();
+        assert_eq!(buffer[(39, 3)].symbol(), "│", "{data_row}");
+        assert!(
+            data_row.contains('▰') || data_row.contains('▱'),
+            "{data_row}"
+        );
     }
 
     #[test]

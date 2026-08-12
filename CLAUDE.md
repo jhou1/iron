@@ -32,7 +32,10 @@ src/
     mod.rs             — shared TUI exports, layout helpers, and modules
     navigation.rs      — typed screen/module IDs, navigation intents, and actions
     lifecycle.rs       — static re-entry and navigation-status contracts
-    framework/         — shared viewport, input, status, shortcut, and test primitives
+    framework/         — shared viewport, input, presentation, and test primitives
+      screen_frame.rs  — centered body with reserved status and shortcut rows
+      list_panel.rs    — bordered scrollable list presentation
+      action_panel.rs  — bounded contextual action presentation
     dashboard.rs       — heatmap + summary + recent logs + goals + quote + HRV
     log_entry.rs       — practice picker + set-by-set form + date + RPE + notes
     history.rs         — 14-day scrollable log, edit/delete
@@ -74,7 +77,7 @@ Vim-style navigation includes `j/k` up/down, `h/l` left/right, `/` filter, `Esc`
 
 Screen actions use typed `NavigationIntent` values. Ordinary module navigation prepares a freshly loaded replacement before changing the route; approved browse context such as stable-ID selection, filters, viewports, focused detail, and the Trends window survives where applicable. Unfinished edit/confirmation state, prior status, and cross-page undo payloads clear on re-entry. History edit intents carry the selected log's stable database ID, and Log Entry is built from that exact ID rather than an application-side selection lookup.
 
-Navigation preparation is atomic: if target loading fails, neither the current route nor the cached target changes, and the source screen shows the localized error while retaining its in-place state. The navigation topology and shortcuts are unchanged. Batch 3A provides this concrete lifecycle routing; Batch 3B UI component extraction is not shipped.
+Navigation preparation is atomic: if target loading fails, neither the current route nor the cached target changes, and the source screen shows the localized error while retaining its in-place state. The navigation topology and shortcuts are unchanged. Batch 3A provides this concrete lifecycle routing. Batch 3B-1 migrates Practices presentation only; other screens are unchanged and later slices are not shipped.
 
 All text input fields use emacs-style cursor: `Ctrl+B`/Left back, `Ctrl+F`/Right forward, `Ctrl+A`/Home start, `Ctrl+E`/End end, `Ctrl+K` kill to end of line. Characters insert at cursor, not append.
 
@@ -83,6 +86,8 @@ All text input fields use emacs-style cursor: `Ctrl+B`/Left back, `Ctrl+F`/Right
 **Text input must never overflow its container.** Single-line inputs render with `TextInput::visible_spans()` so long text scrolls horizontally with the Unicode cursor. Never render raw `text[..cursor]` + cursor + `text[cursor..]` spans without width clipping.
 
 Shared TUI mechanics live in `src/tui/framework/`: visual viewports, input state, detail/status/shortcut components, bounded rectangle helpers, and test support. Screens own domain state, database operations, validation, and modes. Selected content must remain visible, hidden visual rows use `↑/↓` indicators, and failed mutations retain their active input/focus while showing a visible error. Log Entry is verified at `80x24`; Dashboard is verified at `80x35`; both tolerate smaller direct-render rectangles without panicking.
+
+Practices is the only Batch 3B-1 consumer of `ScreenFrame`, `ScrollableListPanel`, and `ActionPanel`. Those components own its presentation geometry, while Practices continues to own domain modes, database operations, validation, shortcuts, and lifecycle behavior.
 
 Log Entry uses shared `TextInput` state for its filter, set fields, warm-up, cool-down, RPE, note, and date editor, plus `ViewportState` for its clamped practice selector. Its shortcuts must be generated from the active filter/field/edit/confirmation mode. Validation and database failures retain the complete form, cursor, focus, editing identity, and return target.
 

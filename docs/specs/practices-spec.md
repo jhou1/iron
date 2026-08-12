@@ -10,6 +10,12 @@ Manage the practice inventory — add, rename, toggle visibility, and delete pra
 4. Status line
 5. Shortcuts bar
 
+## Presentation Ownership
+
+Batch 3B-1 composes Practices from three presentation-only components. `ScreenFrame` reserves the status and shortcut rows. `ScrollableListPanel` owns the list border, overflow markers, viewport reveal and clamp, and selected-row highlight. `ActionPanel` owns bounded rendering and highlighting for contextual action rows.
+
+Practices still formats every domain-specific line and makes every state decision. It owns practice columns and status glyphs, action copy, modes, selection decisions, shortcuts, validation, database mutations, and lifecycle behavior.
+
 ## List
 
 - Shows all practices (active and inactive)
