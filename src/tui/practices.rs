@@ -583,7 +583,7 @@ impl NavigationStatus for PracticesScreen {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tui::framework::test_support::render_to_string;
+    use crate::tui::framework::test_support::{render_to_snapshot, render_to_string};
     use crate::tui::lifecycle::{NavigationStatus, Reenter};
     use crossterm::event::KeyModifiers;
 
@@ -602,6 +602,88 @@ mod tests {
                 .unwrap();
         }
         db
+    }
+
+    fn golden_screen(mode: Mode) -> PracticesScreen {
+        std::env::set_var("LC_ALL", "C");
+        crate::i18n::init();
+
+        let db = Database::open_in_memory().unwrap();
+        db.create_practice("Barbell Squat", PracticeType::Weighted)
+            .unwrap();
+        let selected = db
+            .create_practice("Pull-ups", PracticeType::Bodyweight)
+            .unwrap();
+        db.create_practice(
+            "Zone 2 endurance with a deliberately long practice name",
+            PracticeType::Endurance,
+        )
+        .unwrap();
+        db.set_practice_active(selected.id, false).unwrap();
+
+        let mut screen = PracticesScreen::new(&db).unwrap();
+        screen.selected = screen
+            .practices
+            .iter()
+            .position(|practice| practice.id == selected.id)
+            .unwrap();
+        screen.mode = mode.clone();
+        screen.status_msg = Some(("Fixture status".into(), false));
+        match mode {
+            Mode::AddName => screen.input.set("新 practice"),
+            Mode::AddType => {
+                screen.input.set("Interval Run");
+                screen.type_selected = 2;
+            }
+            Mode::EditName => screen.input.set("Pull-ups revised"),
+            Mode::Browse | Mode::ConfirmDelete => {}
+        }
+        screen
+    }
+
+    fn practices_golden(name: &str) -> &'static str {
+        match name {
+            "browse" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/practices/browse.txt"
+            )),
+            "add_name" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/practices/add_name.txt"
+            )),
+            "add_type" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/practices/add_type.txt"
+            )),
+            "edit_name" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/practices/edit_name.txt"
+            )),
+            "confirm_delete" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/practices/confirm_delete.txt"
+            )),
+            unexpected => panic!("unknown Practices golden {unexpected}"),
+        }
+    }
+
+    #[test]
+    fn practices_modes_match_golden_buffers() {
+        for (name, mode) in [
+            ("browse", Mode::Browse),
+            ("add_name", Mode::AddName),
+            ("add_type", Mode::AddType),
+            ("edit_name", Mode::EditName),
+            ("confirm_delete", Mode::ConfirmDelete),
+        ] {
+            let mut screen = golden_screen(mode);
+            let actual = render_to_snapshot(80, 24, |frame| screen.render(frame));
+            assert_eq!(
+                actual,
+                practices_golden(name),
+                "Practices {name} buffer changed"
+            );
+        }
     }
 
     #[test]
