@@ -1,12 +1,35 @@
 use std::collections::HashSet;
 use std::path::Path;
 
+fn starts_char_literal(chars: &std::iter::Peekable<std::str::Chars<'_>>) -> bool {
+    let mut probe = chars.clone();
+    match probe.next() {
+        Some('\\') => match probe.next() {
+            Some('u') if probe.next() == Some('{') => {
+                for character in probe.by_ref() {
+                    if character == '}' {
+                        return probe.next() == Some('\'');
+                    }
+                }
+                false
+            }
+            Some('x') => probe.nth(1).is_some() && probe.next() == Some('\''),
+            Some(_) => probe.next() == Some('\''),
+            None => false,
+        },
+        Some(character) if character != '\n' && character != '\'' => probe.next() == Some('\''),
+        _ => false,
+    }
+}
+
 fn source_code_contains(source: &str, needle: &str) -> bool {
     let mut code = String::with_capacity(source.len());
     let mut chars = source.chars().peekable();
     let mut block_comment_depth = 0usize;
     let mut in_line_comment = false;
     let mut in_string = false;
+    let mut in_char = false;
+    let mut raw_string_hashes = None;
     let mut escaped = false;
 
     while let Some(character) = chars.next() {
@@ -34,16 +57,58 @@ fn source_code_contains(source: &str, needle: &str) -> bool {
             continue;
         }
 
+        if let Some(hash_count) = raw_string_hashes {
+            if character == '"' {
+                let mut probe = chars.clone();
+                if (0..hash_count).all(|_| probe.next() == Some('#')) {
+                    for _ in 0..hash_count {
+                        chars.next();
+                    }
+                    raw_string_hashes = None;
+                }
+            } else if character == '\n' {
+                code.push(character);
+            }
+            continue;
+        }
+
         if in_string {
-            code.push(character);
             if escaped {
                 escaped = false;
             } else if character == '\\' {
                 escaped = true;
             } else if character == '"' {
                 in_string = false;
+            } else if character == '\n' {
+                code.push(character);
             }
             continue;
+        }
+
+        if in_char {
+            if escaped {
+                escaped = false;
+            } else if character == '\\' {
+                escaped = true;
+            } else if character == '\'' {
+                in_char = false;
+            }
+            continue;
+        }
+
+        if character == 'r' {
+            let mut probe = chars.clone();
+            let mut hash_count = 0;
+            while probe.next_if_eq(&'#').is_some() {
+                hash_count += 1;
+            }
+            if probe.next() == Some('"') {
+                for _ in 0..=hash_count {
+                    chars.next();
+                }
+                raw_string_hashes = Some(hash_count);
+                continue;
+            }
         }
 
         match (character, chars.peek().copied()) {
@@ -57,7 +122,9 @@ fn source_code_contains(source: &str, needle: &str) -> bool {
             }
             ('"', _) => {
                 in_string = true;
-                code.push(character);
+            }
+            ('\'', _) if starts_char_literal(&chars) => {
+                in_char = true;
             }
             _ => code.push(character),
         }
@@ -134,16 +201,25 @@ fn paragraph_lint_scans_nested_framework_sources() {
 }
 
 #[test]
-fn ownership_source_check_rejects_comment_only_evidence() {
+fn ownership_source_check_rejects_non_code_evidence() {
     let comments_only = r#"
         // render_scrollable_list_panel(
         /* render_scrollable_list_panel( */
     "#;
+    let strings_only = r###"
+        const ORDINARY: &str = "render_scrollable_list_panel(";
+        const RAW: &str = r#"render_scrollable_list_panel("#;
+    "###;
 
     assert!(!source_code_contains(
         comments_only,
         "render_scrollable_list_panel("
     ));
+    assert!(!source_code_contains(
+        strings_only,
+        "render_scrollable_list_panel("
+    ));
+    assert!(!source_code_contains("const MARKER: char = '(';", "("));
     assert!(source_code_contains(
         "render_scrollable_list_panel(frame, area);",
         "render_scrollable_list_panel("
