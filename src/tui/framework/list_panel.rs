@@ -99,6 +99,35 @@ mod tests {
     use ratatui::{layout::Rect, style::Color, text::Line};
 
     #[test]
+    fn list_panel_renders_all_border_edges_with_border_style() {
+        let mut viewport = ViewportState::new(0);
+        let buffer = render_to_buffer(12, 6, |frame| {
+            let area = frame.area();
+            render_scrollable_list_panel(frame, area, "Items", &mut viewport, |_| {
+                ListPanelContent {
+                    header: None,
+                    rows: vec![Line::from("Item")],
+                    empty: None,
+                    selected: None,
+                }
+            });
+        });
+
+        for ((x, y), symbol) in [
+            ((0, 0), "┌"),
+            ((11, 0), "┐"),
+            ((0, 5), "└"),
+            ((11, 5), "┘"),
+            ((0, 3), "│"),
+            ((11, 3), "│"),
+            ((5, 5), "─"),
+        ] {
+            assert_eq!(buffer[(x, y)].symbol(), symbol, "border cell ({x}, {y})");
+            assert_eq!(buffer[(x, y)].fg, BORDER_COLOR, "border style ({x}, {y})");
+        }
+    }
+
+    #[test]
     fn list_panel_keeps_header_fixed_and_reveals_selected_row() {
         let mut viewport = ViewportState::new(0);
         let output = render_to_string(24, 8, |frame| {

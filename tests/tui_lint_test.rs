@@ -1,6 +1,71 @@
 use std::collections::HashSet;
 use std::path::Path;
 
+fn source_code_contains(source: &str, needle: &str) -> bool {
+    let mut code = String::with_capacity(source.len());
+    let mut chars = source.chars().peekable();
+    let mut block_comment_depth = 0usize;
+    let mut in_line_comment = false;
+    let mut in_string = false;
+    let mut escaped = false;
+
+    while let Some(character) = chars.next() {
+        if in_line_comment {
+            if character == '\n' {
+                in_line_comment = false;
+                code.push(character);
+            }
+            continue;
+        }
+
+        if block_comment_depth > 0 {
+            match (character, chars.peek().copied()) {
+                ('/', Some('*')) => {
+                    chars.next();
+                    block_comment_depth += 1;
+                }
+                ('*', Some('/')) => {
+                    chars.next();
+                    block_comment_depth -= 1;
+                }
+                ('\n', _) => code.push(character),
+                _ => {}
+            }
+            continue;
+        }
+
+        if in_string {
+            code.push(character);
+            if escaped {
+                escaped = false;
+            } else if character == '\\' {
+                escaped = true;
+            } else if character == '"' {
+                in_string = false;
+            }
+            continue;
+        }
+
+        match (character, chars.peek().copied()) {
+            ('/', Some('/')) => {
+                chars.next();
+                in_line_comment = true;
+            }
+            ('/', Some('*')) => {
+                chars.next();
+                block_comment_depth = 1;
+            }
+            ('"', _) => {
+                in_string = true;
+                code.push(character);
+            }
+            _ => code.push(character),
+        }
+    }
+
+    code.contains(needle)
+}
+
 fn rust_sources(root: &Path) -> Vec<std::path::PathBuf> {
     let mut sources = Vec::new();
     let mut pending = vec![root.to_path_buf()];
@@ -66,6 +131,23 @@ fn paragraph_lint_scans_nested_framework_sources() {
             .any(|violation| violation.contains("framework/bad_panel.rs:1")),
         "{violations:?}"
     );
+}
+
+#[test]
+fn ownership_source_check_rejects_comment_only_evidence() {
+    let comments_only = r#"
+        // render_scrollable_list_panel(
+        /* render_scrollable_list_panel( */
+    "#;
+
+    assert!(!source_code_contains(
+        comments_only,
+        "render_scrollable_list_panel("
+    ));
+    assert!(source_code_contains(
+        "render_scrollable_list_panel(frame, area);",
+        "render_scrollable_list_panel("
+    ));
 }
 
 /// Scans all TUI source files and verifies that every `Paragraph::new(`
@@ -174,14 +256,14 @@ fn screens_must_have_bordered_blocks() {
 
     let practices_source = std::fs::read_to_string(tui_dir.join("practices.rs")).unwrap();
     assert!(
-        practices_source.contains("render_scrollable_list_panel("),
+        source_code_contains(&practices_source, "render_scrollable_list_panel("),
         "Practices must delegate its bordered list to ScrollableListPanel"
     );
 
     let list_panel_source =
         std::fs::read_to_string(tui_dir.join("framework/list_panel.rs")).unwrap();
     assert!(
-        list_panel_source.contains(".borders(Borders::ALL)"),
+        source_code_contains(&list_panel_source, ".borders(Borders::ALL)"),
         "ScrollableListPanel must own the Practices bordered-list contract"
     );
 }
