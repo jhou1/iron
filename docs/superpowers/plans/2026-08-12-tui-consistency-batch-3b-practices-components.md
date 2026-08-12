@@ -312,6 +312,7 @@ git commit -m "test(practices): capture mode rendering"
 - Create: `src/tui/framework/list_panel.rs`
 - Create: `src/tui/framework/action_panel.rs`
 - Modify: `src/tui/framework/mod.rs`
+- Modify: `tests/tui_lint_test.rs` — recursive Paragraph discovery only; border ownership remains Task 3.
 
 **Interfaces:**
 - Consumes: `centered_area`, `fit_rect`, `render_status_line`, `render_shortcuts`, `shortcut_height`, `highlight_row`, `Shortcut`, `StatusMessage`, `ViewportState`, and `VisualSpan`.
@@ -742,76 +743,7 @@ pub use screen_frame::{render_screen_frame, ScreenFrameAreas};
 
 Keep existing exports intact. Do not add component traits, builders, generic error types, or screen-specific options.
 
-- [ ] **Step 8: Run component and regression gates**
-
-```bash
-cargo test tui::framework::screen_frame::tests -- --nocapture
-cargo test tui::framework::list_panel::tests -- --nocapture
-cargo test tui::framework::action_panel::tests -- --nocapture
-cargo test tui::framework:: -- --nocapture
-cargo test tui::practices::tests::practices_modes_match_golden_buffers -- --exact --nocapture
-cargo test --test tui_lint_test -- --nocapture
-cargo clippy --all-targets --all-features -- -D warnings
-cargo fmt -- --check
-git diff --check
-```
-
-Expected: all component tests pass and the pre-refactor Practices golden test remains unchanged and green. If Clippy reports the new public exports as unused before Task 3, use the same narrow documented `#[allow(unused_imports)]` pattern already present in `framework/mod.rs`; do not add dummy production consumers.
-
-- [ ] **Step 9: Commit the framework components**
-
-```bash
-git add src/tui/framework/action_panel.rs src/tui/framework/list_panel.rs \
-  src/tui/framework/screen_frame.rs src/tui/framework/mod.rs
-git commit -m "refactor(tui): add shared screen presentation components"
-```
-
----
-
-### Task 3: Migrate Practices, Transfer Lint Ownership, and Document Batch 3B-1
-
-**Files:**
-- Modify: `src/tui/practices.rs:1-348,583-756`
-- Modify: `tests/tui_lint_test.rs`
-- Modify: `CLAUDE.md`
-- Modify: `README.md`
-- Modify: `README_zh.md`
-- Modify: `docs/specs/practices-spec.md`
-- Modify: `docs/specs/navigation-spec.md`
-- Modify: `docs/superpowers/specs/2026-08-10-tui-consistency-framework-design.md`
-
-**Interfaces:**
-- Consumes: the three Task 2 render functions and the five immutable Task 1 fixtures.
-- Produces: one component-based Practices render path, recursive wrapping lint coverage, delegated border ownership, accurate shipped documentation, and a Practices-only manual-acceptance handoff.
-
-- [ ] **Step 1: Change the border lint contract first and verify RED**
-
-In `screens_must_have_bordered_blocks`, remove `practices.rs` from `required_screens`. Add explicit delegated checks:
-
-```rust
-let practices_source = std::fs::read_to_string(tui_dir.join("practices.rs")).unwrap();
-assert!(
-    practices_source.contains("render_scrollable_list_panel("),
-    "Practices must delegate its bordered list to ScrollableListPanel"
-);
-
-let list_panel_source =
-    std::fs::read_to_string(tui_dir.join("framework/list_panel.rs")).unwrap();
-assert!(
-    list_panel_source.contains(".borders(Borders::ALL)"),
-    "ScrollableListPanel must own the Practices bordered-list contract"
-);
-```
-
-Run:
-
-```bash
-cargo test --test tui_lint_test screens_must_have_bordered_blocks -- --exact --nocapture
-```
-
-Expected: FAIL because `practices.rs` does not yet call `render_scrollable_list_panel`.
-
-- [ ] **Step 2: Make Paragraph lint recurse into framework files**
+- [ ] **Step 8: Make Paragraph lint recurse into framework files**
 
 Add a focused source collector above the tests:
 
@@ -875,7 +807,7 @@ let violations = paragraph_violations(tui_dir, &allowlist);
 
 Existing top-level allowlist strings remain unchanged because their relative paths are still `dashboard.rs` and `log_entry.rs`.
 
-Add a self-test proving recursion, using a temporary nested source tree and a small extracted `paragraph_violations(root, allowlist)` helper rather than duplicating the scanner:
+Add a self-test proving recursion through a temporary nested source tree:
 
 ```rust
 #[test]
@@ -907,9 +839,78 @@ cargo test --test tui_lint_test paragraph_lint_scans_nested_framework_sources --
 cargo test --test tui_lint_test paragraph_widgets_must_wrap_user_content -- --exact --nocapture
 ```
 
-Expected: both pass; every new component Paragraph already uses `.wrap(Wrap { trim: false })`.
+Expected: both pass; every new component Paragraph is covered immediately and already uses `.wrap(Wrap { trim: false })`.
 
-- [ ] **Step 3: Extract domain-only practice list formatting**
+- [ ] **Step 9: Run component and regression gates**
+
+```bash
+cargo test tui::framework::screen_frame::tests -- --nocapture
+cargo test tui::framework::list_panel::tests -- --nocapture
+cargo test tui::framework::action_panel::tests -- --nocapture
+cargo test tui::framework:: -- --nocapture
+cargo test tui::practices::tests::practices_modes_match_golden_buffers -- --exact --nocapture
+cargo test --test tui_lint_test -- --nocapture
+cargo clippy --all-targets --all-features -- -D warnings
+cargo fmt -- --check
+git diff --check
+```
+
+Expected: all component tests pass and the pre-refactor Practices golden test remains unchanged and green. If Clippy reports the new public exports as unused before Task 3, use the same narrow documented `#[allow(unused_imports)]` pattern already present in `framework/mod.rs`; do not add dummy production consumers.
+
+- [ ] **Step 10: Commit the framework components**
+
+```bash
+git add src/tui/framework/action_panel.rs src/tui/framework/list_panel.rs \
+  src/tui/framework/screen_frame.rs src/tui/framework/mod.rs tests/tui_lint_test.rs
+git commit -m "refactor(tui): add shared screen presentation components"
+```
+
+---
+
+### Task 3: Migrate Practices, Transfer Lint Ownership, and Document Batch 3B-1
+
+**Files:**
+- Modify: `src/tui/practices.rs:1-348,583-756`
+- Modify: `tests/tui_lint_test.rs`
+- Modify: `CLAUDE.md`
+- Modify: `README.md`
+- Modify: `README_zh.md`
+- Modify: `docs/specs/practices-spec.md`
+- Modify: `docs/specs/navigation-spec.md`
+- Modify: `docs/superpowers/specs/2026-08-10-tui-consistency-framework-design.md`
+
+**Interfaces:**
+- Consumes: the three Task 2 render functions, recursive Paragraph lint coverage, and the five immutable Task 1 fixtures.
+- Produces: one component-based Practices render path, delegated border ownership, accurate shipped documentation, and a Practices-only manual-acceptance handoff.
+
+- [ ] **Step 1: Change the border lint contract first and verify RED**
+
+In `screens_must_have_bordered_blocks`, remove `practices.rs` from `required_screens`. Add explicit delegated checks:
+
+```rust
+let practices_source = std::fs::read_to_string(tui_dir.join("practices.rs")).unwrap();
+assert!(
+    practices_source.contains("render_scrollable_list_panel("),
+    "Practices must delegate its bordered list to ScrollableListPanel"
+);
+
+let list_panel_source =
+    std::fs::read_to_string(tui_dir.join("framework/list_panel.rs")).unwrap();
+assert!(
+    list_panel_source.contains(".borders(Borders::ALL)"),
+    "ScrollableListPanel must own the Practices bordered-list contract"
+);
+```
+
+Run:
+
+```bash
+cargo test --test tui_lint_test screens_must_have_bordered_blocks -- --exact --nocapture
+```
+
+Expected: FAIL because `practices.rs` does not yet call `render_scrollable_list_panel`.
+
+- [ ] **Step 2: Extract domain-only practice list formatting**
 
 In `src/tui/practices.rs`, remove the render-only imports `Block`, `Borders`, `Padding`, and `Paragraph`. Keep `Wrap` only if a remaining non-component Paragraph needs it; otherwise remove it too. Import:
 
@@ -1020,7 +1021,7 @@ fn practice_list_content(
 
 This helper formats domain columns and status glyphs but contains no viewport, border, overflow, clipping, or frame mutation.
 
-- [ ] **Step 4: Extract action-line formatting without moving the state machine**
+- [ ] **Step 3: Extract action-line formatting without moving the state machine**
 
 Add a private method that returns already-styled lines and an optional selected visual row:
 
@@ -1115,7 +1116,7 @@ fn action_content(&self, width: u16) -> (Vec<Line<'static>>, Option<usize>) {
 
 Do not move `handle_key`, mutation functions, mode transitions, status assignment, or `Reenter`.
 
-- [ ] **Step 5: Replace the Practices render path with the three components**
+- [ ] **Step 4: Replace the Practices render path with the three components**
 
 Replace `PracticesScreen::render` with:
 
@@ -1155,7 +1156,7 @@ pub fn render(&mut self, frame: &mut Frame) {
 
 Delete the superseded local block construction, list viewport reveal/clamp, visible-row slicing, overflow-title construction, `Paragraph` calls, and `highlight_row` calls from Practices. There must be one render path only.
 
-- [ ] **Step 6: Verify exact fixture parity before any further edit**
+- [ ] **Step 5: Verify exact fixture parity before any further edit**
 
 Run:
 
@@ -1171,7 +1172,7 @@ git diff --exit-code -- tests/fixtures/tui/practices
 
 Expected: no diff. If any fixture changes, stop and identify the exact cell/geometry difference; do not update the fixture.
 
-- [ ] **Step 7: Add tiny-screen and long-name regression coverage**
+- [ ] **Step 6: Add tiny-screen and long-name regression coverage**
 
 Add these focused Practices tests:
 
@@ -1222,7 +1223,7 @@ cargo test tui::practices::tests -- --nocapture
 
 Expected: all Practices tests pass in both library and binary targets.
 
-- [ ] **Step 8: Complete and verify the lint ownership transfer**
+- [ ] **Step 7: Complete and verify the lint ownership transfer**
 
 Run:
 
@@ -1246,7 +1247,7 @@ Expected:
 - the second finds all three component calls; and
 - the third finds the centralized border, viewport, overflow, and highlight behavior.
 
-- [ ] **Step 9: Update active documentation with Practices-only shipped status**
+- [ ] **Step 8: Update active documentation with Practices-only shipped status**
 
 Make these exact semantic updates:
 
@@ -1259,7 +1260,7 @@ Make these exact semantic updates:
 
 Do not claim that the three components are already suitable for every future screen. Do not change user-facing copy or localization files.
 
-- [ ] **Step 10: Run final formatting, static analysis, test, and build gates**
+- [ ] **Step 9: Run final formatting, static analysis, test, and build gates**
 
 ```bash
 cargo fmt -- --check
@@ -1277,7 +1278,7 @@ git diff --check
 
 Expected: every command exits zero, Clippy emits no warnings, all five fixtures remain unchanged, and the full suite passes.
 
-- [ ] **Step 11: Perform the scoped self-review before commit**
+- [ ] **Step 10: Perform the scoped self-review before commit**
 
 Review the complete diff and verify:
 
@@ -1300,7 +1301,7 @@ Confirm all of the following before staging:
 - lint checks real ownership rather than a marker comment; and
 - docs distinguish shipped Practices extraction from unshipped later slices.
 
-- [ ] **Step 12: Commit Practices migration and documentation**
+- [ ] **Step 11: Commit Practices migration and documentation**
 
 ```bash
 git add src/tui/practices.rs tests/tui_lint_test.rs CLAUDE.md README.md README_zh.md \
@@ -1309,7 +1310,7 @@ git add src/tui/practices.rs tests/tui_lint_test.rs CLAUDE.md README.md README_z
 git commit -m "refactor(practices): adopt shared presentation components"
 ```
 
-- [ ] **Step 13: Request a final whole-slice read-only review**
+- [ ] **Step 12: Request a final whole-slice read-only review**
 
 Review `d823731..HEAD` against the approved design. Require explicit findings by Critical, Important, and Minor severity for:
 
@@ -1326,7 +1327,7 @@ Review `d823731..HEAD` against the approved design. Require explicit findings by
 
 Resolve every valid Critical or Important finding with a failing regression first, then rerun all gates in Step 10. Keep fixes in separately identified follow-up commits rather than rewriting recorded review history.
 
-- [ ] **Step 14: Prepare the Practices-only manual acceptance handoff**
+- [ ] **Step 13: Prepare the Practices-only manual acceptance handoff**
 
 Provide the built binary and ask the user to verify:
 
