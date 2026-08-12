@@ -126,14 +126,8 @@ pub fn render_detail_panel(
 pub fn render_status_line(frame: &mut Frame, area: Rect, status: &StatusMessage) {
     if let Some((message, is_error)) = status {
         let color = if *is_error { Color::Red } else { Color::Green };
-        frame.render_widget(
-            Paragraph::new(Line::from(Span::styled(
-                message.clone(),
-                Style::default().fg(color),
-            )))
-            .wrap(Wrap { trim: false }),
-            area,
-        );
+        let line = Line::from(Span::styled(message.clone(), Style::default().fg(color)));
+        frame.render_widget(Paragraph::new(line).wrap(Wrap { trim: false }), area);
     }
 }
 

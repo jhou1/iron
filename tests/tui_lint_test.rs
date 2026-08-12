@@ -1,6 +1,73 @@
 use std::collections::HashSet;
 use std::path::Path;
 
+fn rust_sources(root: &Path) -> Vec<std::path::PathBuf> {
+    let mut sources = Vec::new();
+    let mut pending = vec![root.to_path_buf()];
+    while let Some(directory) = pending.pop() {
+        for entry in std::fs::read_dir(&directory)
+            .unwrap_or_else(|_| panic!("failed to read {}", directory.display()))
+        {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                pending.push(path);
+            } else if path.extension().is_some_and(|extension| extension == "rs") {
+                sources.push(path);
+            }
+        }
+    }
+    sources.sort();
+    sources
+}
+
+fn paragraph_violations(root: &Path, allowlist: &HashSet<&str>) -> Vec<String> {
+    let mut violations = Vec::new();
+    for path in rust_sources(root) {
+        let relative = path.strip_prefix(root).unwrap().to_string_lossy();
+        let source = std::fs::read_to_string(&path).unwrap();
+        let lines: Vec<&str> = source.lines().collect();
+        for (line_num_0, line) in lines.iter().enumerate() {
+            if !line.trim().contains("Paragraph::new(") {
+                continue;
+            }
+            let end = (line_num_0 + 4).min(lines.len());
+            if lines[line_num_0..end].join(" ").contains(".wrap(") {
+                continue;
+            }
+            let line_num = line_num_0 + 1;
+            let key = format!("{}:{}", relative, line_num);
+            if !allowlist.contains(key.as_str()) {
+                violations.push(format!(
+                    "  {}:{} — Paragraph::new() without .wrap(). Add .wrap(Wrap {{ trim: false }}) or allowlist with reason.",
+                    relative, line_num
+                ));
+            }
+        }
+    }
+    violations
+}
+
+#[test]
+fn paragraph_lint_scans_nested_framework_sources() {
+    let temp = tempfile::tempdir().unwrap();
+    let nested = temp.path().join("framework");
+    std::fs::create_dir_all(&nested).unwrap();
+    std::fs::write(
+        nested.join("bad_panel.rs"),
+        "fn render() { Paragraph::new(variable_content); }\n",
+    )
+    .unwrap();
+
+    let violations = paragraph_violations(temp.path(), &HashSet::new());
+
+    assert!(
+        violations
+            .iter()
+            .any(|violation| violation.contains("framework/bad_panel.rs:1")),
+        "{violations:?}"
+    );
+}
+
 /// Scans all TUI source files and verifies that every `Paragraph::new(`
 /// rendering user-entered or variable-length content uses `.wrap(`.
 ///
@@ -26,45 +93,7 @@ fn paragraph_widgets_must_wrap_user_content() {
     .collect();
 
     let tui_dir = Path::new("src/tui");
-    let mut violations = Vec::new();
-
-    for entry in std::fs::read_dir(tui_dir).expect("failed to read src/tui/") {
-        let entry = entry.unwrap();
-        let path = entry.path();
-        if path.extension().map(|e| e != "rs").unwrap_or(true) {
-            continue;
-        }
-        let filename = path.file_name().unwrap().to_str().unwrap().to_string();
-        let source = std::fs::read_to_string(&path).unwrap();
-
-        for (line_num_0, line) in source.lines().enumerate() {
-            let line_num = line_num_0 + 1; // 1-based to match editors/grep (file is 0-indexed in read)
-            let trimmed = line.trim();
-
-            if !trimmed.contains("Paragraph::new(") {
-                continue;
-            }
-            // Check if this line or the surrounding context has .wrap(
-            // We check the line itself and up to 3 lines after it (for chained calls)
-            let lines_vec: Vec<&str> = source.lines().collect();
-            let end = (line_num_0 + 4).min(lines_vec.len());
-            let context: String = lines_vec[line_num_0..end].join(" ");
-
-            if context.contains(".wrap(") {
-                continue;
-            }
-
-            let key = format!("{}:{}", filename, line_num);
-            if allowlist.contains(key.as_str()) {
-                continue;
-            }
-
-            violations.push(format!(
-                "  {}:{} — Paragraph::new() without .wrap(). Add .wrap(Wrap {{ trim: false }}) or allowlist with reason.",
-                filename, line_num
-            ));
-        }
-    }
+    let violations = paragraph_violations(tui_dir, &allowlist);
 
     // Also check that allowlist entries still correspond to actual Paragraph::new( lines
     // (catch stale entries after refactors)
