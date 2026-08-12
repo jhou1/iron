@@ -224,6 +224,10 @@ fn ownership_source_check_rejects_non_code_evidence() {
         "render_scrollable_list_panel(frame, area);",
         "render_scrollable_list_panel("
     ));
+    assert!(source_code_contains(
+        "fn render<'a>(frame: &'a mut Frame) { render_scrollable_list_panel(frame, area); }",
+        "render_scrollable_list_panel("
+    ));
 }
 
 /// Scans all TUI source files and verifies that every `Paragraph::new(`
