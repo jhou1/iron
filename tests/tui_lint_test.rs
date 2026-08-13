@@ -310,13 +310,7 @@ fn paragraph_widgets_must_wrap_user_content() {
 #[test]
 fn screens_must_have_bordered_blocks() {
     let tui_dir = Path::new("src/tui");
-    let required_screens = [
-        "goals.rs",
-        "trends.rs",
-        "history.rs",
-        "quotes_screen.rs",
-        "log_entry.rs",
-    ];
+    let required_screens = ["goals.rs", "trends.rs", "history.rs", "log_entry.rs"];
 
     let mut missing = Vec::new();
     for filename in &required_screens {
@@ -334,16 +328,21 @@ fn screens_must_have_bordered_blocks() {
         missing.join("\n")
     );
 
-    let practices_source = std::fs::read_to_string(tui_dir.join("practices.rs")).unwrap();
-    assert!(
-        source_code_contains(&practices_source, "render_scrollable_list_panel("),
-        "Practices must delegate its bordered list to ScrollableListPanel"
-    );
+    for (filename, screen_name) in [
+        ("practices.rs", "Practices"),
+        ("quotes_screen.rs", "Quotes"),
+    ] {
+        let source = std::fs::read_to_string(tui_dir.join(filename)).unwrap();
+        assert!(
+            source_code_contains(&source, "render_scrollable_list_panel("),
+            "{screen_name} must delegate its bordered list to ScrollableListPanel"
+        );
+    }
 
     let list_panel_source =
         std::fs::read_to_string(tui_dir.join("framework/list_panel.rs")).unwrap();
     assert!(
         source_code_contains(&list_panel_source, ".borders(Borders::ALL)"),
-        "ScrollableListPanel must own the Practices bordered-list contract"
+        "ScrollableListPanel must own the delegated bordered-list contract"
     );
 }

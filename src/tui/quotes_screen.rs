@@ -1,21 +1,20 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
-    layout::{Constraint, Direction, Layout},
+    layout::Constraint,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Padding, Paragraph, Wrap},
+    widgets::Clear,
     Frame,
 };
 
 use super::lifecycle::{NavigationStatus, Reenter};
 use super::{
-    centered_area,
     framework::{
-        fit_rect, render_detail_panel, render_shortcuts, shortcut_height, truncate_to_width,
-        visual_spans, DetailPanelState, Shortcut, TextInput, ViewportState, VisualSpan,
+        fit_rect, render_action_panel, render_detail_panel, render_screen_frame_sections,
+        render_scrollable_list_panel, truncate_to_width, visual_spans, DetailPanelState,
+        ListPanelAreas, ListPanelContent, ScreenFrameSections, Shortcut, TextInput, ViewportState,
     },
-    highlight_row, render_status_line, Action, ModuleId, NavigationIntent, StatusMessage,
-    BORDER_COLOR, CONTENT_WIDTH,
+    Action, ModuleId, NavigationIntent, StatusMessage, CONTENT_WIDTH,
 };
 use crate::db::Database;
 use crate::i18n::tr;
@@ -23,6 +22,77 @@ use crate::model::Quote;
 
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
+
+fn quote_list_content(
+    quotes: &[Quote],
+    selected: usize,
+    inner: ratatui::layout::Rect,
+) -> ListPanelContent<'static> {
+    let rows = quotes
+        .iter()
+        .enumerate()
+        .map(|(index, quote)| {
+            let selected = index == selected;
+            let marker = if selected { "> " } else { "  " };
+            let style = if selected {
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            };
+            let max_text = inner.width.saturating_sub(3) as usize;
+            let text = truncate_to_width(&quote.text, max_text);
+            Line::from(Span::styled(format!("{marker}{text}"), style))
+        })
+        .collect();
+
+    ListPanelContent {
+        header: None,
+        rows,
+        empty: Some(Line::from(Span::styled(
+            tr("dashboard-no-quotes-modal"),
+            Style::default().fg(Color::Gray),
+        ))),
+        selected: (!quotes.is_empty()).then_some(selected),
+    }
+}
+
+fn quote_preview_rect(
+    inner: ratatui::layout::Rect,
+    focused: bool,
+    content_height: usize,
+) -> ratatui::layout::Rect {
+    let x = inner.x + 4.min(inner.width);
+    let width = quote_preview_width(inner);
+    let height = if focused {
+        inner.height
+    } else {
+        (content_height as u16 + 2).max(4).min(inner.height / 2)
+    };
+    fit_rect(
+        inner,
+        ratatui::layout::Rect {
+            x,
+            y: if focused {
+                inner.y
+            } else {
+                inner.y + inner.height.saturating_sub(height)
+            },
+            width,
+            height,
+        },
+    )
+}
+
+fn quote_preview_width(inner: ratatui::layout::Rect) -> u16 {
+    let x = inner.x + 4.min(inner.width);
+    inner
+        .width
+        .saturating_sub(8)
+        .max(30)
+        .min(inner.right().saturating_sub(x))
+}
 
 #[derive(Debug, Clone, PartialEq)]
 enum Mode {
@@ -107,134 +177,107 @@ impl QuotesScreen {
         shortcuts
     }
 
-    pub fn render(&mut self, frame: &mut Frame) {
-        let area = centered_area(frame.area(), CONTENT_WIDTH);
-        let shortcuts = self.active_shortcuts();
-        let shortcut_rows = shortcut_height(&shortcuts, area.width);
-
-        let action_height: u16 = match &self.mode {
-            Mode::Browse | Mode::Detail => 0,
-            _ => 3,
-        };
-        let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Min(4),                // bordered list
-                Constraint::Length(1),             // spacer
-                Constraint::Length(action_height), // input/action area
-                Constraint::Length(1),             // status message
-                Constraint::Length(shortcut_rows), // shortcuts
-                Constraint::Min(0),                // spacer
-            ])
-            .split(area);
-
-        // ── Bordered quote list ──
-        let visible = chunks[0].height.saturating_sub(4) as usize;
-        self.list_viewport.set_height(visible);
-        if !self.quotes.is_empty() {
-            self.list_viewport.reveal(VisualSpan {
-                start: self.selected,
-                height: 1,
-            });
-        }
-        self.list_viewport.clamp(self.quotes.len());
-        let overflow = self.list_viewport.overflow(self.quotes.len()).suffix();
-        let block = Block::default()
-            .title(Line::from(vec![
-                Span::styled("── ", Style::default().fg(BORDER_COLOR)),
-                Span::styled(
-                    format!("{}{}", tr("dashboard-quotes"), overflow),
-                    Style::default()
-                        .fg(Color::White)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
-            ]))
-            .borders(Borders::ALL)
-            .padding(Padding::uniform(1))
-            .border_style(Style::default().fg(BORDER_COLOR));
-        let inner = block.inner(chunks[0]);
-        frame.render_widget(block, chunks[0]);
-
-        if self.quotes.is_empty() {
-            let hint_content = Line::from(Span::styled(
-                tr("dashboard-no-quotes-modal"),
-                Style::default().fg(Color::Gray),
-            ));
-            let hint = Paragraph::new(hint_content).wrap(Wrap { trim: false });
-            frame.render_widget(hint, inner);
-        } else {
-            let lines: Vec<Line> = self
-                .quotes
-                .iter()
-                .enumerate()
-                .skip(self.list_viewport.offset())
-                .take(visible)
-                .map(|(i, q)| {
-                    let is_sel = i == self.selected;
-                    let marker = if is_sel { "> " } else { "  " };
-                    let style = if is_sel {
-                        Style::default()
-                            .fg(Color::White)
-                            .add_modifier(Modifier::BOLD)
-                    } else {
-                        Style::default().fg(Color::White)
-                    };
-                    let max_text = inner.width.saturating_sub(3) as usize;
-                    let display = truncate_to_width(&q.text, max_text);
-                    let display = format!("{marker}{display}");
-                    Line::from(Span::styled(display, style))
-                })
-                .collect();
-
-            frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
-
-            if self.selected >= self.list_viewport.offset() {
-                let row = (self.selected - self.list_viewport.offset()) as u16;
-                highlight_row(frame, inner, row);
+    fn action_content(&self, width: u16) -> Vec<Line<'static>> {
+        match &self.mode {
+            Mode::Add | Mode::Edit => {
+                let label = if self.mode == Mode::Add {
+                    tr("key-add")
+                } else {
+                    tr("key-edit")
+                };
+                let prefix = format!(" {}: ", label);
+                let prefix_width = Line::from(prefix.as_str()).width() as u16;
+                let mut spans = vec![Span::styled(prefix, Style::default().fg(Color::Gray))];
+                spans.extend(self.input.visible_spans(width, prefix_width, GREEN));
+                vec![
+                    Line::from(spans),
+                    Line::from(""),
+                    Line::from(vec![
+                        Span::styled(" [Enter]", Style::default().fg(ACCENT)),
+                        Span::styled(
+                            format!(" {}  ", tr("key-confirm")),
+                            Style::default().fg(Color::DarkGray),
+                        ),
+                        Span::styled("[Esc]", Style::default().fg(ACCENT)),
+                        Span::styled(
+                            format!(" {}", tr("key-cancel")),
+                            Style::default().fg(Color::DarkGray),
+                        ),
+                    ]),
+                ]
             }
+            Mode::ConfirmDelete => vec![
+                Line::from(Span::styled(
+                    format!(" {}", tr("quotes-delete-confirm")),
+                    Style::default().fg(Color::Red),
+                )),
+                Line::from(""),
+                Line::from(vec![
+                    Span::styled(" [y]", Style::default().fg(ACCENT)),
+                    Span::styled(
+                        format!(" {}  ", tr("key-yes")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                    Span::styled("[any]", Style::default().fg(ACCENT)),
+                    Span::styled(
+                        format!(" {}", tr("key-cancel")),
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                ]),
+            ],
+            Mode::Browse | Mode::Detail => Vec::new(),
         }
+    }
+
+    pub fn render(&mut self, frame: &mut Frame) {
+        let shortcuts = self.active_shortcuts();
+        let action_height = match &self.mode {
+            Mode::Browse | Mode::Detail => 0,
+            Mode::Add | Mode::Edit | Mode::ConfirmDelete => 3,
+        };
+        let area = frame.area();
+        let screen: ScreenFrameSections = render_screen_frame_sections(
+            frame,
+            area,
+            CONTENT_WIDTH,
+            &self.status_msg,
+            &shortcuts,
+            &[
+                Constraint::Min(4),
+                Constraint::Length(1),
+                Constraint::Length(action_height),
+            ],
+            true,
+        );
+
+        let quotes = &self.quotes;
+        let selected = self.selected;
+        let list: ListPanelAreas = render_scrollable_list_panel(
+            frame,
+            screen.body[0],
+            tr("dashboard-quotes"),
+            &mut self.list_viewport,
+            |inner| quote_list_content(quotes, selected, inner),
+        );
 
         if matches!(self.mode, Mode::Browse | Mode::Detail) {
             if let Some(quote) = self.quotes.get(self.selected) {
-                let popup_x = inner.x + 4.min(inner.width);
-                let popup_w = inner
-                    .width
-                    .saturating_sub(8)
-                    .max(30)
-                    .min(inner.right().saturating_sub(popup_x));
-                let popup_inner_width = popup_w.saturating_sub(2).max(1);
+                let focused = self.mode == Mode::Detail;
+                let preview_width = quote_preview_width(list.inner).saturating_sub(2).max(1);
                 let lines = vec![Line::from(quote.text.clone())];
-                let spans = visual_spans(&lines, popup_inner_width);
-                self.detail_content_height = spans.first().map(|span| span.height).unwrap_or(0);
-                let popup_h = if self.mode == Mode::Detail {
-                    inner.height
-                } else {
-                    (self.detail_content_height as u16 + 2)
-                        .max(4)
-                        .min(inner.height / 2)
-                };
-                let popup_rect = fit_rect(
-                    inner,
-                    ratatui::layout::Rect {
-                        x: popup_x,
-                        y: if self.mode == Mode::Detail {
-                            inner.y
-                        } else {
-                            inner.y + inner.height.saturating_sub(popup_h)
-                        },
-                        width: popup_w,
-                        height: popup_h,
-                    },
-                );
-                self.detail_state.focused = self.mode == Mode::Detail;
-                if !self.detail_state.focused {
+                self.detail_content_height = visual_spans(&lines, preview_width)
+                    .first()
+                    .map(|span| span.height)
+                    .unwrap_or(0);
+                let popup = quote_preview_rect(list.inner, focused, self.detail_content_height);
+                self.detail_state.focused = focused;
+                if !focused {
                     self.detail_state.viewport.set_offset(0);
                 }
-                frame.render_widget(Clear, popup_rect);
+                frame.render_widget(Clear, popup);
                 render_detail_panel(
                     frame,
-                    popup_rect,
+                    popup,
                     format!(" {} ", tr("dashboard-quotes")),
                     lines,
                     &mut self.detail_state,
@@ -243,70 +286,12 @@ impl QuotesScreen {
             }
         }
 
-        // ── Action area ──
-        if action_height > 0 {
-            let action_lines = match &self.mode {
-                Mode::Add | Mode::Edit => {
-                    let label = if self.mode == Mode::Add {
-                        tr("key-add")
-                    } else {
-                        tr("key-edit")
-                    };
-                    let prefix = format!(" {}: ", label);
-                    let prefix_width = Line::from(prefix.as_str()).width() as u16;
-                    let mut spans = vec![Span::styled(prefix, Style::default().fg(Color::Gray))];
-                    spans.extend(self.input.visible_spans(area.width, prefix_width, GREEN));
-                    vec![
-                        Line::from(spans),
-                        Line::from(""),
-                        Line::from(vec![
-                            Span::styled(" [Enter]", Style::default().fg(ACCENT)),
-                            Span::styled(
-                                format!(" {}  ", tr("key-confirm")),
-                                Style::default().fg(Color::DarkGray),
-                            ),
-                            Span::styled("[Esc]", Style::default().fg(ACCENT)),
-                            Span::styled(
-                                format!(" {}", tr("key-cancel")),
-                                Style::default().fg(Color::DarkGray),
-                            ),
-                        ]),
-                    ]
-                }
-                Mode::ConfirmDelete => {
-                    vec![
-                        Line::from(Span::styled(
-                            format!(" {}", tr("quotes-delete-confirm")),
-                            Style::default().fg(Color::Red),
-                        )),
-                        Line::from(""),
-                        Line::from(vec![
-                            Span::styled(" [y]", Style::default().fg(ACCENT)),
-                            Span::styled(
-                                format!(" {}  ", tr("key-yes")),
-                                Style::default().fg(Color::DarkGray),
-                            ),
-                            Span::styled("[any]", Style::default().fg(ACCENT)),
-                            Span::styled(
-                                format!(" {}", tr("key-cancel")),
-                                Style::default().fg(Color::DarkGray),
-                            ),
-                        ]),
-                    ]
-                }
-                Mode::Browse | Mode::Detail => vec![],
-            };
-            frame.render_widget(
-                Paragraph::new(action_lines).wrap(Wrap { trim: false }),
-                chunks[2],
-            );
-        }
-
-        // ── Status line ──
-        render_status_line(frame, chunks[3], &self.status_msg);
-
-        // ── Shortcuts ──
-        render_shortcuts(frame, chunks[4], &shortcuts);
+        render_action_panel(
+            frame,
+            screen.body[2],
+            self.action_content(screen.area.width),
+            None,
+        );
     }
 
     pub fn handle_key(&mut self, key: KeyEvent, db: &Database) -> Action {
@@ -535,6 +520,13 @@ mod tests {
         render_to_string(width, height, |frame| screen.render(frame))
     }
 
+    fn rect_is_within(parent: ratatui::layout::Rect, child: ratatui::layout::Rect) -> bool {
+        child.x >= parent.x
+            && child.y >= parent.y
+            && child.right() <= parent.right()
+            && child.bottom() <= parent.bottom()
+    }
+
     fn golden_quotes_screen(name: &str) -> QuotesScreen {
         std::env::set_var("LC_ALL", "C");
         crate::i18n::init();
@@ -631,6 +623,102 @@ mod tests {
             let expected = quotes_golden(name);
             assert_eq!(actual, expected, "Quotes {name} buffer changed");
         }
+    }
+
+    #[test]
+    fn quote_preview_rect_stays_inside_list_inner() {
+        for inner in [
+            ratatui::layout::Rect::new(0, 0, 0, 0),
+            ratatui::layout::Rect::new(5, 5, 1, 1),
+            ratatui::layout::Rect::new(2, 3, 12, 4),
+            ratatui::layout::Rect::new(4, 2, 72, 15),
+        ] {
+            for focused in [false, true] {
+                let preview = quote_preview_rect(inner, focused, 40);
+                assert!(rect_is_within(inner, preview), "{inner:?} -> {preview:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn quotes_all_modes_render_in_tiny_terminals_without_panicking() {
+        for name in [
+            "browse",
+            "browse_with_undo",
+            "detail",
+            "add",
+            "edit",
+            "confirm_delete",
+        ] {
+            for (width, height) in [(1, 1), (12, 4), (24, 10), (40, 6)] {
+                let mut screen = golden_quotes_screen(name);
+                let _ = render_quotes(&mut screen, width, height);
+            }
+        }
+    }
+
+    #[test]
+    fn quote_write_failure_retains_edit_state() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        let db = Database::open(file.path()).unwrap();
+        let quote = db.create_quote("Original").unwrap();
+        let mut screen = QuotesScreen::new(&db).unwrap();
+        screen.handle_key(key(KeyCode::Char('e')), &db);
+        screen.input.set("Retry me");
+        rusqlite::Connection::open(file.path())
+            .unwrap()
+            .execute("DROP TABLE quotes", [])
+            .unwrap();
+
+        screen.handle_key(key(KeyCode::Enter), &db);
+
+        assert_eq!(screen.mode, Mode::Edit);
+        assert_eq!(screen.editing_id, Some(quote.id));
+        assert_eq!(screen.input.value(), "Retry me");
+        assert!(screen.status_msg.as_ref().is_some_and(|(_, error)| *error));
+    }
+
+    #[test]
+    fn quote_delete_failure_retains_confirmation() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        let db = Database::open(file.path()).unwrap();
+        db.create_quote("Delete me").unwrap();
+        let mut screen = QuotesScreen::new(&db).unwrap();
+        screen.handle_key(key(KeyCode::Char('d')), &db);
+        rusqlite::Connection::open(file.path())
+            .unwrap()
+            .execute("DROP TABLE quotes", [])
+            .unwrap();
+
+        screen.handle_key(key(KeyCode::Char('y')), &db);
+
+        assert_eq!(screen.mode, Mode::ConfirmDelete);
+        assert!(screen.last_deleted.is_none());
+        assert!(screen.status_msg.as_ref().is_some_and(|(_, error)| *error));
+    }
+
+    #[test]
+    fn quote_restore_failure_restores_undo_payload() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        let db = Database::open(file.path()).unwrap();
+        db.create_quote("Current").unwrap();
+        let mut screen = QuotesScreen::new(&db).unwrap();
+        let deleted = Quote {
+            id: 9_001,
+            text: "Retry restore".into(),
+            position: 9,
+        };
+        screen.last_deleted = Some(deleted.clone());
+        rusqlite::Connection::open(file.path())
+            .unwrap()
+            .execute("DROP TABLE quotes", [])
+            .unwrap();
+
+        screen.handle_key(key(KeyCode::Char('u')), &db);
+
+        assert_eq!(screen.mode, Mode::Browse);
+        assert_eq!(screen.last_deleted, Some(deleted));
+        assert!(screen.status_msg.as_ref().is_some_and(|(_, error)| *error));
     }
 
     #[test]
