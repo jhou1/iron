@@ -1,7 +1,7 @@
 # TUI Consistency Framework — Batch 3B-2 Quotes Components Design
 
 **Date:** 2026-08-12  
-**Status:** Approved design; implementation not started
+**Status:** Approved design; implementation in progress (footer-preservation correction approved 2026-08-13)
 
 ## Context
 
@@ -16,6 +16,7 @@ This remains an incremental structural refactor. Trends does not begin until Quo
 - Freeze the current Quotes rendering across every visible mode and the optional undo state with exact styled-buffer fixtures.
 - Reuse `ScreenFrame`, `ScrollableListPanel`, and `ActionPanel` for the presentation mechanics already proven by Practices.
 - Extend the list-panel API only enough to return its safely clipped outer and inner rectangles for Quotes preview placement.
+- Extend `ScreenFrame` with a generic, presentation-only layout configuration proven necessary by the immutable Quotes fixtures, while keeping its existing renderer as a backward-compatible default wrapper.
 - Migrate Quotes without changing visible output, shortcuts, navigation, database behavior, lifecycle behavior, failure retention, detail scrolling, or undo behavior.
 - Keep floating-preview sizing, focus, content measurement, and scrolling owned by Quotes and the existing `render_detail_panel` helper.
 - Remove Quotes-local duplication of frame layout, list borders, overflow-title composition, viewport reveal/clamp, visible-row slicing, selected-row highlighting, status rendering, shortcut rendering, and action-panel rendering.
@@ -34,15 +35,18 @@ This remains an incremental structural refactor. Trends does not begin until Quo
 
 ## Chosen Approach
 
-Batch 3B-2 uses the existing three components and makes one demonstrated API extension: `ScrollableListPanel` returns safely clipped geometry after it renders.
+Batch 3B-2 uses the existing three components and makes two demonstrated API extensions: `ScrollableListPanel` returns safely clipped geometry after it renders, and `ScreenFrame` accepts an optional generic body/trailing-flex layout policy through a new configured renderer.
 
 Quotes needs the list panel's inner rectangle because its preview is positioned inside that padded region. Recomputing the block geometry in Quotes would preserve duplicate presentation logic, while introducing a new popup framework would over-design for screens that have not yet been migrated. Returning generic geometry keeps the component boundary narrow and lets Quotes retain its unique preview policy.
+
+The second extension was approved after migration RED proved that the original three-row `ScreenFrame` layout moved the Quotes footer and expanded its list. The exact migration produced 917 styled-cell differences in Browse. Adding a trailing flexible row only inside Quotes restored list/preview placement but left 144 footer-cell differences because the default frame still anchored status and shortcuts at the terminal bottom. The approved solution keeps that policy in the shared frame component: `ScreenFrameLayout` exposes only `min_body_height: u16` and `trailing_flex: bool`, and `render_screen_frame_with_layout` owns the four-row allocation. Quotes must not retain or derive its old six-row footer layout locally.
 
 Rejected alternatives:
 
 - **Add a generic floating-detail component now:** this could be useful to a later screen, but Quotes alone does not establish a complete shared popup contract.
 - **Create a composite list/detail/action screen component:** this would couple reusable presentation code to Quotes modes, focus, and layout policy.
 - **Recompute list inner geometry locally:** this would leave two sources of truth for border padding and tiny-rectangle clipping.
+- **Retain or derive the old six-row layout in Quotes:** a bounded-sub-rectangle diagnostic proved fixture parity was possible, but it duplicated footer allocation and was rejected in favor of generic shared ownership.
 
 ## Compatibility Contract
 
@@ -109,14 +113,23 @@ The exact Rust syntax may vary to improve naming or ergonomics, but the contract
 - Returning geometry does not expose viewport internals or permit the component to mutate screen state beyond the supplied `ViewportState`.
 - Existing Practices rendering consumes the component exactly as before and must remain fixture-identical.
 
-No additional configuration is added unless a failing Quotes characterization proves it necessary.
+The failing Quotes characterization proved one additional presentation configuration necessary. `ScreenFrameLayout` has exactly these concepts:
+
+```rust
+pub struct ScreenFrameLayout {
+    pub min_body_height: u16,
+    pub trailing_flex: bool,
+}
+```
+
+`render_screen_frame_with_layout(...)` uses `[Constraint::Min(min_body_height), status, shortcuts, Constraint::Min(0)]` when `trailing_flex` is true and preserves the current three-row layout otherwise. Existing `render_screen_frame(...)` remains the default wrapper, so Practices and other existing callers retain their output. Quotes supplies `min_body_height = 5 + action_height` and `trailing_flex = true`; it then subdivides only the returned body into list, spacer, and action areas. Neither the layout type nor the configured renderer imports Quotes or business state.
 
 ## Render and Data Flow
 
 Each Quotes render follows this sequence:
 
 1. Quotes derives the active shortcuts from its current mode and undo state.
-2. `ScreenFrame` clips and centers the available area, measures shortcut wrapping, renders status/shortcuts, and returns the body rectangle.
+2. Quotes calls the configured `ScreenFrame` renderer with `min_body_height = 5 + action_height` and trailing flex enabled. The component clips and centers the available area, measures shortcut wrapping, allocates the generic body/status/shortcuts/trailing-flex rows, renders status/shortcuts, and returns the body rectangle.
 3. Quotes divides the body into the current list, spacer, and mode-dependent action regions using the existing constraints and heights.
 4. Quotes formats all logical list rows using the list panel's actual inner width.
 5. `ScrollableListPanel` renders the border, overflow title, visible rows, viewport, and selected highlight, then returns its safe geometry.
@@ -192,6 +205,7 @@ On tiny rectangles, the safe subset may be empty. The viewport still clamps to v
 - Verify returned list `area` and `inner` geometry for normal, zero-sized, one-cell, narrow, short, and frame-edge targets.
 - Verify both rectangles stay within their binding parents.
 - Preserve existing border, header, overflow, viewport, empty-state, and highlight tests.
+- Prove the default `ScreenFrame` wrapper is unchanged, configured `80x24` status/shortcut placement matches the accepted Quotes rows, and configured zero/tiny targets remain clipped inside the frame.
 - Re-run Practices golden fixtures unchanged after the API extension.
 
 ### Quotes Tests
@@ -230,8 +244,9 @@ Implementation uses independently reviewable commits:
 
 1. Capture immutable Quotes styled-buffer fixtures from the old implementation.
 2. Extend list-panel safe geometry and its tests without migrating Quotes.
-3. Migrate Quotes to the shared components and update structural lint.
-4. Update shipped-state documentation and complete final verification.
+3. Record the approved footer-preservation design/plan correction.
+4. Migrate Quotes to the shared components, extend `ScreenFrame` generically, and update structural lint.
+5. Update shipped-state documentation and complete final verification.
 
 Any correctness fix discovered during characterization or review is isolated in its own follow-up commit with focused RED/GREEN evidence.
 
