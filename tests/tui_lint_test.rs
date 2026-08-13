@@ -310,7 +310,7 @@ fn paragraph_widgets_must_wrap_user_content() {
 #[test]
 fn screens_must_have_bordered_blocks() {
     let tui_dir = Path::new("src/tui");
-    let required_screens = ["goals.rs", "trends.rs", "history.rs", "log_entry.rs"];
+    let required_screens = ["goals.rs", "history.rs", "log_entry.rs"];
 
     let mut missing = Vec::new();
     for filename in &required_screens {
@@ -331,6 +331,7 @@ fn screens_must_have_bordered_blocks() {
     for (filename, screen_name) in [
         ("practices.rs", "Practices"),
         ("quotes_screen.rs", "Quotes"),
+        ("trends.rs", "Trends"),
     ] {
         let source = std::fs::read_to_string(tui_dir.join(filename)).unwrap();
         assert!(

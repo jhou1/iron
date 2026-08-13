@@ -1,7 +1,7 @@
 use chrono::Datelike;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
-    layout::{Constraint, Direction, Layout},
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span},
     widgets::{Block, Borders, Padding, Paragraph, Wrap},
@@ -13,13 +13,11 @@ use unicode_width::UnicodeWidthStr;
 use super::lifecycle::{NavigationStatus, Reenter};
 use super::widgets::sparkline::Sparkline;
 use super::{
-    centered_area,
     framework::{
-        move_selection, render_shortcuts, shortcut_height, truncate_to_width, EdgeBehavior,
-        Shortcut, TextInput, ViewportState, VisualSpan,
+        move_selection, render_screen_frame_sections, render_scrollable_list_panel,
+        truncate_to_width, EdgeBehavior, ListPanelContent, Shortcut, TextInput, ViewportState,
     },
-    highlight_row, render_status_line, Action, ModuleId, NavigationIntent, StatusMessage,
-    BORDER_COLOR, CONTENT_WIDTH,
+    Action, ModuleId, NavigationIntent, StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
 };
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
@@ -65,49 +63,38 @@ impl TrendsScreen {
     }
 
     pub fn render(&mut self, frame: &mut Frame) {
-        let area = centered_area(frame.area(), CONTENT_WIDTH);
         let shortcuts = vec![
             Shortcut::new("j/k", tr("key-navigate")),
             Shortcut::new("h/l", tr("key-window")),
             Shortcut::new("/", tr("key-filter")),
             Shortcut::new("Esc", tr("key-back")),
         ];
-        let shortcut_rows = shortcut_height(&shortcuts, area.width);
+        let screen = render_screen_frame_sections(
+            frame,
+            frame.area(),
+            CONTENT_WIDTH,
+            &self.status_msg,
+            &shortcuts,
+            &[
+                Constraint::Length(1),
+                Constraint::Percentage(40),
+                Constraint::Min(5),
+            ],
+            false,
+        );
 
-        let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(1),             // filter bar
-                Constraint::Percentage(40),        // practice list
-                Constraint::Min(5),                // sparkline chart
-                Constraint::Length(1),             // status
-                Constraint::Length(shortcut_rows), // footer
-            ])
-            .split(area);
-
-        self.render_practice_list(frame, chunks[0], chunks[1]);
-        self.render_sparkline_panel(frame, chunks[2]);
-
-        render_status_line(frame, chunks[3], &self.status_msg);
-        render_shortcuts(frame, chunks[4], &shortcuts);
+        self.render_filter(frame, screen.body[0]);
+        self.render_practice_list(frame, screen.body[1]);
+        self.render_sparkline_panel(frame, screen.body[2]);
     }
 
-    fn render_practice_list(
-        &mut self,
-        frame: &mut Frame,
-        filter_area: ratatui::layout::Rect,
-        list_area: ratatui::layout::Rect,
-    ) {
-        let name_header = tr("practices-col-name");
-        let type_header = tr("practices-col-type");
-
-        // Filter bar
+    fn render_filter(&self, frame: &mut Frame, area: Rect) {
         let filter_style = if self.filtering {
             Style::default().fg(ACCENT)
         } else {
             Style::default().fg(Color::Gray)
         };
-        let mut filter_spans = if self.filtering || !self.filter.value().is_empty() {
+        let mut spans = if self.filtering || !self.filter.value().is_empty() {
             vec![Span::styled(" /", filter_style)]
         } else {
             vec![Span::styled(
@@ -116,47 +103,26 @@ impl TrendsScreen {
             )]
         };
         if self.filtering {
-            filter_spans.extend(self.filter.visible_spans(filter_area.width, 2, ACCENT));
+            spans.extend(self.filter.visible_spans(area.width, 2, ACCENT));
         } else if !self.filter.value().is_empty() {
-            filter_spans.push(Span::styled(self.filter.value().to_owned(), filter_style));
+            spans.push(Span::styled(self.filter.value().to_owned(), filter_style));
         }
         frame.render_widget(
-            Paragraph::new(Line::from(filter_spans)).wrap(Wrap { trim: false }),
-            filter_area,
+            Paragraph::new(Line::from(spans)).wrap(Wrap { trim: false }),
+            area,
         );
+    }
 
-        // Bordered list
-        let visible_rows = list_area.height.saturating_sub(5) as usize;
-        self.list_viewport.set_height(visible_rows);
-        if !self.filtered_indices.is_empty() {
-            self.list_viewport.reveal(VisualSpan {
-                start: self.selected,
-                height: 1,
-            });
-        }
-        self.list_viewport.clamp(self.filtered_indices.len());
-        let overflow = self
-            .list_viewport
-            .overflow(self.filtered_indices.len())
-            .suffix();
-        let block = Block::default()
-            .title(Line::from(vec![
-                Span::styled("── ", Style::default().fg(BORDER_COLOR)),
-                Span::styled(
-                    format!("{}{}", tr("trends-title"), overflow),
-                    Style::default().fg(Color::White).bold(),
-                ),
-                Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
-            ]))
-            .borders(Borders::ALL)
-            .padding(Padding::uniform(1))
-            .border_style(Style::default().fg(BORDER_COLOR));
-        let inner = block.inner(list_area);
-        frame.render_widget(block, list_area);
-
+    fn practice_list_content(
+        practices: &[Practice],
+        filtered_indices: &[usize],
+        selected: usize,
+        inner: Rect,
+    ) -> ListPanelContent<'static> {
+        let name_header = tr("practices-col-name");
+        let type_header = tr("practices-col-type");
         let max_name_width = inner.width.saturating_sub(type_header.width() as u16 + 5) as usize;
-        let desired_name_width = self
-            .practices
+        let desired_name_width = practices
             .iter()
             .map(|practice| practice.name.width())
             .max()
@@ -165,44 +131,56 @@ impl TrendsScreen {
         let name_width = desired_name_width.min(max_name_width);
         let col_width = name_width.saturating_add(2);
         let header_padding = col_width.saturating_sub(name_header.width());
-
-        let hdr_style = Style::default().fg(Color::White).bold();
-        let mut all_lines = vec![Line::from(vec![
+        let header_style = Style::default().fg(Color::White).bold();
+        let header = Line::from(vec![
             Span::raw("  "),
-            Span::styled(&name_header, hdr_style),
+            Span::styled(name_header, header_style),
             Span::raw(" ".repeat(header_padding)),
-            Span::styled(&type_header, hdr_style),
-        ])];
+            Span::styled(type_header, header_style),
+        ]);
+        let rows = filtered_indices
+            .iter()
+            .enumerate()
+            .map(|(row, index)| {
+                let practice = &practices[*index];
+                let selected_style = if row == selected {
+                    Style::default().fg(Color::White).bold()
+                } else {
+                    Style::default().fg(Color::White)
+                };
+                let name = truncate_to_width(&practice.name, name_width);
+                let padding = col_width.saturating_sub(name.width());
+                Line::from(vec![
+                    Span::styled(if row == selected { "> " } else { "  " }, selected_style),
+                    Span::styled(name, selected_style),
+                    Span::raw(" ".repeat(padding)),
+                    Span::styled(
+                        practice.practice_type.label(),
+                        Style::default().fg(Color::Gray),
+                    ),
+                ])
+            })
+            .collect();
 
-        let scroll = self.list_viewport.offset();
-        let end = (scroll + visible_rows).min(self.filtered_indices.len());
-
-        for i in scroll..end {
-            let idx = self.filtered_indices[i];
-            let practice = &self.practices[idx];
-            let marker = if i == self.selected { "> " } else { "  " };
-            let name_style = if i == self.selected {
-                Style::default().fg(Color::White).bold()
-            } else {
-                Style::default().fg(Color::White)
-            };
-            let name = truncate_to_width(&practice.name, name_width);
-            let padding = col_width.saturating_sub(name.width());
-            all_lines.push(Line::from(vec![
-                Span::styled(marker, name_style),
-                Span::styled(name, name_style),
-                Span::raw(" ".repeat(padding)),
-                Span::styled(
-                    practice.practice_type.label(),
-                    Style::default().fg(Color::Gray),
-                ),
-            ]));
+        ListPanelContent {
+            header: Some(header),
+            rows,
+            empty: None,
+            selected: (!filtered_indices.is_empty()).then_some(selected),
         }
-        frame.render_widget(Paragraph::new(all_lines).wrap(Wrap { trim: false }), inner);
+    }
 
-        if !self.filtered_indices.is_empty() && self.selected >= scroll && self.selected < end {
-            highlight_row(frame, inner, (self.selected - scroll) as u16 + 1);
-        }
+    fn render_practice_list(&mut self, frame: &mut Frame, area: Rect) {
+        let practices = &self.practices;
+        let filtered_indices = &self.filtered_indices;
+        let selected = self.selected;
+        render_scrollable_list_panel(
+            frame,
+            area,
+            tr("trends-title"),
+            &mut self.list_viewport,
+            |inner| Self::practice_list_content(practices, filtered_indices, selected, inner),
+        );
     }
 
     fn render_sparkline_panel(&self, frame: &mut Frame, area: ratatui::layout::Rect) {
@@ -528,8 +506,9 @@ impl NavigationStatus for TrendsScreen {
 mod tests {
     use super::*;
     use crate::model::{Log, PracticeType, Set, SetData};
-    use crate::tui::framework::test_support::{
-        render_to_buffer, render_to_snapshot, render_to_string,
+    use crate::tui::framework::{
+        test_support::{render_to_buffer, render_to_snapshot, render_to_string},
+        VisualSpan,
     };
     use crate::tui::lifecycle::{NavigationStatus, Reenter};
     use crossterm::event::KeyModifiers;
