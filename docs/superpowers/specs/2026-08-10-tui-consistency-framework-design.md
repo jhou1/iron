@@ -1,7 +1,7 @@
 # TUI Consistency Framework Design
 
 **Date:** 2026-08-10
-**Status:** Batches 1, 2, 3A, and 3B-1 complete; later Batch 3B slices are not shipped
+**Status:** Batches 1, 2, 3A, 3B-1, and 3B-2 complete; Trends and later slices are not shipped
 **Branch:** `codex/tui-consistency`
 **Base:** validated Goals milestone-management implementation (`0069c04`)
 
@@ -173,7 +173,13 @@ The terminal loop now delegates screen behavior to a terminal-independent applic
 
 Batch 3B-1 adds presentation-only `ScreenFrame`, `ScrollableListPanel`, and `ActionPanel` components and migrates only Practices to them. The frame reserves status and shortcut rows; the list panel owns border, overflow, viewport reveal and clamp, and selected-row highlight; and the action panel owns bounded contextual rendering. Practices retains all domain line formatting, modes, database operations, validation, shortcuts, and lifecycle behavior. Five immutable styled-buffer fixtures preserve exact output across Browse, AddName, AddType, EditName, and ConfirmDelete.
 
-Quotes, Trends, History, Goals popups, Dashboard responsive layout, and Log Entry forms remain unshipped later component-extraction work. This slice does not establish that the three components are suitable for those screens.
+### Batch 3B-2: Quotes Presentation Components — Complete
+
+Batch 3B-2 extends `ScreenFrame` with a generic one-pass sections API and migrates Quotes to `ScreenFrame`, `ScrollableListPanel`, and `ActionPanel`. The frame reserves the list, spacer, optional action area, status, and wrapped shortcut rows in one composition pass. The list panel returns safe outer and inner `ListPanelAreas` geometry; Quotes uses only that returned inner rectangle to measure and position its floating preview. The action panel bounds Add, Edit, and ConfirmDelete content.
+
+Quotes retains quote row formatting, domain modes, database operations, input state, mutation ordering, undo, shortcuts, lifecycle behavior, floating-preview placement, and Detail focus/scroll policy. Its preview remains Quotes-owned integration through the existing `render_detail_panel` helper rather than a new generic popup abstraction. Six immutable styled-buffer fixtures preserve exact output across Browse, Browse with Undo, Detail, Add, Edit, and ConfirmDelete; the five Practices fixtures also remain unchanged.
+
+Trends, History, Goals popups, Dashboard responsive layout, and Log Entry forms remain unshipped later component-extraction work. Batch 3B-2 changes no other screen and does not establish that the three components are suitable for those later slices.
 
 ## Testing Strategy
 

@@ -6,7 +6,17 @@ Browse, inspect, add, edit, delete, and restore personal quotes.
 
 The bordered list uses compact one-row entries. Long quote text is truncated by terminal display width only in the list; the source text is never changed. The selected quote also opens in a floating preview that wraps the complete text and shows `↑`, `↓`, or `↑↓` when more content exists.
 
+Quotes composes its presentation from three shared components with explicit ownership boundaries:
+
+- `ScreenFrame` uses its generic one-pass sections API to reserve the list, spacer, optional action area, status row, and wrapped shortcut rows together.
+- `ScrollableListPanel` owns the bordered list, its safe outer and inner `ListPanelAreas` geometry, overflow suffix, viewport reveal and clamp, selected-row highlight, and empty-list rendering. Quotes derives preview measurement and placement only from the returned safe inner geometry.
+- `ActionPanel` owns bounded rendering of the Add, Edit, and ConfirmDelete action content.
+
+Quotes still owns quote row formatting, domain modes, input and database mutations, floating-preview measurement and placement, and Detail focus/scroll policy. It integrates that preview through the existing shared `render_detail_panel` helper; Batch 3B-2 does not introduce a generic popup abstraction.
+
 Press `Enter` in Browse to focus the complete preview. In Detail mode, `j/k` or the arrow keys scroll by visual row, and `Esc` returns to Browse. The focused border uses the shared accent color.
+
+Batch 3B-2 changes only this presentation composition. Floating-preview behavior, Browse and Detail behavior, active-mode shortcuts and status/error retention, delete/undo ordering, mutation failure retention, and re-entry behavior remain unchanged.
 
 ## Modes
 
