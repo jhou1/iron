@@ -528,9 +528,12 @@ impl NavigationStatus for TrendsScreen {
 mod tests {
     use super::*;
     use crate::model::{Log, PracticeType, Set, SetData};
-    use crate::tui::framework::test_support::{render_to_snapshot, render_to_string};
+    use crate::tui::framework::test_support::{
+        render_to_buffer, render_to_snapshot, render_to_string,
+    };
     use crate::tui::lifecycle::{NavigationStatus, Reenter};
     use crossterm::event::KeyModifiers;
+    use unicode_width::UnicodeWidthChar;
 
     fn key(code: KeyCode) -> KeyEvent {
         KeyEvent::new(code, KeyModifiers::NONE)
@@ -999,6 +1002,53 @@ mod tests {
         }
         let list_output = render_trends(&mut screen, 80, 24);
         assert!(list_output.contains("Practice 30"), "{list_output}");
+    }
+
+    #[test]
+    fn trends_states_render_in_small_and_resized_terminals_without_panicking() {
+        for name in [
+            "browse_with_chart",
+            "filtering_long_input",
+            "no_filter_match",
+            "list_overflow",
+            "no_log_data",
+            "cached_chart_error",
+        ] {
+            let mut screen = golden_trends_screen(name);
+            for (width, height) in [(1, 1), (12, 4), (24, 10), (40, 6), (80, 24), (20, 5)] {
+                let _ = render_to_snapshot(width, height, |frame| screen.render(frame));
+            }
+            let resized = render_to_buffer(80, 24, |frame| screen.render(frame));
+            if !screen.filtered_indices.is_empty() {
+                let selected_name =
+                    &screen.practices[screen.filtered_indices[screen.selected]].name;
+                let visible_prefix = truncate_to_width(selected_name, 8);
+                let (marker_x, marker_y) = (resized.area.y..resized.area.bottom())
+                    .find_map(|y| {
+                        (resized.area.x..resized.area.right())
+                            .find(|&x| resized[(x, y)].symbol() == ">")
+                            .map(|x| (x, y))
+                    })
+                    .unwrap_or_else(|| panic!("selected row marker missing after resize: {name}"));
+                let mut x = marker_x + 2;
+                for character in visible_prefix.chars() {
+                    assert_eq!(
+                        resized[(x, marker_y)].symbol(),
+                        character.to_string(),
+                        "selected practice should be visible after resize: {name}"
+                    );
+                    x += 1;
+                    if character.width().unwrap_or(0) == 2 {
+                        assert_eq!(
+                            resized[(x, marker_y)].symbol(),
+                            " ",
+                            "wide character continuation cell missing after resize: {name}"
+                        );
+                        x += 1;
+                    }
+                }
+            }
+        }
     }
 
     #[test]
