@@ -1,7 +1,7 @@
 # TUI Consistency Framework Design
 
 **Date:** 2026-08-10
-**Status:** Batches 1, 2, 3A, 3B-1, and 3B-2 complete; Trends and later slices are not shipped
+**Status:** Batches 1, 2, 3A, 3B-1, 3B-2, and 3B-3 complete; History and later presentation-component slices are not shipped
 **Branch:** `codex/tui-consistency`
 **Base:** validated Goals milestone-management implementation (`0069c04`)
 
@@ -179,7 +179,13 @@ Batch 3B-2 extends `ScreenFrame` with a generic one-pass sections API and migrat
 
 Quotes retains quote row formatting, domain modes, database operations, input state, mutation ordering, undo, shortcuts, lifecycle behavior, floating-preview placement, and Detail focus/scroll policy. Its preview remains Quotes-owned integration through the existing `render_detail_panel` helper rather than a new generic popup abstraction. Six immutable styled-buffer fixtures preserve exact output across Browse, Browse with Undo, Detail, Add, Edit, and ConfirmDelete; the five Practices fixtures also remain unchanged.
 
-Trends, History, Goals popups, Dashboard responsive layout, and Log Entry forms remain unshipped later component-extraction work. Batch 3B-2 changes no other screen and does not establish that the three components are suitable for those later slices.
+### Batch 3B-3: Trends Presentation Components — Complete
+
+Batch 3B-3 migrates Trends to `ScreenFrame` and `ScrollableListPanel`. The frame receives exactly the accepted filter, list, and chart body constraints with trailing flex disabled, reserving status and shortcut rows without changing their geometry. The list panel is the sole owner of the Trends list border, title and overflow markers, viewport reveal and clamp, and selected-row highlight.
+
+Trends retains its filter rendering, row formatting, selection and wrap policy, database query, time-window controls, error and re-entry behavior, and its specialized Sparkline/chart and statistics policy. Six immutable styled-buffer fixtures preserve exact output for a populated chart, long filter input, no filter match, list overflow, no log data, and a cached chart query error; all five Practices and six Quotes fixtures also remain unchanged.
+
+History, Goals popups, Dashboard responsive layout, and Log Entry forms remain unshipped as later presentation-component extraction slices. Batch 3B-3 changes no other screen and does not establish that the Trends component subset is suitable for those later slices.
 
 ## Testing Strategy
 

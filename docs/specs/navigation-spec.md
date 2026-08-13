@@ -14,7 +14,7 @@ Global navigation patterns, keybinding conventions, and shared TUI interaction r
 
 Dashboard reaches Log Entry (`l`), History (`h`), Trends (`t`), Practices (`e`), Goals (`g`), and Quotes (`Q`). There is no Quick Log screen, route, or shortcut and no `w` action. Feature-specific screens return to Dashboard via `Esc`; Log Entry opened from History returns to History after a successful edit.
 
-Batch 3A does not change this topology or any screen shortcut. It changes how those existing transitions identify and prepare their targets. Batch 3B-1 changes only Practices presentation composition. Batch 3B-2 changes only Quotes presentation composition; it does not change routes, intents, re-entry behavior, or shortcuts.
+Batch 3A does not change this topology or any screen shortcut. It changes how those existing transitions identify and prepare their targets. Batch 3B-1 changes only Practices presentation composition. Batch 3B-2 changes only the Quotes presentation composition. Batch 3B-3 changes only Trends presentation composition; it does not change routes, intents, re-entry behavior, or shortcuts.
 
 ## Typed Routing and Re-entry
 

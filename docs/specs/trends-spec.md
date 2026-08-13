@@ -6,9 +6,13 @@ View training progress over time with sparkline charts and summary statistics.
 
 Trends shows a bounded active-practice list above a specialized sparkline chart. Changing the selected practice immediately changes the chart; there is no separate phase transition.
 
-The practice list uses the shared viewport. Selection wraps at both ends, remains visible, and the title shows `↑`, `↓`, or `↑↓` when more rows exist. Long practice names are truncated by terminal display width so the type column remains inside its panel.
+Batch 3B-3 changes only this presentation composition. `ScreenFrame` owns the centered frame and reserves the filter, practice-list, chart, status, and shortcut rows in one pass. `ScrollableListPanel` is the sole owner of the practice list's border, title and overflow markers, viewport reveal and clamp, and selected-row highlight. Trends continues to own filter rendering, practice row formatting, selection and filter state, and the specialized Sparkline/statistics panel.
+
+The practice list uses the shared panel viewport. Selection wraps at both ends, remains visible, and the title shows `↑`, `↓`, or `↑↓` when more rows exist. Long practice names are truncated by terminal display width so the type column remains inside its panel.
 
 The `/` filter uses the shared bounded input with Unicode-safe Emacs cursor movement. Long filter text scrolls horizontally to keep the cursor visible.
+
+Six immutable styled-buffer fixtures preserve exact visual compatibility for a populated chart, long filter input, no filter match, list overflow, no log data, and a cached chart with a query error. The migration does not change filtering, selection wrapping, chart chronology or rendering policy, statistics formulas, time-window controls, no-data behavior, error retention, or re-entry behavior.
 
 ## Chart panel
 
