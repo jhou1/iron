@@ -1,0 +1,238 @@
+# TUI Consistency Framework — Batch 3B-3 Trends Components Design
+
+**Date:** 2026-08-13  
+**Status:** Approved design; implementation not started
+
+## Context
+
+Batch 3B-1 migrated Practices to the shared presentation components, and Batch 3B-2 migrated Quotes while extending `ScreenFrame` with a generic one-pass sections API and making `ScrollableListPanel` return safely clipped geometry. Both slices passed automated verification and manual acceptance.
+
+Batch 3B-3 is the next single-screen vertical slice. It migrates Trends to the proven frame and list components while preserving the existing filter bar, active-practice list, specialized Sparkline chart, statistics, time-window controls, shortcuts, lifecycle, and persistence behavior.
+
+This remains a structural refactor. History and later screens do not begin until Trends has passed its own automated and manual acceptance.
+
+## Goals
+
+- Freeze the current Trends output across its important visible states with exact styled-buffer fixtures.
+- Reuse `ScreenFrame` for centered content, body sections, status, and shortcuts.
+- Reuse `ScrollableListPanel` for the practice-list border, title, overflow markers, viewport, visible-row slicing, and selected-row highlight.
+- Preserve the Trends-owned filter bar, practice-row formatting, Sparkline renderer, chart statistics, and time-window policy.
+- Remove Trends-local duplication only where a shipped shared component already owns the behavior.
+- Preserve current rendering, shortcuts, data queries, navigation, re-entry, chronological chart ordering, and failure retention.
+- Keep normal, narrow, short, tiny, zero-sized, and resized rendering bounded and panic-free.
+
+## Non-Goals
+
+- No visual redesign, copy change, color change, spacing change, shortcut change, or navigation change.
+- No migration of History, Goals, Dashboard, Log Entry, or another screen.
+- No database, schema, model, localization, router, navigation-intent, or lifecycle change.
+- No extraction of the filter bar into a generic component.
+- No generic chart, list-plus-chart, analytics-page, or statistics component.
+- No use of `ActionPanel`; Trends has no add, edit, delete, or confirmation form.
+- No change to Sparkline normalization, colors, labels, trend calculation, chronological ordering, or 30–365 day window behavior.
+- No parallel old and new Trends presentation paths after migration.
+- No regeneration of accepted fixtures to hide a migration difference.
+- No reintroduction or replacement of Quick Log, LLM configuration, or Abbreviations.
+
+## Chosen Approach
+
+Batch 3B-3 uses the smallest proven component boundary:
+
+- `ScreenFrame` owns the outer centered layout, body allocation, status line, and shortcut rows.
+- `ScrollableListPanel` owns the bordered, scrollable practice-list presentation.
+- Trends continues to own the filter presentation and all chart-specific rendering.
+
+The render path uses `render_screen_frame_sections(...)` with the existing Trends body constraints, in order:
+
+```rust
+[
+    Constraint::Length(1),
+    Constraint::Percentage(40),
+    Constraint::Min(5),
+]
+```
+
+Trailing flex remains disabled. Status and shortcuts follow those body sections in the same single Ratatui vertical layout. This matches the current layout topology without locally calculating footer coordinates.
+
+Rejected alternatives:
+
+- **Extract a shared filter bar now:** Trends alone does not establish a stable cross-screen input contract; prompts, modes, and available widths differ on later screens.
+- **Extract a generic list-plus-chart screen:** this would expose Trends-specific Sparkline and statistics policy through the presentation framework.
+- **Move the Sparkline into a shared chart component:** no second migrated consumer demonstrates a shared chart contract.
+- **Keep the local list renderer beside the component path:** two presentation implementations would drift and defeat the consistency work.
+
+## Compatibility Contract
+
+Batch 3B-3 is not a user-facing behavior change.
+
+At an `80x24` terminal, the complete Ratatui buffer must match the pre-refactor fixture for these states:
+
+1. **BrowseWithChart** — multiple practices, selected row, populated chronological chart, labels, and statistics.
+2. **FilteringLongInput** — active filter, horizontally bounded long input, and visible cursor.
+3. **NoFilterMatch** — empty filtered list, no selected practice, and cleared chart.
+4. **ListOverflow** — enough practices to scroll, the final selection visible, and the correct title overflow suffix.
+5. **NoLogData** — a selected practice with no logs in the active window and the existing no-data presentation.
+6. **CachedChartError** — the last successful chart retained while the reserved status row displays an error.
+
+Fixtures compare every cell's symbol, foreground color, background color, modifiers, and skip flag. They are captured from the pre-refactor implementation, committed before migration, and cannot be regenerated by the normal test path.
+
+Existing behavior tests remain binding. If characterization reveals an existing defect or a shared component cannot reproduce the accepted `80x24` output, implementation stops for an explicit scope decision instead of modifying the fixtures.
+
+For impossible tiny geometry, safety takes precedence over off-screen parity: rendering may omit clipped content, but no derived rectangle may escape its parent or frame and rendering must not panic.
+
+## Ownership Boundary
+
+### Trends Owns
+
+- Active `Practice` values, filtered indices, stable selected practice identity, and selection policy.
+- Filter text, filter-input mode, prompt and cursor presentation, and filter application.
+- Practice name/type column formatting and display-width truncation.
+- `days_window`, chart entries, chronological sorting, and chart refresh policy.
+- Sparkline rendering, normalization, value colors, date/value labels, and trend line.
+- Average, peak, and first-half-versus-second-half trend statistics.
+- Empty-chart and no-data presentation inside the chart panel.
+- Database reads, key handling, active shortcuts, navigation actions, status creation, and lifecycle re-entry.
+
+### Framework Components Own
+
+- Centering and clipping the active screen area.
+- One-pass allocation of filter, list, chart, status, and shortcut sections.
+- Measuring wrapped shortcut height and rendering the status and shortcut rows.
+- Practice-list border, padding, title, overflow suffix, logical-row viewport, reveal/clamp, visible-row slicing, and selected-row highlight.
+- Safe list outer and inner geometry for normal and undersized rectangles.
+
+The framework does not import database types, `Practice`, chart entries, filter state, time-window state, navigation intents, or Trends statistics.
+
+## Render Flow
+
+Each Trends render follows this sequence:
+
+1. Trends derives the unchanged active shortcuts.
+2. Trends calls `render_screen_frame_sections(...)` with the filter, list, and chart constraints. `ScreenFrame` clips and centers the target, measures shortcut wrapping, renders status and shortcuts, and returns the three body rectangles.
+3. Trends renders its existing filter line in the returned filter rectangle.
+4. Trends calls `ScrollableListPanel` with the returned list rectangle and its existing `ViewportState`.
+5. Inside the component content closure, Trends uses the component's safe inner width to format the Name/Type header and every logical practice row.
+6. `ScrollableListPanel` renders the border, title and overflow suffix, clamps/reveals the selected row, renders the visible rows, and applies the shared selected-row highlight.
+7. Trends renders the existing specialized chart panel in the returned chart rectangle.
+
+After migration, Trends contains no local list block, overflow-title construction, visible-row slicing, viewport reveal/clamp, selected-row highlight, status renderer, shortcut renderer, or footer-height calculation.
+
+## Interaction and Data Contract
+
+The migration does not change interaction:
+
+- `j/k` and arrow keys wrap through filtered practices and immediately reload the chart.
+- `/` enters filtering; filter edits update the filtered list, selected practice, and chart.
+- Enter and Esc leave filter-input mode according to the current behavior.
+- `h/l` changes the window in 30-day increments within the existing 30–365 day range.
+- `Esc` from browse returns to Dashboard.
+- The shortcut footer continues to describe the current Trends behavior and wrap at the same width.
+
+Chart data remains queried through `list_logs_for_practice(practice_id, days_window)` and sorted oldest-first before rendering, so the newest value stays at the right edge.
+
+## Failure and Re-entry Contract
+
+- An in-place chart query failure keeps the selected practice, newly chosen time window, and last successful chart, then displays an error in the reserved status row.
+- Filtering to no practice clears the selected practice and chart without leaving a stale data series.
+- Re-entry reloads active practices and chart data before route commit.
+- Re-entry preserves filter text, stable selected-practice ID where possible, bounded list viewport, and time window.
+- Re-entry clears filter-input mode and old status.
+- If the previous selected practice is no longer active, selection falls back to a valid filtered practice or zero when none remain.
+- A cross-screen preparation failure remains atomic: the source screen stays active, the cached Trends screen is unchanged, and the source displays the navigation error.
+
+## Geometry and Safety
+
+All changed geometry uses the rectangles returned by `ScreenFrame` and `ScrollableListPanel` plus saturating arithmetic and existing clipping helpers.
+
+The implementation must not:
+
+- call raw `Block::inner` for the migrated practice list;
+- render a child outside its component-owned parent rectangle;
+- subtract borders, padding, headers, labels, or statistics without saturation;
+- assume a minimum terminal width or height;
+- let filter cursor rendering, list column calculations, or chart inner layouts underflow;
+- panic when the list, chart, status, or shortcuts receive empty or one-cell rectangles.
+
+On later terminal expansion, the selected logical practice must again be revealed normally by the shared viewport.
+
+## Test Strategy
+
+### Characterization Before Migration
+
+- Add the six immutable `80x24` styled-buffer fixtures.
+- Prove the golden test is initially RED with empty fixture content.
+- Capture fixtures only from the old Trends implementation.
+- Remove the fixture-update path before committing the characterization.
+
+### Focused Component and Trends Tests
+
+- Prove the three returned `ScreenFrame` body rectangles preserve the accepted Trends layout.
+- Keep shared frame and list geometry tests green for normal, zero-sized, one-cell, narrow, short, and edge-positioned targets.
+- Prove all six Trends fixtures remain identical after migration in both library and binary targets.
+- Preserve and extend tests for long filter cursor visibility, last-row visibility, list overflow, empty filtering, no-log data, chronological chart order, in-place failure retention, and re-entry context.
+- Add normal, narrow, short, tiny, and resized render tests that verify containment and absence of panics.
+
+### Structural Lint
+
+The recursive TUI ownership lint will require Trends, in addition to Practices and Quotes, to delegate its list border through executable `ScrollableListPanel` usage. Comment, ordinary-string, raw-string, and character-literal evidence remains invalid. Unmigrated screens retain their current direct-border requirement.
+
+The Paragraph wrapping lint keeps its current recursive scan, four-line window, and semantic allowlist unless an exact source move requires a separately reviewed mechanical line refresh.
+
+### Release Gates
+
+- `cargo fmt -- --check`
+- `cargo clippy --all-targets --all-features -- -D warnings`
+- focused framework, Trends, Practices golden, Quotes golden, lifecycle, i18n, TUI lint, and removed-feature tests
+- `cargo test --all-targets --all-features`
+- `cargo build --all-features`
+- fixture immutability checks
+- Batch-range `git diff --check`
+- clean tracked worktree at handoff
+
+## Documentation
+
+After implementation, active documentation will state that Practices, Quotes, and Trends are shipped shared-component consumers. History and later migration slices remain explicitly unshipped.
+
+Documentation changes are limited to the English and Chinese READMEs, Trends specification, navigation specification, framework design, and contributor guidance needed to record the component boundary and rollout state. Historical design records are not rewritten as if Trends had shipped earlier.
+
+## Implementation Sequencing
+
+The later implementation plan must keep independently reviewable boundaries:
+
+1. Capture immutable Trends fixtures from the old renderer.
+2. Add only any fixture-proven generic frame/list coverage needed before migration; do not speculate beyond Trends.
+3. Migrate Trends to `ScreenFrame` and `ScrollableListPanel`, extend structural ownership lint, and preserve fixtures.
+4. Update shipped-state documentation and run the complete release gates.
+5. Perform a whole-slice code and specification review before manual handoff.
+
+Any correctness fix found during characterization or review is isolated with focused RED/GREEN evidence. A fixture or shared-component conflict pauses implementation for user approval.
+
+## Manual Acceptance
+
+Batch 3B-3 is handed off as a Trends-only binary. Manual acceptance covers:
+
+- practice navigation, wrapping, scrolling, truncation, overflow suffixes, and selection highlight;
+- filtering, long Unicode input, cursor visibility, no-match behavior, and leaving filter mode;
+- populated and empty Sparkline charts, chronological direction, labels, colors, statistics, and trend direction;
+- 30–365 day window changes and retained chart behavior after a query failure;
+- re-entry after practice or log changes;
+- normal, narrow, short, tiny, and resized terminals;
+- status messages and shortcut wrapping; and
+- return to Dashboard and atomic navigation failure behavior.
+
+History work does not start until the user explicitly accepts this Trends slice.
+
+## Acceptance Criteria
+
+Batch 3B-3 is ready for manual acceptance when:
+
+- all six pre-refactor Trends fixtures pass unchanged after migration in library and binary targets;
+- Practices and Quotes fixtures remain unchanged;
+- Trends uses `ScreenFrame` and `ScrollableListPanel` as the only owners of the delegated presentation mechanics;
+- Trends retains its specialized filter and chart behavior without a speculative new abstraction;
+- existing navigation, re-entry, failure retention, chronological ordering, shortcuts, and data behavior remain green;
+- tiny and undersized geometry stays inside the frame without panic;
+- structural lint rejects a return to local Trends list-border ownership;
+- all release gates pass with zero strict Clippy warnings;
+- documentation accurately distinguishes shipped Trends work from unshipped History work; and
+- the user manually accepts Trends before the next screen begins.
