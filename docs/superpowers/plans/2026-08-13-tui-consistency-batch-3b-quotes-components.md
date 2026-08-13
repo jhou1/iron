@@ -4,7 +4,7 @@
 
 **Goal:** Migrate Quotes to the proven screen-frame, scrollable-list, and action-panel presentation components without changing its rendered output or behavior.
 
-**Architecture:** Quotes keeps ownership of modes, database operations, validation, input, undo, shortcuts, lifecycle, and floating-preview policy. The existing presentation components own frame, list, viewport, highlight, status, shortcut, and action rendering; `ScrollableListPanel` gains one presentation-only return value exposing safely clipped outer and inner rectangles, and `ScreenFrame` gains a generic configured renderer for a minimum body height plus optional trailing flex while retaining its default wrapper. Six immutable styled-buffer fixtures bind the accepted pre-refactor output.
+**Architecture:** Quotes keeps ownership of modes, database operations, validation, input, undo, shortcuts, lifecycle, and floating-preview policy. The existing presentation components own frame, list, viewport, highlight, status, shortcut, and action rendering; `ScrollableListPanel` gains one presentation-only return value exposing safely clipped outer and inner rectangles, and `ScreenFrame` gains a generic one-pass sections renderer accepting body constraints plus optional trailing flex while retaining its default wrapper. Six immutable styled-buffer fixtures bind the accepted pre-refactor output.
 
 **Tech Stack:** Rust 2021, Ratatui 0.29, Crossterm 0.28, Rusqlite 0.32, Fluent localization, the existing TUI framework, Cargo tests, Clippy, and Ratatui `TestBackend`.
 
@@ -18,6 +18,7 @@
 - Quotes retains database access, stable IDs, modes, validation, localized status creation, key handling, shortcut selection, undo policy, domain-row formatting, and floating-preview policy.
 - Framework components remain presentation-only. They do not import `Database`, `Quote`, screen modes, navigation intents, `anyhow`, or business errors.
 - `ScrollableListPanel` may return only safely clipped presentation geometry. It still mutates only the supplied `ViewportState`.
+- `ScreenFrame` may accept only generic presentation constraints and trailing-flex policy; it solves body/footer geometry once and does not import Quotes state.
 - No generic floating-popup or composite list/detail component is authorized.
 - All rectangle arithmetic is saturating or clamped. Empty, zero-sized, one-cell, narrow, short, and edge-positioned targets must not panic or escape their parent/frame.
 - Do not change database schema, localization copy, navigation topology, colors, borders, padding, spacing, or keyboard commands.
@@ -28,7 +29,7 @@
 - Structural ownership lint must inspect executable source. Comments, ordinary strings, raw strings, and character literals do not count as delegation evidence; Rust lifetime syntax must remain visible to the scanner.
 - Paragraph lint remains recursive and keeps its current four-line scan window. Refresh an allowlist line only after proving the old and new lines are the same approved widget.
 - Stop for a scope ruling if a fixture would need to change, an existing test conflicts with the fixture, a user-facing behavior change appears necessary, or a tracked file outside this plan is required.
-- Use five planned commits: Quotes fixtures; list-panel geometry; approved footer-preservation design/plan correction; Quotes migration plus generic ScreenFrame configuration and structural lint; active documentation. Any review-discovered correctness fix uses a separate follow-up commit with focused RED/GREEN evidence.
+- Use six planned commits: Quotes fixtures; list-panel geometry; approved footer-preservation design/plan correction; approved one-pass sections correction; Quotes migration plus generic ScreenFrame sections and structural lint; active documentation. Any review-discovered correctness fix uses a separate follow-up commit with focused RED/GREEN evidence.
 - Stop after the Quotes-only manual-acceptance handoff. Do not begin Trends until the user explicitly accepts Quotes.
 
 ## File Structure
@@ -46,8 +47,8 @@
 
 - `src/tui/quotes_screen.rs` — fixtures, domain-line builders, preview geometry helper, component-based render path, and focused regressions.
 - `src/tui/framework/list_panel.rs` — `ListPanelAreas` return contract and geometry tests.
-- `src/tui/framework/screen_frame.rs` — generic `ScreenFrameLayout` and configured renderer with a backward-compatible default wrapper.
-- `src/tui/framework/mod.rs` — re-export list geometry and configured ScreenFrame interfaces.
+- `src/tui/framework/screen_frame.rs` — generic one-pass `ScreenFrameSections` renderer with a backward-compatible default wrapper.
+- `src/tui/framework/mod.rs` — re-export list geometry and ScreenFrame sections interfaces.
 - `tests/tui_lint_test.rs` — transfer Quotes bordered-list ownership to executable `ScrollableListPanel` delegation.
 - `CLAUDE.md` — mark Practices and Quotes as the shipped component consumers.
 - `README.md` — describe Batch 3B-2 Quotes as shipped without claiming later slices.
@@ -419,10 +420,10 @@ git commit -m "refactor(tui): expose list panel geometry"
 - Modify: `tests/tui_lint_test.rs:242-287`
 
 **Interfaces:**
-- Consumes: `render_screen_frame_with_layout`, `ScreenFrameLayout`, `render_scrollable_list_panel -> ListPanelAreas`, `ListPanelContent`, `render_action_panel`, existing `render_detail_panel`, `fit_rect`, `TextInput`, `DetailPanelState`, and `ViewportState`.
-- Produces: a backward-compatible configured ScreenFrame path; one Quotes render path with `quote_list_content`, `quote_preview_rect`, and `action_content`; structural lint requiring executable Quotes delegation.
+- Consumes: `render_screen_frame_sections`, `ScreenFrameSections`, `render_scrollable_list_panel -> ListPanelAreas`, `ListPanelContent`, `render_action_panel`, existing `render_detail_panel`, `fit_rect`, `TextInput`, `DetailPanelState`, and `ViewportState`.
+- Produces: a backward-compatible one-pass ScreenFrame sections path; one Quotes render path with `quote_list_content`, `quote_preview_rect`, and `action_content`; structural lint requiring executable Quotes delegation.
 
-**Approved scope correction:** The immutable Browse fixture exposed 917 styled-cell differences with the original planned three-row frame. A Quotes-local trailing-flex diagnostic reduced this to 144 footer-cell differences; a bounded-sub-rectangle diagnostic achieved parity but was rejected because it retained legacy footer math in Quotes. The approved implementation adds generic shared ownership with exactly `ScreenFrameLayout { min_body_height: u16, trailing_flex: bool }`. Quotes must not retain or derive the old six-row layout.
+**Approved scope corrections:** The immutable Browse fixture exposed 917 styled-cell differences with the original planned three-row frame. A Quotes-local trailing-flex diagnostic reduced this to 144 footer-cell differences; a bounded-sub-rectangle diagnostic achieved parity but was rejected because it retained legacy footer math in Quotes. The first shared aggregate-body correction then failed its component RED/GREEN by one row: `[Min(5), status, shortcuts, Min(0)]` returned body height 11 rather than the characterized 12 because removing the zero-length action section changed Ratatui's allocation. The final approved implementation passes every generic body constraint through one shared vertical layout. Quotes must not retain or derive the old six-row layout.
 
 - [ ] **Step 0: Commit the approved footer-preservation correction**
 
@@ -434,9 +435,19 @@ git add docs/superpowers/specs/2026-08-12-tui-consistency-batch-3b-quotes-compon
 git commit -m "docs: preserve Quotes footer placement"
 ```
 
-- [ ] **Step 0a: Extend ScreenFrame through RED/GREEN**
+- [ ] **Step 0a: Record and replace the superseded aggregate layout**
 
-Add `ScreenFrameLayout` with exactly `min_body_height` and `trailing_flex`, plus `render_screen_frame_with_layout(...)`. When trailing flex is enabled, allocate body/status/shortcuts/trailing flex in that order; otherwise preserve the current three-row layout. Keep `render_screen_frame(...)` as the default wrapper. Tests must prove default layout/output remains unchanged, configured `80x24` placement puts status at row 12 and shortcuts at row 13 for the accepted Browse geometry, and zero/tiny configured targets stay inside the frame.
+Update the approved design and this plan to replace `ScreenFrameLayout` with the one-pass sections API, preserving the earlier correction commit as history, then commit only these records:
+
+```bash
+git add docs/superpowers/specs/2026-08-12-tui-consistency-batch-3b-quotes-components-design.md \
+  docs/superpowers/plans/2026-08-13-tui-consistency-batch-3b-quotes-components.md
+git commit -m "docs: solve Quotes layout in one frame pass"
+```
+
+- [ ] **Step 0b: Extend ScreenFrame through RED/GREEN**
+
+Add `ScreenFrameSections { area, body: Vec<Rect>, status, shortcuts }` plus `render_screen_frame_sections(..., body_constraints: &[Constraint], trailing_flex: bool)`. In one vertical layout, append status and shortcuts after all supplied body constraints, then append `Min(0)` only when trailing flex is enabled. Keep `render_screen_frame(...)` as the byte/rectangle-compatible wrapper using `[Min(0)]` and no trailing flex. Tests must prove default output remains unchanged; Browse `[Min(4), Length(1), Length(0)]` and action `[Min(4), Length(1), Length(3)]` at `80x24` match characterized rectangles and footer rows; and empty-body, zero-sized, one-cell, and tiny targets remain contained.
 
 - [ ] **Step 1: Transfer Quotes border ownership in lint and record RED**
 
@@ -664,29 +675,25 @@ pub fn render(&mut self, frame: &mut Frame) {
         Mode::Add | Mode::Edit | Mode::ConfirmDelete => 3,
     };
     let area = frame.area();
-    let screen = render_screen_frame_with_layout(
+    let screen = render_screen_frame_sections(
         frame,
         area,
         CONTENT_WIDTH,
         &self.status_msg,
         &shortcuts,
-        ScreenFrameLayout {
-            min_body_height: 5 + action_height,
-            trailing_flex: true,
-        },
+        &[
+            Constraint::Min(4),
+            Constraint::Length(1),
+            Constraint::Length(action_height),
+        ],
+        true,
     );
-    let body = Layout::vertical([
-        Constraint::Min(4),
-        Constraint::Length(1),
-        Constraint::Length(action_height),
-    ])
-    .split(screen.body);
 
     let quotes = &self.quotes;
     let selected = self.selected;
     let list = render_scrollable_list_panel(
         frame,
-        body[0],
+        screen.body[0],
         tr("dashboard-quotes"),
         &mut self.list_viewport,
         |inner| quote_list_content(quotes, selected, inner),
@@ -720,7 +727,12 @@ pub fn render(&mut self, frame: &mut Frame) {
         }
     }
 
-    render_action_panel(frame, body[2], self.action_content(screen.area.width), None);
+    render_action_panel(
+        frame,
+        screen.body[2],
+        self.action_content(screen.area.width),
+        None,
+    );
 }
 ```
 
