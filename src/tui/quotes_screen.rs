@@ -63,12 +63,16 @@ fn quote_preview_rect(
     focused: bool,
     content_height: usize,
 ) -> ratatui::layout::Rect {
-    let x = inner.x + 4.min(inner.width);
+    let x = inner.x.saturating_add(4.min(inner.width));
     let width = quote_preview_width(inner);
     let height = if focused {
         inner.height
     } else {
-        (content_height as u16 + 2).max(4).min(inner.height / 2)
+        u16::try_from(content_height)
+            .unwrap_or(u16::MAX)
+            .saturating_add(2)
+            .max(4)
+            .min(inner.height / 2)
     };
     fit_rect(
         inner,
@@ -77,7 +81,7 @@ fn quote_preview_rect(
             y: if focused {
                 inner.y
             } else {
-                inner.y + inner.height.saturating_sub(height)
+                inner.y.saturating_add(inner.height.saturating_sub(height))
             },
             width,
             height,
@@ -86,7 +90,7 @@ fn quote_preview_rect(
 }
 
 fn quote_preview_width(inner: ratatui::layout::Rect) -> u16 {
-    let x = inner.x + 4.min(inner.width);
+    let x = inner.x.saturating_add(4.min(inner.width));
     inner
         .width
         .saturating_sub(8)
@@ -638,6 +642,38 @@ mod tests {
                 assert!(rect_is_within(inner, preview), "{inner:?} -> {preview:?}");
             }
         }
+    }
+
+    #[test]
+    fn quote_preview_rect_clamps_extreme_content_height_and_coordinates() {
+        let large = ratatui::layout::Rect::new(0, 0, u16::MAX, u16::MAX);
+        let expected = ratatui::layout::Rect::new(4, 32_768, 65_527, 32_767);
+        let previews: Vec<_> = [u16::MAX as usize - 1, u16::MAX as usize, usize::MAX]
+            .into_iter()
+            .map(|content_height| {
+                std::panic::catch_unwind(|| quote_preview_rect(large, false, content_height)).ok()
+            })
+            .collect();
+
+        let edge = ratatui::layout::Rect {
+            x: u16::MAX - 2,
+            y: u16::MAX - 2,
+            width: 8,
+            height: 8,
+        };
+        let edge_preview =
+            std::panic::catch_unwind(|| quote_preview_rect(edge, false, usize::MAX)).ok();
+
+        assert_eq!(previews, vec![Some(expected); 3]);
+        assert!(previews
+            .iter()
+            .flatten()
+            .all(|preview| rect_is_within(large, *preview)));
+        assert_eq!(
+            edge_preview,
+            Some(ratatui::layout::Rect::new(u16::MAX, u16::MAX, 0, 0))
+        );
+        assert!(rect_is_within(edge, edge_preview.unwrap()));
     }
 
     #[test]
