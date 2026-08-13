@@ -527,13 +527,155 @@ impl NavigationStatus for TrendsScreen {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{PracticeType, SetData};
-    use crate::tui::framework::test_support::render_to_string;
+    use crate::model::{Log, PracticeType, Set, SetData};
+    use crate::tui::framework::test_support::{render_to_snapshot, render_to_string};
     use crate::tui::lifecycle::{NavigationStatus, Reenter};
     use crossterm::event::KeyModifiers;
 
     fn key(code: KeyCode) -> KeyEvent {
         KeyEvent::new(code, KeyModifiers::NONE)
+    }
+
+    fn fixed_time(month: u32, day: u32) -> chrono::NaiveDateTime {
+        chrono::NaiveDate::from_ymd_opt(2026, month, day)
+            .unwrap()
+            .and_hms_opt(8, 0, 0)
+            .unwrap()
+    }
+
+    fn fixed_practice(id: i64, name: impl Into<String>) -> Practice {
+        Practice {
+            id,
+            name: name.into(),
+            practice_type: PracticeType::Bodyweight,
+            created_at: fixed_time(1, 1),
+            active: true,
+        }
+    }
+
+    fn fixed_entry(id: i64, practice: &Practice, month: u32, day: u32, reps: i32) -> LogEntry {
+        LogEntry {
+            log: Log {
+                id,
+                practice_id: practice.id,
+                logged_at: fixed_time(month, day),
+                note: None,
+                warm_up: None,
+                cool_down: None,
+                rpe: None,
+            },
+            practice_name: practice.name.clone(),
+            practice_type: practice.practice_type,
+            sets: vec![Set {
+                id: id * 10,
+                log_id: id,
+                set_number: 1,
+                data: SetData::Bodyweight { reps },
+            }],
+            rpe: None,
+        }
+    }
+
+    fn fixed_chart(practice: &Practice) -> Vec<LogEntry> {
+        vec![
+            fixed_entry(101, practice, 4, 28, 10),
+            fixed_entry(102, practice, 5, 2, 20),
+            fixed_entry(103, practice, 5, 9, 30),
+            fixed_entry(104, practice, 5, 16, 40),
+        ]
+    }
+
+    fn golden_trends_screen(name: &str) -> TrendsScreen {
+        std::env::set_var("LC_ALL", "C");
+        crate::i18n::init();
+
+        let practices = vec![
+            fixed_practice(1, "Bench Press"),
+            fixed_practice(2, "Pull-up"),
+            fixed_practice(3, "Ring Dip"),
+        ];
+        let chosen = practices[0].clone();
+        let mut screen = TrendsScreen {
+            practices,
+            filtered_indices: vec![0, 1, 2],
+            filter: TextInput::new(),
+            filtering: false,
+            selected: 0,
+            list_viewport: ViewportState::new(0),
+            chosen_practice: Some(chosen.clone()),
+            days_window: 90,
+            entries: fixed_chart(&chosen),
+            needs_refresh: false,
+            status_msg: None,
+        };
+
+        match name {
+            "browse_with_chart" => {}
+            "filtering_long_input" => {
+                let long = "训练".repeat(50);
+                screen.practices[0].name = long.clone();
+                screen.filter = TextInput::from(long);
+                screen.filtering = true;
+                screen.filtered_indices = vec![0];
+                screen.chosen_practice = Some(screen.practices[0].clone());
+                screen.entries = fixed_chart(&screen.practices[0]);
+            }
+            "no_filter_match" => {
+                screen.filter = TextInput::from("missing practice".to_owned());
+                screen.filtering = true;
+                screen.filtered_indices.clear();
+                screen.selected = 0;
+                screen.chosen_practice = None;
+                screen.entries.clear();
+            }
+            "list_overflow" => {
+                screen.practices = (1..=30)
+                    .map(|id| fixed_practice(id, format!("Practice {id:02}")))
+                    .collect();
+                screen.filtered_indices = (0..screen.practices.len()).collect();
+                screen.selected = screen.practices.len() - 1;
+                screen.list_viewport.set_offset(25);
+                screen.chosen_practice = Some(screen.practices[screen.selected].clone());
+                screen.entries = fixed_chart(screen.chosen_practice.as_ref().unwrap());
+            }
+            "no_log_data" => screen.entries.clear(),
+            "cached_chart_error" => {
+                screen.status_msg = Some(("Fixture chart query failed".into(), true));
+            }
+            other => panic!("unknown Trends golden state: {other}"),
+        }
+
+        screen
+    }
+
+    fn trends_golden(name: &str) -> &'static str {
+        match name {
+            "browse_with_chart" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/trends/browse_with_chart.txt"
+            )),
+            "filtering_long_input" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/trends/filtering_long_input.txt"
+            )),
+            "no_filter_match" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/trends/no_filter_match.txt"
+            )),
+            "list_overflow" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/trends/list_overflow.txt"
+            )),
+            "no_log_data" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/trends/no_log_data.txt"
+            )),
+            "cached_chart_error" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/trends/cached_chart_error.txt"
+            )),
+            other => panic!("unknown Trends golden fixture: {other}"),
+        }
     }
 
     fn render_trends(screen: &mut TrendsScreen, width: u16, height: u16) -> String {
@@ -857,5 +999,22 @@ mod tests {
         }
         let list_output = render_trends(&mut screen, 80, 24);
         assert!(list_output.contains("Practice 30"), "{list_output}");
+    }
+
+    #[test]
+    fn trends_states_match_golden_buffers() {
+        for name in [
+            "browse_with_chart",
+            "filtering_long_input",
+            "no_filter_match",
+            "list_overflow",
+            "no_log_data",
+            "cached_chart_error",
+        ] {
+            let mut screen = golden_trends_screen(name);
+            let actual = render_to_snapshot(80, 24, |frame| screen.render(frame));
+            let expected = trends_golden(name);
+            assert_eq!(actual, expected, "Trends {name} buffer changed");
+        }
     }
 }
