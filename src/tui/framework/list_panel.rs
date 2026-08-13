@@ -17,13 +17,19 @@ pub struct ListPanelContent<'a> {
     pub selected: Option<usize>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ListPanelAreas {
+    pub area: Rect,
+    pub inner: Rect,
+}
+
 pub fn render_scrollable_list_panel<'a>(
     frame: &mut Frame,
     area: Rect,
     title: impl Into<String>,
     viewport: &mut ViewportState,
     build_content: impl FnOnce(Rect) -> ListPanelContent<'a>,
-) {
+) -> ListPanelAreas {
     let area = fit_rect(frame.area(), area);
     let geometry = Block::default()
         .borders(Borders::ALL)
@@ -87,6 +93,8 @@ pub fn render_scrollable_list_panel<'a>(
         let row = header_height.saturating_add(selected - viewport.offset());
         highlight_row(frame, inner, row.min(u16::MAX as usize) as u16);
     }
+
+    ListPanelAreas { area, inner }
 }
 
 #[cfg(test)]
@@ -97,6 +105,52 @@ mod tests {
         ViewportState,
     };
     use ratatui::{layout::Rect, style::Color, text::Line};
+
+    fn rect_is_within(parent: Rect, child: Rect) -> bool {
+        child.x >= parent.x
+            && child.y >= parent.y
+            && child.right() <= parent.right()
+            && child.bottom() <= parent.bottom()
+    }
+
+    #[test]
+    fn list_panel_returns_clipped_outer_and_inner_geometry() {
+        let frame_area = Rect::new(0, 0, 6, 6);
+        for target in [
+            Rect::new(0, 0, 6, 6),
+            Rect::new(5, 5, 0, 0),
+            Rect::new(5, 5, 1, 1),
+            Rect::new(1, 1, 2, 3),
+            Rect::new(5, 5, 4, 4),
+        ] {
+            let mut viewport = ViewportState::new(0);
+            let mut returned = None;
+            let mut closure_inner = None;
+            render_to_buffer(6, 6, |frame| {
+                let areas =
+                    render_scrollable_list_panel(frame, target, "Items", &mut viewport, |inner| {
+                        closure_inner = Some(inner);
+                        ListPanelContent {
+                            header: None,
+                            rows: Vec::new(),
+                            empty: None,
+                            selected: None,
+                        }
+                    });
+                returned = Some(areas);
+            });
+            let areas = returned.unwrap();
+            assert_eq!(closure_inner, Some(areas.inner));
+            assert!(
+                rect_is_within(frame_area, areas.area),
+                "{target:?} -> {areas:?}"
+            );
+            assert!(
+                rect_is_within(areas.area, areas.inner),
+                "{target:?} -> {areas:?}"
+            );
+        }
+    }
 
     #[test]
     fn list_panel_renders_all_border_edges_with_border_style() {

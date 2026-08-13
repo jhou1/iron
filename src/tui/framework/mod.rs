@@ -14,7 +14,8 @@ pub use components::{
     shortcut_height, truncate_to_width, DetailPanelState, Shortcut, StatusMessage,
 };
 pub use input::TextInput;
-pub use list_panel::{render_scrollable_list_panel, ListPanelContent};
+#[allow(unused_imports)]
+pub use list_panel::{render_scrollable_list_panel, ListPanelAreas, ListPanelContent};
 pub use screen_frame::render_screen_frame;
 #[allow(unused_imports)]
 pub use viewport::{
