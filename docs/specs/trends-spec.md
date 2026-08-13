@@ -6,7 +6,7 @@ View training progress over time with sparkline charts and summary statistics.
 
 Trends shows a bounded active-practice list above a specialized sparkline chart. Changing the selected practice immediately changes the chart; there is no separate phase transition.
 
-Batch 3B-3 changes only this presentation composition. `ScreenFrame` owns the centered frame and reserves the filter, practice-list, chart, status, and shortcut rows in one pass. `ScrollableListPanel` is the sole owner of the practice list's border, title and overflow markers, viewport reveal and clamp, and selected-row highlight. Trends continues to own filter rendering, practice row formatting, selection and filter state, and the specialized Sparkline/statistics panel.
+Batch 3B-3 changes only this presentation composition. `ScreenFrame` owns the centered frame and reserves the filter, practice-list, chart, status, and shortcut rows in one pass. The status line and mode-accurate shortcut rows are global frame rows below the body, not part of the chart panel. `ScrollableListPanel` is the sole owner of the practice list's border, title and overflow markers, viewport reveal and clamp, and selected-row highlight. Trends continues to own filter rendering, practice row formatting, selection and filter state, and the specialized Sparkline/statistics panel.
 
 The practice list uses the shared panel viewport. Selection wraps at both ends, remains visible, and the title shows `↑`, `↓`, or `↑↓` when more rows exist. Long practice names are truncated by terminal display width so the type column remains inside its panel.
 
@@ -17,11 +17,9 @@ Six immutable styled-buffer fixtures preserve exact visual compatibility for a p
 ## Chart panel
 
 **Display (top to bottom):**
-1. Title: "[Practice Name] — [N] days"
+1. Practice/metric/type title and time-window subtitle
 2. Sparkline chart (fills available space)
 3. Stats summary: average, peak, trend percentage
-4. Visible error status line
-5. Mode-accurate shortcut row
 
 ### Sparkline Chart
 

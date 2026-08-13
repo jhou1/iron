@@ -31,7 +31,7 @@ The project has replaced those repeated interaction mechanisms with a unified TU
 
 ## Architecture
 
-`src/tui/framework/` provides four focused units.
+`src/tui/framework/` provides seven focused units.
 
 ### `viewport.rs`
 
@@ -66,6 +66,18 @@ Provides composable Ratatui presentation components:
 - bordered panel construction using the real inner rectangle
 
 Components receive already-formatted domain content and return no domain data.
+
+### `screen_frame.rs`
+
+Provides `ScreenFrame`, which centers a screen body and reserves its body sections, status row, and wrapped shortcut rows in one composition pass. Practices and Quotes use the frame with all their applicable presentation components; Trends uses the frame with its accepted filter, list, and chart constraints.
+
+### `list_panel.rs`
+
+Provides `ScrollableListPanel`, which owns bordered-list geometry, title and overflow markers, viewport reveal and clamp, visible-row slicing, and selected-row highlighting. Practices, Quotes, and Trends provide already-formatted rows and retain their domain selection policies.
+
+### `action_panel.rs`
+
+Provides `ActionPanel`, which bounds contextual action content and its selected-row highlighting. Practices and Quotes consume it for their applicable modes; Trends does not use `ActionPanel` because its filter and specialized Sparkline/statistics panel remain screen-owned.
 
 ### `test_support.rs`
 

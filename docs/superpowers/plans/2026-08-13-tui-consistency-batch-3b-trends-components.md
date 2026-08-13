@@ -697,7 +697,7 @@ Do not keep a production-only `VisualSpan` import just for tests.
 cargo test --test tui_lint_test screens_must_have_bordered_blocks -- --exact --nocapture
 cargo test tui::trends::tests::trends_states_match_golden_buffers -- --exact --nocapture
 cargo test tui::trends::tests::trends_states_render_in_small_and_resized_terminals_without_panicking -- --exact --nocapture
-git diff --exit-code "$(git log -1 --format=%H -- tests/fixtures/tui/trends)" -- tests/fixtures/tui/trends
+git diff --exit-code 1463268..HEAD -- tests/fixtures/tui/trends
 ```
 
 Expected: ownership lint passes, all six fixtures pass in library and binary targets, all small/resized cases pass, and fixtures have not changed since their characterization commit. Any fixture difference is a stop condition; do not regenerate it.
@@ -802,7 +802,7 @@ cargo test --test i18n_test -- --nocapture
 cargo test --test removed_quick_log_test -- --nocapture
 cargo test --all-targets --all-features
 cargo build --all-features
-git diff --exit-code "$(git log -1 --format=%H -- tests/fixtures/tui/trends)" -- tests/fixtures/tui/trends
+git diff --exit-code 1463268..HEAD -- tests/fixtures/tui/trends
 git diff --check 6aea597..HEAD
 git diff --check
 ```
