@@ -523,7 +523,7 @@ impl NavigationStatus for QuotesScreen {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tui::framework::test_support::render_to_string;
+    use crate::tui::framework::test_support::{render_to_snapshot, render_to_string};
     use crate::tui::lifecycle::{NavigationStatus, Reenter};
     use crossterm::event::KeyModifiers;
 
@@ -533,6 +533,104 @@ mod tests {
 
     fn render_quotes(screen: &mut QuotesScreen, width: u16, height: u16) -> String {
         render_to_string(width, height, |frame| screen.render(frame))
+    }
+
+    fn golden_quotes_screen(name: &str) -> QuotesScreen {
+        std::env::set_var("LC_ALL", "C");
+        crate::i18n::init();
+
+        let db = Database::open_in_memory().unwrap();
+        db.create_quote("First compact quote").unwrap();
+        let long = db
+            .create_quote(
+                &"A deliberately long quote with Unicode 训练 and enough words to wrap. ".repeat(8),
+            )
+            .unwrap();
+        db.create_quote("Third quote for list scrolling").unwrap();
+
+        let mut screen = QuotesScreen::new(&db).unwrap();
+        screen.selected = screen
+            .quotes
+            .iter()
+            .position(|quote| quote.id == long.id)
+            .unwrap();
+        screen.status_msg = Some(("Fixture status".into(), false));
+
+        match name {
+            "browse" => {}
+            "browse_with_undo" => {
+                screen.last_deleted = Some(Quote {
+                    id: 9_001,
+                    text: "Deleted quote available for undo".into(),
+                    position: 9,
+                });
+            }
+            "detail" => {
+                screen.mode = Mode::Detail;
+                screen.detail_state.focused = true;
+                screen.detail_state.viewport.set_offset(2);
+            }
+            "add" => {
+                screen.mode = Mode::Add;
+                screen.input.set("新增 quote");
+            }
+            "edit" => {
+                screen.mode = Mode::Edit;
+                screen.input.set("Edited quote text");
+                screen.editing_id = Some(long.id);
+            }
+            "confirm_delete" => screen.mode = Mode::ConfirmDelete,
+            other => panic!("unknown Quotes golden state: {other}"),
+        }
+
+        screen
+    }
+
+    fn quotes_golden(name: &str) -> &'static str {
+        match name {
+            "browse" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/quotes/browse.txt"
+            )),
+            "browse_with_undo" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/quotes/browse_with_undo.txt"
+            )),
+            "detail" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/quotes/detail.txt"
+            )),
+            "add" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/quotes/add.txt"
+            )),
+            "edit" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/quotes/edit.txt"
+            )),
+            "confirm_delete" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/quotes/confirm_delete.txt"
+            )),
+            other => panic!("unknown Quotes golden fixture: {other}"),
+        }
+    }
+
+    #[test]
+    fn quotes_modes_match_golden_buffers() {
+        for name in [
+            "browse",
+            "browse_with_undo",
+            "detail",
+            "add",
+            "edit",
+            "confirm_delete",
+        ] {
+            let mut screen = golden_quotes_screen(name);
+            let actual = render_to_snapshot(80, 24, |frame| screen.render(frame));
+            let expected = quotes_golden(name);
+            assert_eq!(actual, expected, "Quotes {name} buffer changed");
+        }
     }
 
     #[test]
