@@ -1,9 +1,9 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
-    layout::{Constraint, Direction, Layout},
+    layout::Constraint,
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Cell, Clear, Padding, Paragraph, Row, Table, Wrap},
+    widgets::{Clear, Paragraph, Wrap},
     Frame,
 };
 
@@ -11,13 +11,12 @@ use unicode_width::UnicodeWidthStr;
 
 use super::lifecycle::{NavigationStatus, Reenter};
 use super::{
-    centered_area,
     framework::{
-        fit_rect, render_detail_panel, render_shortcuts, shortcut_height, visual_spans,
-        DetailPanelState, Shortcut, TextInput, ViewportState, VisualSpan,
+        fit_rect, render_detail_panel, render_screen_frame_sections, render_scrollable_list_panel,
+        truncate_to_width, visual_spans, DetailPanelState, ListPanelAreas, ListPanelContent,
+        ScreenFrameSections, Shortcut, TextInput, ViewportState,
     },
-    highlight_row, render_status_line, Action, ModuleId, NavigationIntent, StatusMessage,
-    BORDER_COLOR, CONTENT_WIDTH,
+    Action, ModuleId, NavigationIntent, StatusMessage, CONTENT_WIDTH,
 };
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
@@ -45,6 +44,155 @@ pub struct HistoryScreen {
     detail_content_height: usize,
     status_msg: StatusMessage,
     last_deleted: Option<LogEntry>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct HistoryColumns {
+    marker: usize,
+    date: usize,
+    name: usize,
+    metric: usize,
+    max_total: usize,
+    max_label: usize,
+}
+
+fn append_cell(
+    output: &mut Vec<Span<'static>>,
+    spans: Vec<Span<'static>>,
+    requested_width: usize,
+    remaining: &mut usize,
+    gap_after: bool,
+) {
+    let width = requested_width.min(*remaining);
+    let mut unused = width;
+    for span in spans {
+        if unused == 0 {
+            break;
+        }
+        let text = truncate_to_width(span.content.as_ref(), unused);
+        let used = text.width();
+        if !text.is_empty() {
+            output.push(Span::styled(text, span.style));
+        }
+        unused = unused.saturating_sub(used);
+    }
+    if unused > 0 {
+        output.push(Span::raw(" ".repeat(unused)));
+    }
+    *remaining = remaining.saturating_sub(width);
+    if gap_after && *remaining > 0 {
+        output.push(Span::raw(" "));
+        *remaining -= 1;
+    }
+}
+
+fn history_list_content(
+    entries: &[LogEntry],
+    filtered_indices: &[usize],
+    selected: usize,
+    inner_width: u16,
+    columns: HistoryColumns,
+) -> ListPanelContent<'static> {
+    if filtered_indices.is_empty() {
+        return ListPanelContent {
+            header: None,
+            rows: Vec::new(),
+            empty: Some(Line::from(Span::styled(
+                format!("  {}", tr("history-no-entries")),
+                Style::default().fg(Color::Gray),
+            ))),
+            selected: None,
+        };
+    }
+
+    let mut widths = [columns.marker, columns.date, columns.name, columns.metric];
+    let fixed_width = columns
+        .marker
+        .saturating_add(columns.date)
+        .saturating_add(columns.metric)
+        .saturating_add(widths.len().saturating_sub(1));
+    widths[2] = columns
+        .name
+        .min((inner_width as usize).saturating_sub(fixed_width));
+    let name_width = widths[2];
+
+    let build_line = |cells: Vec<Vec<Span<'static>>>| {
+        let mut remaining = inner_width as usize;
+        let mut output = Vec::new();
+        let cell_count = cells.len();
+        for (index, (cell, width)) in cells.into_iter().zip(widths).enumerate() {
+            append_cell(
+                &mut output,
+                cell,
+                width,
+                &mut remaining,
+                index + 1 < cell_count,
+            );
+        }
+        Line::from(output)
+    };
+
+    let header_style = Style::default().fg(Color::White).bold();
+    let header = build_line(vec![
+        vec![],
+        vec![Span::styled(tr("history-col-date"), header_style)],
+        vec![Span::styled(tr("history-col-practice"), header_style)],
+        vec![Span::styled(tr("history-col-volume"), header_style)],
+    ]);
+
+    let rows = filtered_indices
+        .iter()
+        .enumerate()
+        .filter_map(|(filtered_index, entry_index)| {
+            let entry = entries.get(*entry_index)?;
+            let selected_row = filtered_index == selected;
+            let primary = if selected_row {
+                Style::default().fg(Color::White).bold()
+            } else {
+                Style::default().fg(Color::White)
+            };
+            let dim = if selected_row {
+                Style::default().fg(Color::White)
+            } else {
+                Style::default().fg(Color::Gray)
+            };
+            let total = format!("{:.0}", entry.total_metric());
+            let label = entry.metric_label();
+            let rpe = entry.log.rpe.map(|rpe| format!(" [RPE: {rpe}]"));
+            let rpe_width = rpe.as_deref().map(str::width).unwrap_or(0).min(name_width);
+            let visible_name =
+                truncate_to_width(&entry.practice_name, name_width.saturating_sub(rpe_width));
+            let mut name = vec![Span::styled(visible_name, primary)];
+            if let Some(rpe) = rpe {
+                name.push(Span::styled(rpe, Style::default().fg(Color::Yellow)));
+            }
+            Some(build_line(vec![
+                vec![Span::styled(if selected_row { ">" } else { " " }, primary)],
+                vec![Span::styled(
+                    entry.log.logged_at.format("%Y-%m-%d").to_string(),
+                    dim,
+                )],
+                name,
+                vec![Span::styled(
+                    format!(
+                        "{:>width$} {}{}",
+                        total,
+                        label,
+                        " ".repeat(columns.max_label.saturating_sub(label.width())),
+                        width = columns.max_total,
+                    ),
+                    dim,
+                )],
+            ]))
+        })
+        .collect();
+
+    ListPanelContent {
+        header: Some(header),
+        rows,
+        empty: None,
+        selected: Some(selected),
+    }
 }
 
 fn history_detail_rect(
@@ -111,6 +259,38 @@ impl HistoryScreen {
             .and_then(|&idx| self.entries.get(idx))
     }
 
+    fn columns(&self) -> HistoryColumns {
+        let max_name = self
+            .filtered_indices
+            .iter()
+            .filter_map(|index| self.entries.get(*index))
+            .map(|entry| entry.practice_name.width() + usize::from(entry.log.rpe.is_some()) * 10)
+            .max()
+            .unwrap_or(4);
+        let max_total = self
+            .filtered_indices
+            .iter()
+            .filter_map(|index| self.entries.get(*index))
+            .map(|entry| format!("{:.0}", entry.total_metric()).len())
+            .max()
+            .unwrap_or(4);
+        let max_label = self
+            .filtered_indices
+            .iter()
+            .filter_map(|index| self.entries.get(*index))
+            .map(|entry| entry.metric_label().width())
+            .max()
+            .unwrap_or(2);
+        HistoryColumns {
+            marker: 2,
+            date: 11,
+            name: max_name + 2,
+            metric: max_total + 1 + max_label + 1,
+            max_total,
+            max_label,
+        }
+    }
+
     fn apply_filter(&mut self) {
         let lower = self.filter.value().to_lowercase();
         self.filtered_indices = self
@@ -155,49 +335,18 @@ impl HistoryScreen {
     }
 
     pub fn render(&mut self, frame: &mut Frame) {
-        let area = centered_area(frame.area(), CONTENT_WIDTH);
         let shortcuts = self.active_shortcuts();
-        let shortcut_rows = shortcut_height(&shortcuts, area.width);
-
-        let max_name_len = self
-            .filtered_indices
-            .iter()
-            .filter_map(|&i| self.entries.get(i))
-            .map(|e| {
-                let rpe_len = if e.log.rpe.is_some() { 10 } else { 0 };
-                e.practice_name.width() + rpe_len
-            })
-            .max()
-            .unwrap_or(4);
-        let name_col_w = (max_name_len + 2) as u16;
-        let marker_w: u16 = 2; // "> " or "  "
-        let date_col_w: u16 = 11; // "2026-05-12" + 1 padding
-        let max_total_w = self
-            .filtered_indices
-            .iter()
-            .filter_map(|&i| self.entries.get(i))
-            .map(|e| format!("{:.0}", e.total_metric()).len())
-            .max()
-            .unwrap_or(4);
-        let max_label_w = self
-            .filtered_indices
-            .iter()
-            .filter_map(|&i| self.entries.get(i))
-            .map(|e| e.metric_label().width())
-            .max()
-            .unwrap_or(2);
-        let vol_col_w = (max_total_w + 1 + max_label_w + 1) as u16;
-
-        // Vertical split: filter | main content (list + detail) | status | shortcuts
-        let v_chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(1),             // [0] filter
-                Constraint::Min(1), // [1] main content area (list + detail side by side)
-                Constraint::Length(1), // [2] status line
-                Constraint::Length(shortcut_rows), // [3] shortcuts
-            ])
-            .split(area);
+        let sections: ScreenFrameSections = render_screen_frame_sections(
+            frame,
+            frame.area(),
+            CONTENT_WIDTH,
+            &self.status_msg,
+            &shortcuts,
+            &[Constraint::Length(1), Constraint::Min(1)],
+            false,
+        );
+        let filter_area = sections.body[0];
+        let list_area = sections.body[1];
 
         // Filter bar
         let filter_style = if self.filtering {
@@ -214,27 +363,25 @@ impl HistoryScreen {
             )]
         };
         if self.filtering {
-            filter_spans.extend(self.filter.visible_spans(v_chunks[0].width, 2, ACCENT));
+            filter_spans.extend(self.filter.visible_spans(filter_area.width, 2, ACCENT));
         } else if !self.filter.value().is_empty() {
             filter_spans.push(Span::styled(self.filter.value().to_owned(), filter_style));
         }
         frame.render_widget(
             Paragraph::new(Line::from(filter_spans)).wrap(Wrap { trim: false }),
-            v_chunks[0],
+            filter_area,
         );
 
-        let list_area = v_chunks[1];
-        let visible_items = (list_area.height as usize).saturating_sub(5);
-        self.render_list(
+        let columns = self.columns();
+        let entries = &self.entries;
+        let filtered_indices = &self.filtered_indices;
+        let selected = self.selected;
+        let list_areas: ListPanelAreas = render_scrollable_list_panel(
             frame,
             list_area,
-            visible_items,
-            marker_w,
-            name_col_w,
-            date_col_w,
-            vol_col_w,
-            max_total_w,
-            max_label_w,
+            tr("history-title"),
+            &mut self.list_viewport,
+            |inner| history_list_content(entries, filtered_indices, selected, inner.width, columns),
         );
 
         // ── Floating detail popup ──
@@ -242,7 +389,7 @@ impl HistoryScreen {
             let row_in_list = self.selected.saturating_sub(self.list_viewport.offset()) as u16 + 1; // +1 for header
             let popup_content = self.build_detail_lines(&entry);
             let popup_inner_width =
-                history_detail_rect(list_area, row_in_list, 0, self.mode == Mode::Detail)
+                history_detail_rect(list_areas.area, row_in_list, 0, self.mode == Mode::Detail)
                     .width
                     .saturating_sub(2)
                     .max(1);
@@ -252,7 +399,7 @@ impl HistoryScreen {
                 .map(|span| span.start.saturating_add(span.height))
                 .unwrap_or(0);
             let popup_rect = history_detail_rect(
-                list_area,
+                list_areas.area,
                 row_in_list,
                 self.detail_content_height,
                 self.mode == Mode::Detail,
@@ -282,140 +429,6 @@ impl HistoryScreen {
                 &mut self.detail_state,
                 None,
             );
-        }
-
-        // Status + shortcuts
-        render_status_line(frame, v_chunks[2], &self.status_msg);
-        render_shortcuts(frame, v_chunks[3], &shortcuts);
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn render_list(
-        &mut self,
-        frame: &mut Frame,
-        area: ratatui::layout::Rect,
-        visible: usize,
-        marker_w: u16,
-        name_col_w: u16,
-        date_col_w: u16,
-        vol_col_w: u16,
-        max_total_w: usize,
-        max_label_w: usize,
-    ) {
-        self.list_viewport.set_height(visible);
-        if !self.filtered_indices.is_empty() {
-            self.list_viewport.reveal(VisualSpan {
-                start: self.selected,
-                height: 1,
-            });
-        }
-        self.list_viewport.clamp(self.filtered_indices.len());
-        let scroll_offset = self.list_viewport.offset();
-        let overflow = self
-            .list_viewport
-            .overflow(self.filtered_indices.len())
-            .suffix();
-        let block = Block::default()
-            .title(Line::from(vec![
-                Span::styled("── ", Style::default().fg(BORDER_COLOR)),
-                Span::styled(
-                    format!("{}{}", tr("history-title"), overflow),
-                    Style::default().fg(Color::White).bold(),
-                ),
-                Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
-            ]))
-            .borders(Borders::ALL)
-            .padding(Padding::uniform(1))
-            .border_style(Style::default().fg(BORDER_COLOR));
-        let inner = block.inner(area);
-        frame.render_widget(block, area);
-
-        if self.filtered_indices.is_empty() {
-            let no_entries_text = format!("  {}", tr("history-no-entries"));
-            let empty_content = Line::from(Span::styled(
-                no_entries_text,
-                Style::default().fg(Color::Gray),
-            ));
-            let empty = Paragraph::new(empty_content).wrap(Wrap { trim: false });
-            frame.render_widget(empty, inner);
-            return;
-        }
-
-        let hdr_style = Style::default().fg(Color::White).bold();
-        let header = Row::new(vec![
-            Cell::from(""),
-            Cell::from(Span::styled(tr("history-col-date"), hdr_style)),
-            Cell::from(Span::styled(tr("history-col-practice"), hdr_style)),
-            Cell::from(Span::styled(tr("history-col-volume"), hdr_style)),
-        ]);
-
-        let mut rows: Vec<Row> = Vec::new();
-        for (fi, &entry_idx) in self
-            .filtered_indices
-            .iter()
-            .enumerate()
-            .skip(scroll_offset)
-            .take(visible)
-        {
-            let entry = &self.entries[entry_idx];
-            let date = entry.log.logged_at.format("%Y-%m-%d").to_string();
-            let total = format!("{:.0}", entry.total_metric());
-            let label = entry.metric_label();
-
-            let style = if fi == self.selected {
-                Style::default().fg(Color::White).bold()
-            } else {
-                Style::default().fg(Color::White)
-            };
-            let dim = if fi == self.selected {
-                Style::default().fg(Color::White)
-            } else {
-                Style::default().fg(Color::Gray)
-            };
-
-            let marker = if fi == self.selected { ">" } else { " " };
-
-            let mut name_spans = vec![Span::styled(entry.practice_name.clone(), style)];
-            if let Some(rpe) = entry.log.rpe {
-                name_spans.push(Span::styled(
-                    format!(" [RPE: {}]", rpe),
-                    Style::default().fg(Color::Yellow),
-                ));
-            }
-
-            rows.push(Row::new(vec![
-                Cell::from(Span::styled(marker, style)),
-                Cell::from(Span::styled(date, dim)),
-                Cell::from(Line::from(name_spans)),
-                Cell::from(Span::styled(
-                    format!(
-                        "{:>w$} {}{}",
-                        total,
-                        label,
-                        " ".repeat(max_label_w.saturating_sub(label.width())),
-                        w = max_total_w
-                    ),
-                    dim,
-                )),
-            ]));
-        }
-
-        let table = Table::new(
-            rows,
-            [
-                Constraint::Length(marker_w),
-                Constraint::Length(date_col_w),
-                Constraint::Length(name_col_w),
-                Constraint::Length(vol_col_w),
-            ],
-        )
-        .header(header);
-
-        frame.render_widget(table, inner);
-
-        if !self.filtered_indices.is_empty() && self.selected >= scroll_offset {
-            let row = (self.selected - scroll_offset) as u16 + 1; // +1 for header row
-            highlight_row(frame, inner, row);
         }
     }
 
@@ -1047,6 +1060,31 @@ mod tests {
             let expected = history_golden(name);
             assert_eq!(actual, expected, "History {name} buffer changed");
         }
+    }
+
+    #[test]
+    fn history_line_rows_preserve_unicode_rpe_and_metric_cells() {
+        let screen = golden_history_screen("filtering_long_input");
+        let columns = screen.columns();
+        let content = history_list_content(
+            &screen.entries,
+            &screen.filtered_indices,
+            screen.selected,
+            76,
+            columns,
+        );
+
+        assert!(content
+            .header
+            .as_ref()
+            .unwrap()
+            .to_string()
+            .contains(&tr("history-col-date")));
+        assert_eq!(content.rows.len(), 1);
+        let row = content.rows[0].clone();
+        assert!(row.to_string().contains("训练"));
+        assert!(row.to_string().contains("[RPE: 8]"));
+        assert!(row.width() <= 76);
     }
 
     fn key(code: KeyCode) -> KeyEvent {

@@ -310,7 +310,7 @@ fn paragraph_widgets_must_wrap_user_content() {
 #[test]
 fn screens_must_have_bordered_blocks() {
     let tui_dir = Path::new("src/tui");
-    let required_screens = ["goals.rs", "history.rs", "log_entry.rs"];
+    let required_screens = ["goals.rs", "log_entry.rs"];
 
     let mut missing = Vec::new();
     for filename in &required_screens {
@@ -332,12 +332,19 @@ fn screens_must_have_bordered_blocks() {
         ("practices.rs", "Practices"),
         ("quotes_screen.rs", "Quotes"),
         ("trends.rs", "Trends"),
+        ("history.rs", "History"),
     ] {
         let source = std::fs::read_to_string(tui_dir.join(filename)).unwrap();
         assert!(
             source_code_contains(&source, "render_scrollable_list_panel("),
             "{screen_name} must delegate its bordered list to ScrollableListPanel"
         );
+        if filename == "history.rs" {
+            assert!(
+                source_code_contains(&source, "render_screen_frame_sections("),
+                "History must delegate frame/footer geometry to ScreenFrame"
+            );
+        }
     }
 
     let list_panel_source =
