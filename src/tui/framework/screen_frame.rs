@@ -227,6 +227,62 @@ mod tests {
     }
 
     #[test]
+    fn screen_frame_sections_match_accepted_history_layouts() {
+        let area = Rect::new(0, 0, 80, 24);
+        let shortcut_sets = [
+            vec![
+                Shortcut::new("j/k", "Navigate"),
+                Shortcut::new("Enter", "Details"),
+                Shortcut::new("/", "Filter"),
+                Shortcut::new("e", "Edit"),
+                Shortcut::new("d", "Delete"),
+                Shortcut::new("Esc", "Back"),
+            ],
+            vec![
+                Shortcut::new("j/k", "Navigate"),
+                Shortcut::new("Enter", "Details"),
+                Shortcut::new("/", "Filter"),
+                Shortcut::new("e", "Edit"),
+                Shortcut::new("d", "Delete"),
+                Shortcut::new("u", "Undo"),
+                Shortcut::new("Esc", "Back"),
+            ],
+            vec![
+                Shortcut::new("y", "Delete · Yes"),
+                Shortcut::new("any", "Cancel"),
+            ],
+        ];
+
+        for shortcuts in shortcut_sets {
+            let legacy = Layout::vertical([
+                Constraint::Length(1),
+                Constraint::Min(1),
+                Constraint::Length(1),
+                Constraint::Length(shortcut_height(&shortcuts, area.width)),
+            ])
+            .split(area);
+            let mut sections = None;
+            render_to_buffer(80, 24, |frame| {
+                sections = Some(render_screen_frame_sections(
+                    frame,
+                    frame.area(),
+                    107,
+                    &Some(("Fixture status".into(), false)),
+                    &shortcuts,
+                    &[Constraint::Length(1), Constraint::Min(1)],
+                    false,
+                ));
+            });
+
+            let sections = sections.unwrap();
+            assert_eq!(sections.area, area);
+            assert_eq!(sections.body.as_slice(), &legacy[..2]);
+            assert_eq!(sections.status, legacy[2]);
+            assert_eq!(sections.shortcuts, legacy[3]);
+        }
+    }
+
+    #[test]
     fn screen_frame_sections_match_accepted_action_layout() {
         let shortcuts = vec![Shortcut::new("Enter", "Confirm")];
         let mut sections = None;

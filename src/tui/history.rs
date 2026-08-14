@@ -47,6 +47,45 @@ pub struct HistoryScreen {
     last_deleted: Option<LogEntry>,
 }
 
+fn history_detail_rect(
+    list_area: ratatui::layout::Rect,
+    row_in_list: u16,
+    content_height: usize,
+    focused: bool,
+) -> ratatui::layout::Rect {
+    let popup_x = list_area.x.saturating_add(4.min(list_area.width));
+    let popup_w = list_area
+        .width
+        .saturating_sub(8)
+        .max(30)
+        .min(list_area.right().saturating_sub(popup_x));
+    let popup_h = if focused {
+        list_area.height
+    } else {
+        (content_height.min(u16::MAX as usize) as u16)
+            .saturating_add(2)
+            .max(4)
+            .min(list_area.height / 2)
+    };
+    let popup_y = if focused {
+        list_area.y
+    } else {
+        let below_y = list_area.y.saturating_add(row_in_list).saturating_add(2);
+        if below_y.saturating_add(popup_h) > list_area.bottom() {
+            list_area
+                .y
+                .saturating_add(row_in_list.saturating_sub(popup_h))
+        } else {
+            below_y
+        }
+    };
+
+    fit_rect(
+        list_area,
+        ratatui::layout::Rect::new(popup_x, popup_y, popup_w, popup_h),
+    )
+}
+
 impl HistoryScreen {
     pub fn new(db: &Database) -> anyhow::Result<Self> {
         let entries = db.list_logs_all()?;
@@ -202,45 +241,21 @@ impl HistoryScreen {
         if let Some(entry) = self.selected_entry().cloned() {
             let row_in_list = self.selected.saturating_sub(self.list_viewport.offset()) as u16 + 1; // +1 for header
             let popup_content = self.build_detail_lines(&entry);
-            let popup_x = list_area.x + 4.min(list_area.width);
-            let popup_w = list_area
-                .width
-                .saturating_sub(8)
-                .max(30)
-                .min(list_area.right().saturating_sub(popup_x));
-            let popup_inner_width = popup_w.saturating_sub(2).max(1);
+            let popup_inner_width =
+                history_detail_rect(list_area, row_in_list, 0, self.mode == Mode::Detail)
+                    .width
+                    .saturating_sub(2)
+                    .max(1);
             let detail_spans = visual_spans(&popup_content, popup_inner_width);
             self.detail_content_height = detail_spans
                 .last()
                 .map(|span| span.start.saturating_add(span.height))
                 .unwrap_or(0);
-            let popup_h = if self.mode == Mode::Detail {
-                list_area.height
-            } else {
-                (self.detail_content_height as u16 + 2)
-                    .max(4)
-                    .min(list_area.height / 2)
-            };
-
-            // Position below selected row; flip above if near bottom
-            let popup_y = if self.mode == Mode::Detail {
-                list_area.y
-            } else {
-                let below_y = list_area.y + row_in_list + 2;
-                if below_y + popup_h > list_area.y + list_area.height {
-                    list_area.y + row_in_list.saturating_sub(popup_h)
-                } else {
-                    below_y
-                }
-            };
-            let popup_rect = fit_rect(
+            let popup_rect = history_detail_rect(
                 list_area,
-                ratatui::layout::Rect {
-                    x: popup_x,
-                    y: popup_y,
-                    width: popup_w,
-                    height: popup_h,
-                },
+                row_in_list,
+                self.detail_content_height,
+                self.mode == Mode::Detail,
             );
 
             let rpe = entry
@@ -738,7 +753,6 @@ impl Reenter for HistoryScreen {
         next.list_viewport.clamp(next.filtered_indices.len());
         next.detail_state.viewport = self.detail_state.viewport;
         next.detail_content_height = self.detail_content_height;
-        next.detail_state.viewport.clamp(next.detail_content_height);
 
         next.mode = if self.mode == Mode::Detail && next.selected_entry().is_some() {
             Mode::Detail
@@ -764,9 +778,12 @@ impl NavigationStatus for HistoryScreen {
 mod tests {
     use super::*;
     use crate::model::{Log, PracticeType, Set, SetData};
-    use crate::tui::framework::test_support::{render_to_snapshot, render_to_string};
+    use crate::tui::framework::test_support::{
+        render_to_buffer, render_to_snapshot, render_to_string,
+    };
     use crate::tui::lifecycle::Reenter;
     use crossterm::event::KeyModifiers;
+    use ratatui::layout::Rect;
 
     fn fixed_time(month: u32, day: u32) -> chrono::NaiveDateTime {
         chrono::NaiveDate::from_ymd_opt(2026, month, day)
@@ -973,6 +990,47 @@ mod tests {
         }
     }
 
+    fn rect_is_within(parent: Rect, child: Rect) -> bool {
+        child.x >= parent.x
+            && child.y >= parent.y
+            && child.right() <= parent.right()
+            && child.bottom() <= parent.bottom()
+    }
+
+    #[test]
+    fn history_detail_rect_preserves_below_flip_and_focused_geometry() {
+        let list = Rect::new(0, 1, 80, 20);
+        assert_eq!(
+            history_detail_rect(list, 1, 5, false),
+            Rect::new(4, 4, 72, 7)
+        );
+        assert_eq!(
+            history_detail_rect(list, 17, 5, false),
+            Rect::new(4, 11, 72, 7)
+        );
+        assert_eq!(
+            history_detail_rect(list, 8, 5, true),
+            Rect::new(4, 1, 72, 20)
+        );
+    }
+
+    #[test]
+    fn history_detail_rect_never_escapes_tiny_or_edge_parents() {
+        for parent in [
+            Rect::new(0, 0, 0, 0),
+            Rect::new(5, 5, 1, 1),
+            Rect::new(2, 3, 12, 4),
+            Rect::new(u16::MAX - 2, u16::MAX - 2, 8, 8),
+        ] {
+            for focused in [false, true] {
+                for content_height in [0, 5, usize::MAX] {
+                    let popup = history_detail_rect(parent, u16::MAX, content_height, focused);
+                    assert!(rect_is_within(parent, popup), "{parent:?} -> {popup:?}");
+                }
+            }
+        }
+    }
+
     #[test]
     fn history_states_match_golden_buffers() {
         for name in [
@@ -1120,7 +1178,7 @@ mod tests {
         assert!(next.selected < next.filtered_indices.len());
         assert!(next.selected_entry().is_some());
         assert_eq!(next.list_viewport.offset(), 0);
-        assert_eq!(next.detail_state.viewport.offset(), 3);
+        assert_eq!(next.detail_state.viewport.offset(), 4);
 
         let remaining_id = next.selected_entry().unwrap().log.id;
         db.delete_log(remaining_id).unwrap();
@@ -1129,6 +1187,120 @@ mod tests {
         assert!(empty.filtered_indices.is_empty());
         assert_eq!(empty.selected, 0);
         assert!(empty.selected_entry().is_none());
+    }
+
+    #[test]
+    fn history_reentry_defers_detail_clamp_until_actual_width_render() {
+        let db = history_db_with_long_entry(20);
+        let mut screen = HistoryScreen::new(&db).unwrap();
+        screen.mode = Mode::Detail;
+        screen.detail_state.focused = true;
+        screen.detail_state.viewport.set_height(2);
+        screen.detail_state.viewport.set_offset(usize::MAX);
+        screen.detail_content_height = 1;
+
+        let mut next = screen.reenter(&db).unwrap();
+
+        assert_eq!(next.detail_state.viewport.offset(), usize::MAX);
+        let _ = render_history(&mut next, 80, 24);
+        assert_ne!(next.detail_state.viewport.offset(), usize::MAX);
+    }
+
+    #[test]
+    fn history_delete_failure_retains_confirmation_and_context() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        let db = Database::open(file.path()).unwrap();
+        let practice = db
+            .create_practice("Press", PracticeType::Bodyweight)
+            .unwrap();
+        db.create_log(
+            practice.id,
+            &[SetData::Bodyweight { reps: 10 }],
+            Some("keep"),
+            None,
+            None,
+            Some(7),
+        )
+        .unwrap();
+        let mut screen = HistoryScreen::new(&db).unwrap();
+        let selected_id = screen.selected_entry().unwrap().log.id;
+        screen.handle_key(key(KeyCode::Char('d')), &db);
+        rusqlite::Connection::open(file.path())
+            .unwrap()
+            .execute("DROP TABLE training_sessions", [])
+            .unwrap();
+
+        screen.handle_key(key(KeyCode::Char('y')), &db);
+
+        assert_eq!(screen.mode, Mode::ConfirmDelete);
+        assert_eq!(screen.selected_entry().unwrap().log.id, selected_id);
+        assert!(screen.last_deleted.is_none());
+        assert!(screen.status_msg.as_ref().is_some_and(|(_, error)| *error));
+    }
+
+    #[test]
+    fn history_restore_failure_restores_undo_payload_and_context() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        let db = Database::open(file.path()).unwrap();
+        let practice = db
+            .create_practice("Press", PracticeType::Bodyweight)
+            .unwrap();
+        db.create_log(
+            practice.id,
+            &[SetData::Bodyweight { reps: 10 }],
+            Some("current"),
+            None,
+            None,
+            Some(7),
+        )
+        .unwrap();
+        let mut screen = HistoryScreen::new(&db).unwrap();
+        let selected_id = screen.selected_entry().unwrap().log.id;
+        let deleted = fixed_history_entry(
+            9_002,
+            "Retry",
+            PracticeType::Bodyweight,
+            fixed_time(8, 1),
+            vec![SetData::Bodyweight { reps: 9 }],
+            Some(6),
+            Some("retry".into()),
+        );
+        screen.last_deleted = Some(deleted.clone());
+        rusqlite::Connection::open(file.path())
+            .unwrap()
+            .execute("DROP TABLE training_sessions", [])
+            .unwrap();
+
+        screen.handle_key(key(KeyCode::Char('u')), &db);
+
+        assert_eq!(screen.mode, Mode::Browse);
+        assert_eq!(screen.selected_entry().unwrap().log.id, selected_id);
+        assert_eq!(screen.last_deleted.as_ref().unwrap().log.id, deleted.log.id);
+        assert!(screen.status_msg.as_ref().is_some_and(|(_, error)| *error));
+    }
+
+    #[test]
+    fn history_states_render_in_tiny_and_resized_terminals_without_panicking() {
+        for name in [
+            "browse",
+            "browse_with_undo",
+            "detail",
+            "filtering_long_input",
+            "no_filter_match",
+            "list_overflow",
+            "confirm_delete",
+        ] {
+            let mut screen = golden_history_screen(name);
+            for (width, height) in [(1, 1), (12, 4), (24, 10), (40, 6), (80, 24), (20, 5)] {
+                let _ = render_to_snapshot(width, height, |frame| screen.render(frame));
+            }
+            let _ = render_to_buffer(80, 24, |frame| screen.render(frame));
+            if !screen.filtered_indices.is_empty() {
+                assert!(screen.list_viewport.offset() <= screen.selected);
+            } else {
+                assert_eq!(screen.list_viewport.offset(), 0);
+            }
+        }
     }
 
     #[test]
