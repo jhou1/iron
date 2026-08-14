@@ -48,7 +48,7 @@ LANG=zh_CN.UTF-8 iron  # Chinese
 
 The existing Dashboard routes and shortcuts are unchanged. Opening Dashboard, History, Trends, Practices, Goals, or Quotes reloads current database data before switching screens. Where applicable, Iron restores the same item by stable ID together with the active filter, viewport, focused detail, and Trends time window. Unfinished add/edit/date/delete-confirmation state, old status messages, and cross-page undo payloads are cleared when a screen is re-entered.
 
-History edit navigation carries the selected log's stable ID, so the Log Entry form opens the exact requested log even after data changes. Target preparation is atomic: if a destination cannot refresh, Iron remains on the source screen, preserves its in-place state and the cached destination, and shows an error. Batch 3A ships this lifecycle behavior. Batch 3B-1 Practices, Batch 3B-2 Quotes, and Batch 3B-3 Trends presentation migrations are shipped; History and later slices are not shipped.
+History edit navigation carries the selected log's stable ID, so the Log Entry form opens the exact requested log even after data changes. Target preparation is atomic: if a destination cannot refresh, Iron remains on the source screen, preserves its in-place state and the cached destination, and shows an error. Batch 3A ships this lifecycle behavior. Batch 3B-1 Practices, Batch 3B-2 Quotes, Batch 3B-3 Trends, and Batch 3B-4 History presentation migrations are shipped; later presentation slices are not shipped.
 
 ### Dashboard
 
@@ -96,7 +96,7 @@ The practice selector clamps at the first and last result and adds `↑`, `↓`,
 
 ### History
 
-Press `h`. The list previews the selected log in a wrapped detail panel. Press `Enter` to focus and scroll the complete detail.
+Press `h`. The shared frame owns filter, list, status, and shortcut allocation, while the shared list panel owns the border, overflow, viewport, header, and selected-row highlight. History retains log formatting, filtering, detail, editing, delete/undo, and re-entry. The list previews the selected log in a wrapped detail panel. Press `Enter` to focus and scroll the complete detail.
 
 | Key | Action |
 |---|---|

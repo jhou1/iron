@@ -1,7 +1,7 @@
 # TUI Consistency Framework Design
 
 **Date:** 2026-08-10
-**Status:** Batches 1, 2, 3A, 3B-1, 3B-2, and 3B-3 complete; History and later presentation-component slices are not shipped
+**Status:** Batches 1, 2, 3A, 3B-1, 3B-2, 3B-3, and 3B-4 complete; later presentation-component slices are not shipped
 **Branch:** `codex/tui-consistency`
 **Base:** validated Goals milestone-management implementation (`0069c04`)
 
@@ -69,11 +69,11 @@ Components receive already-formatted domain content and return no domain data.
 
 ### `screen_frame.rs`
 
-Provides `ScreenFrame`, which centers a screen body and reserves its body sections, status row, and wrapped shortcut rows in one composition pass. Practices and Quotes use the frame with all their applicable presentation components; Trends uses the frame with its accepted filter, list, and chart constraints.
+Provides `ScreenFrame`, which centers a screen body and reserves its body sections, status row, and wrapped shortcut rows in one composition pass. Practices and Quotes use the frame with all their applicable presentation components; Trends uses the frame with its accepted filter, list, and chart constraints; History uses it for its filter, list, status, and shortcut composition.
 
 ### `list_panel.rs`
 
-Provides `ScrollableListPanel`, which owns bordered-list geometry, title and overflow markers, viewport reveal and clamp, visible-row slicing, and selected-row highlighting. Practices, Quotes, and Trends provide already-formatted rows and retain their domain selection policies.
+Provides `ScrollableListPanel`, which owns bordered-list geometry, title and overflow markers, viewport reveal and clamp, visible-row slicing, and selected-row highlighting. Practices, Quotes, Trends, and History provide already-formatted rows and retain their domain selection policies.
 
 ### `action_panel.rs`
 
@@ -197,7 +197,13 @@ Batch 3B-3 migrates Trends to `ScreenFrame` and `ScrollableListPanel`. The frame
 
 Trends retains its filter rendering, row formatting, selection and wrap policy, database query, time-window controls, error and re-entry behavior, and its specialized Sparkline/chart and statistics policy. Six immutable styled-buffer fixtures preserve exact output for a populated chart, long filter input, no filter match, list overflow, no log data, and a cached chart query error; all five Practices and six Quotes fixtures also remain unchanged.
 
-History, Goals popups, Dashboard responsive layout, and Log Entry forms remain unshipped as later presentation-component extraction slices. Batch 3B-3 changes no other screen and does not establish that the Trends component subset is suitable for those later slices.
+### Batch 3B-4: History Presentation Components — Complete
+
+Batch 3B-4 migrates History to `ScreenFrame` and `ScrollableListPanel`. The frame reserves the filter, list, status, and wrapped shortcut rows in one composition pass, while the list panel owns the list border, fixed header, overflow suffix, logical-row viewport, visible slicing, empty state, and selected-row highlight. Seven immutable styled-buffer fixtures preserve Table-to-Line cell equivalence across Browse, Browse with Undo, Detail, filtering with long input, list overflow, no filter match, and ConfirmDelete.
+
+History retains its dynamic log-column formatting, filtering, floating-preview placement, Detail-mode measurement and scrolling, edit navigation, delete/undo policy, database behavior, and re-entry lifecycle through the existing `render_detail_panel` helper rather than a generic popup component. Detail-viewport clamping is deferred until the actual popup width is known, keeping normal, narrow, short, tiny, zero-sized, edge, and resized rendering geometry-safe. Navigation, stable-ID edit intents, re-entry selection/filter/transient-state policy, delete/undo behavior, and shortcuts are unchanged.
+
+Goals popups, Dashboard responsive layout, Log Entry forms, and later presentation-component extraction slices remain unshipped. Batch 3B-4 changes no other screen and does not establish that the History component subset is suitable for those later slices.
 
 ## Testing Strategy
 

@@ -6,6 +6,8 @@ Browse, inspect, edit, and delete training logs.
 
 The History screen keeps the log list as the primary surface and opens the selected log in a floating detail panel. The panel is a read-only preview during Browse and becomes a focused, full-height viewport after `Enter`.
 
+`ScreenFrame` reserves the filter, list, status, and wrapped shortcut rows in one composition pass. `ScrollableListPanel` owns the History list border, fixed header, overflow suffix, logical-row viewport, visible slicing, empty state, and selected-row highlight. History supplies already-formatted date/practice/RPE/metric lines and retains filtering, popup placement, Detail focus, editing, delete/undo, database, and re-entry policy. The floating and focused detail remains integrated through `render_detail_panel` rather than a generic popup component.
+
 ### Screen rows (top to bottom)
 1. Title + filter bar
 2. Log list (scrollable)
