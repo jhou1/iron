@@ -7,14 +7,15 @@ use ratatui::{
     Frame,
 };
 
+use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
 use super::lifecycle::{NavigationStatus, Reenter};
 use super::{
     framework::{
         fit_rect, render_detail_panel, render_screen_frame_sections, render_scrollable_list_panel,
-        truncate_to_width, visual_spans, DetailPanelState, ListPanelAreas, ListPanelContent,
-        ScreenFrameSections, Shortcut, TextInput, ViewportState,
+        visual_spans, DetailPanelState, ListPanelAreas, ListPanelContent, ScreenFrameSections,
+        Shortcut, TextInput, ViewportState,
     },
     Action, ModuleId, NavigationIntent, StatusMessage, CONTENT_WIDTH,
 };
@@ -56,6 +57,21 @@ struct HistoryColumns {
     max_label: usize,
 }
 
+fn clip_history_cell_span(text: &str, width: usize) -> String {
+    let mut used = 0;
+    UnicodeSegmentation::graphemes(text, true)
+        .take_while(|grapheme| {
+            let grapheme_width = UnicodeWidthStr::width(*grapheme);
+            if used + grapheme_width > width {
+                false
+            } else {
+                used += grapheme_width;
+                true
+            }
+        })
+        .collect()
+}
+
 fn append_cell(
     output: &mut Vec<Span<'static>>,
     spans: Vec<Span<'static>>,
@@ -69,12 +85,17 @@ fn append_cell(
         if unused == 0 {
             break;
         }
-        let text = truncate_to_width(span.content.as_ref(), unused);
-        let used = text.width();
+        let span_width = span.content.width();
+        let text = clip_history_cell_span(span.content.as_ref(), unused);
+        let rendered_width = text.width();
         if !text.is_empty() {
             output.push(Span::styled(text, span.style));
         }
-        unused = unused.saturating_sub(used);
+        let consumed = span_width.min(unused);
+        if rendered_width < consumed {
+            output.push(Span::raw(" ".repeat(consumed - rendered_width)));
+        }
+        unused = unused.saturating_sub(consumed);
     }
     if unused > 0 {
         output.push(Span::raw(" ".repeat(unused)));
@@ -114,7 +135,6 @@ fn history_list_content(
     widths[2] = columns
         .name
         .min((inner_width as usize).saturating_sub(fixed_width));
-    let name_width = widths[2];
 
     let build_line = |cells: Vec<Vec<Span<'static>>>| {
         let mut remaining = inner_width as usize;
@@ -159,10 +179,7 @@ fn history_list_content(
             let total = format!("{:.0}", entry.total_metric());
             let label = entry.metric_label();
             let rpe = entry.log.rpe.map(|rpe| format!(" [RPE: {rpe}]"));
-            let rpe_width = rpe.as_deref().map(str::width).unwrap_or(0).min(name_width);
-            let visible_name =
-                truncate_to_width(&entry.practice_name, name_width.saturating_sub(rpe_width));
-            let mut name = vec![Span::styled(visible_name, primary)];
+            let mut name = vec![Span::styled(entry.practice_name.clone(), primary)];
             if let Some(rpe) = rpe {
                 name.push(Span::styled(rpe, Style::default().fg(Color::Yellow)));
             }
@@ -796,7 +813,10 @@ mod tests {
     };
     use crate::tui::lifecycle::Reenter;
     use crossterm::event::KeyModifiers;
-    use ratatui::layout::Rect;
+    use ratatui::{
+        layout::Rect,
+        widgets::{Cell, Row, Table},
+    };
 
     fn fixed_time(month: u32, day: u32) -> chrono::NaiveDateTime {
         chrono::NaiveDate::from_ymd_opt(2026, month, day)
@@ -1003,6 +1023,124 @@ mod tests {
         }
     }
 
+    fn legacy_history_table_buffer(
+        entries: &[LogEntry],
+        filtered_indices: &[usize],
+        selected: usize,
+        inner_width: u16,
+        columns: HistoryColumns,
+    ) -> ratatui::buffer::Buffer {
+        let header_style = Style::default().fg(Color::White).bold();
+        let header = Row::new(vec![
+            Cell::from(""),
+            Cell::from(Span::styled(tr("history-col-date"), header_style)),
+            Cell::from(Span::styled(tr("history-col-practice"), header_style)),
+            Cell::from(Span::styled(tr("history-col-volume"), header_style)),
+        ]);
+        let rows = filtered_indices
+            .iter()
+            .enumerate()
+            .filter_map(|(filtered_index, entry_index)| {
+                let entry = entries.get(*entry_index)?;
+                let selected_row = filtered_index == selected;
+                let primary = if selected_row {
+                    Style::default().fg(Color::White).bold()
+                } else {
+                    Style::default().fg(Color::White)
+                };
+                let dim = if selected_row {
+                    Style::default().fg(Color::White)
+                } else {
+                    Style::default().fg(Color::Gray)
+                };
+                let mut name = vec![Span::styled(entry.practice_name.clone(), primary)];
+                if let Some(rpe) = entry.log.rpe {
+                    name.push(Span::styled(
+                        format!(" [RPE: {rpe}]"),
+                        Style::default().fg(Color::Yellow),
+                    ));
+                }
+                let total = format!("{:.0}", entry.total_metric());
+                let label = entry.metric_label();
+                Some(Row::new(vec![
+                    Cell::from(Span::styled(if selected_row { ">" } else { " " }, primary)),
+                    Cell::from(Span::styled(
+                        entry.log.logged_at.format("%Y-%m-%d").to_string(),
+                        dim,
+                    )),
+                    Cell::from(Line::from(name)),
+                    Cell::from(Span::styled(
+                        format!(
+                            "{:>width$} {}{}",
+                            total,
+                            label,
+                            " ".repeat(columns.max_label.saturating_sub(label.width())),
+                            width = columns.max_total,
+                        ),
+                        dim,
+                    )),
+                ]))
+            })
+            .collect::<Vec<_>>();
+        let height = rows.len().saturating_add(1).min(u16::MAX as usize) as u16;
+        let table = Table::new(
+            rows,
+            [
+                Constraint::Length(columns.marker.min(u16::MAX as usize) as u16),
+                Constraint::Length(columns.date.min(u16::MAX as usize) as u16),
+                Constraint::Length(columns.name.min(u16::MAX as usize) as u16),
+                Constraint::Length(columns.metric.min(u16::MAX as usize) as u16),
+            ],
+        )
+        .header(header);
+
+        render_to_buffer(inner_width, height, |frame| {
+            frame.render_widget(table.clone(), frame.area());
+        })
+    }
+
+    fn line_history_table_buffer(
+        entries: &[LogEntry],
+        filtered_indices: &[usize],
+        selected: usize,
+        inner_width: u16,
+        columns: HistoryColumns,
+    ) -> ratatui::buffer::Buffer {
+        let content =
+            history_list_content(entries, filtered_indices, selected, inner_width, columns);
+        let mut lines = content.header.into_iter().collect::<Vec<_>>();
+        lines.extend(content.rows);
+        let height = lines.len().min(u16::MAX as usize) as u16;
+        render_to_buffer(inner_width, height, |frame| {
+            frame.render_widget(
+                Paragraph::new(lines.clone()).wrap(Wrap { trim: false }),
+                frame.area(),
+            );
+        })
+    }
+
+    fn assert_history_row_matches_legacy_table(
+        entries: &[LogEntry],
+        filtered_indices: &[usize],
+        selected: usize,
+        compared_row: usize,
+        inner_width: u16,
+        columns: HistoryColumns,
+    ) {
+        let legacy =
+            legacy_history_table_buffer(entries, filtered_indices, selected, inner_width, columns);
+        let line =
+            line_history_table_buffer(entries, filtered_indices, selected, inner_width, columns);
+        let y = compared_row.saturating_add(1).min(u16::MAX as usize) as u16;
+        for x in 0..inner_width {
+            assert_eq!(
+                line[(x, y)],
+                legacy[(x, y)],
+                "styled cell mismatch at ({x}, {y}) for inner width {inner_width}"
+            );
+        }
+    }
+
     fn rect_is_within(parent: Rect, child: Rect) -> bool {
         child.x >= parent.x
             && child.y >= parent.y
@@ -1063,7 +1201,26 @@ mod tests {
     }
 
     #[test]
-    fn history_line_rows_preserve_unicode_rpe_and_metric_cells() {
+    fn history_line_rows_show_rpe_when_the_legacy_name_cell_has_room() {
+        let screen = golden_history_screen("browse");
+        let columns = screen.columns();
+        let content = history_list_content(
+            &screen.entries,
+            &screen.filtered_indices,
+            screen.selected,
+            76,
+            columns,
+        );
+
+        let row = content.rows[0].clone();
+        assert!(row.to_string().contains("Bench Press"));
+        assert!(row.to_string().contains("[RPE: 8]"));
+        assert!(row.to_string().contains(&screen.entries[0].metric_label()));
+        assert!(row.width() <= 76);
+    }
+
+    #[test]
+    fn history_line_rows_let_a_long_unicode_name_hide_the_rpe_suffix() {
         let screen = golden_history_screen("filtering_long_input");
         let columns = screen.columns();
         let content = history_list_content(
@@ -1083,8 +1240,130 @@ mod tests {
         assert_eq!(content.rows.len(), 1);
         let row = content.rows[0].clone();
         assert!(row.to_string().contains("训练"));
-        assert!(row.to_string().contains("[RPE: 8]"));
+        assert!(!row.to_string().contains("[RPE: 8]"));
+        assert!(row.to_string().contains(&screen.entries[0].metric_label()));
         assert!(row.width() <= 76);
+    }
+
+    #[test]
+    fn history_long_unselected_names_match_legacy_table_clipping() {
+        let selected = 8;
+        let compared_row = 9;
+        let entries = (0..10)
+            .map(|index| {
+                let name = if index == compared_row {
+                    "Long ASCII practice 训练组合 ".repeat(8)
+                } else {
+                    format!("Practice {index:02}")
+                };
+                fixed_history_entry(
+                    4_000 + index as i64,
+                    name,
+                    PracticeType::Bodyweight,
+                    fixed_time(8, 1) + chrono::Duration::days(index as i64),
+                    vec![SetData::Bodyweight { reps: 10 }],
+                    Some(9),
+                    None,
+                )
+            })
+            .collect::<Vec<_>>();
+        let filtered_indices = (0..entries.len()).collect::<Vec<_>>();
+        let screen = HistoryScreen {
+            filtered_indices: filtered_indices.clone(),
+            entries: entries.clone(),
+            filter: TextInput::new(),
+            filtering: false,
+            selected,
+            mode: Mode::Browse,
+            list_viewport: ViewportState::new(0),
+            detail_state: DetailPanelState::new(false),
+            detail_content_height: 0,
+            status_msg: None,
+            last_deleted: None,
+        };
+        let columns = screen.columns();
+        let compared_y = compared_row as u16 + 1;
+        let popup = history_detail_rect(
+            Rect::new(0, 0, 76, entries.len() as u16 + 1),
+            selected as u16 + 1,
+            4,
+            false,
+        );
+        assert!(
+            popup.bottom() <= compared_y,
+            "popup {popup:?} must flip above compared row {compared_y}"
+        );
+
+        for inner_width in [76, 34] {
+            assert_history_row_matches_legacy_table(
+                &entries,
+                &filtered_indices,
+                selected,
+                compared_row,
+                inner_width,
+                columns,
+            );
+        }
+    }
+
+    fn assert_grapheme_cut_matches_legacy_table(practice_name: &str, name_cell_width: usize) {
+        let entries = vec![fixed_history_entry(
+            5_000,
+            practice_name,
+            PracticeType::Bodyweight,
+            fixed_time(8, 1),
+            vec![SetData::Bodyweight { reps: 10 }],
+            None,
+            None,
+        )];
+        let filtered_indices = vec![0];
+        let screen = HistoryScreen {
+            filtered_indices: filtered_indices.clone(),
+            entries: entries.clone(),
+            filter: TextInput::new(),
+            filtering: false,
+            selected: 0,
+            mode: Mode::Browse,
+            list_viewport: ViewportState::new(0),
+            detail_state: DetailPanelState::new(false),
+            detail_content_height: 0,
+            status_msg: None,
+            last_deleted: None,
+        };
+        let mut columns = screen.columns();
+        columns.name = name_cell_width;
+        let fixed_width = columns
+            .marker
+            .saturating_add(columns.date)
+            .saturating_add(columns.metric)
+            .saturating_add(3);
+        let inner_width = fixed_width
+            .saturating_add(name_cell_width)
+            .min(u16::MAX as usize) as u16;
+
+        assert_history_row_matches_legacy_table(
+            &entries,
+            &filtered_indices,
+            0,
+            0,
+            inner_width,
+            columns,
+        );
+    }
+
+    #[test]
+    fn history_flag_cut_matches_legacy_table_grapheme_clipping() {
+        assert_grapheme_cut_matches_legacy_table("A🇨🇳Z", 2);
+    }
+
+    #[test]
+    fn history_combining_cut_matches_legacy_table_grapheme_clipping() {
+        assert_grapheme_cut_matches_legacy_table("e\u{301}Z", 1);
+    }
+
+    #[test]
+    fn history_zwj_cut_matches_legacy_table_grapheme_clipping() {
+        assert_grapheme_cut_matches_legacy_table("👩‍💻Z", 2);
     }
 
     fn key(code: KeyCode) -> KeyEvent {

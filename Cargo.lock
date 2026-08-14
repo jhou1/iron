@@ -573,8 +573,10 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
+ "syn",
  "tempfile",
  "unic-langid",
+ "unicode-segmentation",
  "unicode-width 0.2.0",
 ]
 

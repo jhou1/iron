@@ -1,5 +1,6 @@
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::Path;
+use syn::visit::{self, Visit};
 
 fn starts_char_literal(chars: &std::iter::Peekable<std::str::Chars<'_>>) -> bool {
     let mut probe = chars.clone();
@@ -137,28 +138,258 @@ fn source_code_contains(source: &str, needle: &str) -> bool {
     source_code(source).contains(needle)
 }
 
-fn source_code_count(source: &str, needle: &str) -> usize {
-    source_code(source).matches(needle).count()
+fn is_history_screen_type(ty: &syn::Type) -> bool {
+    matches!(
+        ty,
+        syn::Type::Path(path)
+            if path.qself.is_none()
+                && path.path.segments.last().is_some_and(|segment| segment.ident == "HistoryScreen")
+    )
 }
 
-fn history_ownership_violations(source: &str) -> Vec<String> {
-    let mut violations = Vec::new();
-    for (needle, component) in [
-        ("render_screen_frame_sections(", "ScreenFrame"),
-        ("render_scrollable_list_panel(", "ScrollableListPanel"),
-    ] {
-        let count = source_code_count(source, needle);
-        if count != 1 {
-            violations.push(format!(
-                "History must contain exactly one executable {component} call; found {count}"
-            ));
+fn is_cfg_test(attrs: &[syn::Attribute]) -> bool {
+    attrs.iter().any(|attribute| {
+        let syn::Meta::List(list) = &attribute.meta else {
+            return false;
+        };
+        list.path.is_ident("cfg")
+            && list
+                .parse_args::<syn::Path>()
+                .is_ok_and(|path| path.is_ident("test"))
+    })
+}
+
+fn collect_widget_aliases(tree: &syn::UseTree, aliases: &mut HashMap<String, String>) {
+    match tree {
+        syn::UseTree::Path(path) => collect_widget_aliases(&path.tree, aliases),
+        syn::UseTree::Group(group) => {
+            for item in &group.items {
+                collect_widget_aliases(item, aliases);
+            }
+        }
+        syn::UseTree::Rename(rename) => {
+            let original = rename.ident.to_string();
+            if matches!(original.as_str(), "Block" | "Table" | "Row" | "Cell") {
+                aliases.insert(rename.rename.to_string(), original);
+            }
+        }
+        syn::UseTree::Name(_) | syn::UseTree::Glob(_) => {}
+    }
+}
+
+struct LocalWidgetAliasCollector<'a> {
+    aliases: &'a mut HashMap<String, String>,
+}
+
+impl<'ast> Visit<'ast> for LocalWidgetAliasCollector<'_> {
+    fn visit_item(&mut self, item: &'ast syn::Item) {
+        if let syn::Item::Use(item_use) = item {
+            collect_widget_aliases(&item_use.tree, self.aliases);
+        }
+    }
+}
+
+#[derive(Default)]
+struct HistoryRenderOwnership {
+    screen_frame_calls: usize,
+    list_panel_calls: usize,
+    detail_panel_calls: usize,
+    borders_method_calls: usize,
+    block_bordered_calls: usize,
+    table_new_calls: usize,
+    row_new_calls: usize,
+    cell_from_calls: usize,
+    alias_uses: BTreeSet<(String, String)>,
+}
+
+struct HistoryRenderVisitor<'a> {
+    aliases: &'a HashMap<String, String>,
+    ownership: HistoryRenderOwnership,
+}
+
+impl HistoryRenderVisitor<'_> {
+    fn record_alias_use(&mut self, path: &syn::Path) {
+        let Some(first) = path.segments.first() else {
+            return;
+        };
+        let alias = first.ident.to_string();
+        if let Some(original) = self.aliases.get(&alias) {
+            self.ownership.alias_uses.insert((original.clone(), alias));
         }
     }
 
-    let local_border_count = source_code_count(source, ".borders(Borders::ALL)");
-    if local_border_count != 0 {
+    fn called_type_and_method(call: &syn::ExprPath) -> Option<(String, String)> {
+        let method = call.path.segments.last()?.ident.to_string();
+        let receiver = if call.path.segments.len() >= 2 {
+            call.path
+                .segments
+                .iter()
+                .nth(call.path.segments.len() - 2)?
+                .ident
+                .to_string()
+        } else {
+            let syn::Type::Path(path) = call.qself.as_ref()?.ty.as_ref() else {
+                return None;
+            };
+            path.path.segments.last()?.ident.to_string()
+        };
+        Some((receiver, method))
+    }
+}
+
+impl<'ast> Visit<'ast> for HistoryRenderVisitor<'_> {
+    fn visit_item(&mut self, _item: &'ast syn::Item) {
+        // Nested items are declarations, not calls made by HistoryScreen::render.
+    }
+
+    fn visit_expr_call(&mut self, call: &'ast syn::ExprCall) {
+        if let syn::Expr::Path(function) = call.func.as_ref() {
+            match function
+                .path
+                .segments
+                .last()
+                .map(|segment| segment.ident.to_string())
+                .as_deref()
+            {
+                Some("render_screen_frame_sections") => self.ownership.screen_frame_calls += 1,
+                Some("render_scrollable_list_panel") => self.ownership.list_panel_calls += 1,
+                Some("render_detail_panel") => self.ownership.detail_panel_calls += 1,
+                _ => {}
+            }
+
+            if let Some((receiver, method)) = Self::called_type_and_method(function) {
+                let original = self
+                    .aliases
+                    .get(&receiver)
+                    .map(String::as_str)
+                    .unwrap_or(receiver.as_str());
+                match (original, method.as_str()) {
+                    ("Block", "bordered") => self.ownership.block_bordered_calls += 1,
+                    ("Table", "new") => self.ownership.table_new_calls += 1,
+                    ("Row", "new") => self.ownership.row_new_calls += 1,
+                    ("Cell", "from") => self.ownership.cell_from_calls += 1,
+                    _ => {}
+                }
+            }
+        }
+        visit::visit_expr_call(self, call);
+    }
+
+    fn visit_expr_method_call(&mut self, call: &'ast syn::ExprMethodCall) {
+        if call.method == "borders" {
+            self.ownership.borders_method_calls += 1;
+        }
+        visit::visit_expr_method_call(self, call);
+    }
+
+    fn visit_expr_path(&mut self, path: &'ast syn::ExprPath) {
+        self.record_alias_use(&path.path);
+        visit::visit_expr_path(self, path);
+    }
+
+    fn visit_type_path(&mut self, path: &'ast syn::TypePath) {
+        self.record_alias_use(&path.path);
+        visit::visit_type_path(self, path);
+    }
+}
+
+fn history_ownership_violations(source: &str) -> Vec<String> {
+    let file = match syn::parse_file(source) {
+        Ok(file) => file,
+        Err(error) => return vec![format!("History source must parse as Rust: {error}")],
+    };
+    let render_methods = file
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            syn::Item::Impl(item_impl)
+                if item_impl.trait_.is_none()
+                    && !is_cfg_test(&item_impl.attrs)
+                    && is_history_screen_type(item_impl.self_ty.as_ref()) =>
+            {
+                Some(item_impl)
+            }
+            _ => None,
+        })
+        .flat_map(|item_impl| &item_impl.items)
+        .filter_map(|item| match item {
+            syn::ImplItem::Fn(method)
+                if method.sig.ident == "render" && !is_cfg_test(&method.attrs) =>
+            {
+                Some(method)
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+
+    if render_methods.len() != 1 {
+        return vec![format!(
+            "History must define exactly one production inherent HistoryScreen::render method; found {}",
+            render_methods.len()
+        )];
+    }
+    let render = render_methods[0];
+    let mut aliases = HashMap::new();
+    for item in &file.items {
+        if let syn::Item::Use(item_use) = item {
+            collect_widget_aliases(&item_use.tree, &mut aliases);
+        }
+    }
+    LocalWidgetAliasCollector {
+        aliases: &mut aliases,
+    }
+    .visit_block(&render.block);
+
+    let mut visitor = HistoryRenderVisitor {
+        aliases: &aliases,
+        ownership: HistoryRenderOwnership::default(),
+    };
+    visitor.visit_block(&render.block);
+    let ownership = visitor.ownership;
+    let mut violations = Vec::new();
+    for (count, component) in [
+        (
+            ownership.screen_frame_calls,
+            "ScreenFrame (render_screen_frame_sections)",
+        ),
+        (
+            ownership.list_panel_calls,
+            "ScrollableListPanel (render_scrollable_list_panel)",
+        ),
+        (ownership.detail_panel_calls, "render_detail_panel"),
+    ] {
+        if count != 1 {
+            violations.push(format!(
+                "HistoryScreen::render must call {component} exactly once; found {count}"
+            ));
+        }
+    }
+    if ownership.borders_method_calls != 0 {
         violations.push(format!(
-            "History must not own a local Borders::ALL block; found {local_border_count}"
+            "HistoryScreen::render must not own a local border through .borders(...); found {}",
+            ownership.borders_method_calls
+        ));
+    }
+    if ownership.block_bordered_calls != 0 {
+        violations.push(format!(
+            "HistoryScreen::render must not own a local border through Block::bordered(); found {}",
+            ownership.block_bordered_calls
+        ));
+    }
+    for (count, constructor) in [
+        (ownership.table_new_calls, "Table::new"),
+        (ownership.row_new_calls, "Row::new"),
+        (ownership.cell_from_calls, "Cell::from"),
+    ] {
+        if count != 0 {
+            violations.push(format!(
+                "HistoryScreen::render must not own local table cells through {constructor}; found {count}"
+            ));
+        }
+    }
+    for (original, alias) in ownership.alias_uses {
+        violations.push(format!(
+            "HistoryScreen::render must not use aliased {original} `{alias}` for local presentation ownership"
         ));
     }
     violations
@@ -264,12 +495,16 @@ fn ownership_source_check_rejects_non_code_evidence() {
 #[test]
 fn history_ownership_rejects_duplicate_shared_calls_and_local_border() {
     let mixed_ownership = r###"
-        fn render(frame: &mut Frame, area: Rect) {
-            render_screen_frame_sections(frame, area);
-            render_screen_frame_sections(frame, area);
-            render_scrollable_list_panel(frame, area);
-            render_scrollable_list_panel(frame, area);
-            Block::default().borders(Borders::ALL);
+        impl HistoryScreen {
+            fn render(&mut self) {
+                render_screen_frame_sections();
+                render_screen_frame_sections();
+                render_scrollable_list_panel();
+                render_scrollable_list_panel();
+                render_detail_panel();
+                render_detail_panel();
+                Block::default().borders(Borders::ALL);
+            }
         }
         // render_screen_frame_sections( render_scrollable_list_panel( .borders(Borders::ALL)
         const DECOYS: &str = r#"render_screen_frame_sections( render_scrollable_list_panel( .borders(Borders::ALL)"#;
@@ -286,13 +521,210 @@ fn history_ownership_rejects_duplicate_shared_calls_and_local_border() {
     ));
 
     let violations = history_ownership_violations(mixed_ownership);
-    assert_eq!(
-        violations.iter().map(String::as_str).collect::<Vec<_>>(),
-        vec![
-            "History must contain exactly one executable ScreenFrame call; found 2",
-            "History must contain exactly one executable ScrollableListPanel call; found 2",
-            "History must not own a local Borders::ALL block; found 1",
-        ]
+    assert!(
+        violations
+            .iter()
+            .any(|violation| violation.contains("ScreenFrame") && violation.contains("found 2")),
+        "{violations:?}"
+    );
+    assert!(
+        violations.iter().any(|violation| {
+            violation.contains("ScrollableListPanel") && violation.contains("found 2")
+        }),
+        "{violations:?}"
+    );
+    assert!(
+        violations
+            .iter()
+            .any(|violation| violation.contains("render_detail_panel") && violation.contains("2")),
+        "{violations:?}"
+    );
+    assert!(
+        violations
+            .iter()
+            .any(|violation| violation.contains("local") && violation.contains("border")),
+        "{violations:?}"
+    );
+}
+
+#[test]
+fn history_ownership_requires_calls_in_production_render_not_decoys() {
+    let decoy_delegation = r#"
+        impl HistoryScreen {
+            fn render(&mut self) {
+                render_detail_panel();
+            }
+        }
+
+        fn dead_helper() {
+            render_screen_frame_sections();
+        }
+
+        #[cfg(test)]
+        mod tests {
+            fn test_only_helper() {
+                render_scrollable_list_panel();
+            }
+        }
+    "#;
+
+    let violations = history_ownership_violations(decoy_delegation);
+    assert!(
+        violations
+            .iter()
+            .any(|violation| violation.contains("ScreenFrame") && violation.contains("found 0")),
+        "{violations:?}"
+    );
+    assert!(
+        violations.iter().any(|violation| {
+            violation.contains("ScrollableListPanel") && violation.contains("found 0")
+        }),
+        "{violations:?}"
+    );
+}
+
+#[test]
+fn history_ownership_requires_detail_integration_in_production_render() {
+    let missing_detail = r#"
+        impl HistoryScreen {
+            fn render(&mut self) {
+                render_screen_frame_sections();
+                render_scrollable_list_panel();
+            }
+        }
+    "#;
+
+    let violations = history_ownership_violations(missing_detail);
+    assert!(
+        violations
+            .iter()
+            .any(|violation| violation.contains("render_detail_panel") && violation.contains("0")),
+        "{violations:?}"
+    );
+}
+
+#[test]
+fn history_ownership_rejects_method_and_bordered_block_syntax() {
+    for local_border in [
+        "Block::default().borders(Borders::TOP);",
+        "ratatui::widgets::Block::bordered();",
+    ] {
+        let source = format!(
+            r#"
+                impl HistoryScreen {{
+                    fn render(&mut self) {{
+                        render_screen_frame_sections();
+                        render_scrollable_list_panel();
+                        render_detail_panel();
+                        {local_border}
+                    }}
+                }}
+            "#
+        );
+        let violations = history_ownership_violations(&source);
+        assert!(
+            violations
+                .iter()
+                .any(|violation| violation.contains("local") && violation.contains("border")),
+            "{local_border}: {violations:?}"
+        );
+    }
+}
+
+#[test]
+fn history_ownership_rejects_qualified_table_construction() {
+    let qualified_table = r#"
+        impl HistoryScreen {
+            fn render(&mut self) {
+                render_screen_frame_sections();
+                render_scrollable_list_panel();
+                render_detail_panel();
+                ratatui::widgets::Table::new([], []);
+            }
+        }
+    "#;
+
+    let violations = history_ownership_violations(qualified_table);
+    assert!(
+        violations
+            .iter()
+            .any(|violation| violation.contains("Table::new")),
+        "{violations:?}"
+    );
+}
+
+#[test]
+fn history_ownership_rejects_local_table_row_and_cell_constructors() {
+    let local_widgets = r#"
+        impl HistoryScreen {
+            fn render(&mut self) {
+                render_screen_frame_sections();
+                render_scrollable_list_panel();
+                render_detail_panel();
+                Table::new([], []);
+                Row::new([]);
+                Cell::from("");
+            }
+        }
+    "#;
+
+    let violations = history_ownership_violations(local_widgets);
+    for constructor in ["Table::new", "Row::new", "Cell::from"] {
+        assert!(
+            violations
+                .iter()
+                .any(|violation| violation.contains(constructor)),
+            "{constructor}: {violations:?}"
+        );
+    }
+}
+
+#[test]
+fn history_ownership_rejects_aliased_block_and_table_use() {
+    let aliased_ownership = r#"
+        use ratatui::widgets::{Block as Panel, Table as Grid};
+
+        impl HistoryScreen {
+            fn render(&mut self) {
+                render_screen_frame_sections();
+                render_scrollable_list_panel();
+                render_detail_panel();
+                Panel::bordered();
+                Grid::new([], []);
+            }
+        }
+    "#;
+
+    let violations = history_ownership_violations(aliased_ownership);
+    assert!(
+        violations
+            .iter()
+            .any(|violation| violation.contains("Block") && violation.contains("Panel")),
+        "{violations:?}"
+    );
+    assert!(
+        violations
+            .iter()
+            .any(|violation| violation.contains("Table") && violation.contains("Grid")),
+        "{violations:?}"
+    );
+}
+
+#[test]
+fn history_ownership_accepts_the_component_only_render_path() {
+    let component_only = r#"
+        impl HistoryScreen {
+            fn render(&mut self) {
+                render_screen_frame_sections();
+                render_scrollable_list_panel();
+                render_detail_panel();
+            }
+        }
+    "#;
+
+    assert!(
+        history_ownership_violations(component_only).is_empty(),
+        "component-only render must satisfy History ownership"
     );
 }
 

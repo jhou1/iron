@@ -21,8 +21,10 @@ anyhow = "1"
 fluent-bundle = "0.15"
 unic-langid = "0.9"
 unicode-width = "0.2"
+unicode-segmentation = "1"
 rand = "0.9"
 
 [dev-dependencies]
 tempfile = "3"
 fluent-syntax = "0.11"
+syn = { version = "2", features = ["full", "visit"] }
