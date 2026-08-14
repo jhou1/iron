@@ -764,9 +764,7 @@ impl NavigationStatus for HistoryScreen {
 mod tests {
     use super::*;
     use crate::model::{Log, PracticeType, Set, SetData};
-    use crate::tui::framework::test_support::{
-        render_to_buffer, render_to_snapshot, render_to_string,
-    };
+    use crate::tui::framework::test_support::{render_to_snapshot, render_to_string};
     use crate::tui::lifecycle::Reenter;
     use crossterm::event::KeyModifiers;
 
@@ -918,7 +916,7 @@ mod tests {
                             1_000 + index,
                             format!("Practice {:02}", index + 1),
                             PracticeType::Bodyweight,
-                            fixed_time(7, 1) + chrono::Duration::days(index as i64),
+                            fixed_time(7, 1) + chrono::Duration::days(index),
                             vec![SetData::Bodyweight {
                                 reps: index as i32 + 1,
                             }],
