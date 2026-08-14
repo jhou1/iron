@@ -22,7 +22,7 @@ fn starts_char_literal(chars: &std::iter::Peekable<std::str::Chars<'_>>) -> bool
     }
 }
 
-fn source_code_contains(source: &str, needle: &str) -> bool {
+fn source_code(source: &str) -> String {
     let mut code = String::with_capacity(source.len());
     let mut chars = source.chars().peekable();
     let mut block_comment_depth = 0usize;
@@ -130,7 +130,38 @@ fn source_code_contains(source: &str, needle: &str) -> bool {
         }
     }
 
-    code.contains(needle)
+    code
+}
+
+fn source_code_contains(source: &str, needle: &str) -> bool {
+    source_code(source).contains(needle)
+}
+
+fn source_code_count(source: &str, needle: &str) -> usize {
+    source_code(source).matches(needle).count()
+}
+
+fn history_ownership_violations(source: &str) -> Vec<String> {
+    let mut violations = Vec::new();
+    for (needle, component) in [
+        ("render_screen_frame_sections(", "ScreenFrame"),
+        ("render_scrollable_list_panel(", "ScrollableListPanel"),
+    ] {
+        let count = source_code_count(source, needle);
+        if count != 1 {
+            violations.push(format!(
+                "History must contain exactly one executable {component} call; found {count}"
+            ));
+        }
+    }
+
+    let local_border_count = source_code_count(source, ".borders(Borders::ALL)");
+    if local_border_count != 0 {
+        violations.push(format!(
+            "History must not own a local Borders::ALL block; found {local_border_count}"
+        ));
+    }
+    violations
 }
 
 fn rust_sources(root: &Path) -> Vec<std::path::PathBuf> {
@@ -228,6 +259,41 @@ fn ownership_source_check_rejects_non_code_evidence() {
         "fn render<'a>(frame: &'a mut Frame) { render_scrollable_list_panel(frame, area); }",
         "render_scrollable_list_panel("
     ));
+}
+
+#[test]
+fn history_ownership_rejects_duplicate_shared_calls_and_local_border() {
+    let mixed_ownership = r###"
+        fn render(frame: &mut Frame, area: Rect) {
+            render_screen_frame_sections(frame, area);
+            render_screen_frame_sections(frame, area);
+            render_scrollable_list_panel(frame, area);
+            render_scrollable_list_panel(frame, area);
+            Block::default().borders(Borders::ALL);
+        }
+        // render_screen_frame_sections( render_scrollable_list_panel( .borders(Borders::ALL)
+        const DECOYS: &str = r#"render_screen_frame_sections( render_scrollable_list_panel( .borders(Borders::ALL)"#;
+    "###;
+
+    // The old presence-only assertions accepted this mixed ownership.
+    assert!(source_code_contains(
+        mixed_ownership,
+        "render_screen_frame_sections("
+    ));
+    assert!(source_code_contains(
+        mixed_ownership,
+        "render_scrollable_list_panel("
+    ));
+
+    let violations = history_ownership_violations(mixed_ownership);
+    assert_eq!(
+        violations.iter().map(String::as_str).collect::<Vec<_>>(),
+        vec![
+            "History must contain exactly one executable ScreenFrame call; found 2",
+            "History must contain exactly one executable ScrollableListPanel call; found 2",
+            "History must not own a local Borders::ALL block; found 1",
+        ]
+    );
 }
 
 /// Scans all TUI source files and verifies that every `Paragraph::new(`
@@ -335,14 +401,17 @@ fn screens_must_have_bordered_blocks() {
         ("history.rs", "History"),
     ] {
         let source = std::fs::read_to_string(tui_dir.join(filename)).unwrap();
-        assert!(
-            source_code_contains(&source, "render_scrollable_list_panel("),
-            "{screen_name} must delegate its bordered list to ScrollableListPanel"
-        );
         if filename == "history.rs" {
+            let violations = history_ownership_violations(&source);
             assert!(
-                source_code_contains(&source, "render_screen_frame_sections("),
-                "History must delegate frame/footer geometry to ScreenFrame"
+                violations.is_empty(),
+                "History presentation ownership violations:\n{}",
+                violations.join("\n")
+            );
+        } else {
+            assert!(
+                source_code_contains(&source, "render_scrollable_list_panel("),
+                "{screen_name} must delegate its bordered list to ScrollableListPanel"
             );
         }
     }
