@@ -763,9 +763,235 @@ impl NavigationStatus for HistoryScreen {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::{Log, PracticeType, Set, SetData};
+    use crate::tui::framework::test_support::{
+        render_to_buffer, render_to_snapshot, render_to_string,
+    };
     use crate::tui::lifecycle::Reenter;
-    use crate::{model::PracticeType, tui::framework::test_support::render_to_string};
     use crossterm::event::KeyModifiers;
+
+    fn fixed_time(month: u32, day: u32) -> chrono::NaiveDateTime {
+        chrono::NaiveDate::from_ymd_opt(2026, month, day)
+            .unwrap()
+            .and_hms_opt(8, 0, 0)
+            .unwrap()
+    }
+
+    fn fixed_history_entry(
+        id: i64,
+        practice_name: impl Into<String>,
+        practice_type: PracticeType,
+        logged_at: chrono::NaiveDateTime,
+        data: Vec<SetData>,
+        rpe: Option<u8>,
+        note: Option<String>,
+    ) -> LogEntry {
+        let practice_name = practice_name.into();
+        LogEntry {
+            log: Log {
+                id,
+                practice_id: id + 10_000,
+                logged_at,
+                note,
+                warm_up: Some("Band warm-up with Unicode 训练 and controlled breathing".into()),
+                cool_down: Some("Easy cooldown and mobility".into()),
+                rpe,
+            },
+            practice_name,
+            practice_type,
+            sets: data
+                .into_iter()
+                .enumerate()
+                .map(|(index, data)| Set {
+                    id: id * 100 + index as i64,
+                    log_id: id,
+                    set_number: index as i32 + 1,
+                    data,
+                })
+                .collect(),
+            rpe,
+        }
+    }
+
+    fn base_history_entries() -> Vec<LogEntry> {
+        vec![
+            fixed_history_entry(
+                301,
+                "Bench Press",
+                PracticeType::Weighted,
+                fixed_time(8, 13),
+                vec![
+                    SetData::Weighted {
+                        weight: 60.0,
+                        reps: 5,
+                    },
+                    SetData::Weighted {
+                        weight: 67.5,
+                        reps: 5,
+                    },
+                    SetData::Weighted {
+                        weight: 72.5,
+                        reps: 3,
+                    },
+                ],
+                Some(8),
+                Some("A deliberately long fixture note that wraps across visual rows. ".repeat(5)),
+            ),
+            fixed_history_entry(
+                302,
+                "Pull-up",
+                PracticeType::Bodyweight,
+                fixed_time(8, 12),
+                vec![
+                    SetData::Bodyweight { reps: 12 },
+                    SetData::Bodyweight { reps: 10 },
+                ],
+                Some(7),
+                Some("Controlled tempo".into()),
+            ),
+            fixed_history_entry(
+                303,
+                "Trail Run",
+                PracticeType::Distance,
+                fixed_time(8, 11),
+                vec![SetData::Distance { distance: 5.5 }],
+                None,
+                None,
+            ),
+        ]
+    }
+
+    fn golden_history_screen(name: &str) -> HistoryScreen {
+        std::env::set_var("LC_ALL", "C");
+        crate::i18n::init();
+
+        let entries = base_history_entries();
+        let mut screen = HistoryScreen {
+            filtered_indices: (0..entries.len()).collect(),
+            entries,
+            filter: TextInput::new(),
+            filtering: false,
+            selected: 0,
+            mode: Mode::Browse,
+            list_viewport: ViewportState::new(0),
+            detail_state: DetailPanelState::new(false),
+            detail_content_height: 0,
+            status_msg: Some(("Fixture status".into(), false)),
+            last_deleted: None,
+        };
+
+        match name {
+            "browse" => {}
+            "browse_with_undo" => {
+                screen.last_deleted = Some(fixed_history_entry(
+                    9_001,
+                    "Deleted Log",
+                    PracticeType::Bodyweight,
+                    fixed_time(8, 1),
+                    vec![SetData::Bodyweight { reps: 9 }],
+                    Some(6),
+                    Some("Undo fixture".into()),
+                ));
+            }
+            "detail" => {
+                screen.mode = Mode::Detail;
+                screen.detail_state.focused = true;
+                screen.detail_state.viewport.set_offset(2);
+            }
+            "filtering_long_input" => {
+                let long = "训练".repeat(50);
+                screen.entries[0].practice_name = long.clone();
+                screen.filter = TextInput::from(long);
+                screen.filtering = true;
+                screen.filtered_indices = vec![0];
+            }
+            "no_filter_match" => {
+                screen.filter = TextInput::from("missing practice".to_owned());
+                screen.filtering = true;
+                screen.filtered_indices.clear();
+                screen.selected = 0;
+            }
+            "list_overflow" => {
+                screen.entries = (0..30)
+                    .map(|index| {
+                        fixed_history_entry(
+                            1_000 + index,
+                            format!("Practice {:02}", index + 1),
+                            PracticeType::Bodyweight,
+                            fixed_time(7, 1) + chrono::Duration::days(index as i64),
+                            vec![SetData::Bodyweight {
+                                reps: index as i32 + 1,
+                            }],
+                            None,
+                            None,
+                        )
+                    })
+                    .collect();
+                screen.filtered_indices = (0..screen.entries.len()).collect();
+                screen.selected = screen.filtered_indices.len() - 1;
+                screen.list_viewport.set_offset(25);
+            }
+            "confirm_delete" => {
+                screen.selected = 1;
+                screen.mode = Mode::ConfirmDelete;
+            }
+            other => panic!("unknown History golden state: {other}"),
+        }
+
+        screen
+    }
+
+    fn history_golden(name: &str) -> &'static str {
+        match name {
+            "browse" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/history/browse.txt"
+            )),
+            "browse_with_undo" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/history/browse_with_undo.txt"
+            )),
+            "detail" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/history/detail.txt"
+            )),
+            "filtering_long_input" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/history/filtering_long_input.txt"
+            )),
+            "no_filter_match" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/history/no_filter_match.txt"
+            )),
+            "list_overflow" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/history/list_overflow.txt"
+            )),
+            "confirm_delete" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/history/confirm_delete.txt"
+            )),
+            other => panic!("unknown History golden fixture: {other}"),
+        }
+    }
+
+    #[test]
+    fn history_states_match_golden_buffers() {
+        for name in [
+            "browse",
+            "browse_with_undo",
+            "detail",
+            "filtering_long_input",
+            "no_filter_match",
+            "list_overflow",
+            "confirm_delete",
+        ] {
+            let mut screen = golden_history_screen(name);
+            let actual = render_to_snapshot(80, 24, |frame| screen.render(frame));
+            let expected = history_golden(name);
+            assert_eq!(actual, expected, "History {name} buffer changed");
+        }
+    }
 
     fn key(code: KeyCode) -> KeyEvent {
         KeyEvent::new(code, KeyModifiers::NONE)
