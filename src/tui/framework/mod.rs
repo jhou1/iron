@@ -10,8 +10,9 @@ pub mod viewport;
 pub use action_panel::render_action_panel;
 #[allow(unused_imports)]
 pub use components::{
-    fit_rect, render_detail_panel, render_scrollable_lines, render_shortcuts, render_status_line,
-    shortcut_height, truncate_to_width, DetailPanelState, Shortcut, StatusMessage,
+    fit_rect, render_detail_panel, render_detail_panel_with_header, render_scrollable_lines,
+    render_shortcuts, render_status_line, shortcut_height, truncate_to_width, DetailPanelState,
+    Shortcut, StatusMessage,
 };
 pub use input::TextInput;
 #[allow(unused_imports)]

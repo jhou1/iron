@@ -93,34 +93,142 @@ pub fn render_detail_panel(
     state: &mut DetailPanelState,
     selected: Option<VisualSpan>,
 ) {
-    let title = title.into();
-    let base_block = Block::default().borders(Borders::ALL);
-    let inner = base_block.inner(area);
-    state.viewport.set_height(inner.height as usize);
+    render_detail_panel_core(
+        frame,
+        area,
+        DetailPanelContent {
+            title: title.into(),
+            header: Vec::new(),
+            lines,
+            selected,
+        },
+        state,
+        true,
+    );
+}
 
-    let spans = visual_spans(&lines, inner.width);
+#[allow(dead_code)]
+pub fn render_detail_panel_with_header(
+    frame: &mut Frame,
+    area: Rect,
+    title: impl Into<String>,
+    header: Vec<Line<'static>>,
+    lines: Vec<Line<'static>>,
+    state: &mut DetailPanelState,
+    selected: Option<VisualSpan>,
+) {
+    let highlight_selection = state.focused;
+    render_detail_panel_core(
+        frame,
+        area,
+        DetailPanelContent {
+            title: title.into(),
+            header,
+            lines,
+            selected,
+        },
+        state,
+        highlight_selection,
+    );
+}
+
+struct DetailPanelContent {
+    title: String,
+    header: Vec<Line<'static>>,
+    lines: Vec<Line<'static>>,
+    selected: Option<VisualSpan>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct DetailPanelAreas {
+    area: Rect,
+    inner: Rect,
+    header: Rect,
+    body: Rect,
+}
+
+fn detail_panel_geometry(
+    frame_area: Rect,
+    requested_area: Rect,
+    header: &[Line<'static>],
+) -> DetailPanelAreas {
+    let area = fit_rect(frame_area, requested_area);
+    let base_block = Block::default().borders(Borders::ALL);
+    let inner = fit_rect(area, base_block.inner(area));
+    let header_height = visual_spans(header, inner.width)
+        .last()
+        .map(|span| span.start.saturating_add(span.height))
+        .unwrap_or(0)
+        .min(inner.height as usize) as u16;
+    let header = fit_rect(
+        inner,
+        Rect::new(inner.x, inner.y, inner.width, header_height),
+    );
+    let body = fit_rect(
+        inner,
+        Rect::new(
+            inner.x,
+            inner.y.saturating_add(header.height),
+            inner.width,
+            inner.height.saturating_sub(header.height),
+        ),
+    );
+
+    DetailPanelAreas {
+        area,
+        inner,
+        header,
+        body,
+    }
+}
+
+fn detail_panel_block(title: &str, suffix: &str, focused: bool) -> Block<'static> {
+    let decorated_title = format!("{}{} ", title.trim_end(), suffix);
+    let accent = if focused { Color::Cyan } else { BORDER_COLOR };
+
+    Block::default()
+        .borders(Borders::ALL)
+        .title(decorated_title)
+        .title_style(Style::default().fg(accent))
+        .border_style(Style::default().fg(accent))
+}
+
+fn render_detail_panel_core(
+    frame: &mut Frame,
+    requested_area: Rect,
+    content: DetailPanelContent,
+    state: &mut DetailPanelState,
+    highlight_selection: bool,
+) {
+    let areas = detail_panel_geometry(frame.area(), requested_area, &content.header);
+    let spans = visual_spans(&content.lines, areas.body.width);
     let content_height = spans
         .last()
         .map(|span| span.start.saturating_add(span.height))
         .unwrap_or(0);
-    if let Some(selected) = selected {
+
+    state.viewport.set_height(areas.body.height as usize);
+    if let Some(selected) = content.selected {
         state.viewport.reveal(selected);
     }
     state.viewport.clamp(content_height);
 
     let suffix = state.viewport.overflow(content_height).suffix();
-    let decorated_title = format!("{}{} ", title.trim_end(), suffix);
-    let accent = if state.focused {
-        Color::Cyan
-    } else {
-        BORDER_COLOR
-    };
-    let block = base_block
-        .title(decorated_title)
-        .title_style(Style::default().fg(accent))
-        .border_style(Style::default().fg(accent));
-    frame.render_widget(block, area);
-    render_scrollable_lines(frame, inner, lines, &mut state.viewport, selected);
+    frame.render_widget(
+        detail_panel_block(&content.title, suffix, state.focused),
+        areas.area,
+    );
+    frame.render_widget(
+        Paragraph::new(content.header).wrap(Wrap { trim: false }),
+        areas.header,
+    );
+    render_scrollable_lines(
+        frame,
+        areas.body,
+        content.lines,
+        &mut state.viewport,
+        highlight_selection.then_some(content.selected).flatten(),
+    );
 }
 
 pub fn render_status_line(frame: &mut Frame, area: Rect, status: &StatusMessage) {
@@ -208,11 +316,19 @@ pub fn fit_rect(parent: Rect, preferred: Rect) -> Rect {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tui::framework::test_support::render_to_string;
+    use crate::tui::framework::test_support::{render_to_buffer, render_to_string};
     use ratatui::{
-        layout::{Constraint, Layout},
+        layout::{Constraint, Layout, Rect},
+        style::Color,
         text::Line,
     };
+
+    fn rect_is_within(parent: Rect, child: Rect) -> bool {
+        child.x >= parent.x
+            && child.y >= parent.y
+            && child.right() <= parent.right()
+            && child.bottom() <= parent.bottom()
+    }
 
     #[test]
     fn focused_detail_panel_shows_accent_and_down_overflow() {
@@ -232,6 +348,162 @@ mod tests {
         });
         assert!(output.contains("Detail ↓"), "{output}");
         assert!(output.contains("Item 1"), "{output}");
+    }
+
+    #[test]
+    fn pinned_detail_header_stays_visible_while_body_scrolls() {
+        let mut state = DetailPanelState::new(true);
+        state.viewport.set_offset(12);
+        let output = render_to_string(40, 8, |frame| {
+            render_detail_panel_with_header(
+                frame,
+                frame.area(),
+                " Goal ",
+                vec![Line::from("████████  10/20 · 50%")],
+                (1..=20)
+                    .map(|number| Line::from(format!("Milestone {number:02}")))
+                    .collect(),
+                &mut state,
+                Some(VisualSpan {
+                    start: 19,
+                    height: 1,
+                }),
+            );
+        });
+
+        assert!(output.contains("10/20 · 50%"), "{output}");
+        assert!(output.contains("Milestone 20"), "{output}");
+        assert!(output.contains("Goal ↑"), "{output}");
+    }
+
+    #[test]
+    fn pinned_detail_header_uses_its_wrapped_height_before_scrolling_the_body() {
+        let mut state = DetailPanelState::new(true);
+        let output = render_to_string(12, 8, |frame| {
+            render_detail_panel_with_header(
+                frame,
+                frame.area(),
+                " Goal ",
+                vec![Line::from("123456789012345678")],
+                (1..=8)
+                    .map(|number| Line::from(format!("Body {number}")))
+                    .collect(),
+                &mut state,
+                Some(VisualSpan {
+                    start: 7,
+                    height: 1,
+                }),
+            );
+        });
+
+        assert!(output.contains("1234567890"), "{output}");
+        assert!(output.contains("12345678"), "{output}");
+        assert!(output.contains("Body 8"), "{output}");
+        assert!(output.contains("Goal ↑"), "{output}");
+    }
+
+    #[test]
+    fn pinned_detail_header_keeps_empty_body_out_of_title_overflow() {
+        let mut state = DetailPanelState::new(false);
+        state.viewport.set_offset(12);
+        let output = render_to_string(24, 6, |frame| {
+            render_detail_panel_with_header(
+                frame,
+                frame.area(),
+                " Goal ",
+                vec![Line::from("No milestones yet")],
+                Vec::new(),
+                &mut state,
+                None,
+            );
+        });
+
+        assert!(output.contains("No milestones yet"), "{output}");
+        assert!(!output.contains("Goal ↑"), "{output}");
+        assert!(!output.contains("Goal ↓"), "{output}");
+        assert_eq!(state.viewport.offset(), 0);
+    }
+
+    #[test]
+    fn unfocused_pinned_detail_reveals_selected_body_without_highlighting_it() {
+        let mut state = DetailPanelState::new(false);
+        let buffer = render_to_buffer(20, 6, |frame| {
+            render_detail_panel_with_header(
+                frame,
+                frame.area(),
+                " Goal ",
+                vec![Line::from("Progress")],
+                (1..=8)
+                    .map(|number| Line::from(format!("Body {number:02}")))
+                    .collect(),
+                &mut state,
+                Some(VisualSpan {
+                    start: 7,
+                    height: 1,
+                }),
+            );
+        });
+
+        assert_eq!(state.viewport.offset(), 5);
+        assert_eq!(buffer[(1, 4)].symbol(), "B");
+        assert_ne!(buffer[(1, 4)].bg, Color::Rgb(204, 163, 0));
+    }
+
+    #[test]
+    fn pinned_detail_geometry_clips_header_and_body_inside_the_safe_inner_rectangle() {
+        let frame_area = Rect::new(0, 0, 6, 6);
+        let header = vec![Line::from("Header wraps")];
+
+        for requested_area in [
+            Rect::new(0, 0, 0, 0),
+            Rect::new(5, 5, 1, 1),
+            Rect::new(5, 5, 4, 4),
+            Rect::new(u16::MAX, u16::MAX, 0, 0),
+        ] {
+            let areas = detail_panel_geometry(frame_area, requested_area, &header);
+            assert!(
+                rect_is_within(frame_area, areas.area),
+                "{requested_area:?} -> {areas:?}"
+            );
+            assert!(
+                rect_is_within(areas.area, areas.inner),
+                "{requested_area:?} -> {areas:?}"
+            );
+            assert!(
+                rect_is_within(areas.inner, areas.header),
+                "{requested_area:?} -> {areas:?}"
+            );
+            assert!(
+                rect_is_within(areas.inner, areas.body),
+                "{requested_area:?} -> {areas:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn pinned_detail_renders_zero_one_and_max_edge_rectangles_without_panic() {
+        let mut state = DetailPanelState::new(true);
+        render_to_buffer(6, 6, |frame| {
+            for area in [
+                Rect::new(0, 0, 0, 0),
+                Rect::new(5, 5, 1, 1),
+                Rect::new(5, 5, 4, 4),
+                Rect::new(u16::MAX, u16::MAX, 0, 0),
+            ] {
+                render_detail_panel_with_header(
+                    frame,
+                    area,
+                    " Goal ",
+                    vec![Line::from("Header")],
+                    vec![Line::from("Body")],
+                    &mut state,
+                    Some(VisualSpan {
+                        start: 0,
+                        height: 1,
+                    }),
+                );
+            }
+        });
     }
 
     #[test]
