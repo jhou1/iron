@@ -57,6 +57,8 @@ dashboard-quit-confirm = 退出 iron？
 
 # ── 目标 ──
 goals-title = 目标
+goals-milestones-title = 里程碑
+goals-no-selection = 请选择或添加目标以管理里程碑
 goals-no-milestones = 暂无里程碑 — 按 [a] 添加
 goals-press-enter = 按 [Enter] 管理里程碑
 goals-progress-from-milestones = 目标完成状态由里程碑决定
