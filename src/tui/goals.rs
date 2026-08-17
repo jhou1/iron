@@ -1534,112 +1534,173 @@ mod tests {
         }
     }
 
-    #[derive(Clone, Copy)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum ShortcutPane {
+        Goals,
+        Milestones,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum ShortcutSelection {
+        Empty,
+        Incomplete,
+        Complete,
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    struct BrowseShortcutCase {
+        pane: ShortcutPane,
+        selection: ShortcutSelection,
+        undo: bool,
+    }
+
+    #[derive(Debug, Clone, Copy)]
     enum ShortcutCase {
-        GoalEmpty,
-        GoalIncomplete,
-        GoalCompleteUndo,
+        Browse(BrowseShortcutCase),
         GoalMode(Mode),
-        MilestoneEmpty,
-        MilestoneIncomplete,
-        MilestoneCompleteUndo,
         MilestoneMode(MilestoneMode),
     }
 
     fn shortcut_case(case: ShortcutCase) -> (Database, GoalsScreen) {
         let db = Database::open_in_memory().unwrap();
-        if !matches!(case, ShortcutCase::GoalEmpty) {
-            let goal_id = db.create_goal("Goal").unwrap();
-            db.create_goal("Other").unwrap();
-            if matches!(
-                case,
-                ShortcutCase::MilestoneIncomplete
-                    | ShortcutCase::MilestoneCompleteUndo
-                    | ShortcutCase::MilestoneMode(_)
-            ) {
-                let first = db.create_milestone(goal_id, "First").unwrap();
-                db.create_milestone(goal_id, "Second").unwrap();
-                if matches!(
-                    case,
-                    ShortcutCase::MilestoneCompleteUndo
-                        | ShortcutCase::MilestoneMode(MilestoneMode::EditMilestoneDate)
-                ) {
-                    db.toggle_milestone(first).unwrap();
-                }
-            }
-            if matches!(case, ShortcutCase::GoalCompleteUndo) {
-                db.toggle_goal(goal_id).unwrap();
-            }
+        let goals_empty = matches!(
+            case,
+            ShortcutCase::Browse(BrowseShortcutCase {
+                pane: ShortcutPane::Goals,
+                selection: ShortcutSelection::Empty,
+                ..
+            })
+        );
+        let goal_id = if goals_empty {
+            None
+        } else {
+            db.create_goal("Goal A").unwrap();
+            let goal_id = db.create_goal("Goal B").unwrap();
+            db.create_goal("Goal C").unwrap();
+            Some(goal_id)
+        };
+        let milestones_nonempty = matches!(
+            case,
+            ShortcutCase::Browse(BrowseShortcutCase {
+                pane: ShortcutPane::Milestones,
+                selection: ShortcutSelection::Incomplete | ShortcutSelection::Complete,
+                ..
+            }) | ShortcutCase::MilestoneMode(_)
+        );
+        if milestones_nonempty {
+            let goal_id = goal_id.unwrap();
+            db.create_milestone(goal_id, "First").unwrap();
+            db.create_milestone(goal_id, "Selected").unwrap();
+            db.create_milestone(goal_id, "Third").unwrap();
         }
         let mut screen = GoalsScreen::new(&db).unwrap();
         match case {
+            ShortcutCase::Browse(BrowseShortcutCase {
+                pane: ShortcutPane::Goals,
+                selection,
+                undo,
+            }) => {
+                if selection != ShortcutSelection::Empty {
+                    screen.selected = 1;
+                    screen.goals[screen.selected].completed =
+                        selection == ShortcutSelection::Complete;
+                }
+                if undo {
+                    screen.last_deleted = Some(GoalUndoData::Goal(Goal {
+                        id: -10,
+                        title: "Deleted goal".into(),
+                        completed: false,
+                        position: 99,
+                        created_at: chrono::NaiveDateTime::default(),
+                        completed_at: None,
+                        milestones: Vec::new(),
+                    }));
+                }
+            }
+            ShortcutCase::Browse(BrowseShortcutCase {
+                pane: ShortcutPane::Milestones,
+                selection,
+                undo,
+            }) => {
+                screen.mode = Mode::Milestones;
+                screen.milestone_goal_idx = screen
+                    .goals
+                    .iter()
+                    .position(|goal| goal.id == goal_id.unwrap())
+                    .unwrap();
+                if selection != ShortcutSelection::Empty {
+                    screen.milestone_selected = 1;
+                    screen.goals[screen.milestone_goal_idx].milestones[screen.milestone_selected]
+                        .completed = selection == ShortcutSelection::Complete;
+                }
+                if undo {
+                    screen.milestone_last_deleted = Some(GoalUndoData::Milestone {
+                        goal_id: goal_id.unwrap(),
+                        milestone: Milestone {
+                            id: -20,
+                            goal_id: goal_id.unwrap(),
+                            title: "Deleted milestone".into(),
+                            completed: false,
+                            position: 99,
+                            created_at: chrono::NaiveDateTime::default(),
+                            completed_at: None,
+                        },
+                    });
+                }
+            }
             ShortcutCase::GoalMode(mode) => {
                 screen.mode = mode;
+                screen.selected = 1;
                 match mode {
                     Mode::AddGoal | Mode::EditGoal => screen.goal_input.set("Changed"),
                     Mode::EditGoalDate => {
-                        screen.goals[0].completed = true;
+                        screen.goals[screen.selected].completed = true;
                         screen.goal_input.set("2026-08-17");
                     }
                     _ => {}
                 }
             }
-            ShortcutCase::GoalCompleteUndo => {
-                screen.selected = screen
-                    .goals
-                    .iter()
-                    .position(|goal| goal.title == "Goal")
-                    .unwrap();
-                screen.last_deleted = Some(GoalUndoData::Goal(screen.goals[0].clone()));
-            }
-            ShortcutCase::MilestoneEmpty
-            | ShortcutCase::MilestoneIncomplete
-            | ShortcutCase::MilestoneCompleteUndo
-            | ShortcutCase::MilestoneMode(_) => {
+            ShortcutCase::MilestoneMode(mode) => {
                 screen.milestone_goal_idx = screen
                     .goals
                     .iter()
-                    .position(|goal| goal.title == "Goal")
+                    .position(|goal| goal.id == goal_id.unwrap())
                     .unwrap();
+                screen.milestone_selected = 1;
                 screen.mode = Mode::Milestones;
-                if let ShortcutCase::MilestoneMode(mode) = case {
-                    screen.milestone_mode = mode;
-                    match mode {
-                        MilestoneMode::AddMilestone | MilestoneMode::EditMilestone => {
-                            screen.milestone_input.set("Changed")
-                        }
-                        MilestoneMode::EditMilestoneDate => {
-                            screen.milestone_input.set("2026-08-17")
-                        }
-                        _ => {}
+                screen.milestone_mode = mode;
+                match mode {
+                    MilestoneMode::AddMilestone | MilestoneMode::EditMilestone => {
+                        screen.milestone_input.set("Changed")
                     }
-                }
-                if matches!(case, ShortcutCase::MilestoneCompleteUndo) {
-                    screen.milestone_last_deleted = Some(GoalUndoData::Milestone {
-                        goal_id: screen.goals[screen.milestone_goal_idx].id,
-                        milestone: screen.goals[screen.milestone_goal_idx].milestones[0].clone(),
-                    });
+                    MilestoneMode::EditMilestoneDate => {
+                        screen.goals[screen.milestone_goal_idx].milestones
+                            [screen.milestone_selected]
+                            .completed = true;
+                        screen.milestone_input.set("2026-08-17")
+                    }
+                    _ => {}
                 }
             }
-            ShortcutCase::GoalEmpty | ShortcutCase::GoalIncomplete => {}
         }
         (db, screen)
     }
 
-    fn shortcut_key(key_name: &str) -> KeyCode {
+    fn shortcut_keys(key_name: &str) -> Vec<KeyCode> {
         match key_name {
-            "j/k" => KeyCode::Char('j'),
-            "a" => KeyCode::Char('a'),
-            "Enter" | "Enter/e" => KeyCode::Enter,
-            "m" => KeyCode::Char('m'),
-            "e" => KeyCode::Char('e'),
-            "Space" => KeyCode::Char(' '),
-            "d" => KeyCode::Char('d'),
-            "D" => KeyCode::Char('D'),
-            "u" => KeyCode::Char('u'),
-            "Esc" => KeyCode::Esc,
-            "y" => KeyCode::Char('y'),
-            "any" => KeyCode::Char('n'),
+            "j/k" => vec![KeyCode::Char('j'), KeyCode::Char('k')],
+            "a" => vec![KeyCode::Char('a')],
+            "Enter" => vec![KeyCode::Enter],
+            "Enter/e" => vec![KeyCode::Enter, KeyCode::Char('e')],
+            "m" => vec![KeyCode::Char('m')],
+            "e" => vec![KeyCode::Char('e')],
+            "Space" => vec![KeyCode::Char(' ')],
+            "d" => vec![KeyCode::Char('d')],
+            "D" => vec![KeyCode::Char('D')],
+            "u" => vec![KeyCode::Char('u')],
+            "Esc" => vec![KeyCode::Esc],
+            "y" => vec![KeyCode::Char('y')],
+            "any" => vec![KeyCode::Char('n')],
             other => panic!("unmapped advertised shortcut {other}"),
         }
     }
@@ -1661,139 +1722,118 @@ mod tests {
         )
     }
 
-    #[test]
-    fn goals_shortcuts_match_active_handlers() {
-        let edit_shortcuts = || {
-            vec![
-                Shortcut::new("Enter", tr("key-confirm")),
-                Shortcut::new("Esc", tr("key-cancel")),
-            ]
-        };
-        let confirm_shortcuts = || {
-            vec![
+    fn expected_shortcuts(case: ShortcutCase) -> Vec<Shortcut> {
+        match case {
+            ShortcutCase::Browse(BrowseShortcutCase {
+                pane: ShortcutPane::Goals,
+                selection,
+                undo,
+            }) => {
+                let mut expected = Vec::new();
+                if selection != ShortcutSelection::Empty {
+                    expected.push(Shortcut::new("j/k", tr("key-navigate")));
+                }
+                expected.push(Shortcut::new("a", tr("key-add-goal")));
+                if selection != ShortcutSelection::Empty {
+                    expected.extend([
+                        Shortcut::new("Enter", tr("key-milestone")),
+                        Shortcut::new("m", tr("key-add")),
+                        Shortcut::new("e", tr("key-edit")),
+                        Shortcut::new("Space", tr("key-toggle")),
+                        Shortcut::new("d", tr("key-delete")),
+                    ]);
+                    if selection == ShortcutSelection::Complete {
+                        expected.push(Shortcut::new("D", tr("key-date")));
+                    }
+                }
+                if undo {
+                    expected.push(Shortcut::new("u", tr("key-undo")));
+                }
+                expected.push(Shortcut::new("Esc", tr("key-back")));
+                expected
+            }
+            ShortcutCase::Browse(BrowseShortcutCase {
+                pane: ShortcutPane::Milestones,
+                selection,
+                undo,
+            }) => {
+                let mut expected = Vec::new();
+                if selection != ShortcutSelection::Empty {
+                    expected.push(Shortcut::new("j/k", tr("key-navigate")));
+                }
+                expected.push(Shortcut::new("a", tr("key-add")));
+                if selection != ShortcutSelection::Empty {
+                    expected.extend([
+                        Shortcut::new("Enter/e", tr("key-edit")),
+                        Shortcut::new("Space", tr("key-toggle")),
+                        Shortcut::new("d", tr("key-delete")),
+                    ]);
+                    if selection == ShortcutSelection::Complete {
+                        expected.push(Shortcut::new("D", tr("key-date")));
+                    }
+                }
+                if undo {
+                    expected.push(Shortcut::new("u", tr("key-undo")));
+                }
+                expected.push(Shortcut::new("Esc", tr("key-back")));
+                expected
+            }
+            ShortcutCase::GoalMode(Mode::ConfirmDeleteGoal)
+            | ShortcutCase::MilestoneMode(MilestoneMode::ConfirmDeleteMilestone) => vec![
                 Shortcut::new("y", tr("key-yes")),
                 Shortcut::new("any", tr("key-cancel")),
-            ]
-        };
-        let cases = vec![
-            (
-                ShortcutCase::GoalEmpty,
-                vec![
-                    Shortcut::new("a", tr("key-add-goal")),
-                    Shortcut::new("Esc", tr("key-back")),
-                ],
-            ),
-            (
-                ShortcutCase::GoalIncomplete,
-                vec![
-                    Shortcut::new("j/k", tr("key-navigate")),
-                    Shortcut::new("a", tr("key-add-goal")),
-                    Shortcut::new("Enter", tr("key-milestone")),
-                    Shortcut::new("m", tr("key-add")),
-                    Shortcut::new("e", tr("key-edit")),
-                    Shortcut::new("Space", tr("key-toggle")),
-                    Shortcut::new("d", tr("key-delete")),
-                    Shortcut::new("Esc", tr("key-back")),
-                ],
-            ),
-            (
-                ShortcutCase::GoalCompleteUndo,
-                vec![
-                    Shortcut::new("j/k", tr("key-navigate")),
-                    Shortcut::new("a", tr("key-add-goal")),
-                    Shortcut::new("Enter", tr("key-milestone")),
-                    Shortcut::new("m", tr("key-add")),
-                    Shortcut::new("e", tr("key-edit")),
-                    Shortcut::new("Space", tr("key-toggle")),
-                    Shortcut::new("d", tr("key-delete")),
-                    Shortcut::new("D", tr("key-date")),
-                    Shortcut::new("u", tr("key-undo")),
-                    Shortcut::new("Esc", tr("key-back")),
-                ],
-            ),
-            (ShortcutCase::GoalMode(Mode::AddGoal), edit_shortcuts()),
-            (ShortcutCase::GoalMode(Mode::EditGoal), edit_shortcuts()),
-            (ShortcutCase::GoalMode(Mode::EditGoalDate), edit_shortcuts()),
-            (
-                ShortcutCase::GoalMode(Mode::ConfirmDeleteGoal),
-                confirm_shortcuts(),
-            ),
-            (
-                ShortcutCase::MilestoneEmpty,
-                vec![
-                    Shortcut::new("a", tr("key-add")),
-                    Shortcut::new("Esc", tr("key-back")),
-                ],
-            ),
-            (
-                ShortcutCase::MilestoneIncomplete,
-                vec![
-                    Shortcut::new("j/k", tr("key-navigate")),
-                    Shortcut::new("a", tr("key-add")),
-                    Shortcut::new("Enter/e", tr("key-edit")),
-                    Shortcut::new("Space", tr("key-toggle")),
-                    Shortcut::new("d", tr("key-delete")),
-                    Shortcut::new("Esc", tr("key-back")),
-                ],
-            ),
-            (
-                ShortcutCase::MilestoneCompleteUndo,
-                vec![
-                    Shortcut::new("j/k", tr("key-navigate")),
-                    Shortcut::new("a", tr("key-add")),
-                    Shortcut::new("Enter/e", tr("key-edit")),
-                    Shortcut::new("Space", tr("key-toggle")),
-                    Shortcut::new("d", tr("key-delete")),
-                    Shortcut::new("D", tr("key-date")),
-                    Shortcut::new("u", tr("key-undo")),
-                    Shortcut::new("Esc", tr("key-back")),
-                ],
-            ),
-            (
-                ShortcutCase::MilestoneMode(MilestoneMode::AddMilestone),
-                edit_shortcuts(),
-            ),
-            (
-                ShortcutCase::MilestoneMode(MilestoneMode::EditMilestone),
-                edit_shortcuts(),
-            ),
-            (
-                ShortcutCase::MilestoneMode(MilestoneMode::EditMilestoneDate),
-                edit_shortcuts(),
-            ),
-            (
-                ShortcutCase::MilestoneMode(MilestoneMode::ConfirmDeleteMilestone),
-                confirm_shortcuts(),
-            ),
-        ];
+            ],
+            ShortcutCase::GoalMode(_) | ShortcutCase::MilestoneMode(_) => vec![
+                Shortcut::new("Enter", tr("key-confirm")),
+                Shortcut::new("Esc", tr("key-cancel")),
+            ],
+        }
+    }
 
-        for (case, expected) in cases {
+    #[test]
+    fn goals_shortcuts_match_active_handlers() {
+        let mut cases = Vec::new();
+        for pane in [ShortcutPane::Goals, ShortcutPane::Milestones] {
+            for selection in [
+                ShortcutSelection::Empty,
+                ShortcutSelection::Incomplete,
+                ShortcutSelection::Complete,
+            ] {
+                for undo in [false, true] {
+                    cases.push(ShortcutCase::Browse(BrowseShortcutCase {
+                        pane,
+                        selection,
+                        undo,
+                    }));
+                }
+            }
+        }
+        cases.extend([
+            ShortcutCase::GoalMode(Mode::AddGoal),
+            ShortcutCase::GoalMode(Mode::EditGoal),
+            ShortcutCase::GoalMode(Mode::EditGoalDate),
+            ShortcutCase::GoalMode(Mode::ConfirmDeleteGoal),
+            ShortcutCase::MilestoneMode(MilestoneMode::AddMilestone),
+            ShortcutCase::MilestoneMode(MilestoneMode::EditMilestone),
+            ShortcutCase::MilestoneMode(MilestoneMode::EditMilestoneDate),
+            ShortcutCase::MilestoneMode(MilestoneMode::ConfirmDeleteMilestone),
+        ]);
+
+        for case in cases {
+            let expected = expected_shortcuts(case);
             let (_, screen) = shortcut_case(case);
-            assert_eq!(screen.active_shortcuts(), expected);
+            assert_eq!(screen.active_shortcuts(), expected, "case: {case:?}");
             for shortcut in expected {
-                let (db, mut screen) = shortcut_case(case);
-                let before = screen_witness(&screen, &db);
-                let code = if shortcut.key == "j/k" {
-                    let selected = if screen.mode == Mode::Milestones {
-                        screen.milestone_selected
-                    } else {
-                        screen.selected
-                    };
-                    if selected == 0 {
-                        KeyCode::Char('j')
-                    } else {
-                        KeyCode::Char('k')
-                    }
-                } else {
-                    shortcut_key(&shortcut.key)
-                };
-                let action = screen.handle_key(key(code), &db);
-                let after = screen_witness(&screen, &db);
-                assert!(
-                    before != after || action != Action::None,
-                    "advertised shortcut {:?} did not dispatch an active branch",
-                    shortcut
-                );
+                for code in shortcut_keys(&shortcut.key) {
+                    let (db, mut screen) = shortcut_case(case);
+                    let before = screen_witness(&screen, &db);
+                    let action = screen.handle_key(key(code), &db);
+                    let after = screen_witness(&screen, &db);
+                    assert!(
+                        before != after || action != Action::None,
+                        "case {case:?}: advertised shortcut {shortcut:?} constituent {code:?} did not dispatch an active branch"
+                    );
+                }
             }
         }
     }
@@ -1802,25 +1842,56 @@ mod tests {
     fn goals_all_modes_render_safely_in_small_rectangles() {
         let db = goals_db_with_milestones(1, 0);
         let sizes = [(0, 0), (1, 1), (12, 4), (24, 10), (40, 16), (80, 24)];
-        for mode in [
-            Mode::Browse,
-            Mode::AddGoal,
-            Mode::EditGoal,
-            Mode::EditGoalDate,
-            Mode::ConfirmDeleteGoal,
-            Mode::Milestones,
-        ] {
+        let states = [
+            (Mode::Browse, MilestoneMode::Browse),
+            (Mode::AddGoal, MilestoneMode::Browse),
+            (Mode::EditGoal, MilestoneMode::Browse),
+            (Mode::EditGoalDate, MilestoneMode::Browse),
+            (Mode::ConfirmDeleteGoal, MilestoneMode::Browse),
+            (Mode::Milestones, MilestoneMode::Browse),
+            (Mode::Milestones, MilestoneMode::AddMilestone),
+            (Mode::Milestones, MilestoneMode::EditMilestone),
+            (Mode::Milestones, MilestoneMode::EditMilestoneDate),
+            (Mode::Milestones, MilestoneMode::ConfirmDeleteMilestone),
+        ];
+        for (mode, milestone_mode) in states {
             for (width, height) in sizes {
                 let mut screen = GoalsScreen::new(&db).unwrap();
                 screen.mode = mode;
+                screen.milestone_mode = milestone_mode;
+                let mut body = None;
+                crate::tui::framework::test_support::render_to_buffer(width, height, |frame| {
+                    let shortcuts = screen.active_shortcuts();
+                    let active_status = if screen.mode == Mode::Milestones {
+                        &screen.milestone_status_msg
+                    } else {
+                        &screen.status_msg
+                    };
+                    body = Some(
+                        render_screen_frame(
+                            frame,
+                            frame.area(),
+                            CONTENT_WIDTH,
+                            active_status,
+                            &shortcuts,
+                        )
+                        .body,
+                    );
+                });
                 let _ =
                     crate::tui::framework::test_support::render_to_buffer(width, height, |frame| {
                         screen.render(frame)
                     });
-                let body = Rect::new(0, 0, width, height.saturating_sub(2));
+                let body = body.unwrap();
                 let panes = goals_pane_areas(body);
-                assert!(rect_contains(body, panes.goals));
-                assert!(rect_contains(body, panes.milestones));
+                assert!(
+                    rect_contains(body, panes.goals),
+                    "{mode:?}/{milestone_mode:?} {width}x{height}: {body:?} -> {panes:?}"
+                );
+                assert!(
+                    rect_contains(body, panes.milestones),
+                    "{mode:?}/{milestone_mode:?} {width}x{height}: {body:?} -> {panes:?}"
+                );
             }
         }
     }
