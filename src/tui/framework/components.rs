@@ -182,8 +182,22 @@ fn detail_panel_geometry(
     }
 }
 
-fn detail_panel_block(title: &str, suffix: &str, focused: bool) -> Block<'static> {
-    let decorated_title = format!("{}{} ", title.trim_end(), suffix);
+fn detail_panel_block(
+    title: &str,
+    suffix: &str,
+    focused: bool,
+    panel_width: u16,
+) -> Block<'static> {
+    let decorated_title = if suffix.is_empty() {
+        format!("{} ", title.trim_end())
+    } else {
+        let title_capacity = (panel_width as usize)
+            .saturating_sub(2)
+            .saturating_sub(suffix.width())
+            .saturating_sub(1);
+        let visible_title = truncate_to_width(title.trim_end(), title_capacity);
+        format!("{visible_title}{suffix} ")
+    };
     let accent = if focused { Color::Cyan } else { BORDER_COLOR };
 
     Block::default()
@@ -215,7 +229,7 @@ fn render_detail_panel_core(
 
     let suffix = state.viewport.overflow(content_height).suffix();
     frame.render_widget(
-        detail_panel_block(&content.title, suffix, state.focused),
+        detail_panel_block(&content.title, suffix, state.focused, areas.area.width),
         areas.area,
     );
     frame.render_widget(
@@ -447,6 +461,29 @@ mod tests {
         assert_eq!(state.viewport.offset(), 5);
         assert_eq!(buffer[(1, 4)].symbol(), "B");
         assert_ne!(buffer[(1, 4)].bg, Color::Rgb(204, 163, 0));
+    }
+
+    #[test]
+    fn pinned_detail_keeps_overflow_suffix_visible_with_a_long_title() {
+        let mut state = DetailPanelState::new(false);
+        let output = render_to_string(24, 8, |frame| {
+            render_detail_panel_with_header(
+                frame,
+                frame.area(),
+                "A selected goal title that is much wider than the panel",
+                vec![Line::from("0/20 · 0%")],
+                (1..=20)
+                    .map(|number| Line::from(format!("Milestone {number:02}")))
+                    .collect(),
+                &mut state,
+                Some(VisualSpan {
+                    start: 0,
+                    height: 1,
+                }),
+            );
+        });
+
+        assert!(output.lines().next().unwrap().contains('↓'), "{output}");
     }
 
     #[test]
