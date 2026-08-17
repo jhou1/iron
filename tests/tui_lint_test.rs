@@ -210,6 +210,172 @@ impl<'ast> Visit<'ast> for LocalOwnershipAliasCollector<'_> {
     }
 }
 
+fn is_goals_framework_component(name: &str) -> bool {
+    matches!(
+        name,
+        "render_screen_frame"
+            | "render_scrollable_list_panel_spanned"
+            | "render_detail_panel_with_header"
+    )
+}
+
+fn collect_goals_framework_imports(
+    tree: &syn::UseTree,
+    prefix: &mut Vec<String>,
+    imports: &mut HashMap<String, Vec<String>>,
+) {
+    match tree {
+        syn::UseTree::Path(path) => {
+            prefix.push(path.ident.to_string());
+            collect_goals_framework_imports(&path.tree, prefix, imports);
+            prefix.pop();
+        }
+        syn::UseTree::Group(group) => {
+            for item in &group.items {
+                collect_goals_framework_imports(item, prefix, imports);
+            }
+        }
+        syn::UseTree::Name(name) if is_goals_framework_component(&name.ident.to_string()) => {
+            let original = name.ident.to_string();
+            let mut path = prefix.clone();
+            path.push(original.clone());
+            imports.insert(original, path);
+        }
+        syn::UseTree::Rename(rename) if is_goals_framework_component(&rename.ident.to_string()) => {
+            let mut path = prefix.clone();
+            path.push(rename.ident.to_string());
+            imports.insert(rename.rename.to_string(), path);
+        }
+        syn::UseTree::Name(_) | syn::UseTree::Rename(_) | syn::UseTree::Glob(_) => {}
+    }
+}
+
+struct LocalGoalsFrameworkImportCollector<'a> {
+    imports: &'a mut HashMap<String, Vec<String>>,
+}
+
+impl<'ast> Visit<'ast> for LocalGoalsFrameworkImportCollector<'_> {
+    fn visit_item(&mut self, item: &'ast syn::Item) {
+        if let syn::Item::Use(item_use) = item {
+            collect_goals_framework_imports(&item_use.tree, &mut Vec::new(), self.imports);
+        }
+    }
+}
+
+fn canonical_goals_framework_path(path: &[String]) -> bool {
+    match path {
+        [root, framework, component] => {
+            root == "super" && framework == "framework" && is_goals_framework_component(component)
+        }
+        [root, tui, framework, component] => {
+            matches!(root.as_str(), "crate" | "iron")
+                && tui == "tui"
+                && framework == "framework"
+                && is_goals_framework_component(component)
+        }
+        _ => false,
+    }
+}
+
+fn canonical_goals_framework_call(
+    function: &syn::ExprPath,
+    imports: &HashMap<String, Vec<String>>,
+    local_bindings: &HashSet<String>,
+) -> Option<String> {
+    if function.qself.is_some() {
+        return None;
+    }
+    let path = function
+        .path
+        .segments
+        .iter()
+        .map(|segment| segment.ident.to_string())
+        .collect::<Vec<_>>();
+    let canonical = if path.len() == 1 {
+        let local_name = path.first()?;
+        if local_bindings.contains(local_name) {
+            return None;
+        }
+        imports.get(local_name)?
+    } else {
+        &path
+    };
+    canonical_goals_framework_path(canonical).then(|| canonical.last().unwrap().clone())
+}
+
+#[derive(Default)]
+struct GoalsLocalBindingCollector {
+    names: HashSet<String>,
+    has_glob_import: bool,
+}
+
+fn collect_local_use_bindings(
+    tree: &syn::UseTree,
+    prefix: &mut Vec<String>,
+    bindings: &mut GoalsLocalBindingCollector,
+) {
+    match tree {
+        syn::UseTree::Path(path) => {
+            prefix.push(path.ident.to_string());
+            collect_local_use_bindings(&path.tree, prefix, bindings);
+            prefix.pop();
+        }
+        syn::UseTree::Name(name) if name.ident == "self" => {
+            if !canonical_goals_framework_path(prefix) {
+                if let Some(local_name) = prefix.last() {
+                    bindings.names.insert(local_name.clone());
+                }
+            }
+        }
+        syn::UseTree::Name(name) => {
+            let mut origin = prefix.clone();
+            origin.push(name.ident.to_string());
+            if !canonical_goals_framework_path(&origin) {
+                bindings.names.insert(name.ident.to_string());
+            }
+        }
+        syn::UseTree::Rename(rename) => {
+            let mut origin = prefix.clone();
+            origin.push(rename.ident.to_string());
+            if !canonical_goals_framework_path(&origin) {
+                bindings.names.insert(rename.rename.to_string());
+            }
+        }
+        syn::UseTree::Group(group) => {
+            for item in &group.items {
+                collect_local_use_bindings(item, prefix, bindings);
+            }
+        }
+        syn::UseTree::Glob(_) => bindings.has_glob_import = true,
+    }
+}
+
+impl<'ast> Visit<'ast> for GoalsLocalBindingCollector {
+    fn visit_item(&mut self, item: &'ast syn::Item) {
+        match item {
+            syn::Item::Const(item) => {
+                self.names.insert(item.ident.to_string());
+            }
+            syn::Item::Fn(item) => {
+                self.names.insert(item.sig.ident.to_string());
+            }
+            syn::Item::Static(item) => {
+                self.names.insert(item.ident.to_string());
+            }
+            syn::Item::Use(item) => {
+                collect_local_use_bindings(&item.tree, &mut Vec::new(), self);
+            }
+            _ => {}
+        }
+        // Nested item bodies are declarations outside the render execution path.
+    }
+
+    fn visit_pat_ident(&mut self, pattern: &'ast syn::PatIdent) {
+        self.names.insert(pattern.ident.to_string());
+        visit::visit_pat_ident(self, pattern);
+    }
+}
+
 fn normalized_path_name(path: &syn::Path, aliases: &HashMap<String, String>) -> Option<String> {
     let name = path.segments.last()?.ident.to_string();
     Some(aliases.get(&name).cloned().unwrap_or(name))
@@ -244,9 +410,21 @@ fn expr_path_contains_name(
             .is_some_and(|qself| type_contains_name(&qself.ty, aliases, expected))
 }
 
+fn type_path_name(ty: &syn::Type) -> Option<String> {
+    match ty {
+        syn::Type::Group(group) => type_path_name(&group.elem),
+        syn::Type::Paren(paren) => type_path_name(&paren.elem),
+        syn::Type::Path(path) => Some(path.path.segments.last()?.ident.to_string()),
+        syn::Type::Reference(reference) => type_path_name(&reference.elem),
+        _ => None,
+    }
+}
+
 fn called_type_and_method(call: &syn::ExprPath) -> Option<(String, String)> {
     let method = call.path.segments.last()?.ident.to_string();
-    let receiver = if call.path.segments.len() >= 2 {
+    let receiver = if let Some(qself) = &call.qself {
+        type_path_name(&qself.ty)?
+    } else if call.path.segments.len() >= 2 {
         call.path
             .segments
             .iter()
@@ -254,10 +432,7 @@ fn called_type_and_method(call: &syn::ExprPath) -> Option<(String, String)> {
             .ident
             .to_string()
     } else {
-        let syn::Type::Path(path) = call.qself.as_ref()?.ty.as_ref() else {
-            return None;
-        };
-        path.path.segments.last()?.ident.to_string()
+        return None;
     };
     Some((receiver, method))
 }
@@ -469,6 +644,8 @@ struct GoalsRenderOwnership {
 
 struct GoalsRenderVisitor<'a> {
     aliases: &'a HashMap<String, String>,
+    framework_imports: &'a HashMap<String, Vec<String>>,
+    local_bindings: &'a HashSet<String>,
     ownership: GoalsRenderOwnership,
 }
 
@@ -479,7 +656,13 @@ impl<'ast> Visit<'ast> for GoalsRenderVisitor<'_> {
 
     fn visit_expr_call(&mut self, call: &'ast syn::ExprCall) {
         if let syn::Expr::Path(function) = call.func.as_ref() {
-            match normalized_path_name(&function.path, self.aliases).as_deref() {
+            match canonical_goals_framework_call(
+                function,
+                self.framework_imports,
+                self.local_bindings,
+            )
+            .as_deref()
+            {
                 Some("render_screen_frame") => self.ownership.screen_frame_calls += 1,
                 Some("render_scrollable_list_panel_spanned") => {
                     self.ownership.list_panel_calls += 1;
@@ -567,18 +750,39 @@ fn goals_ownership_violations(source: &str) -> Vec<String> {
     }
     let render = render_methods[0];
     let mut aliases = HashMap::new();
+    let mut framework_imports = HashMap::new();
     for item in &file.items {
         if let syn::Item::Use(item_use) = item {
             collect_ownership_aliases(&item_use.tree, &mut aliases);
+            collect_goals_framework_imports(
+                &item_use.tree,
+                &mut Vec::new(),
+                &mut framework_imports,
+            );
         }
     }
     LocalOwnershipAliasCollector {
         aliases: &mut aliases,
     }
     .visit_block(&render.block);
+    let mut local_framework_imports = HashMap::new();
+    LocalGoalsFrameworkImportCollector {
+        imports: &mut local_framework_imports,
+    }
+    .visit_block(&render.block);
+    framework_imports.extend(local_framework_imports.clone());
+    let mut local_bindings = GoalsLocalBindingCollector::default();
+    local_bindings.visit_block(&render.block);
+    if local_bindings.has_glob_import {
+        local_bindings
+            .names
+            .extend(framework_imports.keys().cloned());
+    }
 
     let mut visitor = GoalsRenderVisitor {
         aliases: &aliases,
+        framework_imports: &framework_imports,
+        local_bindings: &local_bindings.names,
         ownership: GoalsRenderOwnership::default(),
     };
     visitor.visit_block(&render.block);
@@ -954,6 +1158,12 @@ fn history_ownership_accepts_the_component_only_render_path() {
 #[test]
 fn goals_ownership_requires_one_production_render_and_ignores_decoys() {
     let decoy_delegation = r#"
+        use crate::tui::framework::{
+            render_detail_panel_with_header,
+            render_screen_frame,
+            render_scrollable_list_panel_spanned,
+        };
+
         impl GoalsScreen {
             fn render(&mut self) {
                 // render_status_line(); Clear; Paragraph::new("");
@@ -1021,8 +1231,149 @@ fn goals_ownership_requires_one_production_render_and_ignores_decoys() {
 }
 
 #[test]
+fn goals_ownership_rejects_wrong_module_required_calls() {
+    let wrong_module = r#"
+        impl GoalsScreen {
+            fn render(&mut self) {
+                decoy::render_screen_frame();
+                decoy::render_scrollable_list_panel_spanned();
+                decoy::render_detail_panel_with_header();
+            }
+        }
+    "#;
+
+    let violations = goals_ownership_violations(wrong_module);
+    for component in [
+        "render_screen_frame",
+        "render_scrollable_list_panel_spanned",
+        "render_detail_panel_with_header",
+    ] {
+        assert!(
+            violations
+                .iter()
+                .any(|violation| violation.contains(component) && violation.contains("found 0")),
+            "{component}: {violations:?}"
+        );
+    }
+}
+
+#[test]
+fn goals_ownership_rejects_wrong_origin_required_aliases() {
+    let wrong_aliases = r#"
+        use decoy::{
+            render_detail_panel_with_header as details,
+            render_screen_frame as frame_shell,
+            render_scrollable_list_panel_spanned as goals_panel,
+        };
+
+        impl GoalsScreen {
+            fn render(&mut self) {
+                frame_shell();
+                goals_panel();
+                details();
+            }
+        }
+    "#;
+
+    let violations = goals_ownership_violations(wrong_aliases);
+    for component in [
+        "render_screen_frame",
+        "render_scrollable_list_panel_spanned",
+        "render_detail_panel_with_header",
+    ] {
+        assert!(
+            violations
+                .iter()
+                .any(|violation| violation.contains(component) && violation.contains("found 0")),
+            "{component}: {violations:?}"
+        );
+    }
+}
+
+#[test]
+fn goals_ownership_rejects_same_name_local_wrappers() {
+    let local_wrappers = r#"
+        use crate::tui::framework::{
+            render_detail_panel_with_header as details,
+            render_screen_frame,
+            render_scrollable_list_panel_spanned,
+        };
+
+        impl GoalsScreen {
+            fn render(&mut self) {
+                fn render_screen_frame() {}
+                let render_scrollable_list_panel_spanned = || {};
+                let details = || {};
+                render_screen_frame();
+                render_scrollable_list_panel_spanned();
+                details();
+            }
+        }
+    "#;
+
+    let violations = goals_ownership_violations(local_wrappers);
+    for component in [
+        "render_screen_frame",
+        "render_scrollable_list_panel_spanned",
+        "render_detail_panel_with_header",
+    ] {
+        assert!(
+            violations
+                .iter()
+                .any(|violation| violation.contains(component) && violation.contains("found 0")),
+            "{component}: {violations:?}"
+        );
+    }
+}
+
+#[test]
+fn goals_ownership_rejects_render_local_wrong_origin_aliases() {
+    let local_aliases = r#"
+        impl GoalsScreen {
+            fn render(&mut self) {
+                use crate::tui::framework::{
+                    render_detail_panel_with_header as details,
+                    render_screen_frame as frame_shell,
+                    render_scrollable_list_panel_spanned as goals_panel,
+                };
+                {
+                    use decoy::{
+                        details as details,
+                        frame as frame_shell,
+                        list as goals_panel,
+                    };
+                    frame_shell();
+                    goals_panel();
+                    details();
+                }
+            }
+        }
+    "#;
+
+    let violations = goals_ownership_violations(local_aliases);
+    for component in [
+        "render_screen_frame",
+        "render_scrollable_list_panel_spanned",
+        "render_detail_panel_with_header",
+    ] {
+        assert!(
+            violations
+                .iter()
+                .any(|violation| violation.contains(component) && violation.contains("found 0")),
+            "{component}: {violations:?}"
+        );
+    }
+}
+
+#[test]
 fn goals_ownership_rejects_duplicate_delegation_and_local_rendering() {
     let mixed_ownership = r#"
+        use crate::tui::framework::{
+            render_detail_panel_with_header,
+            render_screen_frame,
+            render_scrollable_list_panel_spanned,
+        };
+
         impl GoalsScreen {
             fn render(&mut self) {
                 render_screen_frame();
@@ -1114,6 +1465,12 @@ fn goals_ownership_normalizes_qualified_paths() {
 #[test]
 fn goals_ownership_rejects_forbidden_function_and_constructor_paths() {
     let indirect_ownership = r#"
+        use crate::tui::framework::{
+            render_detail_panel_with_header,
+            render_screen_frame,
+            render_scrollable_list_panel_spanned,
+        };
+
         impl GoalsScreen {
             fn render(&mut self) {
                 render_screen_frame();
@@ -1146,8 +1503,55 @@ fn goals_ownership_rejects_forbidden_function_and_constructor_paths() {
 }
 
 #[test]
+fn goals_ownership_rejects_trait_qualified_ufcs_widget_paths() {
+    let trait_qualified_widgets = r#"
+        use crate::tui::framework::{
+            render_detail_panel_with_header,
+            render_screen_frame,
+            render_scrollable_list_panel_spanned,
+        };
+        use ratatui::widgets::{Block as Panel, Paragraph as Copy};
+
+        impl GoalsScreen {
+            fn render(&mut self) {
+                render_screen_frame();
+                render_scrollable_list_panel_spanned();
+                render_detail_panel_with_header();
+                let _border = <Block as LocalBorderFactory>::bordered;
+                let _qualified_border =
+                    <ratatui::widgets::Block as LocalBorderFactory>::bordered;
+                let _aliased_border = <Panel as LocalBorderFactory>::bordered;
+                let _paragraph = <Paragraph as LocalParagraphFactory>::new;
+                let _qualified_paragraph =
+                    <ratatui::widgets::Paragraph as LocalParagraphFactory>::new;
+                let _aliased_paragraph = <Copy as LocalParagraphFactory>::new;
+            }
+        }
+    "#;
+
+    let violations = goals_ownership_violations(trait_qualified_widgets);
+    assert!(
+        violations.iter().any(|violation| {
+            violation.contains("Block::bordered") && violation.contains("found 3")
+        }),
+        "{violations:?}"
+    );
+    assert!(
+        violations.iter().any(|violation| {
+            violation.contains("Paragraph::new") && violation.contains("found 3")
+        }),
+        "{violations:?}"
+    );
+}
+
+#[test]
 fn goals_ownership_rejects_all_clear_construction_paths() {
     let clear_ownership = r#"
+        use crate::tui::framework::{
+            render_detail_panel_with_header,
+            render_screen_frame,
+            render_scrollable_list_panel_spanned,
+        };
         use ratatui::widgets::Clear as Eraser;
 
         impl GoalsScreen {
@@ -1178,16 +1582,16 @@ fn goals_ownership_rejects_all_clear_construction_paths() {
 #[test]
 fn goals_ownership_normalizes_aliased_paths() {
     let aliased_ownership = r#"
-        use crate::tui::framework::{
-            render_detail_panel_with_header as details,
-            render_screen_frame as frame_shell,
-            render_scrollable_list_panel_spanned as goals_panel,
-        };
         use crate::tui::{render_shortcuts as local_keys, render_status_line as local_status};
         use ratatui::widgets::{Block as Panel, Clear as Eraser, Paragraph as Copy};
 
         impl GoalsScreen {
             fn render(&mut self) {
+                use crate::tui::framework::{
+                    render_detail_panel_with_header as details,
+                    render_screen_frame as frame_shell,
+                    render_scrollable_list_panel_spanned as goals_panel,
+                };
                 frame_shell();
                 goals_panel();
                 details();
@@ -1226,6 +1630,12 @@ fn goals_ownership_normalizes_aliased_paths() {
 #[test]
 fn goals_ownership_accepts_component_only_render_path() {
     let component_only = r#"
+        use crate::tui::framework::{
+            render_detail_panel_with_header,
+            render_screen_frame,
+            render_scrollable_list_panel_spanned,
+        };
+
         impl GoalsScreen {
             fn render(&mut self) {
                 render_screen_frame();
