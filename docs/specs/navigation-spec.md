@@ -14,7 +14,9 @@ Global navigation patterns, keybinding conventions, and shared TUI interaction r
 
 Dashboard reaches Log Entry (`l`), History (`h`), Trends (`t`), Practices (`e`), Goals (`g`), and Quotes (`Q`). There is no Quick Log screen, route, or shortcut and no `w` action. Feature-specific screens return to Dashboard via `Esc`; Log Entry opened from History returns to History after a successful edit.
 
-Batch 3A does not change this topology or any screen shortcut. It changes how those existing transitions identify and prepare their targets. Batch 3B-1 changes only Practices presentation composition. Batch 3B-2 changes only the Quotes presentation composition. Batch 3B-3 changes only Trends presentation composition; it does not change routes, intents, re-entry behavior, or shortcuts. Batch 3B-4 changes only History presentation composition and defers detail-viewport clamping until the actual popup width is known; it does not change routes, stable-ID edit intents, re-entry selection/filter/transient-state policy, delete/undo behavior, or shortcuts.
+Batch 3A does not change this topology or any screen shortcut. It changes how those existing transitions identify and prepare their targets. Batch 3B-1 changes only Practices presentation composition. Batch 3B-2 changes only the Quotes presentation composition. Batch 3B-3 changes only Trends presentation composition; it does not change routes, intents, re-entry behavior, or shortcuts. Batch 3B-4 changes only History presentation composition and defers detail-viewport clamping until the actual preview width is known; it does not change routes, stable-ID edit intents, re-entry selection/filter/transient-state policy, delete/undo behavior, or shortcuts. Batch 3B-5 ships the approved Goals presentation redesign with persistent responsive Goals/Milestones panes; its focus layers locally as Goal edit → Milestones Browse → Goal Browse → Dashboard, while routes, database behavior, atomic preparation, re-entry, failure retention, and undo remain unchanged.
+
+Dashboard responsive-component extraction and Log Entry form extraction remain unshipped.
 
 ## Typed Routing and Re-entry
 
@@ -45,7 +47,7 @@ List screens explicitly choose clamp or wrap edge behavior.
 | Goals, History, Quotes, Practices | Clamp |
 | Trends | Wrap |
 
-`j/k` navigates lists, with arrow-key support where implemented by the screen. The selected item or selected visual span remains visible. When visual rows exist outside a viewport, the panel title adds `↑`, `↓`, or `↑↓`. History and Quotes use `Enter` to focus the complete selected detail and `Esc` to return focus to the list.
+`j/k` navigates lists, with arrow-key support where implemented by the screen. The selected item or selected visual span remains visible. When visual rows exist outside a viewport, the panel title adds `↑`, `↓`, or `↑↓`. History and Quotes use `Enter` to focus the complete selected detail and `Esc` to return focus to the list. Goals keeps its selected Goal visible in a span-aware list pane and independently scrolls milestones beneath a pinned derived-progress header.
 
 ## Text Filter Pattern
 
@@ -86,6 +88,7 @@ Reusable mechanics live in `src/tui/framework/`: visual-row measurement and view
 
 - Batch 1 list/detail screens and Log Entry are verified at `80x24`.
 - Dashboard's complete content and remaining navigation are verified at `80x35`.
+- Goals uses horizontal persistent panes at body widths of `>=83` cells and stacked panes below 83; both layouts keep content bounded.
 - Log Entry and Dashboard direct renderers tolerate smaller rectangles without panicking or drawing derived inner regions outside their parents.
 
 ## Removed Interfaces

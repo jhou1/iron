@@ -48,7 +48,9 @@ LANG=zh_CN.UTF-8 iron  # Chinese
 
 The existing Dashboard routes and shortcuts are unchanged. Opening Dashboard, History, Trends, Practices, Goals, or Quotes reloads current database data before switching screens. Where applicable, Iron restores the same item by stable ID together with the active filter, viewport, focused detail, and Trends time window. Unfinished add/edit/date/delete-confirmation state, old status messages, and cross-page undo payloads are cleared when a screen is re-entered.
 
-History edit navigation carries the selected log's stable ID, so the Log Entry form opens the exact requested log even after data changes. Target preparation is atomic: if a destination cannot refresh, Iron remains on the source screen, preserves its in-place state and the cached destination, and shows an error. Batch 3A ships this lifecycle behavior. Batch 3B-1 Practices, Batch 3B-2 Quotes, Batch 3B-3 Trends, and Batch 3B-4 History presentation migrations are shipped; later presentation slices are not shipped.
+History edit navigation carries the selected log's stable ID, so the Log Entry form opens the exact requested log even after data changes. Target preparation is atomic: if a destination cannot refresh, Iron remains on the source screen, preserves its in-place state and the cached destination, and shows an error. Batch 3A ships this lifecycle behavior. Batch 3B-1 Practices, Batch 3B-2 Quotes, Batch 3B-3 Trends, Batch 3B-4 History, and Batch 3B-5 Goals are shipped. Goals is the approved presentation redesign in this rollout.
+
+Dashboard responsive-component extraction and Log Entry form extraction remain unshipped.
 
 ### Dashboard
 
@@ -136,7 +138,7 @@ Long practice names stay inside the list, and failed add/rename/delete operation
 
 ### Goals
 
-Press `g`.
+Press `g`. Goals uses persistent Goals/Milestones panes: at body widths of `>=83` cells they appear side by side, and below 83 they stack. The selected Goal remains visible in the Goals pane while its aggregate progress stays pinned above independently scrolling milestone rows. Goal progress remains derived from milestone completion.
 
 Goal list:
 
@@ -164,7 +166,7 @@ Milestone panel:
 | `d` / `u` | Delete / undo deletion |
 | `Esc` | Return to the goal list |
 
-Goals with milestones show `completed/total · percentage`; their completion state is derived from the milestone states.
+Goals with milestones show `completed/total · percentage`; their completion state is derived from the milestone states. `Esc` is layered: it cancels a Goal edit first, then returns from Milestones Browse to Goal Browse, then returns to Dashboard. Database behavior, navigation, atomic refresh failure handling, re-entry restoration/reset rules, mutation-failure retention, and goal/milestone undo remain unchanged.
 
 ### Quotes
 

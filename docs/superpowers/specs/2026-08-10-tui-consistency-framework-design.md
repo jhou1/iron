@@ -1,7 +1,9 @@
 # TUI Consistency Framework Design
 
 **Date:** 2026-08-10
-**Status:** Batches 1, 2, 3A, 3B-1, 3B-2, 3B-3, and 3B-4 complete; later presentation-component slices are not shipped
+**Status:** Batches 1, 2, 3A, 3B-1, 3B-2, 3B-3, 3B-4, and 3B-5 Goals complete
+
+Dashboard responsive-component extraction and Log Entry form extraction remain unshipped.
 **Branch:** `codex/tui-consistency`
 **Base:** validated Goals milestone-management implementation (`0069c04`)
 
@@ -73,7 +75,7 @@ Provides `ScreenFrame`, which centers a screen body and reserves its body sectio
 
 ### `list_panel.rs`
 
-Provides `ScrollableListPanel`, which owns bordered-list geometry, title and overflow markers, viewport reveal and clamp, visible-row slicing, and selected-row highlighting. Practices, Quotes, Trends, and History provide already-formatted rows and retain their domain selection policies.
+Provides `ScrollableListPanel`, which owns bordered-list geometry, title and overflow markers, viewport reveal and clamp, visible-row slicing, and selected-row highlighting. Practices, Quotes, Trends, and History provide already-formatted rows and retain their domain selection policies. Its existing API remains accepted; the backward-compatible `render_scrollable_list_panel_spanned` sibling adds measured multi-line selection reveal/highlighting for Goals without changing those consumers.
 
 ### `action_panel.rs`
 
@@ -203,7 +205,13 @@ Batch 3B-4 migrates History to `ScreenFrame` and `ScrollableListPanel`. The fram
 
 History retains its dynamic log-column formatting, filtering, floating-preview placement, Detail-mode measurement and scrolling, edit navigation, delete/undo policy, database behavior, and re-entry lifecycle through the existing `render_detail_panel` helper rather than a generic popup component. Detail-viewport clamping is deferred until the actual popup width is known, keeping normal, narrow, short, tiny, zero-sized, edge, and resized rendering geometry-safe. Navigation, stable-ID edit intents, re-entry selection/filter/transient-state policy, delete/undo behavior, and shortcuts are unchanged.
 
-Goals popups, Dashboard responsive layout, Log Entry forms, and later presentation-component extraction slices remain unshipped. Batch 3B-4 changes no other screen and does not establish that the History component subset is suitable for those later slices.
+Batch 3B-4 changes no other screen and does not establish that the History component subset is suitable for Dashboard or Log Entry extraction.
+
+### Batch 3B-5: Goals Responsive Panels — Complete
+
+Batch 3B-5 is the approved presentation redesign in the rollout. Goals replaces its former milestone view with persistent Goals/Milestones panes: horizontal at body widths of `>=83` cells and stacked below 83. The span-aware ListPanel sibling preserves full multi-line Goal selection reveal and focused highlighting, while the pinned-header DetailPanel sibling keeps milestone-derived aggregate progress fixed as milestones scroll. The existing ListPanel and DetailPanel APIs remain accepted and existing screen consumers remain unchanged.
+
+Goals retains its database operations, navigation topology, atomic target preparation, stable-ID re-entry restoration, reset of transient state on cross-page re-entry, mutation-failure retention, and one-level Goal/milestone undo. Focus and `Esc` layer locally as Goal edit → Milestones Browse → Goal Browse → Dashboard.
 
 ## Testing Strategy
 
