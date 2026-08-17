@@ -219,46 +219,66 @@ fn is_goals_framework_component(name: &str) -> bool {
     )
 }
 
-fn collect_goals_framework_imports(
+#[derive(Clone)]
+enum GoalsCallResolution {
+    Framework(Vec<String>),
+    Shadowed,
+}
+
+fn insert_goals_call_resolution(
+    resolutions: &mut HashMap<String, GoalsCallResolution>,
+    local_name: String,
+    origin: Vec<String>,
+) {
+    let resolution = if canonical_goals_framework_path(&origin) {
+        GoalsCallResolution::Framework(origin)
+    } else {
+        GoalsCallResolution::Shadowed
+    };
+    resolutions
+        .entry(local_name)
+        .and_modify(|existing| {
+            if matches!(resolution, GoalsCallResolution::Shadowed) {
+                *existing = GoalsCallResolution::Shadowed;
+            }
+        })
+        .or_insert(resolution);
+}
+
+fn collect_goals_call_imports(
     tree: &syn::UseTree,
     prefix: &mut Vec<String>,
-    imports: &mut HashMap<String, Vec<String>>,
+    resolutions: &mut HashMap<String, GoalsCallResolution>,
+    has_glob_import: &mut bool,
 ) {
     match tree {
         syn::UseTree::Path(path) => {
             prefix.push(path.ident.to_string());
-            collect_goals_framework_imports(&path.tree, prefix, imports);
+            collect_goals_call_imports(&path.tree, prefix, resolutions, has_glob_import);
             prefix.pop();
         }
         syn::UseTree::Group(group) => {
             for item in &group.items {
-                collect_goals_framework_imports(item, prefix, imports);
+                collect_goals_call_imports(item, prefix, resolutions, has_glob_import);
             }
         }
-        syn::UseTree::Name(name) if is_goals_framework_component(&name.ident.to_string()) => {
-            let original = name.ident.to_string();
-            let mut path = prefix.clone();
-            path.push(original.clone());
-            imports.insert(original, path);
+        syn::UseTree::Name(name) if name.ident == "self" => {
+            if let Some(local_name) = prefix.last() {
+                insert_goals_call_resolution(resolutions, local_name.clone(), prefix.clone());
+            }
         }
-        syn::UseTree::Rename(rename) if is_goals_framework_component(&rename.ident.to_string()) => {
-            let mut path = prefix.clone();
-            path.push(rename.ident.to_string());
-            imports.insert(rename.rename.to_string(), path);
+        syn::UseTree::Name(name) => {
+            let local_name = name.ident.to_string();
+            let mut origin = prefix.clone();
+            origin.push(local_name.clone());
+            insert_goals_call_resolution(resolutions, local_name, origin);
         }
-        syn::UseTree::Name(_) | syn::UseTree::Rename(_) | syn::UseTree::Glob(_) => {}
-    }
-}
-
-struct LocalGoalsFrameworkImportCollector<'a> {
-    imports: &'a mut HashMap<String, Vec<String>>,
-}
-
-impl<'ast> Visit<'ast> for LocalGoalsFrameworkImportCollector<'_> {
-    fn visit_item(&mut self, item: &'ast syn::Item) {
-        if let syn::Item::Use(item_use) = item {
-            collect_goals_framework_imports(&item_use.tree, &mut Vec::new(), self.imports);
+        syn::UseTree::Rename(rename) => {
+            let mut origin = prefix.clone();
+            origin.push(rename.ident.to_string());
+            insert_goals_call_resolution(resolutions, rename.rename.to_string(), origin);
         }
+        syn::UseTree::Glob(_) => *has_glob_import = true,
     }
 }
 
@@ -279,8 +299,7 @@ fn canonical_goals_framework_path(path: &[String]) -> bool {
 
 fn canonical_goals_framework_call(
     function: &syn::ExprPath,
-    imports: &HashMap<String, Vec<String>>,
-    local_bindings: &HashSet<String>,
+    scopes: &[HashMap<String, GoalsCallResolution>],
 ) -> Option<String> {
     if function.qself.is_some() {
         return None;
@@ -291,85 +310,30 @@ fn canonical_goals_framework_call(
         .iter()
         .map(|segment| segment.ident.to_string())
         .collect::<Vec<_>>();
-    let canonical = if path.len() == 1 {
+    if path.len() == 1 {
         let local_name = path.first()?;
-        if local_bindings.contains(local_name) {
-            return None;
+        for scope in scopes.iter().rev() {
+            if let Some(resolution) = scope.get(local_name) {
+                return match resolution {
+                    GoalsCallResolution::Framework(origin) => {
+                        canonical_goals_framework_path(origin)
+                            .then(|| origin.last().unwrap().clone())
+                    }
+                    GoalsCallResolution::Shadowed => None,
+                };
+            }
         }
-        imports.get(local_name)?
-    } else {
-        &path
-    };
-    canonical_goals_framework_path(canonical).then(|| canonical.last().unwrap().clone())
+        return None;
+    }
+    canonical_goals_framework_path(&path).then(|| path.last().unwrap().clone())
 }
 
 #[derive(Default)]
-struct GoalsLocalBindingCollector {
+struct GoalsPatternBindingCollector {
     names: HashSet<String>,
-    has_glob_import: bool,
 }
 
-fn collect_local_use_bindings(
-    tree: &syn::UseTree,
-    prefix: &mut Vec<String>,
-    bindings: &mut GoalsLocalBindingCollector,
-) {
-    match tree {
-        syn::UseTree::Path(path) => {
-            prefix.push(path.ident.to_string());
-            collect_local_use_bindings(&path.tree, prefix, bindings);
-            prefix.pop();
-        }
-        syn::UseTree::Name(name) if name.ident == "self" => {
-            if !canonical_goals_framework_path(prefix) {
-                if let Some(local_name) = prefix.last() {
-                    bindings.names.insert(local_name.clone());
-                }
-            }
-        }
-        syn::UseTree::Name(name) => {
-            let mut origin = prefix.clone();
-            origin.push(name.ident.to_string());
-            if !canonical_goals_framework_path(&origin) {
-                bindings.names.insert(name.ident.to_string());
-            }
-        }
-        syn::UseTree::Rename(rename) => {
-            let mut origin = prefix.clone();
-            origin.push(rename.ident.to_string());
-            if !canonical_goals_framework_path(&origin) {
-                bindings.names.insert(rename.rename.to_string());
-            }
-        }
-        syn::UseTree::Group(group) => {
-            for item in &group.items {
-                collect_local_use_bindings(item, prefix, bindings);
-            }
-        }
-        syn::UseTree::Glob(_) => bindings.has_glob_import = true,
-    }
-}
-
-impl<'ast> Visit<'ast> for GoalsLocalBindingCollector {
-    fn visit_item(&mut self, item: &'ast syn::Item) {
-        match item {
-            syn::Item::Const(item) => {
-                self.names.insert(item.ident.to_string());
-            }
-            syn::Item::Fn(item) => {
-                self.names.insert(item.sig.ident.to_string());
-            }
-            syn::Item::Static(item) => {
-                self.names.insert(item.ident.to_string());
-            }
-            syn::Item::Use(item) => {
-                collect_local_use_bindings(&item.tree, &mut Vec::new(), self);
-            }
-            _ => {}
-        }
-        // Nested item bodies are declarations outside the render execution path.
-    }
-
+impl<'ast> Visit<'ast> for GoalsPatternBindingCollector {
     fn visit_pat_ident(&mut self, pattern: &'ast syn::PatIdent) {
         self.names.insert(pattern.ident.to_string());
         visit::visit_pat_ident(self, pattern);
@@ -644,9 +608,84 @@ struct GoalsRenderOwnership {
 
 struct GoalsRenderVisitor<'a> {
     aliases: &'a HashMap<String, String>,
-    framework_imports: &'a HashMap<String, Vec<String>>,
-    local_bindings: &'a HashSet<String>,
+    call_scopes: Vec<HashMap<String, GoalsCallResolution>>,
     ownership: GoalsRenderOwnership,
+}
+
+impl GoalsRenderVisitor<'_> {
+    fn block_call_scope(&self, block: &syn::Block) -> HashMap<String, GoalsCallResolution> {
+        let mut scope = HashMap::new();
+        let mut has_glob_import = false;
+        for statement in &block.stmts {
+            let syn::Stmt::Item(item) = statement else {
+                continue;
+            };
+            match item {
+                syn::Item::Const(item) => {
+                    scope.insert(item.ident.to_string(), GoalsCallResolution::Shadowed);
+                }
+                syn::Item::Fn(item) => {
+                    scope.insert(item.sig.ident.to_string(), GoalsCallResolution::Shadowed);
+                }
+                syn::Item::Static(item) => {
+                    scope.insert(item.ident.to_string(), GoalsCallResolution::Shadowed);
+                }
+                syn::Item::Use(item) => collect_goals_call_imports(
+                    &item.tree,
+                    &mut Vec::new(),
+                    &mut scope,
+                    &mut has_glob_import,
+                ),
+                _ => {}
+            }
+        }
+        if has_glob_import {
+            for local_name in self
+                .call_scopes
+                .iter()
+                .flat_map(HashMap::keys)
+                .cloned()
+                .chain(
+                    [
+                        "render_screen_frame",
+                        "render_scrollable_list_panel_spanned",
+                        "render_detail_panel_with_header",
+                    ]
+                    .map(str::to_owned),
+                )
+            {
+                scope
+                    .entry(local_name)
+                    .or_insert(GoalsCallResolution::Shadowed);
+            }
+        }
+        scope
+    }
+
+    fn shadow_pattern_bindings(&mut self, pattern: &syn::Pat) {
+        let mut bindings = GoalsPatternBindingCollector::default();
+        bindings.visit_pat(pattern);
+        let scope = self.call_scopes.last_mut().unwrap();
+        for name in bindings.names {
+            scope.insert(name, GoalsCallResolution::Shadowed);
+        }
+    }
+
+    fn visit_condition_with_let_bindings(&mut self, expression: &syn::Expr) {
+        match expression {
+            syn::Expr::Binary(binary) if matches!(binary.op, syn::BinOp::And(_)) => {
+                self.visit_condition_with_let_bindings(&binary.left);
+                self.visit_condition_with_let_bindings(&binary.right);
+            }
+            syn::Expr::Group(group) => self.visit_condition_with_let_bindings(&group.expr),
+            syn::Expr::Let(expression) => {
+                self.visit_expr(&expression.expr);
+                self.shadow_pattern_bindings(&expression.pat);
+            }
+            syn::Expr::Paren(paren) => self.visit_condition_with_let_bindings(&paren.expr),
+            _ => self.visit_expr(expression),
+        }
+    }
 }
 
 impl<'ast> Visit<'ast> for GoalsRenderVisitor<'_> {
@@ -654,15 +693,72 @@ impl<'ast> Visit<'ast> for GoalsRenderVisitor<'_> {
         // Nested item declarations are not calls made by GoalsScreen::render.
     }
 
+    fn visit_block(&mut self, block: &'ast syn::Block) {
+        let scope = self.block_call_scope(block);
+        self.call_scopes.push(scope);
+        for statement in &block.stmts {
+            self.visit_stmt(statement);
+        }
+        self.call_scopes.pop();
+    }
+
+    fn visit_local(&mut self, local: &'ast syn::Local) {
+        if let Some(initializer) = &local.init {
+            self.visit_expr(&initializer.expr);
+            if let Some((_, diverge)) = &initializer.diverge {
+                self.visit_expr(diverge);
+            }
+        }
+        self.shadow_pattern_bindings(&local.pat);
+    }
+
+    fn visit_expr_closure(&mut self, closure: &'ast syn::ExprClosure) {
+        self.call_scopes.push(HashMap::new());
+        for input in &closure.inputs {
+            self.shadow_pattern_bindings(input);
+        }
+        self.visit_expr(&closure.body);
+        self.call_scopes.pop();
+    }
+
+    fn visit_arm(&mut self, arm: &'ast syn::Arm) {
+        self.call_scopes.push(HashMap::new());
+        self.shadow_pattern_bindings(&arm.pat);
+        if let Some((_, guard)) = &arm.guard {
+            self.visit_expr(guard);
+        }
+        self.visit_expr(&arm.body);
+        self.call_scopes.pop();
+    }
+
+    fn visit_expr_for_loop(&mut self, expression: &'ast syn::ExprForLoop) {
+        self.visit_expr(&expression.expr);
+        self.call_scopes.push(HashMap::new());
+        self.shadow_pattern_bindings(&expression.pat);
+        self.visit_block(&expression.body);
+        self.call_scopes.pop();
+    }
+
+    fn visit_expr_if(&mut self, expression: &'ast syn::ExprIf) {
+        self.call_scopes.push(HashMap::new());
+        self.visit_condition_with_let_bindings(&expression.cond);
+        self.visit_block(&expression.then_branch);
+        self.call_scopes.pop();
+        if let Some((_, else_branch)) = &expression.else_branch {
+            self.visit_expr(else_branch);
+        }
+    }
+
+    fn visit_expr_while(&mut self, expression: &'ast syn::ExprWhile) {
+        self.call_scopes.push(HashMap::new());
+        self.visit_condition_with_let_bindings(&expression.cond);
+        self.visit_block(&expression.body);
+        self.call_scopes.pop();
+    }
+
     fn visit_expr_call(&mut self, call: &'ast syn::ExprCall) {
         if let syn::Expr::Path(function) = call.func.as_ref() {
-            match canonical_goals_framework_call(
-                function,
-                self.framework_imports,
-                self.local_bindings,
-            )
-            .as_deref()
-            {
+            match canonical_goals_framework_call(function, &self.call_scopes).as_deref() {
                 Some("render_screen_frame") => self.ownership.screen_frame_calls += 1,
                 Some("render_scrollable_list_panel_spanned") => {
                     self.ownership.list_panel_calls += 1;
@@ -750,39 +846,48 @@ fn goals_ownership_violations(source: &str) -> Vec<String> {
     }
     let render = render_methods[0];
     let mut aliases = HashMap::new();
-    let mut framework_imports = HashMap::new();
+    let mut root_call_scope = HashMap::new();
+    let mut root_has_glob_import = false;
     for item in &file.items {
         if let syn::Item::Use(item_use) = item {
             collect_ownership_aliases(&item_use.tree, &mut aliases);
-            collect_goals_framework_imports(
+            collect_goals_call_imports(
                 &item_use.tree,
                 &mut Vec::new(),
-                &mut framework_imports,
+                &mut root_call_scope,
+                &mut root_has_glob_import,
             );
+        }
+    }
+    if root_has_glob_import {
+        for local_name in [
+            "render_screen_frame",
+            "render_scrollable_list_panel_spanned",
+            "render_detail_panel_with_header",
+        ] {
+            root_call_scope
+                .entry(local_name.to_owned())
+                .or_insert(GoalsCallResolution::Shadowed);
         }
     }
     LocalOwnershipAliasCollector {
         aliases: &mut aliases,
     }
     .visit_block(&render.block);
-    let mut local_framework_imports = HashMap::new();
-    LocalGoalsFrameworkImportCollector {
-        imports: &mut local_framework_imports,
-    }
-    .visit_block(&render.block);
-    framework_imports.extend(local_framework_imports.clone());
-    let mut local_bindings = GoalsLocalBindingCollector::default();
-    local_bindings.visit_block(&render.block);
-    if local_bindings.has_glob_import {
-        local_bindings
-            .names
-            .extend(framework_imports.keys().cloned());
+    let mut signature_scope = HashMap::new();
+    for input in &render.sig.inputs {
+        if let syn::FnArg::Typed(input) = input {
+            let mut bindings = GoalsPatternBindingCollector::default();
+            bindings.visit_pat(&input.pat);
+            for name in bindings.names {
+                signature_scope.insert(name, GoalsCallResolution::Shadowed);
+            }
+        }
     }
 
     let mut visitor = GoalsRenderVisitor {
         aliases: &aliases,
-        framework_imports: &framework_imports,
-        local_bindings: &local_bindings.names,
+        call_scopes: vec![root_call_scope, signature_scope],
         ownership: GoalsRenderOwnership::default(),
     };
     visitor.visit_block(&render.block);
@@ -1327,6 +1432,65 @@ fn goals_ownership_rejects_same_name_local_wrappers() {
 }
 
 #[test]
+fn goals_ownership_rejects_if_while_let_and_let_chain_shadows() {
+    let if_while_let = r#"
+        use crate::tui::framework::{
+            render_detail_panel_with_header as details,
+            render_screen_frame as frame_shell,
+            render_scrollable_list_panel_spanned as goals_panel,
+        };
+
+        impl GoalsScreen {
+            fn render(&mut self) {
+                if let Some((frame_shell, goals_panel)) = handlers {
+                    while let Some(details) = next_handler() {
+                        frame_shell();
+                        goals_panel();
+                        details();
+                    }
+                }
+            }
+        }
+    "#;
+    let let_chain = r#"
+        use crate::tui::framework::{
+            render_detail_panel_with_header as details,
+            render_screen_frame as frame_shell,
+            render_scrollable_list_panel_spanned as goals_panel,
+        };
+
+        impl GoalsScreen {
+            fn render(&mut self) {
+                if let Some(frame_shell) = first_handler()
+                    && let Some(goals_panel) = second_handler()
+                    && let Some(details) = third_handler()
+                {
+                    frame_shell();
+                    goals_panel();
+                    details();
+                }
+            }
+        }
+    "#;
+
+    for source in [if_while_let, let_chain] {
+        let violations = goals_ownership_violations(source);
+        for component in [
+            "render_screen_frame",
+            "render_scrollable_list_panel_spanned",
+            "render_detail_panel_with_header",
+        ] {
+            assert!(
+                violations.iter().any(
+                    |violation| violation.contains(component) && violation.contains("found 0")
+                ),
+                "{component}: {violations:?}"
+            );
+        }
+    }
+}
+
+#[test]
 fn goals_ownership_rejects_render_local_wrong_origin_aliases() {
     let local_aliases = r#"
         impl GoalsScreen {
@@ -1363,6 +1527,36 @@ fn goals_ownership_rejects_render_local_wrong_origin_aliases() {
             "{component}: {violations:?}"
         );
     }
+}
+
+#[test]
+fn goals_ownership_accepts_canonical_calls_outside_nested_shadows() {
+    let nested_shadows = r#"
+        use crate::tui::framework::{
+            render_detail_panel_with_header as details,
+            render_screen_frame as frame_shell,
+            render_scrollable_list_panel_spanned as goals_panel,
+        };
+
+        impl GoalsScreen {
+            fn render(&mut self) {
+                {
+                    use decoy::frame as frame_shell;
+                    let goals_panel = || {};
+                    fn details() {}
+                }
+                frame_shell();
+                goals_panel();
+                details();
+            }
+        }
+    "#;
+
+    let violations = goals_ownership_violations(nested_shadows);
+    assert!(
+        violations.is_empty(),
+        "nested shadows must not invalidate canonical calls in the outer scope: {violations:?}"
+    );
 }
 
 #[test]
