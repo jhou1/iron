@@ -156,14 +156,23 @@ fn is_goals_screen_type(ty: &syn::Type) -> bool {
 }
 
 fn is_cfg_test(attrs: &[syn::Attribute]) -> bool {
-    fn meta_contains_test(meta: &syn::Meta) -> bool {
+    fn meta_is_test_only(meta: &syn::Meta) -> bool {
         match meta {
             syn::Meta::Path(path) => path.is_ident("test"),
-            syn::Meta::List(list) => list
-                .parse_args_with(
+            syn::Meta::List(list) => {
+                let Ok(items) = list.parse_args_with(
                     syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated,
-                )
-                .is_ok_and(|items| items.iter().any(meta_contains_test)),
+                ) else {
+                    return false;
+                };
+                if list.path.is_ident("all") {
+                    items.iter().any(meta_is_test_only)
+                } else if list.path.is_ident("any") {
+                    !items.is_empty() && items.iter().all(meta_is_test_only)
+                } else {
+                    false
+                }
+            }
             syn::Meta::NameValue(_) => false,
         }
     }
@@ -172,7 +181,12 @@ fn is_cfg_test(attrs: &[syn::Attribute]) -> bool {
         let syn::Meta::List(list) = &attribute.meta else {
             return false;
         };
-        list.path.is_ident("cfg") && meta_contains_test(&attribute.meta)
+        list.path.is_ident("cfg")
+            && list
+                .parse_args_with(
+                    syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated,
+                )
+                .is_ok_and(|items| items.iter().any(meta_is_test_only))
     })
 }
 
@@ -2181,6 +2195,35 @@ fn goals_ownership_excludes_nested_cfg_test_render_impls() {
         goals_ownership_violations(nested_cfg_test).is_empty(),
         "nested cfg(test) forms must be excluded"
     );
+}
+
+#[test]
+fn goals_ownership_keeps_cfg_forms_that_can_compile_outside_tests() {
+    for condition in ["not(test)", "any(test, feature = \"fixture\")"] {
+        let source = format!(
+            r#"
+                use super::framework::{{
+                    render_detail_panel_with_header, render_screen_frame,
+                    render_scrollable_list_panel_spanned,
+                }};
+                struct GoalsScreen;
+                #[cfg({condition})]
+                impl GoalsScreen {{
+                    fn render(&mut self) {{
+                        render_screen_frame();
+                        render_scrollable_list_panel_spanned();
+                        render_detail_panel_with_header();
+                    }}
+                }}
+            "#
+        );
+
+        let violations = goals_ownership_violations(&source);
+        assert!(
+            violations.is_empty(),
+            "cfg({condition}) can compile outside tests: {violations:?}"
+        );
+    }
 }
 
 #[test]
