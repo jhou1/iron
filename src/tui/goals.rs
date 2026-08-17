@@ -844,9 +844,11 @@ impl GoalsScreen {
     fn handle_confirm_delete_goal(&mut self, key: KeyEvent, db: &Database) -> Action {
         match key.code {
             KeyCode::Char('y') => {
+                let mut delete_succeeded = false;
                 if let Some(goal) = self.goals.get(self.selected).cloned() {
                     match db.delete_goal(goal.id) {
                         Ok(()) => {
+                            delete_succeeded = true;
                             self.last_deleted = Some(GoalUndoData::Goal(goal));
                             match self.reload_goals(db) {
                                 Ok(()) => {
@@ -865,7 +867,9 @@ impl GoalsScreen {
                         self.selected = self.goals.len() - 1;
                     }
                 }
-                self.mode = Mode::Browse;
+                if delete_succeeded {
+                    self.mode = Mode::Browse;
+                }
                 Action::None
             }
             _ => {
@@ -1124,11 +1128,13 @@ impl GoalsScreen {
     fn handle_modal_confirm_delete(&mut self, key: KeyEvent, db: &Database) -> Action {
         match key.code {
             KeyCode::Char('y') => {
+                let mut delete_succeeded = false;
                 if let Some(goal) = self.goals.get(self.modal_goal_idx) {
                     if let Some(ms) = goal.milestones.get(self.modal_selected).cloned() {
                         let goal_id = goal.id;
                         match db.delete_milestone(ms.id) {
                             Ok(()) => {
+                                delete_succeeded = true;
                                 self.modal_last_deleted = Some(GoalUndoData::Milestone {
                                     goal_id,
                                     milestone: ms,
@@ -1158,7 +1164,9 @@ impl GoalsScreen {
                         }
                     }
                 }
-                self.modal_mode = ModalMode::Browse;
+                if delete_succeeded {
+                    self.modal_mode = ModalMode::Browse;
+                }
                 Action::None
             }
             _ => {
@@ -1335,6 +1343,7 @@ mod tests {
     use super::*;
     use crossterm::event::KeyModifiers;
     use ratatui::{backend::TestBackend, Terminal};
+    use rusqlite::Connection;
 
     use crate::tui::framework::ViewportState;
     use crate::tui::lifecycle::{NavigationStatus, Reenter};
@@ -1704,6 +1713,100 @@ mod tests {
 
         assert_eq!(screen.mode, Mode::Modal);
         assert_eq!(screen.modal_mode, ModalMode::AddMilestone);
+    }
+
+    #[test]
+    fn goals_escape_layers_are_bound_before_panel_redesign() {
+        let db = Database::open_in_memory().unwrap();
+        db.create_goal("Goal").unwrap();
+        let mut screen = GoalsScreen::new(&db).unwrap();
+
+        assert_eq!(
+            screen.handle_key(key(KeyCode::Char('m')), &db),
+            Action::None
+        );
+        assert_eq!(screen.mode, Mode::Modal);
+        assert_eq!(screen.modal_mode, ModalMode::AddMilestone);
+
+        assert_eq!(screen.handle_key(key(KeyCode::Esc), &db), Action::None);
+        assert_eq!(screen.mode, Mode::Modal);
+        assert_eq!(screen.modal_mode, ModalMode::Browse);
+
+        assert_eq!(screen.handle_key(key(KeyCode::Esc), &db), Action::None);
+        assert_eq!(screen.mode, Mode::Browse);
+
+        assert_eq!(
+            screen.handle_key(key(KeyCode::Esc), &db),
+            Action::Navigate(NavigationIntent::Open(ModuleId::Dashboard))
+        );
+    }
+
+    #[test]
+    fn failed_goal_delete_retains_confirmation_selection_and_viewport() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("locked-goals.db");
+        let db = Database::open(&path).unwrap();
+        let goal_id = db.create_goal("Keep goal").unwrap();
+        let mut screen = GoalsScreen::new(&db).unwrap();
+        screen.list_viewport.set_height(1);
+        screen.list_viewport.set_offset(3);
+        screen.handle_key(key(KeyCode::Char('d')), &db);
+        let lock = Connection::open(&path).unwrap();
+        lock.execute_batch("BEGIN EXCLUSIVE").unwrap();
+
+        screen.handle_key(key(KeyCode::Char('y')), &db);
+
+        assert_eq!(screen.mode, Mode::ConfirmDeleteGoal);
+        assert_eq!(screen.goals[screen.selected].id, goal_id);
+        assert_eq!(screen.list_viewport.offset(), 3);
+        assert!(screen.status_msg.as_ref().is_some_and(|(_, error)| *error));
+
+        lock.execute_batch("ROLLBACK").unwrap();
+        assert_eq!(db.list_goals().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn failed_milestone_delete_retains_confirmation_identity_and_viewports() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("locked-milestones.db");
+        let db = Database::open(&path).unwrap();
+        let goal_id = db.create_goal("Keep goal").unwrap();
+        let milestone_id = db.create_milestone(goal_id, "Keep milestone").unwrap();
+        let mut screen = GoalsScreen::new(&db).unwrap();
+        screen.handle_key(key(KeyCode::Enter), &db);
+        screen.list_viewport.set_offset(2);
+        screen.detail_state.viewport.set_offset(4);
+        screen.handle_key(key(KeyCode::Char('d')), &db);
+        let lock = Connection::open(&path).unwrap();
+        lock.execute_batch("BEGIN EXCLUSIVE").unwrap();
+
+        screen.handle_key(key(KeyCode::Char('y')), &db);
+
+        assert_eq!(screen.mode, Mode::Modal);
+        assert_eq!(screen.modal_mode, ModalMode::ConfirmDeleteMilestone);
+        assert_eq!(screen.goals[screen.modal_goal_idx].id, goal_id);
+        assert_eq!(
+            screen.goals[screen.modal_goal_idx].milestones[screen.modal_selected].id,
+            milestone_id
+        );
+        assert_eq!(screen.list_viewport.offset(), 2);
+        assert_eq!(screen.detail_state.viewport.offset(), 4);
+        assert!(screen
+            .modal_status_msg
+            .as_ref()
+            .is_some_and(|(_, error)| *error));
+
+        lock.execute_batch("ROLLBACK").unwrap();
+        assert_eq!(
+            db.list_goals()
+                .unwrap()
+                .into_iter()
+                .find(|goal| goal.id == goal_id)
+                .unwrap()
+                .milestones
+                .len(),
+            1
+        );
     }
 
     #[test]
