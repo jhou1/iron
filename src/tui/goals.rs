@@ -1306,6 +1306,7 @@ mod tests {
     use ratatui::{backend::TestBackend, Terminal};
     use rusqlite::Connection;
 
+    use crate::tui::framework::test_support::render_to_snapshot;
     use crate::tui::framework::ViewportState;
     use crate::tui::lifecycle::{NavigationStatus, Reenter};
     use crate::tui::BORDER_COLOR;
@@ -1341,6 +1342,281 @@ mod tests {
             }
         }
         db
+    }
+
+    fn fixed_goals_time() -> chrono::NaiveDateTime {
+        chrono::NaiveDate::from_ymd_opt(2026, 8, 14)
+            .unwrap()
+            .and_hms_opt(8, 0, 0)
+            .unwrap()
+    }
+
+    fn fixed_milestone(
+        id: i64,
+        goal_id: i64,
+        position: i32,
+        title: impl Into<String>,
+        completed: bool,
+    ) -> Milestone {
+        Milestone {
+            id,
+            goal_id,
+            title: title.into(),
+            completed,
+            position,
+            created_at: fixed_goals_time(),
+            completed_at: completed.then_some(fixed_goals_time()),
+        }
+    }
+
+    fn fixed_goal(
+        id: i64,
+        position: i32,
+        title: impl Into<String>,
+        completed: bool,
+        milestones: Vec<Milestone>,
+    ) -> Goal {
+        Goal {
+            id,
+            title: title.into(),
+            completed,
+            position,
+            created_at: fixed_goals_time(),
+            completed_at: completed.then_some(fixed_goals_time()),
+            milestones,
+        }
+    }
+
+    fn base_golden_goals() -> Vec<Goal> {
+        vec![
+            fixed_goal(
+                101,
+                0,
+                "Ship responsive Goals panels",
+                false,
+                vec![
+                    fixed_milestone(1_001, 101, 0, "Bind persistent pane focus", true),
+                    fixed_milestone(1_002, 101, 1, "Keep progress pinned", false),
+                    fixed_milestone(1_003, 101, 2, "Preserve stable identities", true),
+                    fixed_milestone(1_004, 101, 3, "Freeze styled buffers", false),
+                ],
+            ),
+            fixed_goal(102, 1, "Complete migration", true, Vec::new()),
+            fixed_goal(
+                103,
+                2,
+                "长期目标🚀：让训练计划在窄屏和宽屏之间保持清晰、稳定、可操作".repeat(2),
+                false,
+                Vec::new(),
+            ),
+        ]
+    }
+
+    fn goals_fixture_size(name: &str) -> (u16, u16) {
+        match name {
+            "wide_goal_focus"
+            | "wide_milestones_focus"
+            | "goal_edit"
+            | "milestone_add"
+            | "milestone_confirm_delete" => (107, 24),
+            "narrow_goal_focus"
+            | "narrow_milestones_focus"
+            | "overflow"
+            | "empty_goals"
+            | "empty_milestones" => (80, 24),
+            other => panic!("unknown Goals fixture size: {other}"),
+        }
+    }
+
+    fn golden_goals_screen(name: &str) -> GoalsScreen {
+        std::env::set_var("LC_ALL", "C");
+        crate::i18n::init();
+
+        let goals = base_golden_goals();
+        let mut screen = GoalsScreen {
+            goals,
+            selected: 0,
+            list_viewport: ViewportState::new(0),
+            mode: Mode::Browse,
+            goal_input: TextInput::from("inactive goal input".to_owned()),
+            status_msg: Some(("Goals fixture status".into(), false)),
+            last_deleted: Some(GoalUndoData::Goal(fixed_goal(
+                9_001,
+                99,
+                "Deleted goal",
+                false,
+                Vec::new(),
+            ))),
+            milestone_goal_idx: 0,
+            milestone_selected: 1,
+            milestone_input: TextInput::from("inactive milestone input".to_owned()),
+            milestone_panel_state: DetailPanelState::new(false),
+            milestone_mode: MilestoneMode::Browse,
+            milestone_status_msg: Some(("Milestones fixture status".into(), false)),
+            milestone_last_deleted: Some(GoalUndoData::Milestone {
+                goal_id: 101,
+                milestone: fixed_milestone(9_002, 101, 99, "Deleted milestone", false),
+            }),
+        };
+
+        match name {
+            "wide_goal_focus" | "narrow_goal_focus" => {}
+            "wide_milestones_focus" | "narrow_milestones_focus" => {
+                screen.mode = Mode::Milestones;
+                screen.milestone_panel_state.focused = true;
+            }
+            "goal_edit" => {
+                screen.selected = 2;
+                screen.mode = Mode::EditGoal;
+                screen.goal_input = TextInput::from("编辑后的长期目标🚀".repeat(4));
+                screen.list_viewport.set_offset(4);
+            }
+            "milestone_add" => {
+                screen.mode = Mode::Milestones;
+                screen.milestone_mode = MilestoneMode::AddMilestone;
+                screen.milestone_input =
+                    TextInput::from("新增里程碑：验证固定标题与独立滚动".repeat(3));
+                screen.milestone_panel_state.focused = true;
+                screen.milestone_panel_state.viewport.set_offset(1);
+            }
+            "milestone_confirm_delete" => {
+                screen.mode = Mode::Milestones;
+                screen.milestone_selected = 2;
+                screen.milestone_mode = MilestoneMode::ConfirmDeleteMilestone;
+                screen.milestone_panel_state.focused = true;
+                screen.milestone_panel_state.viewport.set_offset(1);
+                screen.milestone_status_msg = Some(("Delete selected milestone?".into(), true));
+            }
+            "overflow" => {
+                screen.goals = (0..20)
+                    .map(|index| {
+                        let goal_id = 2_000 + index;
+                        let milestones = if index == 19 {
+                            (0..20)
+                                .map(|milestone_index| {
+                                    fixed_milestone(
+                                        30_000 + milestone_index,
+                                        goal_id,
+                                        milestone_index as i32,
+                                        format!("Overflow milestone {:02}", milestone_index + 1),
+                                        milestone_index % 3 == 0,
+                                    )
+                                })
+                                .collect()
+                        } else {
+                            Vec::new()
+                        };
+                        fixed_goal(
+                            goal_id,
+                            index as i32,
+                            format!("Overflow goal {:02}", index + 1),
+                            false,
+                            milestones,
+                        )
+                    })
+                    .collect();
+                screen.selected = 19;
+                screen.milestone_goal_idx = 19;
+                screen.milestone_selected = 19;
+                screen.mode = Mode::Milestones;
+                screen.list_viewport.set_offset(54);
+                screen.milestone_panel_state.focused = true;
+                screen.milestone_panel_state.viewport.set_offset(15);
+            }
+            "empty_goals" => {
+                screen.goals.clear();
+                screen.selected = 0;
+                screen.milestone_goal_idx = 0;
+                screen.milestone_selected = 0;
+                screen.last_deleted = None;
+                screen.milestone_last_deleted = None;
+            }
+            "empty_milestones" => {
+                screen.goals = vec![fixed_goal(
+                    501,
+                    0,
+                    "Goal awaiting its first milestone",
+                    false,
+                    Vec::new(),
+                )];
+                screen.mode = Mode::Milestones;
+                screen.milestone_goal_idx = 0;
+                screen.milestone_selected = 0;
+                screen.milestone_panel_state.focused = true;
+                screen.milestone_last_deleted = None;
+            }
+            other => panic!("unknown Goals golden state: {other}"),
+        }
+
+        screen
+    }
+
+    fn goals_golden(name: &str) -> &'static str {
+        match name {
+            "wide_goal_focus" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/goals/wide_goal_focus.txt"
+            )),
+            "wide_milestones_focus" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/goals/wide_milestones_focus.txt"
+            )),
+            "narrow_goal_focus" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/goals/narrow_goal_focus.txt"
+            )),
+            "narrow_milestones_focus" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/goals/narrow_milestones_focus.txt"
+            )),
+            "goal_edit" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/goals/goal_edit.txt"
+            )),
+            "milestone_add" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/goals/milestone_add.txt"
+            )),
+            "milestone_confirm_delete" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/goals/milestone_confirm_delete.txt"
+            )),
+            "overflow" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/goals/overflow.txt"
+            )),
+            "empty_goals" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/goals/empty_goals.txt"
+            )),
+            "empty_milestones" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/goals/empty_milestones.txt"
+            )),
+            other => panic!("unknown Goals golden fixture: {other}"),
+        }
+    }
+
+    #[test]
+    fn goals_states_match_golden_buffers() {
+        for name in [
+            "wide_goal_focus",
+            "wide_milestones_focus",
+            "narrow_goal_focus",
+            "narrow_milestones_focus",
+            "goal_edit",
+            "milestone_add",
+            "milestone_confirm_delete",
+            "overflow",
+            "empty_goals",
+            "empty_milestones",
+        ] {
+            let (width, height) = goals_fixture_size(name);
+            let mut screen = golden_goals_screen(name);
+            let actual = render_to_snapshot(width, height, |frame| screen.render(frame));
+            let expected = goals_golden(name);
+            assert_eq!(actual, expected, "Goals {name} buffer changed");
+        }
     }
 
     fn rect_contains(parent: Rect, child: Rect) -> bool {

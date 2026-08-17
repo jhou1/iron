@@ -138,13 +138,21 @@ fn source_code_contains(source: &str, needle: &str) -> bool {
     source_code(source).contains(needle)
 }
 
-fn is_history_screen_type(ty: &syn::Type) -> bool {
+fn is_screen_type(ty: &syn::Type, expected: &str) -> bool {
     matches!(
         ty,
         syn::Type::Path(path)
             if path.qself.is_none()
-                && path.path.segments.last().is_some_and(|segment| segment.ident == "HistoryScreen")
+                && path.path.segments.last().is_some_and(|segment| segment.ident == expected)
     )
+}
+
+fn is_history_screen_type(ty: &syn::Type) -> bool {
+    is_screen_type(ty, "HistoryScreen")
+}
+
+fn is_goals_screen_type(ty: &syn::Type) -> bool {
+    is_screen_type(ty, "GoalsScreen")
 }
 
 fn is_cfg_test(attrs: &[syn::Attribute]) -> bool {
@@ -159,17 +167,30 @@ fn is_cfg_test(attrs: &[syn::Attribute]) -> bool {
     })
 }
 
-fn collect_widget_aliases(tree: &syn::UseTree, aliases: &mut HashMap<String, String>) {
+fn collect_ownership_aliases(tree: &syn::UseTree, aliases: &mut HashMap<String, String>) {
     match tree {
-        syn::UseTree::Path(path) => collect_widget_aliases(&path.tree, aliases),
+        syn::UseTree::Path(path) => collect_ownership_aliases(&path.tree, aliases),
         syn::UseTree::Group(group) => {
             for item in &group.items {
-                collect_widget_aliases(item, aliases);
+                collect_ownership_aliases(item, aliases);
             }
         }
         syn::UseTree::Rename(rename) => {
             let original = rename.ident.to_string();
-            if matches!(original.as_str(), "Block" | "Table" | "Row" | "Cell") {
+            if matches!(
+                original.as_str(),
+                "Block"
+                    | "Table"
+                    | "Row"
+                    | "Cell"
+                    | "Clear"
+                    | "Paragraph"
+                    | "render_screen_frame"
+                    | "render_scrollable_list_panel_spanned"
+                    | "render_detail_panel_with_header"
+                    | "render_status_line"
+                    | "render_shortcuts"
+            ) {
                 aliases.insert(rename.rename.to_string(), original);
             }
         }
@@ -177,16 +198,68 @@ fn collect_widget_aliases(tree: &syn::UseTree, aliases: &mut HashMap<String, Str
     }
 }
 
-struct LocalWidgetAliasCollector<'a> {
+struct LocalOwnershipAliasCollector<'a> {
     aliases: &'a mut HashMap<String, String>,
 }
 
-impl<'ast> Visit<'ast> for LocalWidgetAliasCollector<'_> {
+impl<'ast> Visit<'ast> for LocalOwnershipAliasCollector<'_> {
     fn visit_item(&mut self, item: &'ast syn::Item) {
         if let syn::Item::Use(item_use) = item {
-            collect_widget_aliases(&item_use.tree, self.aliases);
+            collect_ownership_aliases(&item_use.tree, self.aliases);
         }
     }
+}
+
+fn normalized_path_name(path: &syn::Path, aliases: &HashMap<String, String>) -> Option<String> {
+    let name = path.segments.last()?.ident.to_string();
+    Some(aliases.get(&name).cloned().unwrap_or(name))
+}
+
+fn path_contains_name(path: &syn::Path, aliases: &HashMap<String, String>, expected: &str) -> bool {
+    path.segments.iter().any(|segment| {
+        let name = segment.ident.to_string();
+        aliases.get(&name).map(String::as_str).unwrap_or(&name) == expected
+    })
+}
+
+fn type_contains_name(ty: &syn::Type, aliases: &HashMap<String, String>, expected: &str) -> bool {
+    match ty {
+        syn::Type::Group(group) => type_contains_name(&group.elem, aliases, expected),
+        syn::Type::Paren(paren) => type_contains_name(&paren.elem, aliases, expected),
+        syn::Type::Path(path) => path_contains_name(&path.path, aliases, expected),
+        syn::Type::Reference(reference) => type_contains_name(&reference.elem, aliases, expected),
+        _ => false,
+    }
+}
+
+fn expr_path_contains_name(
+    expression: &syn::ExprPath,
+    aliases: &HashMap<String, String>,
+    expected: &str,
+) -> bool {
+    path_contains_name(&expression.path, aliases, expected)
+        || expression
+            .qself
+            .as_ref()
+            .is_some_and(|qself| type_contains_name(&qself.ty, aliases, expected))
+}
+
+fn called_type_and_method(call: &syn::ExprPath) -> Option<(String, String)> {
+    let method = call.path.segments.last()?.ident.to_string();
+    let receiver = if call.path.segments.len() >= 2 {
+        call.path
+            .segments
+            .iter()
+            .nth(call.path.segments.len() - 2)?
+            .ident
+            .to_string()
+    } else {
+        let syn::Type::Path(path) = call.qself.as_ref()?.ty.as_ref() else {
+            return None;
+        };
+        path.path.segments.last()?.ident.to_string()
+    };
+    Some((receiver, method))
 }
 
 #[derive(Default)]
@@ -213,27 +286,13 @@ impl HistoryRenderVisitor<'_> {
             return;
         };
         let alias = first.ident.to_string();
-        if let Some(original) = self.aliases.get(&alias) {
+        if let Some(original) = self
+            .aliases
+            .get(&alias)
+            .filter(|original| matches!(original.as_str(), "Block" | "Table" | "Row" | "Cell"))
+        {
             self.ownership.alias_uses.insert((original.clone(), alias));
         }
-    }
-
-    fn called_type_and_method(call: &syn::ExprPath) -> Option<(String, String)> {
-        let method = call.path.segments.last()?.ident.to_string();
-        let receiver = if call.path.segments.len() >= 2 {
-            call.path
-                .segments
-                .iter()
-                .nth(call.path.segments.len() - 2)?
-                .ident
-                .to_string()
-        } else {
-            let syn::Type::Path(path) = call.qself.as_ref()?.ty.as_ref() else {
-                return None;
-            };
-            path.path.segments.last()?.ident.to_string()
-        };
-        Some((receiver, method))
     }
 }
 
@@ -257,7 +316,7 @@ impl<'ast> Visit<'ast> for HistoryRenderVisitor<'_> {
                 _ => {}
             }
 
-            if let Some((receiver, method)) = Self::called_type_and_method(function) {
+            if let Some((receiver, method)) = called_type_and_method(function) {
                 let original = self
                     .aliases
                     .get(&receiver)
@@ -332,10 +391,10 @@ fn history_ownership_violations(source: &str) -> Vec<String> {
     let mut aliases = HashMap::new();
     for item in &file.items {
         if let syn::Item::Use(item_use) = item {
-            collect_widget_aliases(&item_use.tree, &mut aliases);
+            collect_ownership_aliases(&item_use.tree, &mut aliases);
         }
     }
-    LocalWidgetAliasCollector {
+    LocalOwnershipAliasCollector {
         aliases: &mut aliases,
     }
     .visit_block(&render.block);
@@ -391,6 +450,170 @@ fn history_ownership_violations(source: &str) -> Vec<String> {
         violations.push(format!(
             "HistoryScreen::render must not use aliased {original} `{alias}` for local presentation ownership"
         ));
+    }
+    violations
+}
+
+#[derive(Default)]
+struct GoalsRenderOwnership {
+    screen_frame_calls: usize,
+    list_panel_calls: usize,
+    detail_panel_calls: usize,
+    borders_method_calls: usize,
+    block_bordered_calls: usize,
+    status_line_calls: usize,
+    shortcuts_calls: usize,
+    clear_paths: usize,
+    paragraph_new_calls: usize,
+}
+
+struct GoalsRenderVisitor<'a> {
+    aliases: &'a HashMap<String, String>,
+    ownership: GoalsRenderOwnership,
+}
+
+impl<'ast> Visit<'ast> for GoalsRenderVisitor<'_> {
+    fn visit_item(&mut self, _item: &'ast syn::Item) {
+        // Nested item declarations are not calls made by GoalsScreen::render.
+    }
+
+    fn visit_expr_call(&mut self, call: &'ast syn::ExprCall) {
+        if let syn::Expr::Path(function) = call.func.as_ref() {
+            match normalized_path_name(&function.path, self.aliases).as_deref() {
+                Some("render_screen_frame") => self.ownership.screen_frame_calls += 1,
+                Some("render_scrollable_list_panel_spanned") => {
+                    self.ownership.list_panel_calls += 1;
+                }
+                Some("render_detail_panel_with_header") => self.ownership.detail_panel_calls += 1,
+                _ => {}
+            }
+        }
+        visit::visit_expr_call(self, call);
+    }
+
+    fn visit_expr_method_call(&mut self, call: &'ast syn::ExprMethodCall) {
+        if call.method == "borders" {
+            self.ownership.borders_method_calls += 1;
+        }
+        visit::visit_expr_method_call(self, call);
+    }
+
+    fn visit_expr_path(&mut self, path: &'ast syn::ExprPath) {
+        match normalized_path_name(&path.path, self.aliases).as_deref() {
+            Some("render_status_line") => self.ownership.status_line_calls += 1,
+            Some("render_shortcuts") => self.ownership.shortcuts_calls += 1,
+            _ => {}
+        }
+        if expr_path_contains_name(path, self.aliases, "Clear") {
+            self.ownership.clear_paths += 1;
+        }
+        if let Some((receiver, method)) = called_type_and_method(path) {
+            let original = self
+                .aliases
+                .get(&receiver)
+                .map(String::as_str)
+                .unwrap_or(receiver.as_str());
+            match (original, method.as_str()) {
+                ("Block", "bordered") => self.ownership.block_bordered_calls += 1,
+                ("Paragraph", "new") => self.ownership.paragraph_new_calls += 1,
+                _ => {}
+            }
+        }
+        visit::visit_expr_path(self, path);
+    }
+
+    fn visit_expr_struct(&mut self, expression: &'ast syn::ExprStruct) {
+        if path_contains_name(&expression.path, self.aliases, "Clear") {
+            self.ownership.clear_paths += 1;
+        }
+        visit::visit_expr_struct(self, expression);
+    }
+}
+
+fn goals_ownership_violations(source: &str) -> Vec<String> {
+    let file = match syn::parse_file(source) {
+        Ok(file) => file,
+        Err(error) => return vec![format!("Goals source must parse as Rust: {error}")],
+    };
+    let render_methods = file
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            syn::Item::Impl(item_impl)
+                if item_impl.trait_.is_none()
+                    && !is_cfg_test(&item_impl.attrs)
+                    && is_goals_screen_type(item_impl.self_ty.as_ref()) =>
+            {
+                Some(item_impl)
+            }
+            _ => None,
+        })
+        .flat_map(|item_impl| &item_impl.items)
+        .filter_map(|item| match item {
+            syn::ImplItem::Fn(method)
+                if method.sig.ident == "render" && !is_cfg_test(&method.attrs) =>
+            {
+                Some(method)
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+
+    if render_methods.len() != 1 {
+        return vec![format!(
+            "Goals must define exactly one production inherent GoalsScreen::render method; found {}",
+            render_methods.len()
+        )];
+    }
+    let render = render_methods[0];
+    let mut aliases = HashMap::new();
+    for item in &file.items {
+        if let syn::Item::Use(item_use) = item {
+            collect_ownership_aliases(&item_use.tree, &mut aliases);
+        }
+    }
+    LocalOwnershipAliasCollector {
+        aliases: &mut aliases,
+    }
+    .visit_block(&render.block);
+
+    let mut visitor = GoalsRenderVisitor {
+        aliases: &aliases,
+        ownership: GoalsRenderOwnership::default(),
+    };
+    visitor.visit_block(&render.block);
+    let ownership = visitor.ownership;
+    let mut violations = Vec::new();
+    for (count, component) in [
+        (ownership.screen_frame_calls, "render_screen_frame"),
+        (
+            ownership.list_panel_calls,
+            "render_scrollable_list_panel_spanned",
+        ),
+        (
+            ownership.detail_panel_calls,
+            "render_detail_panel_with_header",
+        ),
+    ] {
+        if count != 1 {
+            violations.push(format!(
+                "GoalsScreen::render must call {component} exactly once; found {count}"
+            ));
+        }
+    }
+    for (count, forbidden) in [
+        (ownership.borders_method_calls, ".borders"),
+        (ownership.block_bordered_calls, "Block::bordered"),
+        (ownership.status_line_calls, "render_status_line"),
+        (ownership.shortcuts_calls, "render_shortcuts"),
+        (ownership.clear_paths, "Clear"),
+        (ownership.paragraph_new_calls, "Paragraph::new"),
+    ] {
+        if count != 0 {
+            violations.push(format!(
+                "GoalsScreen::render must not own local presentation through {forbidden}; found {count}"
+            ));
+        }
     }
     violations
 }
@@ -728,6 +951,296 @@ fn history_ownership_accepts_the_component_only_render_path() {
     );
 }
 
+#[test]
+fn goals_ownership_requires_one_production_render_and_ignores_decoys() {
+    let decoy_delegation = r#"
+        impl GoalsScreen {
+            fn render(&mut self) {
+                // render_status_line(); Clear; Paragraph::new("");
+                let _literal = "render_shortcuts(); Block::bordered();";
+                fn nested_item() {
+                    render_screen_frame();
+                    render_scrollable_list_panel_spanned();
+                    render_status_line();
+                    Clear;
+                }
+                render_detail_panel_with_header();
+            }
+        }
+
+        fn dead_helper() {
+            render_screen_frame();
+            render_scrollable_list_panel_spanned();
+            Paragraph::new("");
+        }
+
+        #[cfg(test)]
+        impl GoalsScreen {
+            fn render(&mut self) {
+                render_screen_frame();
+                render_scrollable_list_panel_spanned();
+                render_detail_panel_with_header();
+            }
+        }
+    "#;
+
+    let violations = goals_ownership_violations(decoy_delegation);
+    for component in [
+        "render_screen_frame",
+        "render_scrollable_list_panel_spanned",
+    ] {
+        assert!(
+            violations
+                .iter()
+                .any(|violation| violation.contains(component) && violation.contains("found 0")),
+            "{component}: {violations:?}"
+        );
+    }
+    assert!(
+        !violations.iter().any(|violation| {
+            violation.contains("render_status_line")
+                || violation.contains("Clear")
+                || violation.contains("Paragraph::new")
+        }),
+        "nested and dead helpers must not create ownership violations: {violations:?}"
+    );
+
+    let duplicate_production_render = r#"
+        impl GoalsScreen {
+            fn render(&mut self) {}
+            fn render(&self) {}
+        }
+    "#;
+    let violations = goals_ownership_violations(duplicate_production_render);
+    assert!(
+        violations
+            .iter()
+            .any(|violation| violation.contains("exactly one") && violation.contains("found 2")),
+        "{violations:?}"
+    );
+}
+
+#[test]
+fn goals_ownership_rejects_duplicate_delegation_and_local_rendering() {
+    let mixed_ownership = r#"
+        impl GoalsScreen {
+            fn render(&mut self) {
+                render_screen_frame();
+                render_screen_frame();
+                render_scrollable_list_panel_spanned();
+                render_scrollable_list_panel_spanned();
+                render_detail_panel_with_header();
+                render_detail_panel_with_header();
+                Block::default().borders(Borders::ALL);
+                Block::bordered();
+                render_status_line();
+                render_shortcuts();
+                frame.render_widget(Clear, area);
+                Paragraph::new("local footer");
+            }
+        }
+    "#;
+
+    let violations = goals_ownership_violations(mixed_ownership);
+    for symbol in [
+        "render_screen_frame",
+        "render_scrollable_list_panel_spanned",
+        "render_detail_panel_with_header",
+    ] {
+        assert!(
+            violations
+                .iter()
+                .any(|violation| violation.contains(symbol) && violation.contains("found 2")),
+            "{symbol}: {violations:?}"
+        );
+    }
+    for forbidden in [
+        ".borders",
+        "Block::bordered",
+        "render_status_line",
+        "render_shortcuts",
+        "Clear",
+        "Paragraph::new",
+    ] {
+        assert!(
+            violations
+                .iter()
+                .any(|violation| violation.contains(forbidden)),
+            "{forbidden}: {violations:?}"
+        );
+    }
+}
+
+#[test]
+fn goals_ownership_normalizes_qualified_paths() {
+    let qualified_ownership = r#"
+        impl crate::screens::GoalsScreen {
+            fn render(&mut self) {
+                crate::tui::framework::render_screen_frame();
+                crate::tui::framework::render_scrollable_list_panel_spanned();
+                crate::tui::framework::render_detail_panel_with_header();
+                ratatui::widgets::Block::bordered();
+                crate::tui::render_status_line();
+                crate::tui::render_shortcuts();
+                frame.render_widget(ratatui::widgets::Clear, area);
+                ratatui::widgets::Paragraph::new("local footer");
+            }
+        }
+    "#;
+
+    let violations = goals_ownership_violations(qualified_ownership);
+    for forbidden in [
+        "Block::bordered",
+        "render_status_line",
+        "render_shortcuts",
+        "Clear",
+        "Paragraph::new",
+    ] {
+        assert!(
+            violations
+                .iter()
+                .any(|violation| violation.contains(forbidden)),
+            "{forbidden}: {violations:?}"
+        );
+    }
+    assert!(
+        !violations
+            .iter()
+            .any(|violation| violation.contains("found 0")),
+        "qualified component calls must count: {violations:?}"
+    );
+}
+
+#[test]
+fn goals_ownership_rejects_forbidden_function_and_constructor_paths() {
+    let indirect_ownership = r#"
+        impl GoalsScreen {
+            fn render(&mut self) {
+                render_screen_frame();
+                render_scrollable_list_panel_spanned();
+                render_detail_panel_with_header();
+                let _border = ratatui::widgets::Block::bordered;
+                let _status = crate::tui::render_status_line;
+                let _keys = crate::tui::render_shortcuts;
+                let _clear = ratatui::widgets::Clear;
+                let _paragraph = ratatui::widgets::Paragraph::new;
+            }
+        }
+    "#;
+
+    let violations = goals_ownership_violations(indirect_ownership);
+    for forbidden in [
+        "Block::bordered",
+        "render_status_line",
+        "render_shortcuts",
+        "Clear",
+        "Paragraph::new",
+    ] {
+        assert!(
+            violations
+                .iter()
+                .any(|violation| violation.contains(forbidden)),
+            "{forbidden}: {violations:?}"
+        );
+    }
+}
+
+#[test]
+fn goals_ownership_rejects_all_clear_construction_paths() {
+    let clear_ownership = r#"
+        use ratatui::widgets::Clear as Eraser;
+
+        impl GoalsScreen {
+            fn render(&mut self) {
+                render_screen_frame();
+                render_scrollable_list_panel_spanned();
+                render_detail_panel_with_header();
+                frame.render_widget(Clear::default(), area);
+                frame.render_widget(ratatui::widgets::Clear::default(), area);
+                frame.render_widget(Eraser::default(), area);
+                frame.render_widget(Clear {}, area);
+                frame.render_widget(<Clear>::default(), area);
+                frame.render_widget(<ratatui::widgets::Clear as Default>::default(), area);
+                frame.render_widget(<Eraser as Default>::default(), area);
+            }
+        }
+    "#;
+
+    let violations = goals_ownership_violations(clear_ownership);
+    assert!(
+        violations
+            .iter()
+            .any(|violation| violation.contains("Clear") && violation.contains("found 7")),
+        "{violations:?}"
+    );
+}
+
+#[test]
+fn goals_ownership_normalizes_aliased_paths() {
+    let aliased_ownership = r#"
+        use crate::tui::framework::{
+            render_detail_panel_with_header as details,
+            render_screen_frame as frame_shell,
+            render_scrollable_list_panel_spanned as goals_panel,
+        };
+        use crate::tui::{render_shortcuts as local_keys, render_status_line as local_status};
+        use ratatui::widgets::{Block as Panel, Clear as Eraser, Paragraph as Copy};
+
+        impl GoalsScreen {
+            fn render(&mut self) {
+                frame_shell();
+                goals_panel();
+                details();
+                Panel::bordered();
+                local_status();
+                local_keys();
+                frame.render_widget(Eraser, area);
+                Copy::new("local footer");
+            }
+        }
+    "#;
+
+    let violations = goals_ownership_violations(aliased_ownership);
+    for forbidden in [
+        "Block::bordered",
+        "render_status_line",
+        "render_shortcuts",
+        "Clear",
+        "Paragraph::new",
+    ] {
+        assert!(
+            violations
+                .iter()
+                .any(|violation| violation.contains(forbidden)),
+            "{forbidden}: {violations:?}"
+        );
+    }
+    assert!(
+        !violations
+            .iter()
+            .any(|violation| violation.contains("found 0")),
+        "aliased component calls must count: {violations:?}"
+    );
+}
+
+#[test]
+fn goals_ownership_accepts_component_only_render_path() {
+    let component_only = r#"
+        impl GoalsScreen {
+            fn render(&mut self) {
+                render_screen_frame();
+                render_scrollable_list_panel_spanned();
+                render_detail_panel_with_header();
+            }
+        }
+    "#;
+
+    assert!(
+        goals_ownership_violations(component_only).is_empty(),
+        "component-only render must satisfy Goals ownership"
+    );
+}
+
 /// Scans all TUI source files and verifies that every `Paragraph::new(`
 /// rendering user-entered or variable-length content uses `.wrap(`.
 ///
@@ -808,7 +1321,7 @@ fn paragraph_widgets_must_wrap_user_content() {
 #[test]
 fn screens_must_have_bordered_blocks() {
     let tui_dir = Path::new("src/tui");
-    let required_screens = ["goals.rs", "log_entry.rs"];
+    let required_screens = ["log_entry.rs"];
 
     let mut missing = Vec::new();
     for filename in &required_screens {
@@ -827,24 +1340,36 @@ fn screens_must_have_bordered_blocks() {
     );
 
     for (filename, screen_name) in [
+        ("goals.rs", "Goals"),
         ("practices.rs", "Practices"),
         ("quotes_screen.rs", "Quotes"),
         ("trends.rs", "Trends"),
         ("history.rs", "History"),
     ] {
         let source = std::fs::read_to_string(tui_dir.join(filename)).unwrap();
-        if filename == "history.rs" {
-            let violations = history_ownership_violations(&source);
-            assert!(
-                violations.is_empty(),
-                "History presentation ownership violations:\n{}",
-                violations.join("\n")
-            );
-        } else {
-            assert!(
-                source_code_contains(&source, "render_scrollable_list_panel("),
-                "{screen_name} must delegate its bordered list to ScrollableListPanel"
-            );
+        match filename {
+            "goals.rs" => {
+                let violations = goals_ownership_violations(&source);
+                assert!(
+                    violations.is_empty(),
+                    "Goals presentation ownership violations:\n{}",
+                    violations.join("\n")
+                );
+            }
+            "history.rs" => {
+                let violations = history_ownership_violations(&source);
+                assert!(
+                    violations.is_empty(),
+                    "History presentation ownership violations:\n{}",
+                    violations.join("\n")
+                );
+            }
+            _ => {
+                assert!(
+                    source_code_contains(&source, "render_scrollable_list_panel("),
+                    "{screen_name} must delegate its bordered list to ScrollableListPanel"
+                );
+            }
         }
     }
 
