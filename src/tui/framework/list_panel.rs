@@ -8,7 +8,7 @@ use ratatui::{
 
 use crate::tui::{framework::fit_rect, highlight_row, BORDER_COLOR};
 
-use super::{ViewportState, VisualSpan};
+use super::{render_scrollable_lines, visual_spans, ViewportState, VisualSpan};
 
 pub struct ListPanelContent<'a> {
     pub header: Option<Line<'a>>,
@@ -17,10 +17,44 @@ pub struct ListPanelContent<'a> {
     pub selected: Option<usize>,
 }
 
+#[allow(dead_code)]
+pub struct SpannedListPanelContent {
+    pub header: Option<Line<'static>>,
+    pub lines: Vec<Line<'static>>,
+    pub empty: Option<Line<'static>>,
+    pub selected: Option<VisualSpan>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ListPanelAreas {
     pub area: Rect,
     pub inner: Rect,
+}
+
+fn list_panel_geometry(frame_area: Rect, requested_area: Rect) -> (Rect, Rect) {
+    let area = fit_rect(frame_area, requested_area);
+    let geometry = Block::default()
+        .borders(Borders::ALL)
+        .padding(Padding::uniform(1));
+    let inner = fit_rect(area, geometry.inner(area));
+    (area, inner)
+}
+
+fn list_panel_block(title: String, overflow: &str, accent: Color) -> Block<'static> {
+    Block::default()
+        .title(Line::from(vec![
+            Span::styled("── ", Style::default().fg(accent)),
+            Span::styled(
+                format!("{title}{overflow}"),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" ──", Style::default().fg(accent)),
+        ]))
+        .borders(Borders::ALL)
+        .padding(Padding::uniform(1))
+        .border_style(Style::default().fg(accent))
 }
 
 pub fn render_scrollable_list_panel<'a>(
@@ -30,11 +64,7 @@ pub fn render_scrollable_list_panel<'a>(
     viewport: &mut ViewportState,
     build_content: impl FnOnce(Rect) -> ListPanelContent<'a>,
 ) -> ListPanelAreas {
-    let area = fit_rect(frame.area(), area);
-    let geometry = Block::default()
-        .borders(Borders::ALL)
-        .padding(Padding::uniform(1));
-    let inner = fit_rect(area, geometry.inner(area));
+    let (area, inner) = list_panel_geometry(frame.area(), area);
     let content = build_content(inner);
     let header_height = usize::from(content.header.is_some());
     let visible_height = (inner.height as usize).saturating_sub(header_height);
@@ -48,21 +78,7 @@ pub fn render_scrollable_list_panel<'a>(
     }
     viewport.clamp(content.rows.len());
     let overflow = viewport.overflow(content.rows.len()).suffix();
-    let title = title.into();
-    let block = Block::default()
-        .title(Line::from(vec![
-            Span::styled("── ", Style::default().fg(BORDER_COLOR)),
-            Span::styled(
-                format!("{title}{overflow}"),
-                Style::default()
-                    .fg(Color::White)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
-        ]))
-        .borders(Borders::ALL)
-        .padding(Padding::uniform(1))
-        .border_style(Style::default().fg(BORDER_COLOR));
+    let block = list_panel_block(title.into(), overflow, BORDER_COLOR);
     frame.render_widget(block, area);
 
     let mut lines = Vec::new();
@@ -97,12 +113,76 @@ pub fn render_scrollable_list_panel<'a>(
     ListPanelAreas { area, inner }
 }
 
+#[allow(dead_code)]
+pub fn render_scrollable_list_panel_spanned(
+    frame: &mut Frame,
+    area: Rect,
+    title: impl Into<String>,
+    focused: bool,
+    viewport: &mut ViewportState,
+    build_content: impl FnOnce(Rect) -> SpannedListPanelContent,
+) -> ListPanelAreas {
+    let (area, inner) = list_panel_geometry(frame.area(), area);
+    let content = build_content(inner);
+    let header_height = u16::from(content.header.is_some());
+    let header_area = fit_rect(
+        inner,
+        Rect::new(inner.x, inner.y, inner.width, header_height),
+    );
+    let body = fit_rect(
+        inner,
+        Rect::new(
+            inner.x,
+            inner.y.saturating_add(header_height),
+            inner.width,
+            inner.height.saturating_sub(header_height),
+        ),
+    );
+    let spans = visual_spans(&content.lines, body.width);
+    let content_height = spans
+        .last()
+        .map(|span| span.start.saturating_add(span.height))
+        .unwrap_or(0);
+
+    viewport.set_height(body.height as usize);
+    if let Some(selected) = content.selected {
+        viewport.reveal(selected);
+    }
+    viewport.clamp(content_height);
+    let overflow = viewport.overflow(content_height).suffix();
+    let accent = if focused { Color::Cyan } else { BORDER_COLOR };
+    frame.render_widget(list_panel_block(title.into(), overflow, accent), area);
+
+    if let Some(header) = content.header {
+        frame.render_widget(
+            Paragraph::new(header).wrap(Wrap { trim: false }),
+            header_area,
+        );
+    }
+    if content.lines.is_empty() {
+        if let Some(empty) = content.empty {
+            frame.render_widget(Paragraph::new(empty).wrap(Wrap { trim: false }), body);
+        }
+    } else {
+        render_scrollable_lines(
+            frame,
+            body,
+            content.lines,
+            viewport,
+            if focused { content.selected } else { None },
+        );
+    }
+
+    ListPanelAreas { area, inner }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::tui::framework::{
+        combined_span,
         test_support::{render_to_buffer, render_to_string},
-        ViewportState,
+        visual_spans, ViewportState,
     };
     use ratatui::{layout::Rect, style::Color, text::Line};
 
@@ -287,5 +367,115 @@ mod tests {
 
         assert_eq!(zero_inner, Some(Rect::new(5, 5, 0, 0)));
         assert_eq!(one_cell_inner, Some(Rect::new(6, 6, 0, 0)));
+    }
+
+    #[test]
+    fn spanned_list_panel_reveals_and_highlights_the_complete_wrapped_selection() {
+        let mut viewport = ViewportState::new(0);
+        let buffer = render_to_buffer(24, 8, |frame| {
+            render_scrollable_list_panel_spanned(
+                frame,
+                frame.area(),
+                "Goals",
+                true,
+                &mut viewport,
+                |inner| {
+                    let lines = vec![
+                        Line::from("First"),
+                        Line::from("Second"),
+                        Line::from("Selected goal title that wraps"),
+                        Line::from("████ 50%"),
+                        Line::from("Last"),
+                    ];
+                    let spans = visual_spans(&lines, inner.width);
+                    SpannedListPanelContent {
+                        header: None,
+                        lines,
+                        empty: None,
+                        selected: combined_span(&spans, 2, 2),
+                    }
+                },
+            );
+        });
+
+        assert_eq!(viewport.offset(), 1);
+        for y in 3..=5 {
+            assert_eq!(buffer[(2, y)].bg, Color::Rgb(204, 163, 0));
+        }
+        assert_eq!(buffer[(0, 3)].fg, Color::Cyan);
+        assert!((0..8).any(|y| { (0..24).any(|x| buffer[(x, y)].bg == Color::Rgb(204, 163, 0)) }));
+    }
+
+    #[test]
+    fn spanned_list_panel_reveals_selection_without_highlighting_when_unfocused() {
+        let mut viewport = ViewportState::new(0);
+        let buffer = render_to_buffer(24, 8, |frame| {
+            render_scrollable_list_panel_spanned(
+                frame,
+                frame.area(),
+                "Goals",
+                false,
+                &mut viewport,
+                |inner| {
+                    let lines = vec![
+                        Line::from("First"),
+                        Line::from("Second"),
+                        Line::from("Selected goal title that wraps"),
+                        Line::from("████ 50%"),
+                        Line::from("Last"),
+                    ];
+                    let spans = visual_spans(&lines, inner.width);
+                    SpannedListPanelContent {
+                        header: None,
+                        lines,
+                        empty: None,
+                        selected: combined_span(&spans, 2, 2),
+                    }
+                },
+            );
+        });
+
+        assert_eq!(viewport.offset(), 1);
+        assert_eq!(buffer[(0, 3)].fg, BORDER_COLOR);
+        assert!(!(0..8).any(|y| { (0..24).any(|x| buffer[(x, y)].bg == Color::Rgb(204, 163, 0)) }));
+    }
+
+    #[test]
+    fn spanned_list_panel_clips_returned_geometry_for_tiny_and_edge_targets() {
+        let frame_area = Rect::new(0, 0, 6, 6);
+        for target in [
+            Rect::new(0, 0, 0, 0),
+            Rect::new(5, 5, 1, 1),
+            Rect::new(5, 5, 4, 4),
+            Rect::new(6, 6, 1, 1),
+            Rect::new(1, 1, 4, 3),
+        ] {
+            let mut viewport = ViewportState::new(0);
+            let mut returned = None;
+            render_to_buffer(6, 6, |frame| {
+                returned = Some(render_scrollable_list_panel_spanned(
+                    frame,
+                    target,
+                    "Items",
+                    false,
+                    &mut viewport,
+                    |_| SpannedListPanelContent {
+                        header: None,
+                        lines: Vec::new(),
+                        empty: None,
+                        selected: None,
+                    },
+                ));
+            });
+            let areas = returned.expect("renderer returns panel areas");
+            assert!(
+                rect_is_within(frame_area, areas.area),
+                "{target:?} -> {areas:?}"
+            );
+            assert!(
+                rect_is_within(areas.area, areas.inner),
+                "{target:?} -> {areas:?}"
+            );
+        }
     }
 }
