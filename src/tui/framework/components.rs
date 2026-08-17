@@ -104,6 +104,7 @@ pub fn render_detail_panel(
         },
         state,
         true,
+        false,
     );
 }
 
@@ -129,6 +130,7 @@ pub fn render_detail_panel_with_header(
         },
         state,
         highlight_selection,
+        true,
     );
 }
 
@@ -187,9 +189,12 @@ fn detail_panel_block(
     suffix: &str,
     focused: bool,
     panel_width: u16,
+    reserve_overflow_suffix: bool,
 ) -> Block<'static> {
     let decorated_title = if suffix.is_empty() {
         format!("{} ", title.trim_end())
+    } else if !reserve_overflow_suffix {
+        format!("{}{} ", title.trim_end(), suffix)
     } else {
         let title_capacity = (panel_width as usize)
             .saturating_sub(2)
@@ -213,6 +218,7 @@ fn render_detail_panel_core(
     content: DetailPanelContent,
     state: &mut DetailPanelState,
     highlight_selection: bool,
+    reserve_overflow_suffix: bool,
 ) {
     let areas = detail_panel_geometry(frame.area(), requested_area, &content.header);
     let spans = visual_spans(&content.lines, areas.body.width);
@@ -229,7 +235,13 @@ fn render_detail_panel_core(
 
     let suffix = state.viewport.overflow(content_height).suffix();
     frame.render_widget(
-        detail_panel_block(&content.title, suffix, state.focused, areas.area.width),
+        detail_panel_block(
+            &content.title,
+            suffix,
+            state.focused,
+            areas.area.width,
+            reserve_overflow_suffix,
+        ),
         areas.area,
     );
     frame.render_widget(
