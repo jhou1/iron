@@ -82,7 +82,7 @@ The Milestones pane contains the pinned selected-Goal gauge followed by every mi
 | `u` | Undo the last milestone deletion |
 | `Esc` | Return to Goal Browse |
 
-Text-entry modes use `Enter` to save and `Esc` to cancel. Delete confirmation accepts `y`; any other key cancels. `Esc` is layered as Goal edit → Milestones Browse → Goal Browse → Dashboard, as applicable.
+Text-entry modes use `Enter` to save and `Esc` to cancel. Delete confirmation accepts `y`; any other key cancels. Goal add/edit/date and Goal delete-confirmation cancellation return directly to Goal Browse. Milestone add/edit/date and milestone delete-confirmation cancellation return to Milestones Browse. In browse modes, `Esc` then returns from Milestones Browse to Goal Browse and from Goal Browse to Dashboard.
 
 ## Undo and Deletion
 

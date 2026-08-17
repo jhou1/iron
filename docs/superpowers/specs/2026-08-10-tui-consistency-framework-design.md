@@ -211,7 +211,7 @@ Batch 3B-4 changes no other screen and does not establish that the History compo
 
 Batch 3B-5 is the approved presentation redesign in the rollout. Goals replaces its former milestone view with persistent Goals/Milestones panes: horizontal at body widths of `>=83` cells and stacked below 83. The span-aware ListPanel sibling preserves full multi-line Goal selection reveal and focused highlighting, while the pinned-header DetailPanel sibling keeps milestone-derived aggregate progress fixed as milestones scroll. The existing ListPanel and DetailPanel APIs remain accepted and existing screen consumers remain unchanged.
 
-Goals retains its database operations, navigation topology, atomic target preparation, stable-ID re-entry restoration, reset of transient state on cross-page re-entry, mutation-failure retention, and one-level Goal/milestone undo. Focus and `Esc` layer locally as Goal edit → Milestones Browse → Goal Browse → Dashboard.
+Goals retains its database operations, navigation topology, atomic target preparation, stable-ID re-entry restoration, reset of transient state on cross-page re-entry, mutation-failure retention, and one-level Goal/milestone undo. Goal mutation modes cancel directly to Goal Browse, milestone mutation modes cancel to Milestones Browse, and browse focus then returns Milestones Browse → Goal Browse → Dashboard.
 
 ## Testing Strategy
 
