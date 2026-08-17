@@ -24,6 +24,52 @@ use crate::model::{Goal, Milestone};
 
 const ACCENT: Color = Color::Cyan;
 const GREEN: Color = Color::Green;
+#[allow(dead_code)]
+const WIDE_GOALS_PANES_MIN_WIDTH: u16 = 83;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
+struct GoalsPaneAreas {
+    goals: Rect,
+    milestones: Rect,
+}
+
+#[allow(dead_code)]
+fn goals_pane_areas(body: Rect) -> GoalsPaneAreas {
+    if body.width >= WIDE_GOALS_PANES_MIN_WIDTH {
+        let available = body.width.saturating_sub(1);
+        let candidate = ((available as u32 * 2) / 5) as u16;
+        let goals_width = candidate.max(34).min(available.saturating_sub(48));
+        let milestones_width = available.saturating_sub(goals_width);
+        let goals = fit_rect(body, Rect::new(body.x, body.y, goals_width, body.height));
+        let milestones = fit_rect(
+            body,
+            Rect::new(
+                body.x.saturating_add(goals_width).saturating_add(1),
+                body.y,
+                milestones_width,
+                body.height,
+            ),
+        );
+        GoalsPaneAreas { goals, milestones }
+    } else {
+        let gap = u16::from(body.height >= 2);
+        let remaining = body.height.saturating_sub(gap);
+        let goals_height = ((remaining as u32 * 2) / 5) as u16;
+        let milestones_height = remaining.saturating_sub(goals_height);
+        let goals = fit_rect(body, Rect::new(body.x, body.y, body.width, goals_height));
+        let milestones = fit_rect(
+            body,
+            Rect::new(
+                body.x,
+                body.y.saturating_add(goals_height).saturating_add(gap),
+                body.width,
+                milestones_height,
+            ),
+        );
+        GoalsPaneAreas { goals, milestones }
+    }
+}
 
 fn goal_gauge_ratio(goal: &Goal) -> f64 {
     if goal.milestones.is_empty() {
@@ -1417,6 +1463,79 @@ mod tests {
             modal_mode: ModalMode::Browse,
             modal_status_msg: None,
             modal_last_deleted: None,
+        }
+    }
+
+    #[test]
+    fn goals_panes_use_exact_wide_boundary_geometry() {
+        assert_eq!(
+            goals_pane_areas(Rect::new(0, 0, 83, 20)),
+            GoalsPaneAreas {
+                goals: Rect::new(0, 0, 34, 20),
+                milestones: Rect::new(35, 0, 48, 20),
+            }
+        );
+        assert_eq!(
+            goals_pane_areas(Rect::new(0, 0, 107, 20)),
+            GoalsPaneAreas {
+                goals: Rect::new(0, 0, 42, 20),
+                milestones: Rect::new(43, 0, 64, 20),
+            }
+        );
+    }
+
+    #[test]
+    fn goals_panes_stack_below_the_wide_threshold() {
+        assert_eq!(
+            goals_pane_areas(Rect::new(3, 4, 80, 21)),
+            GoalsPaneAreas {
+                goals: Rect::new(3, 4, 80, 8),
+                milestones: Rect::new(3, 13, 80, 12),
+            }
+        );
+    }
+
+    #[test]
+    fn goals_panes_remain_contained_and_separated_for_degenerate_rectangles() {
+        fn contains(parent: Rect, child: Rect) -> bool {
+            let parent_right = parent.x as u32 + parent.width as u32;
+            let parent_bottom = parent.y as u32 + parent.height as u32;
+            let child_right = child.x as u32 + child.width as u32;
+            let child_bottom = child.y as u32 + child.height as u32;
+            child.x >= parent.x
+                && child.y >= parent.y
+                && child_right <= parent_right
+                && child_bottom <= parent_bottom
+        }
+
+        let bodies = [
+            Rect::new(0, 0, 0, 0),
+            Rect::new(0, 0, 1, 1),
+            Rect::new(0, 0, 40, 16),
+            Rect::new(3, 4, 80, 21),
+            Rect::new(u16::MAX - 40, u16::MAX - 30, 40, 16),
+            Rect::new(u16::MAX - 10, u16::MAX - 10, 83, 20),
+            Rect::new(u16::MAX, u16::MAX, u16::MAX, u16::MAX),
+        ];
+
+        for body in bodies {
+            let panes = goals_pane_areas(body);
+            assert!(contains(body, panes.goals), "{body:?} -> {panes:?}");
+            assert!(contains(body, panes.milestones), "{body:?} -> {panes:?}");
+
+            if body.width >= WIDE_GOALS_PANES_MIN_WIDTH {
+                let goals_right = panes.goals.x as u32 + panes.goals.width as u32;
+                assert!(
+                    goals_right <= panes.milestones.x as u32,
+                    "horizontal panes overlap: {body:?} -> {panes:?}"
+                );
+            } else if body.height >= 2 {
+                let goals_bottom = panes.goals.y as u32 + panes.goals.height as u32;
+                assert!(
+                    goals_bottom <= panes.milestones.y as u32,
+                    "vertical panes overlap: {body:?} -> {panes:?}"
+                );
+            }
         }
     }
 
