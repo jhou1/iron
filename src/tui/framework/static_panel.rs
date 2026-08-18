@@ -9,13 +9,11 @@ use ratatui::{
 use crate::tui::{framework::fit_rect, BORDER_COLOR};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)]
 pub struct StaticPanelAreas {
     pub area: Rect,
     pub inner: Rect,
 }
 
-#[allow(dead_code)]
 fn static_panel_geometry(frame_area: Rect, requested_area: Rect) -> StaticPanelAreas {
     let area = fit_rect(frame_area, requested_area);
     let geometry = Block::default()
@@ -25,7 +23,6 @@ fn static_panel_geometry(frame_area: Rect, requested_area: Rect) -> StaticPanelA
     StaticPanelAreas { area, inner }
 }
 
-#[allow(dead_code)]
 fn static_panel_block(title: String) -> Block<'static> {
     Block::default()
         .title(Line::from(vec![
@@ -43,7 +40,6 @@ fn static_panel_block(title: String) -> Block<'static> {
         .border_style(Style::default().fg(BORDER_COLOR))
 }
 
-#[allow(dead_code)]
 pub fn render_static_panel(
     frame: &mut Frame,
     area: Rect,
