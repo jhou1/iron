@@ -1,7 +1,7 @@
 # TUI Consistency Framework — Batch 3B-6 Dashboard Components Design
 
-**Date:** 2026-08-18  
-**Status:** Approved for implementation planning  
+**Date:** 2026-08-18
+**Status:** Approved for implementation planning
 **Scope:** Dashboard presentation composition only
 
 ## Context
