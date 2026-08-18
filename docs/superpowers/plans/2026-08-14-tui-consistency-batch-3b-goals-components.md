@@ -748,7 +748,7 @@ Every add/edit/date mode returns exactly `Enter Confirm` and `Esc Cancel`. Each 
 
 Replace local Paragraph/list painting with a pure builder that receives the actual safe inner width and returns `SpannedListPanelContent`. Before mutably borrowing `list_viewport`, capture the clone-only render inputs in an exact local `GoalPanelRenderState { goals, selected, mode, goal_input }`; its `build(inner_width)` method flattens each Goal's title, gauge, and separator lines. Track the selected Goal's starting logical line and selected-line count, then compute its selected `VisualSpan` with `visual_spans` and `combined_span`.
 
-The selected span includes title and gauge but not the trailing separator. Add/edit/date/delete inline lines retain their current text, styles, and bounded `TextInput` cursor behavior.
+In ordinary Browse, the selected span includes the title and gauge but not the trailing separator. Active inline rows are fully revealable: AddGoal selects its editor row, edit/date spans include their active input rows, and ConfirmDeleteGoal includes the confirmation prompt while still excluding the trailing separator. Add/edit/date/delete inline lines retain their current text, styles, and bounded `TextInput` cursor behavior.
 
 - [ ] **Step 7: Build pinned Milestones content**
 
@@ -825,7 +825,7 @@ Use split field borrows or cloned selected Goal data so the ListPanel closure do
 
 - [ ] **Step 9: Preserve handlers, re-entry, status routing, and stable identities**
 
-Update renamed fields without changing database calls. Goal selection drives the visible Milestones preview in Goal focus; `Enter` and `m` set `milestone_goal_idx = selected`. `Esc` follows the approved edit → Milestones Browse → Goal Browse → Dashboard layering.
+Update renamed fields without changing database calls. Goal selection drives the visible Milestones preview in Goal focus. `Enter` and `m` reconcile `milestone_goal_idx` with the selected Goal while retaining same-Goal milestone identity, viewport, status, and undo context; a changed Goal restores a stable milestone ID when possible and otherwise clamps the prior index. `m` then enters AddMilestone without clearing unrelated persistent context. Goal mutation modes cancel directly to Goal Browse, milestone mutation modes cancel to Milestones Browse, and browse-mode `Esc` returns Milestones Browse → Goal Browse → Dashboard.
 
 On successful milestone operations, restore the active Goal and milestone by stable IDs after `reload_goals`. Preserve `Reenter` selection/focus/viewports and clear `goal_input`, `milestone_input`, and all other renamed transient fields exactly as the current contract requires. `NavigationStatus` writes to `milestone_status_msg` only in `Mode::Milestones`.
 
@@ -1015,7 +1015,7 @@ Document these facts without claiming Dashboard or Log Entry:
 - Goals uses a persistent responsive Goals/Milestones composition: horizontal at `>=83` body cells and stacked below 83.
 - aggregate progress is pinned while milestone rows scroll;
 - Goal progress remains milestone-derived;
-- focus and layered `Esc` are Goal edit → Milestones Browse → Goal Browse → Dashboard as applicable;
+- Goal mutation modes cancel directly to Goal Browse, milestone mutation modes cancel to Milestones Browse, and browse-mode `Esc` returns Milestones Browse → Goal Browse → Dashboard;
 - the old ListPanel and DetailPanel APIs remain accepted while the sibling APIs add multi-line selection and pinned headers;
 - database, navigation, re-entry, atomic failure, and undo contracts remain unchanged;
 - Dashboard responsive-component extraction and Log Entry form extraction remain unshipped.

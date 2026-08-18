@@ -57,6 +57,8 @@ dashboard-quit-confirm = Quit iron?
 
 # ── Goals ──
 goals-title = Goals
+goals-milestones-title = Milestones
+goals-no-selection = Select or add a goal to manage milestones
 goals-no-milestones = No milestones — press [a] to add one
 goals-press-enter = Press [Enter] to manage milestones
 goals-progress-from-milestones = Goal completion is controlled by milestones
