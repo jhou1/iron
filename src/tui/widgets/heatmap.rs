@@ -18,11 +18,16 @@ pub struct Heatmap<'a> {
 }
 
 impl<'a> Heatmap<'a> {
-    #[allow(dead_code)]
     pub fn new(data: &'a [(String, i64)], weeks: u16, no_color: bool) -> Self {
-        Self::with_today(data, weeks, no_color, Local::now().date_naive())
+        Self {
+            data,
+            weeks,
+            no_color,
+            today: Local::now().date_naive(),
+        }
     }
 
+    #[cfg(test)]
     pub(crate) fn with_today(
         data: &'a [(String, i64)],
         weeks: u16,

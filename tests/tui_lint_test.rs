@@ -172,6 +172,27 @@ fn dashboard_ownership_violations(source: &str) -> Vec<String> {
     violations
 }
 
+fn dashboard_heatmap_construction_violations(source: &str) -> Vec<String> {
+    let production = dashboard_production_source(source);
+    let mut violations = Vec::new();
+    for (needle, expected, label) in [
+        ("Heatmap::new(", 1, "local-date Heatmap constructor"),
+        (
+            "Heatmap::with_today(",
+            0,
+            "test-only fixed-date Heatmap seam",
+        ),
+    ] {
+        let actual = source_code_count(&production, needle);
+        if actual != expected {
+            violations.push(format!(
+                "Dashboard production must call {label} exactly {expected} time(s); found {actual}"
+            ));
+        }
+    }
+    violations
+}
+
 fn is_screen_type(ty: &syn::Type, expected: &str) -> bool {
     matches!(
         ty,
@@ -1504,6 +1525,13 @@ fn ownership_source_check_rejects_non_code_evidence() {
 fn dashboard_delegates_static_presentation_to_framework() {
     let source = std::fs::read_to_string("src/tui/dashboard.rs").unwrap();
     let violations = dashboard_ownership_violations(&source);
+    assert!(violations.is_empty(), "{}", violations.join("\n"));
+}
+
+#[test]
+fn dashboard_production_uses_only_the_local_date_heatmap_constructor() {
+    let source = std::fs::read_to_string("src/tui/dashboard.rs").unwrap();
+    let violations = dashboard_heatmap_construction_violations(&source);
     assert!(violations.is_empty(), "{}", violations.join("\n"));
 }
 
@@ -3755,10 +3783,10 @@ fn paragraph_widgets_must_wrap_user_content() {
     // Format: "filename:line_number"
     // When adding entries, include a brief reason.
     let allowlist: HashSet<&str> = [
-        "dashboard.rs:137",
-        "dashboard.rs:338",
-        "dashboard.rs:358",
-        "dashboard.rs:394",
+        "dashboard.rs:141",
+        "dashboard.rs:339",
+        "dashboard.rs:359",
+        "dashboard.rs:395",
         "log_entry.rs:544",
         "log_entry.rs:736",
         "log_entry.rs:835",

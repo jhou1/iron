@@ -97,10 +97,14 @@ impl DashboardScreen {
     }
 
     pub fn render(&self, frame: &mut Frame) {
-        self.render_on(frame, chrono::Local::now().date_naive());
+        self.render_with_heatmap(frame, |data| Heatmap::new(data, 52, self.no_color));
     }
 
-    fn render_on(&self, frame: &mut Frame, today: chrono::NaiveDate) {
+    fn render_with_heatmap<'a>(
+        &'a self,
+        frame: &mut Frame,
+        make_heatmap: impl FnOnce(&'a [(String, i64)]) -> Heatmap<'a>,
+    ) {
         let shortcuts = self.active_shortcuts();
         let status = if self.mode == DashboardMode::ConfirmQuit {
             Some((tr("dashboard-quit-confirm"), true))
@@ -144,10 +148,7 @@ impl DashboardScreen {
             tr("dashboard-heatmap-title"),
             |frame, inner| {
                 if inner.width > 0 && inner.height > 0 {
-                    frame.render_widget(
-                        Heatmap::with_today(&self.heatmap_data, 52, self.no_color, today),
-                        inner,
-                    );
+                    frame.render_widget(make_heatmap(&self.heatmap_data), inner);
                 }
             },
         );
@@ -477,6 +478,13 @@ impl DashboardScreen {
             _ => Action::None,
         }
     }
+
+    #[cfg(test)]
+    fn render_on(&self, frame: &mut Frame, today: chrono::NaiveDate) {
+        self.render_with_heatmap(frame, |data| {
+            Heatmap::with_today(data, 52, self.no_color, today)
+        });
+    }
 }
 
 impl Reenter for DashboardScreen {
@@ -639,6 +647,32 @@ mod tests {
                 "Dashboard {name} buffer changed"
             );
         }
+    }
+
+    #[test]
+    fn public_render_uses_local_date_while_fixed_render_is_deterministic() {
+        for _ in 0..3 {
+            let today = chrono::Local::now().date_naive();
+            let mut screen = golden_dashboard_screen("normal");
+            let dated_cell = today - chrono::Duration::weeks(30);
+            screen.heatmap_data = vec![(dated_cell.format("%Y-%m-%d").to_string(), 4)];
+
+            let production = render_to_snapshot(80, 35, |frame| screen.render(frame));
+            if chrono::Local::now().date_naive() != today {
+                continue;
+            }
+
+            let fixed_today = render_to_snapshot(80, 35, |frame| screen.render_on(frame, today));
+            let shifted = render_to_snapshot(80, 35, |frame| {
+                screen.render_on(frame, today - chrono::Duration::weeks(53))
+            });
+
+            assert_eq!(production, fixed_today);
+            assert_ne!(fixed_today, shifted);
+            return;
+        }
+
+        panic!("local date changed repeatedly while rendering Dashboard");
     }
 
     #[test]
