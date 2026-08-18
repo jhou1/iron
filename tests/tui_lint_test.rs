@@ -343,21 +343,30 @@ fn expanded_goals_ownership_value_path(
     ownership_scopes: &[HashMap<String, GoalsOwnershipResolution>],
     call_scopes: &[GoalsCallScope],
 ) -> Vec<String> {
-    let Some(first) = path
+    let segments = path
         .segments
-        .first()
-        .map(|segment| segment.ident.to_string())
-    else {
-        return Vec::new();
-    };
-    if call_scopes
         .iter()
-        .rev()
-        .any(|scope| scope.ownership_value_shadows.contains(&first))
+        .map(|segment| segment.ident.to_string())
+        .collect::<Vec<_>>();
+    let Some(first) = segments.first().cloned() else {
+        return segments;
+    };
+    for (call_scope, ownership_scope) in call_scopes.iter().rev().zip(ownership_scopes.iter().rev())
     {
-        return Vec::new();
+        match ownership_scope.get(&first) {
+            Some(GoalsOwnershipResolution::Origin(origin)) => {
+                let mut expanded = origin.clone();
+                expanded.extend(segments.iter().skip(1).cloned());
+                return expanded;
+            }
+            Some(GoalsOwnershipResolution::Shadowed) => return Vec::new(),
+            None => {}
+        }
+        if call_scope.ownership_value_shadows.contains(&first) {
+            return Vec::new();
+        }
     }
-    expanded_goals_ownership_path(path, ownership_scopes)
+    segments
 }
 
 fn canonical_goals_widget_type(path: &[String]) -> Option<&'static str> {
@@ -834,13 +843,13 @@ impl GoalsRenderVisitor<'_> {
                 continue;
             };
             match item {
-                syn::Item::Const(item) => {
+                syn::Item::Const(item) if !is_cfg_test(&item.attrs) => {
                     scope.shadow_value(item.ident.to_string());
                 }
-                syn::Item::Fn(item) => {
+                syn::Item::Fn(item) if !is_cfg_test(&item.attrs) => {
                     scope.shadow_value(item.sig.ident.to_string());
                 }
-                syn::Item::Static(item) => {
+                syn::Item::Static(item) if !is_cfg_test(&item.attrs) => {
                     scope.shadow_value(item.ident.to_string());
                 }
                 syn::Item::Use(item) => {
@@ -969,26 +978,32 @@ impl<'ast> Visit<'ast> for GoalsRenderVisitor<'_> {
 
     fn visit_arm(&mut self, arm: &'ast syn::Arm) {
         self.call_scopes.push(GoalsCallScope::default());
+        self.ownership_scopes.push(HashMap::new());
         self.shadow_pattern_bindings(&arm.pat);
         if let Some((_, guard)) = &arm.guard {
             self.visit_expr(guard);
         }
         self.visit_expr(&arm.body);
+        self.ownership_scopes.pop();
         self.call_scopes.pop();
     }
 
     fn visit_expr_for_loop(&mut self, expression: &'ast syn::ExprForLoop) {
         self.visit_expr(&expression.expr);
         self.call_scopes.push(GoalsCallScope::default());
+        self.ownership_scopes.push(HashMap::new());
         self.shadow_pattern_bindings(&expression.pat);
         self.visit_block(&expression.body);
+        self.ownership_scopes.pop();
         self.call_scopes.pop();
     }
 
     fn visit_expr_if(&mut self, expression: &'ast syn::ExprIf) {
         self.call_scopes.push(GoalsCallScope::default());
+        self.ownership_scopes.push(HashMap::new());
         self.visit_condition_with_let_bindings(&expression.cond);
         self.visit_block(&expression.then_branch);
+        self.ownership_scopes.pop();
         self.call_scopes.pop();
         if let Some((_, else_branch)) = &expression.else_branch {
             self.visit_expr(else_branch);
@@ -997,8 +1012,10 @@ impl<'ast> Visit<'ast> for GoalsRenderVisitor<'_> {
 
     fn visit_expr_while(&mut self, expression: &'ast syn::ExprWhile) {
         self.call_scopes.push(GoalsCallScope::default());
+        self.ownership_scopes.push(HashMap::new());
         self.visit_condition_with_let_bindings(&expression.cond);
         self.visit_block(&expression.body);
+        self.ownership_scopes.pop();
         self.call_scopes.pop();
     }
 
@@ -2376,6 +2393,53 @@ fn goals_ownership_does_not_resolve_forbidden_aliases_through_iife_parameters() 
 }
 
 #[test]
+fn goals_ownership_resolves_iife_value_and_import_precedence_lexically() {
+    let inner_import = r#"
+        use crate::tui::render_status_line as status;
+        use super::framework::{
+            render_detail_panel_with_header, render_screen_frame,
+            render_scrollable_list_panel_spanned,
+        };
+        struct GoalsScreen;
+        impl GoalsScreen {
+            fn render(&mut self) {
+                render_screen_frame();
+                render_scrollable_list_panel_spanned();
+                render_detail_panel_with_header();
+                (|status| {
+                    {
+                        use crate::tui::render_status_line as status;
+                        status();
+                    }
+                })(|| {});
+            }
+        }
+    "#;
+    let inner_value_shadow = r#"
+        use crate::tui::render_status_line as status;
+        use super::framework::{
+            render_detail_panel_with_header, render_screen_frame,
+            render_scrollable_list_panel_spanned,
+        };
+        struct GoalsScreen;
+        impl GoalsScreen {
+            fn render(&mut self) {
+                render_screen_frame();
+                render_scrollable_list_panel_spanned();
+                render_detail_panel_with_header();
+                (|status| { status(); })(|| {});
+            }
+        }
+    "#;
+
+    let inner_import_violations = goals_ownership_violations(inner_import);
+    assert!(inner_import_violations
+        .iter()
+        .any(|item| item.contains("render_status_line")));
+    assert!(goals_ownership_violations(inner_value_shadow).is_empty());
+}
+
+#[test]
 fn goals_ownership_checks_widget_types_inside_iifes_with_same_named_parameters() {
     let source = r#"
         use ratatui::widgets::Paragraph as Copy;
@@ -2419,6 +2483,85 @@ fn goals_ownership_root_items_shadow_canonical_framework_globs() {
     assert!(violations.iter().any(|violation| {
         violation.contains("render_screen_frame") && violation.contains("found 0")
     }));
+}
+
+#[test]
+fn goals_ownership_ignores_cfg_test_nested_value_item_shadows() {
+    let source = r#"
+        use crate::tui::render_status_line as status;
+        use super::framework::{
+            render_detail_panel_with_header, render_screen_frame,
+            render_scrollable_list_panel_spanned,
+        };
+        struct GoalsScreen;
+        impl GoalsScreen {
+            fn render(&mut self) {
+                render_screen_frame();
+                render_scrollable_list_panel_spanned();
+                render_detail_panel_with_header();
+                {
+                    #[cfg(test)]
+                    fn status() {}
+                    status();
+                }
+            }
+        }
+    "#;
+
+    let violations = goals_ownership_violations(source);
+    assert!(violations
+        .iter()
+        .any(|item| item.contains("render_status_line")));
+}
+
+#[test]
+fn goals_ownership_keeps_production_relevant_cfg_nested_value_item_shadows() {
+    let cases = [
+        r#"
+            use crate::tui::render_status_line as status;
+            use super::framework::{
+                render_detail_panel_with_header, render_screen_frame,
+                render_scrollable_list_panel_spanned,
+            };
+            struct GoalsScreen;
+            impl GoalsScreen {
+                fn render(&mut self) {
+                    render_screen_frame();
+                    render_scrollable_list_panel_spanned();
+                    render_detail_panel_with_header();
+                    {
+                        #[cfg(not(test))]
+                        fn status() {}
+                        status();
+                    }
+                }
+            }
+        "#,
+        r#"
+            use crate::tui::render_status_line as status;
+            use super::framework::{
+                render_detail_panel_with_header, render_screen_frame,
+                render_scrollable_list_panel_spanned,
+            };
+            struct GoalsScreen;
+            impl GoalsScreen {
+                fn render(&mut self) {
+                    render_screen_frame();
+                    render_scrollable_list_panel_spanned();
+                    render_detail_panel_with_header();
+                    {
+                        #[cfg(any(test, feature = "fixture"))]
+                        fn status() {}
+                        status();
+                    }
+                }
+            }
+        "#,
+    ];
+
+    for source in cases {
+        assert!(goals_ownership_violations(source).is_empty());
+    }
 }
 
 #[test]
