@@ -48,13 +48,13 @@ LANG=zh_CN.UTF-8 iron  # Chinese
 
 The existing Dashboard routes and shortcuts are unchanged. Opening Dashboard, History, Trends, Practices, Goals, or Quotes reloads current database data before switching screens. Where applicable, Iron restores the same item by stable ID together with the active filter, viewport, focused detail, and Trends time window. Unfinished add/edit/date/delete-confirmation state, old status messages, and cross-page undo payloads are cleared when a screen is re-entered.
 
-History edit navigation carries the selected log's stable ID, so the Log Entry form opens the exact requested log even after data changes. Target preparation is atomic: if a destination cannot refresh, Iron remains on the source screen, preserves its in-place state and the cached destination, and shows an error. Batch 3A ships this lifecycle behavior. Batch 3B-1 Practices, Batch 3B-2 Quotes, Batch 3B-3 Trends, Batch 3B-4 History, and Batch 3B-5 Goals are shipped. Goals is the approved presentation redesign in this rollout.
+History edit navigation carries the selected log's stable ID, so the Log Entry form opens the exact requested log even after data changes. Target preparation is atomic: if a destination cannot refresh, Iron remains on the source screen, preserves its in-place state and the cached destination, and shows an error. Batch 3A ships this lifecycle behavior. Batch 3B-1 Practices, Batch 3B-2 Quotes, Batch 3B-3 Trends, Batch 3B-4 History, Batch 3B-5 Goals, and Batch 3B-6 Dashboard are shipped. Goals is the approved presentation redesign in this rollout.
 
-Dashboard responsive-component extraction and Log Entry form extraction remain unshipped.
+Batch 3B-6 moves Dashboard outer-frame and static-panel presentation ownership to shared components with no visual or shortcut change. Log Entry form extraction remains unshipped.
 
 ### Dashboard
 
-The home screen shows the 52-week heatmap, weekly summary and streak, recent activity, active goals, a daily quote, and today's HRV. The responsive layout keeps each section inside its panel at the supported `80x35` size and remains bounded in smaller direct-render rectangles.
+The home screen shows the 52-week heatmap, weekly summary and streak, recent activity, active goals, a daily quote, and today's HRV. Its shared frame reserves status and active-mode shortcut rows, and four shared static panels provide the Heatmap, Summary, Recent, and Goals presentation bounds. Dashboard retains the content formatting and workflows. The responsive layout keeps each section inside its panel at the supported `80x35` size and remains bounded in smaller direct-render rectangles.
 
 | Key   | Action                  |
 |-------|-------------------------|

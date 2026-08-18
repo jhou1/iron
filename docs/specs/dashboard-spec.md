@@ -17,6 +17,8 @@ Dashboard is a bounded vertical stack:
 
 The status and complete shortcut rows are reserved before content panels receive the remaining height. Layout is recalculated from the current frame on every render. `80x35` is the primary acceptance size; smaller direct-render rectangles, including `40x16`, do not panic. Every block-derived inner rectangle is clamped to its parent.
 
+`ScreenFrameSections` owns the centered outer layout and reservation of the status and active-mode shortcut rows. Four `StaticPanel` instances own clipped border, title, padding, and safe-inner geometry for Heatmap, Summary, Recent, and Goals. Dashboard retains heatmap data, summary and HRV formatting, quote wrapping, Recent grouping and width budgeting, goal filtering and gauge rendering, modes, shortcuts, navigation, database work, and lifecycle rules.
+
 Long practice names, metric suffixes, goal titles, percentages, quotes, and localized labels are truncated or wrapped within their real panel width. Recent and Goals stop rendering at their inner bottom edge.
 
 ## Heatmap and Summary

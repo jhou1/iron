@@ -1,9 +1,9 @@
 # TUI Consistency Framework Design
 
 **Date:** 2026-08-10
-**Status:** Batches 1, 2, 3A, 3B-1, 3B-2, 3B-3, 3B-4, and 3B-5 Goals complete
+**Status:** Batches 1, 2, 3A, 3B-1, 3B-2, 3B-3, 3B-4, 3B-5 Goals, and 3B-6 Dashboard complete
 
-Dashboard responsive-component extraction and Log Entry form extraction remain unshipped.
+Log Entry form extraction remains unshipped.
 **Branch:** `codex/tui-consistency`
 **Base:** validated Goals milestone-management implementation (`0069c04`)
 
@@ -33,7 +33,7 @@ The project has replaced those repeated interaction mechanisms with a unified TU
 
 ## Architecture
 
-`src/tui/framework/` provides seven focused units.
+`src/tui/framework/` provides eight focused units.
 
 ### `viewport.rs`
 
@@ -80,6 +80,10 @@ Provides `ScrollableListPanel`, which owns bordered-list geometry, title and ove
 ### `action_panel.rs`
 
 Provides `ActionPanel`, which bounds contextual action content and its selected-row highlighting. Practices and Quotes consume it for their applicable modes; Trends does not use `ActionPanel` because its filter and specialized Sparkline/statistics panel remain screen-owned.
+
+### `static_panel.rs`
+
+Provides `StaticPanel`, a presentation-only sibling for clipped border, decorated title, padding, and safe-inner geometry. It accepts a one-shot content closure and returns the exact clipped outer and inner rectangles. It has no screen, domain, state, status, shortcut, selection, viewport, or database knowledge.
 
 ### `test_support.rs`
 
@@ -212,6 +216,12 @@ Batch 3B-4 changes no other screen and does not establish that the History compo
 Batch 3B-5 is the approved presentation redesign in the rollout. Goals replaces its former milestone view with persistent Goals/Milestones panes: horizontal at body widths of `>=83` cells and stacked below 83. The span-aware ListPanel sibling preserves full multi-line Goal selection reveal and focused highlighting, while the pinned-header DetailPanel sibling keeps milestone-derived aggregate progress fixed as milestones scroll. The existing ListPanel and DetailPanel APIs remain accepted and existing screen consumers remain unchanged.
 
 Goals retains its database operations, navigation topology, atomic target preparation, stable-ID re-entry restoration, reset of transient state on cross-page re-entry, mutation-failure retention, and one-level Goal/milestone undo. Goal mutation modes cancel directly to Goal Browse, milestone mutation modes cancel to Milestones Browse, and browse focus then returns Milestones Browse → Goal Browse → Dashboard.
+
+### Batch 3B-6: Dashboard Presentation Components — Complete
+
+Batch 3B-6 freezes three immutable `80x35` styled-buffer fixtures for populated Normal, HRV-input, and quit-confirmation Dashboard states. A deterministic Heatmap seam supplies the fixture date, while production Dashboard rendering continues to obtain the current local date.
+
+Dashboard uses `ScreenFrameSections` once to allocate its existing seven body constraints with status and active-mode shortcuts reserved, and uses four `StaticPanel` instances for Heatmap, Summary, Recent, and Goals. `StaticPanel` owns clipped border/title/padding/safe-inner geometry; Dashboard retains all domain formatting, data queries, HRV editor and failure retention, Recent and Goals layout, navigation, shortcuts, and lifecycle behavior. Zero, tiny, clipped-edge, and resized render targets remain geometry-safe. This presentation extraction does not change Dashboard visual output, routes, intents, preparation, re-entry, or shortcuts. Log Entry form extraction remains unshipped.
 
 ## Testing Strategy
 
