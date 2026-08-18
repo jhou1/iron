@@ -252,7 +252,16 @@ enum GoalsCallResolution {
 #[derive(Default)]
 struct GoalsCallScope {
     bindings: HashMap<String, GoalsCallResolution>,
+    ownership_value_shadows: HashSet<String>,
     canonical_framework_glob: bool,
+}
+
+impl GoalsCallScope {
+    fn shadow_value(&mut self, name: String) {
+        self.bindings
+            .insert(name.clone(), GoalsCallResolution::Shadowed);
+        self.ownership_value_shadows.insert(name);
+    }
 }
 
 #[derive(Clone)]
@@ -327,6 +336,28 @@ fn expanded_goals_ownership_path(
         }
     }
     segments
+}
+
+fn expanded_goals_ownership_value_path(
+    path: &syn::Path,
+    ownership_scopes: &[HashMap<String, GoalsOwnershipResolution>],
+    call_scopes: &[GoalsCallScope],
+) -> Vec<String> {
+    let Some(first) = path
+        .segments
+        .first()
+        .map(|segment| segment.ident.to_string())
+    else {
+        return Vec::new();
+    };
+    if call_scopes
+        .iter()
+        .rev()
+        .any(|scope| scope.ownership_value_shadows.contains(&first))
+    {
+        return Vec::new();
+    }
+    expanded_goals_ownership_path(path, ownership_scopes)
 }
 
 fn canonical_goals_widget_type(path: &[String]) -> Option<&'static str> {
@@ -804,19 +835,13 @@ impl GoalsRenderVisitor<'_> {
             };
             match item {
                 syn::Item::Const(item) => {
-                    scope
-                        .bindings
-                        .insert(item.ident.to_string(), GoalsCallResolution::Shadowed);
+                    scope.shadow_value(item.ident.to_string());
                 }
                 syn::Item::Fn(item) => {
-                    scope
-                        .bindings
-                        .insert(item.sig.ident.to_string(), GoalsCallResolution::Shadowed);
+                    scope.shadow_value(item.sig.ident.to_string());
                 }
                 syn::Item::Static(item) => {
-                    scope
-                        .bindings
-                        .insert(item.ident.to_string(), GoalsCallResolution::Shadowed);
+                    scope.shadow_value(item.ident.to_string());
                 }
                 syn::Item::Use(item) => {
                     collect_goals_call_imports(&item.tree, &mut Vec::new(), &mut scope)
@@ -890,16 +915,7 @@ impl GoalsRenderVisitor<'_> {
         bindings.visit_pat(pattern);
         let scope = self.call_scopes.last_mut().unwrap();
         for name in bindings.names {
-            scope.bindings.insert(name, GoalsCallResolution::Shadowed);
-        }
-    }
-
-    fn shadow_ownership_pattern_bindings(&mut self, pattern: &syn::Pat) {
-        let mut bindings = GoalsPatternBindingCollector::default();
-        bindings.visit_pat(pattern);
-        let scope = self.ownership_scopes.last_mut().unwrap();
-        for name in bindings.names {
-            scope.insert(name, GoalsOwnershipResolution::Shadowed);
+            scope.shadow_value(name);
         }
     }
 
@@ -992,7 +1008,6 @@ impl<'ast> Visit<'ast> for GoalsRenderVisitor<'_> {
             self.ownership_scopes.push(HashMap::new());
             for input in &closure.inputs {
                 self.shadow_pattern_bindings(input);
-                self.shadow_ownership_pattern_bindings(input);
             }
             self.visit_expr(&closure.body);
             self.ownership_scopes.pop();
@@ -1043,7 +1058,12 @@ impl<'ast> Visit<'ast> for GoalsRenderVisitor<'_> {
 
     fn visit_expr_path(&mut self, path: &'ast syn::ExprPath) {
         let expanded = expanded_goals_ownership_path(&path.path, &self.ownership_scopes);
-        match canonical_goals_forbidden_function(&expanded) {
+        let expanded_value = expanded_goals_ownership_value_path(
+            &path.path,
+            &self.ownership_scopes,
+            &self.call_scopes,
+        );
+        match canonical_goals_forbidden_function(&expanded_value) {
             Some("render_status_line") => self.ownership.status_line_calls += 1,
             Some("render_shortcuts") => self.ownership.shortcuts_calls += 1,
             _ => {}
@@ -1136,20 +1156,14 @@ fn goals_ownership_violations(source: &str) -> Vec<String> {
     let mut root_ownership_scope = HashMap::new();
     for item in &file.items {
         match item {
-            syn::Item::Const(item) => {
-                root_call_scope
-                    .bindings
-                    .insert(item.ident.to_string(), GoalsCallResolution::Shadowed);
+            syn::Item::Const(item) if !is_cfg_test(&item.attrs) => {
+                root_call_scope.shadow_value(item.ident.to_string());
             }
-            syn::Item::Fn(item) => {
-                root_call_scope
-                    .bindings
-                    .insert(item.sig.ident.to_string(), GoalsCallResolution::Shadowed);
+            syn::Item::Fn(item) if !is_cfg_test(&item.attrs) => {
+                root_call_scope.shadow_value(item.sig.ident.to_string());
             }
-            syn::Item::Static(item) => {
-                root_call_scope
-                    .bindings
-                    .insert(item.ident.to_string(), GoalsCallResolution::Shadowed);
+            syn::Item::Static(item) if !is_cfg_test(&item.attrs) => {
+                root_call_scope.shadow_value(item.ident.to_string());
             }
             syn::Item::Use(item_use) => {
                 collect_goals_call_imports(&item_use.tree, &mut Vec::new(), &mut root_call_scope);
@@ -1183,9 +1197,7 @@ fn goals_ownership_violations(source: &str) -> Vec<String> {
                 let mut bindings = GoalsPatternBindingCollector::default();
                 bindings.visit_pat(&input.pat);
                 for name in bindings.names {
-                    signature_scope
-                        .bindings
-                        .insert(name, GoalsCallResolution::Shadowed);
+                    signature_scope.shadow_value(name);
                 }
             }
         }
@@ -2364,6 +2376,31 @@ fn goals_ownership_does_not_resolve_forbidden_aliases_through_iife_parameters() 
 }
 
 #[test]
+fn goals_ownership_checks_widget_types_inside_iifes_with_same_named_parameters() {
+    let source = r#"
+        use ratatui::widgets::Paragraph as Copy;
+        use super::framework::{
+            render_detail_panel_with_header, render_screen_frame,
+            render_scrollable_list_panel_spanned,
+        };
+        struct GoalsScreen;
+        impl GoalsScreen {
+            fn render(&mut self) {
+                render_screen_frame();
+                render_scrollable_list_panel_spanned();
+                render_detail_panel_with_header();
+                (|Copy| { Copy::new("forbidden"); })(());
+            }
+        }
+    "#;
+
+    let violations = goals_ownership_violations(source);
+    assert!(violations
+        .iter()
+        .any(|item| item.contains("Paragraph::new")));
+}
+
+#[test]
 fn goals_ownership_root_items_shadow_canonical_framework_globs() {
     let source = r#"
         use super::framework::*;
@@ -2382,6 +2419,64 @@ fn goals_ownership_root_items_shadow_canonical_framework_globs() {
     assert!(violations.iter().any(|violation| {
         violation.contains("render_screen_frame") && violation.contains("found 0")
     }));
+}
+
+#[test]
+fn goals_ownership_ignores_cfg_test_root_item_shadows() {
+    let source = r#"
+        use super::framework::*;
+        #[cfg(test)]
+        fn render_screen_frame() {}
+        struct GoalsScreen;
+        impl GoalsScreen {
+            fn render(&mut self) {
+                render_screen_frame();
+                render_scrollable_list_panel_spanned();
+                render_detail_panel_with_header();
+            }
+        }
+    "#;
+
+    assert!(goals_ownership_violations(source).is_empty());
+}
+
+#[test]
+fn goals_ownership_keeps_production_relevant_cfg_root_item_shadows() {
+    let cases = [
+        r#"
+            use super::framework::*;
+            #[cfg(not(test))]
+            fn render_screen_frame() {}
+            struct GoalsScreen;
+            impl GoalsScreen {
+                fn render(&mut self) {
+                    render_screen_frame();
+                    render_scrollable_list_panel_spanned();
+                    render_detail_panel_with_header();
+                }
+            }
+        "#,
+        r#"
+            use super::framework::*;
+            #[cfg(any(test, feature = "fixture"))]
+            fn render_screen_frame() {}
+            struct GoalsScreen;
+            impl GoalsScreen {
+                fn render(&mut self) {
+                    render_screen_frame();
+                    render_scrollable_list_panel_spanned();
+                    render_detail_panel_with_header();
+                }
+            }
+        "#,
+    ];
+
+    for source in cases {
+        let violations = goals_ownership_violations(source);
+        assert!(violations.iter().any(|violation| {
+            violation.contains("render_screen_frame") && violation.contains("found 0")
+        }));
+    }
 }
 
 #[test]
