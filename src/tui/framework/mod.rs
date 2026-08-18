@@ -3,6 +3,7 @@ pub mod components;
 pub mod input;
 pub mod list_panel;
 pub mod screen_frame;
+pub mod static_panel;
 #[cfg(test)]
 pub mod test_support;
 pub mod viewport;
@@ -21,6 +22,8 @@ pub use list_panel::{
     ListPanelContent, SpannedListPanelContent,
 };
 pub use screen_frame::{render_screen_frame, render_screen_frame_sections, ScreenFrameSections};
+#[allow(unused_imports)]
+pub use static_panel::{render_static_panel, StaticPanelAreas};
 #[allow(unused_imports)]
 pub use viewport::{
     combined_span, move_selection, visual_spans, EdgeBehavior, Overflow, ViewportState, VisualSpan,
