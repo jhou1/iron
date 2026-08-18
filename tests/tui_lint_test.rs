@@ -245,7 +245,14 @@ fn is_goals_framework_component(name: &str) -> bool {
 #[derive(Clone)]
 enum GoalsCallResolution {
     Framework(Vec<String>),
+    FrameworkModule(Vec<String>),
     Shadowed,
+}
+
+#[derive(Default)]
+struct GoalsCallScope {
+    bindings: HashMap<String, GoalsCallResolution>,
+    canonical_framework_glob: bool,
 }
 
 #[derive(Clone)]
@@ -392,16 +399,20 @@ fn canonical_goals_forbidden_function(path: &[String]) -> Option<&'static str> {
 }
 
 fn insert_goals_call_resolution(
-    resolutions: &mut HashMap<String, GoalsCallResolution>,
+    scope: &mut GoalsCallScope,
     local_name: String,
     origin: Vec<String>,
 ) {
-    let resolution = if canonical_goals_framework_path(&origin) {
-        GoalsCallResolution::Framework(origin)
-    } else {
-        GoalsCallResolution::Shadowed
+    let resolution = match (
+        canonical_goals_framework_path(&origin),
+        canonical_goals_framework_module(&origin),
+    ) {
+        (true, _) => GoalsCallResolution::Framework(origin),
+        (_, true) => GoalsCallResolution::FrameworkModule(origin),
+        _ => GoalsCallResolution::Shadowed,
     };
-    resolutions
+    scope
+        .bindings
         .entry(local_name)
         .and_modify(|existing| {
             if matches!(resolution, GoalsCallResolution::Shadowed) {
@@ -414,38 +425,46 @@ fn insert_goals_call_resolution(
 fn collect_goals_call_imports(
     tree: &syn::UseTree,
     prefix: &mut Vec<String>,
-    resolutions: &mut HashMap<String, GoalsCallResolution>,
-    has_glob_import: &mut bool,
+    scope: &mut GoalsCallScope,
 ) {
     match tree {
         syn::UseTree::Path(path) => {
             prefix.push(path.ident.to_string());
-            collect_goals_call_imports(&path.tree, prefix, resolutions, has_glob_import);
+            collect_goals_call_imports(&path.tree, prefix, scope);
             prefix.pop();
         }
         syn::UseTree::Group(group) => {
             for item in &group.items {
-                collect_goals_call_imports(item, prefix, resolutions, has_glob_import);
+                collect_goals_call_imports(item, prefix, scope);
             }
         }
         syn::UseTree::Name(name) if name.ident == "self" => {
             if let Some(local_name) = prefix.last() {
-                insert_goals_call_resolution(resolutions, local_name.clone(), prefix.clone());
+                insert_goals_call_resolution(scope, local_name.clone(), prefix.clone());
             }
         }
         syn::UseTree::Name(name) => {
             let local_name = name.ident.to_string();
             let mut origin = prefix.clone();
             origin.push(local_name.clone());
-            insert_goals_call_resolution(resolutions, local_name, origin);
+            insert_goals_call_resolution(scope, local_name, origin);
         }
         syn::UseTree::Rename(rename) => {
             let mut origin = prefix.clone();
             origin.push(rename.ident.to_string());
-            insert_goals_call_resolution(resolutions, rename.rename.to_string(), origin);
+            insert_goals_call_resolution(scope, rename.rename.to_string(), origin);
         }
-        syn::UseTree::Glob(_) => *has_glob_import = true,
+        syn::UseTree::Glob(_) => {
+            scope.canonical_framework_glob |= canonical_goals_framework_module(prefix);
+        }
     }
+}
+
+fn canonical_goals_framework_module(path: &[String]) -> bool {
+    matches!(path, [root, framework] if root == "super" && framework == "framework")
+        || matches!(path, [root, tui, framework]
+            if matches!(root.as_str(), "crate" | "iron")
+                && tui == "tui" && framework == "framework")
 }
 
 fn canonical_goals_framework_path(path: &[String]) -> bool {
@@ -465,7 +484,7 @@ fn canonical_goals_framework_path(path: &[String]) -> bool {
 
 fn canonical_goals_framework_call(
     function: &syn::ExprPath,
-    scopes: &[HashMap<String, GoalsCallResolution>],
+    scopes: &[GoalsCallScope],
 ) -> Option<String> {
     if function.qself.is_some() {
         return None;
@@ -479,19 +498,49 @@ fn canonical_goals_framework_call(
     if path.len() == 1 {
         let local_name = path.first()?;
         for scope in scopes.iter().rev() {
-            if let Some(resolution) = scope.get(local_name) {
+            if let Some(resolution) = scope.bindings.get(local_name) {
                 return match resolution {
                     GoalsCallResolution::Framework(origin) => {
                         canonical_goals_framework_path(origin)
                             .then(|| origin.last().unwrap().clone())
                     }
+                    GoalsCallResolution::FrameworkModule(_) => None,
                     GoalsCallResolution::Shadowed => None,
+                };
+            }
+            if scope.canonical_framework_glob && is_goals_framework_component(local_name) {
+                return Some(local_name.clone());
+            }
+        }
+        return None;
+    }
+    if path.len() == 2 {
+        let module_name = path.first()?;
+        for scope in scopes.iter().rev() {
+            if let Some(resolution) = scope.bindings.get(module_name) {
+                return match resolution {
+                    GoalsCallResolution::FrameworkModule(origin) => {
+                        let mut expanded = origin.clone();
+                        expanded.push(path.last()?.clone());
+                        canonical_goals_framework_path(&expanded)
+                            .then(|| expanded.last().unwrap().clone())
+                    }
+                    GoalsCallResolution::Framework(_) | GoalsCallResolution::Shadowed => None,
                 };
             }
         }
         return None;
     }
     canonical_goals_framework_path(&path).then(|| path.last().unwrap().clone())
+}
+
+fn direct_invoked_closure(expression: &syn::Expr) -> Option<&syn::ExprClosure> {
+    match expression {
+        syn::Expr::Closure(closure) => Some(closure),
+        syn::Expr::Group(group) => direct_invoked_closure(&group.expr),
+        syn::Expr::Paren(paren) => direct_invoked_closure(&paren.expr),
+        _ => None,
+    }
 }
 
 #[derive(Default)]
@@ -740,40 +789,41 @@ struct GoalsRenderOwnership {
 }
 
 struct GoalsRenderVisitor<'a> {
-    call_scopes: Vec<HashMap<String, GoalsCallResolution>>,
+    call_scopes: Vec<GoalsCallScope>,
     ownership_scopes: Vec<HashMap<String, GoalsOwnershipResolution>>,
     ownership: GoalsRenderOwnership,
     _marker: std::marker::PhantomData<&'a ()>,
 }
 
 impl GoalsRenderVisitor<'_> {
-    fn block_call_scope(&self, block: &syn::Block) -> HashMap<String, GoalsCallResolution> {
-        let mut scope = HashMap::new();
-        let mut has_glob_import = false;
+    fn block_call_scope(&self, block: &syn::Block) -> GoalsCallScope {
+        let mut scope = GoalsCallScope::default();
         for statement in &block.stmts {
             let syn::Stmt::Item(item) = statement else {
                 continue;
             };
             match item {
                 syn::Item::Const(item) => {
-                    scope.insert(item.ident.to_string(), GoalsCallResolution::Shadowed);
+                    scope
+                        .bindings
+                        .insert(item.ident.to_string(), GoalsCallResolution::Shadowed);
                 }
                 syn::Item::Fn(item) => {
-                    scope.insert(item.sig.ident.to_string(), GoalsCallResolution::Shadowed);
+                    scope
+                        .bindings
+                        .insert(item.sig.ident.to_string(), GoalsCallResolution::Shadowed);
                 }
                 syn::Item::Static(item) => {
-                    scope.insert(item.ident.to_string(), GoalsCallResolution::Shadowed);
+                    scope
+                        .bindings
+                        .insert(item.ident.to_string(), GoalsCallResolution::Shadowed);
                 }
-                syn::Item::Use(item) => collect_goals_call_imports(
-                    &item.tree,
-                    &mut Vec::new(),
-                    &mut scope,
-                    &mut has_glob_import,
-                ),
+                syn::Item::Use(item) => {
+                    collect_goals_call_imports(&item.tree, &mut Vec::new(), &mut scope)
+                }
                 _ => {}
             }
         }
-        let _ = has_glob_import;
         scope
     }
 
@@ -840,7 +890,7 @@ impl GoalsRenderVisitor<'_> {
         bindings.visit_pat(pattern);
         let scope = self.call_scopes.last_mut().unwrap();
         for name in bindings.names {
-            scope.insert(name, GoalsCallResolution::Shadowed);
+            scope.bindings.insert(name, GoalsCallResolution::Shadowed);
         }
     }
 
@@ -893,7 +943,7 @@ impl<'ast> Visit<'ast> for GoalsRenderVisitor<'_> {
     }
 
     fn visit_arm(&mut self, arm: &'ast syn::Arm) {
-        self.call_scopes.push(HashMap::new());
+        self.call_scopes.push(GoalsCallScope::default());
         self.shadow_pattern_bindings(&arm.pat);
         if let Some((_, guard)) = &arm.guard {
             self.visit_expr(guard);
@@ -904,14 +954,14 @@ impl<'ast> Visit<'ast> for GoalsRenderVisitor<'_> {
 
     fn visit_expr_for_loop(&mut self, expression: &'ast syn::ExprForLoop) {
         self.visit_expr(&expression.expr);
-        self.call_scopes.push(HashMap::new());
+        self.call_scopes.push(GoalsCallScope::default());
         self.shadow_pattern_bindings(&expression.pat);
         self.visit_block(&expression.body);
         self.call_scopes.pop();
     }
 
     fn visit_expr_if(&mut self, expression: &'ast syn::ExprIf) {
-        self.call_scopes.push(HashMap::new());
+        self.call_scopes.push(GoalsCallScope::default());
         self.visit_condition_with_let_bindings(&expression.cond);
         self.visit_block(&expression.then_branch);
         self.call_scopes.pop();
@@ -921,13 +971,27 @@ impl<'ast> Visit<'ast> for GoalsRenderVisitor<'_> {
     }
 
     fn visit_expr_while(&mut self, expression: &'ast syn::ExprWhile) {
-        self.call_scopes.push(HashMap::new());
+        self.call_scopes.push(GoalsCallScope::default());
         self.visit_condition_with_let_bindings(&expression.cond);
         self.visit_block(&expression.body);
         self.call_scopes.pop();
     }
 
     fn visit_expr_call(&mut self, call: &'ast syn::ExprCall) {
+        if let Some(closure) = direct_invoked_closure(&call.func) {
+            self.call_scopes.push(GoalsCallScope::default());
+            self.ownership_scopes.push(HashMap::new());
+            for input in &closure.inputs {
+                self.shadow_pattern_bindings(input);
+            }
+            self.visit_expr(&closure.body);
+            self.ownership_scopes.pop();
+            self.call_scopes.pop();
+            for argument in &call.args {
+                self.visit_expr(argument);
+            }
+            return;
+        }
         if let syn::Expr::Path(function) = call.func.as_ref() {
             match canonical_goals_framework_call(function, &self.call_scopes).as_deref() {
                 Some("render_screen_frame") => self.ownership.screen_frame_calls += 1,
@@ -1058,17 +1122,11 @@ fn goals_ownership_violations(source: &str) -> Vec<String> {
         )];
     }
     let render = render_methods[0];
-    let mut root_call_scope = HashMap::new();
-    let mut root_has_glob_import = false;
+    let mut root_call_scope = GoalsCallScope::default();
     let mut root_ownership_scope = HashMap::new();
     for item in &file.items {
         if let syn::Item::Use(item_use) = item {
-            collect_goals_call_imports(
-                &item_use.tree,
-                &mut Vec::new(),
-                &mut root_call_scope,
-                &mut root_has_glob_import,
-            );
+            collect_goals_call_imports(&item_use.tree, &mut Vec::new(), &mut root_call_scope);
             collect_goals_ownership_imports(
                 &item_use.tree,
                 &mut Vec::new(),
@@ -1076,8 +1134,6 @@ fn goals_ownership_violations(source: &str) -> Vec<String> {
             );
         }
     }
-    let _ = root_has_glob_import;
-
     let mut visitor = GoalsRenderVisitor {
         call_scopes: vec![root_call_scope],
         ownership_scopes: vec![root_ownership_scope],
@@ -1093,13 +1149,15 @@ fn goals_ownership_violations(source: &str) -> Vec<String> {
         let Some(method) = methods.get(&method_name) else {
             continue;
         };
-        let mut signature_scope = HashMap::new();
+        let mut signature_scope = GoalsCallScope::default();
         for input in &method.sig.inputs {
             if let syn::FnArg::Typed(input) = input {
                 let mut bindings = GoalsPatternBindingCollector::default();
                 bindings.visit_pat(&input.pat);
                 for name in bindings.names {
-                    signature_scope.insert(name, GoalsCallResolution::Shadowed);
+                    signature_scope
+                        .bindings
+                        .insert(name, GoalsCallResolution::Shadowed);
                 }
             }
         }
@@ -2103,6 +2161,140 @@ fn goals_ownership_does_not_accept_delegation_inside_an_uninvoked_closure() {
                 .any(|violation| violation.contains(component) && violation.contains("found 0")),
             "uninvoked closure must not satisfy {component}: {violations:?}"
         );
+    }
+}
+
+#[test]
+fn goals_ownership_executes_immediately_invoked_closures() {
+    let source = r#"
+        use super::framework::{
+            render_detail_panel_with_header, render_screen_frame,
+            render_scrollable_list_panel_spanned,
+        };
+        struct GoalsScreen;
+        impl GoalsScreen {
+            fn render(&mut self) {
+                (|| {
+                    render_screen_frame();
+                    render_scrollable_list_panel_spanned();
+                    render_detail_panel_with_header();
+                })();
+            }
+        }
+    "#;
+
+    assert!(goals_ownership_violations(source).is_empty());
+}
+
+#[test]
+fn goals_ownership_checks_forbidden_rendering_inside_an_iife() {
+    let source = r#"
+        use super::framework::{
+            render_detail_panel_with_header, render_screen_frame,
+            render_scrollable_list_panel_spanned,
+        };
+        struct GoalsScreen;
+        impl GoalsScreen {
+            fn render(&mut self) {
+                render_screen_frame();
+                render_scrollable_list_panel_spanned();
+                render_detail_panel_with_header();
+                (|| { Paragraph::new("forbidden"); })();
+            }
+        }
+    "#;
+
+    let violations = goals_ownership_violations(source);
+    assert!(violations
+        .iter()
+        .any(|item| item.contains("Paragraph::new")));
+}
+
+#[test]
+fn goals_ownership_accepts_canonical_framework_module_aliases_and_globs() {
+    let cases = [
+        r#"
+            use super::framework as shared;
+            struct GoalsScreen;
+            impl GoalsScreen {
+                fn render(&mut self) {
+                    shared::render_screen_frame();
+                    shared::render_scrollable_list_panel_spanned();
+                    shared::render_detail_panel_with_header();
+                }
+            }
+        "#,
+        r#"
+            use super::framework::*;
+            struct GoalsScreen;
+            impl GoalsScreen {
+                fn render(&mut self) {
+                    render_screen_frame();
+                    render_scrollable_list_panel_spanned();
+                    render_detail_panel_with_header();
+                }
+            }
+        "#,
+    ];
+
+    for source in cases {
+        assert!(goals_ownership_violations(source).is_empty());
+    }
+}
+
+#[test]
+fn goals_ownership_rejects_noncanonical_framework_module_aliases_globs_and_shadows() {
+    let cases = [
+        r#"
+            use domain::framework as shared;
+            struct GoalsScreen;
+            impl GoalsScreen {
+                fn render(&mut self) {
+                    shared::render_screen_frame();
+                    shared::render_scrollable_list_panel_spanned();
+                    shared::render_detail_panel_with_header();
+                }
+            }
+        "#,
+        r#"
+            use super::framework as shared;
+            struct GoalsScreen;
+            impl GoalsScreen {
+                fn render(&mut self) {
+                    let shared = domain::framework;
+                    shared::render_screen_frame();
+                    shared::render_scrollable_list_panel_spanned();
+                    shared::render_detail_panel_with_header();
+                }
+            }
+        "#,
+        r#"
+            use domain::*;
+            struct GoalsScreen;
+            impl GoalsScreen {
+                fn render(&mut self) {
+                    render_screen_frame();
+                    render_scrollable_list_panel_spanned();
+                    render_detail_panel_with_header();
+                }
+            }
+        "#,
+    ];
+
+    for source in cases {
+        let violations = goals_ownership_violations(source);
+        for component in [
+            "render_screen_frame",
+            "render_scrollable_list_panel_spanned",
+            "render_detail_panel_with_header",
+        ] {
+            assert!(
+                violations.iter().any(
+                    |violation| violation.contains(component) && violation.contains("found 0")
+                ),
+                "{component} must not be satisfied by a noncanonical import: {violations:?}"
+            );
+        }
     }
 }
 
