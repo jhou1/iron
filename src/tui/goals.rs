@@ -818,7 +818,9 @@ impl GoalsScreen {
     // ── Milestone key handling ──
 
     fn handle_milestone(&mut self, key: KeyEvent, db: &Database) -> Action {
-        if key.code != KeyCode::Esc {
+        let preserves_browse_context =
+            key.code == KeyCode::Esc && self.milestone_mode == MilestoneMode::Browse;
+        if !preserves_browse_context {
             self.milestone_status_msg = None;
         }
 
@@ -2690,6 +2692,43 @@ mod tests {
             Some(("keep milestone status".into(), false))
         );
         assert!(screen.milestone_last_deleted.is_some());
+    }
+
+    #[test]
+    fn milestone_cancel_clears_mutation_status_but_browse_back_preserves_context() {
+        let db = Database::open_in_memory().unwrap();
+        db.create_goal("Goal").unwrap();
+
+        for milestone_mode in [
+            MilestoneMode::AddMilestone,
+            MilestoneMode::EditMilestone,
+            MilestoneMode::EditMilestoneDate,
+            MilestoneMode::ConfirmDeleteMilestone,
+        ] {
+            let mut screen = GoalsScreen::new(&db).unwrap();
+            screen.mode = Mode::Milestones;
+            screen.milestone_mode = milestone_mode;
+            screen.milestone_status_msg = Some(("stale failure".into(), true));
+            screen.milestone_input.set("pending input");
+
+            assert_eq!(screen.handle_key(key(KeyCode::Esc), &db), Action::None);
+            assert_eq!(screen.mode, Mode::Milestones);
+            assert_eq!(screen.milestone_mode, MilestoneMode::Browse);
+            assert!(screen.milestone_status_msg.is_none(), "{milestone_mode:?}");
+        }
+
+        let mut screen = GoalsScreen::new(&db).unwrap();
+        screen.handle_key(key(KeyCode::Enter), &db);
+        screen.milestone_status_msg = Some(("keep browse status".into(), false));
+        screen.milestone_panel_state.viewport.set_offset(3);
+
+        assert_eq!(screen.handle_key(key(KeyCode::Esc), &db), Action::None);
+        assert_eq!(screen.mode, Mode::Browse);
+        assert_eq!(
+            screen.milestone_status_msg,
+            Some(("keep browse status".into(), false))
+        );
+        assert_eq!(screen.milestone_panel_state.viewport.offset(), 3);
     }
 
     #[test]
