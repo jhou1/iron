@@ -166,7 +166,7 @@ Milestone panel:
 | `d` / `u` | Delete / undo deletion |
 | `Esc` | Return to the goal list |
 
-Goals with milestones show `completed/total · percentage`; their completion state is derived from the milestone states. `Esc` cancels Goal add/edit/date modes directly to Goal Browse, while milestone add/edit/date/delete-confirmation modes cancel to Milestones Browse. From there, `Esc` returns from Milestones Browse to Goal Browse and then from Goal Browse to Dashboard. Database behavior, navigation, atomic refresh failure handling, re-entry restoration/reset rules, mutation-failure retention, and goal/milestone undo remain unchanged.
+Goals with milestones show `completed/total · percentage`; their completion state is derived from the milestone states. `Esc` cancels Goal add/edit/date/delete-confirmation modes directly to Goal Browse, while milestone add/edit/date/delete-confirmation modes cancel to Milestones Browse. From there, `Esc` returns from Milestones Browse to Goal Browse and then from Goal Browse to Dashboard. Database behavior, navigation, atomic refresh failure handling, re-entry restoration/reset rules, mutation-failure retention, and goal/milestone undo remain unchanged.
 
 ### Quotes
 
