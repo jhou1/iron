@@ -353,6 +353,9 @@ fn expanded_goals_ownership_value_path(
     };
     for (call_scope, ownership_scope) in call_scopes.iter().rev().zip(ownership_scopes.iter().rev())
     {
+        if call_scope.ownership_value_shadows.contains(&first) {
+            return Vec::new();
+        }
         match ownership_scope.get(&first) {
             Some(GoalsOwnershipResolution::Origin(origin)) => {
                 let mut expanded = origin.clone();
@@ -361,9 +364,6 @@ fn expanded_goals_ownership_value_path(
             }
             Some(GoalsOwnershipResolution::Shadowed) => return Vec::new(),
             None => {}
-        }
-        if call_scope.ownership_value_shadows.contains(&first) {
-            return Vec::new();
         }
     }
     segments
@@ -2385,6 +2385,29 @@ fn goals_ownership_does_not_resolve_forbidden_aliases_through_iife_parameters() 
                 render_scrollable_list_panel_spanned();
                 render_detail_panel_with_header();
                 (|status| { status(); })(|| {});
+            }
+        }
+    "#;
+
+    assert!(goals_ownership_violations(source).is_empty());
+}
+
+#[test]
+fn goals_ownership_same_block_let_shadows_forbidden_import() {
+    let source = r#"
+        use super::framework::{
+            render_detail_panel_with_header, render_screen_frame,
+            render_scrollable_list_panel_spanned,
+        };
+        struct GoalsScreen;
+        impl GoalsScreen {
+            fn render(&mut self) {
+                render_screen_frame();
+                render_scrollable_list_panel_spanned();
+                render_detail_panel_with_header();
+                use crate::tui::render_status_line as status;
+                let status = || {};
+                status();
             }
         }
     "#;
