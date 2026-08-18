@@ -894,6 +894,15 @@ impl GoalsRenderVisitor<'_> {
         }
     }
 
+    fn shadow_ownership_pattern_bindings(&mut self, pattern: &syn::Pat) {
+        let mut bindings = GoalsPatternBindingCollector::default();
+        bindings.visit_pat(pattern);
+        let scope = self.ownership_scopes.last_mut().unwrap();
+        for name in bindings.names {
+            scope.insert(name, GoalsOwnershipResolution::Shadowed);
+        }
+    }
+
     fn visit_condition_with_let_bindings(&mut self, expression: &syn::Expr) {
         match expression {
             syn::Expr::Binary(binary) if matches!(binary.op, syn::BinOp::And(_)) => {
@@ -983,6 +992,7 @@ impl<'ast> Visit<'ast> for GoalsRenderVisitor<'_> {
             self.ownership_scopes.push(HashMap::new());
             for input in &closure.inputs {
                 self.shadow_pattern_bindings(input);
+                self.shadow_ownership_pattern_bindings(input);
             }
             self.visit_expr(&closure.body);
             self.ownership_scopes.pop();
@@ -1125,13 +1135,31 @@ fn goals_ownership_violations(source: &str) -> Vec<String> {
     let mut root_call_scope = GoalsCallScope::default();
     let mut root_ownership_scope = HashMap::new();
     for item in &file.items {
-        if let syn::Item::Use(item_use) = item {
-            collect_goals_call_imports(&item_use.tree, &mut Vec::new(), &mut root_call_scope);
-            collect_goals_ownership_imports(
-                &item_use.tree,
-                &mut Vec::new(),
-                &mut root_ownership_scope,
-            );
+        match item {
+            syn::Item::Const(item) => {
+                root_call_scope
+                    .bindings
+                    .insert(item.ident.to_string(), GoalsCallResolution::Shadowed);
+            }
+            syn::Item::Fn(item) => {
+                root_call_scope
+                    .bindings
+                    .insert(item.sig.ident.to_string(), GoalsCallResolution::Shadowed);
+            }
+            syn::Item::Static(item) => {
+                root_call_scope
+                    .bindings
+                    .insert(item.ident.to_string(), GoalsCallResolution::Shadowed);
+            }
+            syn::Item::Use(item_use) => {
+                collect_goals_call_imports(&item_use.tree, &mut Vec::new(), &mut root_call_scope);
+                collect_goals_ownership_imports(
+                    &item_use.tree,
+                    &mut Vec::new(),
+                    &mut root_ownership_scope,
+                );
+            }
+            _ => {}
         }
     }
     let mut visitor = GoalsRenderVisitor {
@@ -2240,6 +2268,120 @@ fn goals_ownership_accepts_canonical_framework_module_aliases_and_globs() {
     for source in cases {
         assert!(goals_ownership_violations(source).is_empty());
     }
+}
+
+#[test]
+fn goals_ownership_accepts_crate_and_iron_framework_module_aliases_and_globs() {
+    let cases = [
+        (
+            "crate module alias",
+            r#"
+                use crate::tui::framework as shared;
+                struct GoalsScreen;
+                impl GoalsScreen {
+                    fn render(&mut self) {
+                        shared::render_screen_frame();
+                        shared::render_scrollable_list_panel_spanned();
+                        shared::render_detail_panel_with_header();
+                    }
+                }
+            "#,
+        ),
+        (
+            "crate module glob",
+            r#"
+                use crate::tui::framework::*;
+                struct GoalsScreen;
+                impl GoalsScreen {
+                    fn render(&mut self) {
+                        render_screen_frame();
+                        render_scrollable_list_panel_spanned();
+                        render_detail_panel_with_header();
+                    }
+                }
+            "#,
+        ),
+        (
+            "iron module alias",
+            r#"
+                use iron::tui::framework as shared;
+                struct GoalsScreen;
+                impl GoalsScreen {
+                    fn render(&mut self) {
+                        shared::render_screen_frame();
+                        shared::render_scrollable_list_panel_spanned();
+                        shared::render_detail_panel_with_header();
+                    }
+                }
+            "#,
+        ),
+        (
+            "iron module glob",
+            r#"
+                use iron::tui::framework::*;
+                struct GoalsScreen;
+                impl GoalsScreen {
+                    fn render(&mut self) {
+                        render_screen_frame();
+                        render_scrollable_list_panel_spanned();
+                        render_detail_panel_with_header();
+                    }
+                }
+            "#,
+        ),
+    ];
+
+    let failures = cases
+        .iter()
+        .filter_map(|(name, source)| {
+            let violations = goals_ownership_violations(source);
+            (!violations.is_empty()).then(|| format!("{name}: {violations:?}"))
+        })
+        .collect::<Vec<_>>();
+    assert!(failures.is_empty(), "{failures:?}");
+}
+
+#[test]
+fn goals_ownership_does_not_resolve_forbidden_aliases_through_iife_parameters() {
+    let source = r#"
+        use crate::tui::render_status_line as status;
+        use super::framework::{
+            render_detail_panel_with_header, render_screen_frame,
+            render_scrollable_list_panel_spanned,
+        };
+        struct GoalsScreen;
+        impl GoalsScreen {
+            fn render(&mut self) {
+                render_screen_frame();
+                render_scrollable_list_panel_spanned();
+                render_detail_panel_with_header();
+                (|status| { status(); })(|| {});
+            }
+        }
+    "#;
+
+    assert!(goals_ownership_violations(source).is_empty());
+}
+
+#[test]
+fn goals_ownership_root_items_shadow_canonical_framework_globs() {
+    let source = r#"
+        use super::framework::*;
+        fn render_screen_frame() {}
+        struct GoalsScreen;
+        impl GoalsScreen {
+            fn render(&mut self) {
+                render_screen_frame();
+                render_scrollable_list_panel_spanned();
+                render_detail_panel_with_header();
+            }
+        }
+    "#;
+
+    let violations = goals_ownership_violations(source);
+    assert!(violations.iter().any(|violation| {
+        violation.contains("render_screen_frame") && violation.contains("found 0")
+    }));
 }
 
 #[test]
