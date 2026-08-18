@@ -138,6 +138,40 @@ fn source_code_contains(source: &str, needle: &str) -> bool {
     source_code(source).contains(needle)
 }
 
+fn source_code_count(source: &str, needle: &str) -> usize {
+    source_code(source).match_indices(needle).count()
+}
+
+fn dashboard_production_source(source: &str) -> String {
+    let code = source_code(source);
+    code.split("#[cfg(test)]")
+        .next()
+        .unwrap_or(&code)
+        .to_owned()
+}
+
+fn dashboard_ownership_violations(source: &str) -> Vec<String> {
+    let production = dashboard_production_source(source);
+    let mut violations = Vec::new();
+    for (needle, expected, label) in [
+        ("render_screen_frame_sections(", 1, "ScreenFrameSections"),
+        ("render_static_panel(", 4, "StaticPanel"),
+    ] {
+        let actual = source_code_count(&production, needle);
+        if actual != expected {
+            violations.push(format!(
+                "Dashboard must delegate to {label} exactly {expected} time(s); found {actual}"
+            ));
+        }
+    }
+    for forbidden in [".borders(Borders::ALL)", "dashboard_block_inner("] {
+        if source_code_contains(&production, forbidden) {
+            violations.push(format!("Dashboard still owns {forbidden}"));
+        }
+    }
+    violations
+}
+
 fn is_screen_type(ty: &syn::Type, expected: &str) -> bool {
     matches!(
         ty,
@@ -1464,6 +1498,38 @@ fn ownership_source_check_rejects_non_code_evidence() {
         "fn render<'a>(frame: &'a mut Frame) { render_scrollable_list_panel(frame, area); }",
         "render_scrollable_list_panel("
     ));
+}
+
+#[test]
+fn dashboard_delegates_static_presentation_to_framework() {
+    let source = std::fs::read_to_string("src/tui/dashboard.rs").unwrap();
+    let violations = dashboard_ownership_violations(&source);
+    assert!(violations.is_empty(), "{}", violations.join("\n"));
+}
+
+#[test]
+fn dashboard_ownership_ignores_nonproduction_decoys() {
+    let source = r#"
+        fn render() {
+            // render_screen_frame_sections(); render_static_panel();
+            let _text = "render_static_panel(";
+        }
+        #[cfg(test)]
+        mod tests {
+            fn decoy() {
+                render_screen_frame_sections();
+                render_static_panel(); render_static_panel();
+                render_static_panel(); render_static_panel();
+                Block::default().borders(Borders::ALL);
+            }
+        }
+    "#;
+    let violations = dashboard_ownership_violations(source);
+    assert!(violations
+        .iter()
+        .any(|item| item.contains("ScreenFrameSections")));
+    assert!(violations.iter().any(|item| item.contains("StaticPanel")));
+    assert!(!violations.iter().any(|item| item.contains("Borders::ALL")));
 }
 
 #[test]
@@ -3689,10 +3755,10 @@ fn paragraph_widgets_must_wrap_user_content() {
     // Format: "filename:line_number"
     // When adding entries, include a brief reason.
     let allowlist: HashSet<&str> = [
-        "dashboard.rs:140",
-        "dashboard.rs:414",
-        "dashboard.rs:434",
-        "dashboard.rs:469",
+        "dashboard.rs:137",
+        "dashboard.rs:338",
+        "dashboard.rs:358",
+        "dashboard.rs:394",
         "log_entry.rs:544",
         "log_entry.rs:736",
         "log_entry.rs:835",

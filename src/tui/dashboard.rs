@@ -3,7 +3,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Padding, Paragraph, Wrap},
+    widgets::{Paragraph, Wrap},
     Frame,
 };
 use unicode_width::UnicodeWidthStr;
@@ -11,12 +11,11 @@ use unicode_width::UnicodeWidthStr;
 use super::lifecycle::{NavigationStatus, Reenter};
 use super::widgets::heatmap::Heatmap;
 use super::{
-    centered_area,
     framework::{
-        fit_rect, render_shortcuts, shortcut_height, truncate_to_width, Shortcut, TextInput,
+        render_screen_frame_sections, render_static_panel, truncate_to_width, Shortcut, TextInput,
     },
-    render_gauge_line, render_status_line, Action, ModuleId, NavigationIntent, StatusMessage,
-    BORDER_COLOR, CONTENT_WIDTH,
+    render_gauge_line, Action, ModuleId, NavigationIntent, StatusMessage, BORDER_COLOR,
+    CONTENT_WIDTH,
 };
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
@@ -30,10 +29,6 @@ enum DashboardMode {
     Normal,
     ConfirmQuit,
     HrvInput,
-}
-
-fn dashboard_block_inner(block: &Block<'_>, parent: Rect) -> Rect {
-    fit_rect(parent, block.inner(parent))
 }
 
 pub struct DashboardScreen {
@@ -106,28 +101,30 @@ impl DashboardScreen {
     }
 
     fn render_on(&self, frame: &mut Frame, today: chrono::NaiveDate) {
-        let area = centered_area(frame.area(), CONTENT_WIDTH);
-        if area.width == 0 || area.height == 0 {
-            return;
-        }
-
         let shortcuts = self.active_shortcuts();
-        let shortcut_rows = shortcut_height(&shortcuts, area.width);
-
-        let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(1),             // [0] logo header
-                Constraint::Length(1),             // [1] spacer
-                Constraint::Length(13),            // [2] heatmap preferred height
-                Constraint::Length(1),             // [3] spacer
-                Constraint::Length(7),             // [4] summary preferred height
-                Constraint::Length(1),             // [5] spacer
-                Constraint::Min(1),                // [6] split panes use remaining height
-                Constraint::Length(1),             // [7] reserved status row
-                Constraint::Length(shortcut_rows), // [8] complete dynamic footer
-            ])
-            .split(area);
+        let status = if self.mode == DashboardMode::ConfirmQuit {
+            Some((tr("dashboard-quit-confirm"), true))
+        } else {
+            self.status_msg.clone()
+        };
+        let sections = render_screen_frame_sections(
+            frame,
+            frame.area(),
+            CONTENT_WIDTH,
+            &status,
+            &shortcuts,
+            &[
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Length(13),
+                Constraint::Length(1),
+                Constraint::Length(7),
+                Constraint::Length(1),
+                Constraint::Min(1),
+            ],
+            false,
+        );
+        let chunks = &sections.body;
 
         // ── Logo header (single line) ──
         let logo_text = tr("dashboard-logo-text");
@@ -141,26 +138,19 @@ impl DashboardScreen {
         }
 
         // ── Heatmap ──
-        let heatmap_block = Block::default()
-            .title(Line::from(vec![
-                Span::styled("── ", Style::default().fg(BORDER_COLOR)),
-                Span::styled(
-                    tr("dashboard-heatmap-title"),
-                    Style::default().fg(Color::White).bold(),
-                ),
-                Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
-            ]))
-            .borders(Borders::ALL)
-            .padding(Padding::uniform(1))
-            .border_style(Style::default().fg(BORDER_COLOR));
-        if chunks[2].width > 0 && chunks[2].height > 0 {
-            let heatmap_inner = dashboard_block_inner(&heatmap_block, chunks[2]);
-            frame.render_widget(heatmap_block, chunks[2]);
-            if heatmap_inner.width > 0 && heatmap_inner.height > 0 {
-                let heatmap = Heatmap::with_today(&self.heatmap_data, 52, self.no_color, today);
-                frame.render_widget(heatmap, heatmap_inner);
-            }
-        }
+        render_static_panel(
+            frame,
+            chunks[2],
+            tr("dashboard-heatmap-title"),
+            |frame, inner| {
+                if inner.width > 0 && inner.height > 0 {
+                    frame.render_widget(
+                        Heatmap::with_today(&self.heatmap_data, 52, self.no_color, today),
+                        inner,
+                    );
+                }
+            },
+        );
 
         // ── Training summary ──
         self.render_summary(frame, chunks[4]);
@@ -174,21 +164,6 @@ impl DashboardScreen {
 
             self.render_recent_pane(frame, panes[0]);
             self.render_goals_pane(frame, panes[1]);
-        }
-
-        // ── Status line ──
-        if chunks[7].width > 0 && chunks[7].height > 0 {
-            let status = if self.mode == DashboardMode::ConfirmQuit {
-                Some((tr("dashboard-quit-confirm"), true))
-            } else {
-                self.status_msg.clone()
-            };
-            render_status_line(frame, chunks[7], &status);
-        }
-
-        // ── Footer ──
-        if chunks[8].width > 0 && chunks[8].height > 0 {
-            render_shortcuts(frame, chunks[8], &shortcuts);
         }
     }
 
@@ -214,261 +189,212 @@ impl DashboardScreen {
     }
 
     fn render_summary(&self, frame: &mut Frame, area: Rect) {
-        if area.width == 0 || area.height == 0 {
-            return;
-        }
+        render_static_panel(frame, area, tr("summary-title"), |frame, inner| {
+            if inner.width == 0 || inner.height == 0 {
+                return;
+            }
 
-        let block = Block::default()
-            .title(Line::from(vec![
-                Span::styled("── ", Style::default().fg(BORDER_COLOR)),
-                Span::styled(
-                    tr("summary-title"),
-                    Style::default().fg(Color::White).bold(),
-                ),
-                Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
-            ]))
-            .borders(Borders::ALL)
-            .padding(Padding::uniform(1))
-            .border_style(Style::default().fg(BORDER_COLOR));
-        let inner = dashboard_block_inner(&block, area);
-        frame.render_widget(block, area);
-        if inner.width == 0 || inner.height == 0 {
-            return;
-        }
-
-        let volume_tons = self.weekly_volume / 1000.0;
-        let volume_text = tr_args(
-            "summary-volume",
-            &[("value", FluentValue::from(format!("{:.1}", volume_tons)))],
-        );
-        let consecutive_text = tr_args(
-            "summary-consecutive",
-            &[("days", FluentValue::from(self.consecutive_days))],
-        );
-        let frequency_text = tr_args(
-            "summary-frequency",
-            &[("days", FluentValue::from(self.training_days as i64))],
-        );
-        let recovery_spans = if self.mode == DashboardMode::HrvInput {
-            let prefix = format!("{}: ", tr("dashboard-hrv-label"));
-            let non_input_width = volume_text
-                .width()
-                .saturating_add(consecutive_text.width())
-                .saturating_add(prefix.width())
-                .saturating_add(frequency_text.width())
-                .saturating_add("  ".width().saturating_mul(3));
-            let non_input_width = u16::try_from(non_input_width).unwrap_or(u16::MAX);
-            let mut spans = vec![Span::styled(prefix, Style::default().fg(Color::White))];
-            spans.extend(
-                self.hrv_input
-                    .visible_spans(inner.width, non_input_width, ACCENT),
+            let volume_tons = self.weekly_volume / 1000.0;
+            let volume_text = tr_args(
+                "summary-volume",
+                &[("value", FluentValue::from(format!("{:.1}", volume_tons)))],
             );
-            spans
-        } else {
-            let recovery_text = if let Some(hrv) = self.hrv_today {
-                tr_args(
-                    "summary-recovery",
-                    &[("value", FluentValue::from(hrv as i64))],
-                )
+            let consecutive_text = tr_args(
+                "summary-consecutive",
+                &[("days", FluentValue::from(self.consecutive_days))],
+            );
+            let frequency_text = tr_args(
+                "summary-frequency",
+                &[("days", FluentValue::from(self.training_days as i64))],
+            );
+            let recovery_spans = if self.mode == DashboardMode::HrvInput {
+                let prefix = format!("{}: ", tr("dashboard-hrv-label"));
+                let non_input_width = volume_text
+                    .width()
+                    .saturating_add(consecutive_text.width())
+                    .saturating_add(prefix.width())
+                    .saturating_add(frequency_text.width())
+                    .saturating_add("  ".width().saturating_mul(3));
+                let non_input_width = u16::try_from(non_input_width).unwrap_or(u16::MAX);
+                let mut spans = vec![Span::styled(prefix, Style::default().fg(Color::White))];
+                spans.extend(
+                    self.hrv_input
+                        .visible_spans(inner.width, non_input_width, ACCENT),
+                );
+                spans
             } else {
-                tr("summary-recovery-na")
+                let recovery_text = if let Some(hrv) = self.hrv_today {
+                    tr_args(
+                        "summary-recovery",
+                        &[("value", FluentValue::from(hrv as i64))],
+                    )
+                } else {
+                    tr("summary-recovery-na")
+                };
+                vec![Span::styled(
+                    recovery_text,
+                    Style::default().fg(Color::White),
+                )]
             };
-            vec![Span::styled(
-                recovery_text,
-                Style::default().fg(Color::White),
-            )]
-        };
-        let sep = Span::styled("  ", Style::default());
-        let mut summary_spans = vec![
-            Span::styled(volume_text, Style::default().fg(Color::White)),
-            sep.clone(),
-            Span::styled(consecutive_text, Style::default().fg(Color::White)),
-            sep.clone(),
-        ];
-        summary_spans.extend(recovery_spans);
-        summary_spans.extend([
-            sep,
-            Span::styled(frequency_text, Style::default().fg(Color::White)),
-        ]);
-        let mut lines = vec![Line::from(summary_spans)];
+            let sep = Span::styled("  ", Style::default());
+            let mut summary_spans = vec![
+                Span::styled(volume_text, Style::default().fg(Color::White)),
+                sep.clone(),
+                Span::styled(consecutive_text, Style::default().fg(Color::White)),
+                sep.clone(),
+            ];
+            summary_spans.extend(recovery_spans);
+            summary_spans.extend([
+                sep,
+                Span::styled(frequency_text, Style::default().fg(Color::White)),
+            ]);
+            let mut lines = vec![Line::from(summary_spans)];
 
-        if !self.quote.is_empty() {
-            lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled(
-                format!("> {}", self.quote),
-                Style::default().fg(Color::Yellow).italic(),
-            )));
-        }
+            if !self.quote.is_empty() {
+                lines.push(Line::from(""));
+                lines.push(Line::from(Span::styled(
+                    format!("> {}", self.quote),
+                    Style::default().fg(Color::Yellow).italic(),
+                )));
+            }
 
-        frame.render_widget(
-            Paragraph::new(lines)
-                .wrap(Wrap { trim: false })
-                .alignment(ratatui::layout::Alignment::Center),
-            inner,
-        );
+            frame.render_widget(
+                Paragraph::new(lines)
+                    .wrap(Wrap { trim: false })
+                    .alignment(ratatui::layout::Alignment::Center),
+                inner,
+            );
+        });
     }
 
     fn render_recent_pane(&self, frame: &mut Frame, area: Rect) {
-        if area.width == 0 || area.height == 0 {
-            return;
-        }
-
-        let block = Block::default()
-            .title(Line::from(vec![
-                Span::styled("── ", Style::default().fg(BORDER_COLOR)),
-                Span::styled(
-                    tr("dashboard-recent-title"),
-                    Style::default().fg(Color::White).bold(),
-                ),
-                Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
-            ]))
-            .borders(Borders::ALL)
-            .padding(Padding::uniform(1))
-            .border_style(Style::default().fg(BORDER_COLOR));
-
-        let inner = dashboard_block_inner(&block, area);
-        frame.render_widget(block, area);
-        if inner.width == 0 || inner.height == 0 {
-            return;
-        }
-
-        let mut lines: Vec<Line> = Vec::new();
-
-        if self.recent_entries.is_empty() {
-            lines.push(Line::from(Span::styled(
-                tr("dashboard-no-entries"),
-                Style::default().fg(Color::Gray),
-            )));
-        } else {
-            let mut current_date = String::new();
-            for entry in &self.recent_entries {
-                let date_key = entry.log.logged_at.format("%Y-%m-%d").to_string();
-                if date_key != current_date {
-                    if !current_date.is_empty() {
-                        lines.push(Line::from(""));
-                    }
-                    lines.push(Line::from(Span::styled(
-                        date_key.clone(),
-                        Style::default().fg(Color::White).bold(),
-                    )));
-                    current_date = date_key;
-                }
-                let total = format!("{:.0}", entry.total_metric());
-                let label = entry.metric_label();
-                let row_width = inner.width as usize;
-                let indent = truncate_to_width("    ", row_width);
-                let indent_width = indent.width();
-                let suffix_budget = row_width.saturating_sub(indent_width);
-                let suffix = truncate_to_width(&format!("{total} {label}"), suffix_budget);
-                let suffix_width = suffix.width();
-                let gap_width = usize::from(suffix_width > 0 && suffix_width < suffix_budget);
-                let name_width = row_width
-                    .saturating_sub(indent_width)
-                    .saturating_sub(suffix_width)
-                    .saturating_sub(gap_width);
-                let practice_name = truncate_to_width(&entry.practice_name, name_width);
-                let gap = if practice_name.is_empty() || suffix.is_empty() {
-                    ""
-                } else {
-                    " "
-                };
-                lines.push(Line::from(vec![
-                    Span::raw(indent),
-                    Span::styled(practice_name, Style::default().fg(Color::Gray)),
-                    Span::raw(gap),
-                    Span::styled(suffix, Style::default().fg(Color::Gray)),
-                ]));
+        render_static_panel(frame, area, tr("dashboard-recent-title"), |frame, inner| {
+            if inner.width == 0 || inner.height == 0 {
+                return;
             }
-        }
 
-        frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
+            let mut lines: Vec<Line> = Vec::new();
+
+            if self.recent_entries.is_empty() {
+                lines.push(Line::from(Span::styled(
+                    tr("dashboard-no-entries"),
+                    Style::default().fg(Color::Gray),
+                )));
+            } else {
+                let mut current_date = String::new();
+                for entry in &self.recent_entries {
+                    let date_key = entry.log.logged_at.format("%Y-%m-%d").to_string();
+                    if date_key != current_date {
+                        if !current_date.is_empty() {
+                            lines.push(Line::from(""));
+                        }
+                        lines.push(Line::from(Span::styled(
+                            date_key.clone(),
+                            Style::default().fg(Color::White).bold(),
+                        )));
+                        current_date = date_key;
+                    }
+                    let total = format!("{:.0}", entry.total_metric());
+                    let label = entry.metric_label();
+                    let row_width = inner.width as usize;
+                    let indent = truncate_to_width("    ", row_width);
+                    let indent_width = indent.width();
+                    let suffix_budget = row_width.saturating_sub(indent_width);
+                    let suffix = truncate_to_width(&format!("{total} {label}"), suffix_budget);
+                    let suffix_width = suffix.width();
+                    let gap_width = usize::from(suffix_width > 0 && suffix_width < suffix_budget);
+                    let name_width = row_width
+                        .saturating_sub(indent_width)
+                        .saturating_sub(suffix_width)
+                        .saturating_sub(gap_width);
+                    let practice_name = truncate_to_width(&entry.practice_name, name_width);
+                    let gap = if practice_name.is_empty() || suffix.is_empty() {
+                        ""
+                    } else {
+                        " "
+                    };
+                    lines.push(Line::from(vec![
+                        Span::raw(indent),
+                        Span::styled(practice_name, Style::default().fg(Color::Gray)),
+                        Span::raw(gap),
+                        Span::styled(suffix, Style::default().fg(Color::Gray)),
+                    ]));
+                }
+            }
+
+            frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
+        });
     }
 
     fn render_goals_pane(&self, frame: &mut Frame, area: Rect) {
-        if area.width == 0 || area.height == 0 {
-            return;
-        }
-
-        let block = Block::default()
-            .title(Line::from(vec![
-                Span::styled("── ", Style::default().fg(BORDER_COLOR)),
-                Span::styled(
-                    tr("dashboard-goals"),
-                    Style::default().fg(Color::White).bold(),
-                ),
-                Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
-            ]))
-            .borders(Borders::ALL)
-            .padding(Padding::uniform(1))
-            .border_style(Style::default().fg(BORDER_COLOR));
-
-        let inner = dashboard_block_inner(&block, area);
-        frame.render_widget(block, area);
-        if inner.width == 0 || inner.height == 0 {
-            return;
-        }
-
-        let active_goals: Vec<&Goal> = self.goals.iter().filter(|g| !g.completed).collect();
-
-        if active_goals.is_empty() && self.mode == DashboardMode::Normal {
-            let hint = Paragraph::new(Line::from(Span::styled(
-                tr("dashboard-press-g"),
-                Style::default().fg(Color::Gray),
-            )));
-            frame.render_widget(hint, inner);
-            return;
-        }
-
-        let mut y = inner.y;
-        for goal in &active_goals {
-            if y >= inner.bottom() {
-                break;
+        render_static_panel(frame, area, tr("dashboard-goals"), |frame, inner| {
+            if inner.width == 0 || inner.height == 0 {
+                return;
             }
-            let title_rect = Rect {
-                x: inner.x,
-                y,
-                width: inner.width,
-                height: 1,
-            };
-            frame.render_widget(
-                Paragraph::new(Line::from(Span::styled(
-                    truncate_to_width(&goal.title, inner.width as usize),
-                    Style::default().fg(Color::White).bold(),
-                )))
-                .wrap(Wrap { trim: false }),
-                title_rect,
-            );
-            y = y.saturating_add(1);
 
-            if y >= inner.bottom() {
-                break;
+            let active_goals: Vec<&Goal> = self.goals.iter().filter(|g| !g.completed).collect();
+
+            if active_goals.is_empty() && self.mode == DashboardMode::Normal {
+                let hint = Paragraph::new(Line::from(Span::styled(
+                    tr("dashboard-press-g"),
+                    Style::default().fg(Color::Gray),
+                )));
+                frame.render_widget(hint, inner);
+                return;
             }
-            let milestones = &goal.milestones;
-            let ratio = if milestones.is_empty() {
-                if goal.completed {
-                    1.0
-                } else {
-                    0.0
+
+            let mut y = inner.y;
+            for goal in &active_goals {
+                if y >= inner.bottom() {
+                    break;
                 }
-            } else {
-                milestones.iter().filter(|m| m.completed).count() as f64 / milestones.len() as f64
-            };
-            let pct = (ratio * 100.0).round() as u32;
-            let gauge_rect = Rect {
-                x: inner.x,
-                y,
-                width: inner.width,
-                height: 1,
-            };
-            let suffix = truncate_to_width(&format!("  {pct}%"), inner.width as usize);
-            let bar_width = (inner.width as usize).saturating_sub(suffix.width());
-            let mut gauge_line = render_gauge_line(ratio, 0, 0, bar_width, 0);
-            gauge_line
-                .spans
-                .push(Span::styled(suffix, Style::default().fg(Color::Gray)));
-            frame.render_widget(Paragraph::new(gauge_line), gauge_rect);
-            y = y.saturating_add(2);
-        }
+                let title_rect = Rect {
+                    x: inner.x,
+                    y,
+                    width: inner.width,
+                    height: 1,
+                };
+                frame.render_widget(
+                    Paragraph::new(Line::from(Span::styled(
+                        truncate_to_width(&goal.title, inner.width as usize),
+                        Style::default().fg(Color::White).bold(),
+                    )))
+                    .wrap(Wrap { trim: false }),
+                    title_rect,
+                );
+                y = y.saturating_add(1);
+
+                if y >= inner.bottom() {
+                    break;
+                }
+                let milestones = &goal.milestones;
+                let ratio = if milestones.is_empty() {
+                    if goal.completed {
+                        1.0
+                    } else {
+                        0.0
+                    }
+                } else {
+                    milestones.iter().filter(|m| m.completed).count() as f64
+                        / milestones.len() as f64
+                };
+                let pct = (ratio * 100.0).round() as u32;
+                let gauge_rect = Rect {
+                    x: inner.x,
+                    y,
+                    width: inner.width,
+                    height: 1,
+                };
+                let suffix = truncate_to_width(&format!("  {pct}%"), inner.width as usize);
+                let bar_width = (inner.width as usize).saturating_sub(suffix.width());
+                let mut gauge_line = render_gauge_line(ratio, 0, 0, bar_width, 0);
+                gauge_line
+                    .spans
+                    .push(Span::styled(suffix, Style::default().fg(Color::Gray)));
+                frame.render_widget(Paragraph::new(gauge_line), gauge_rect);
+                y = y.saturating_add(2);
+            }
+        });
     }
 
     pub fn handle_key(&mut self, key: KeyEvent, db: &Database) -> Action {
@@ -569,7 +495,9 @@ impl NavigationStatus for DashboardScreen {
 mod tests {
     use super::*;
     use crate::model::{Log, Milestone, PracticeType, Set, SetData};
-    use crate::tui::framework::test_support::{render_to_snapshot, render_to_string};
+    use crate::tui::framework::test_support::{
+        render_to_buffer, render_to_snapshot, render_to_string,
+    };
     use crate::tui::lifecycle::Reenter;
     use chrono::{NaiveDate, NaiveDateTime};
     use crossterm::event::{KeyEventKind, KeyModifiers};
@@ -750,20 +678,21 @@ mod tests {
     }
 
     #[test]
-    fn dashboard_block_inners_remain_within_tiny_parents() {
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .padding(Padding::uniform(1));
+    fn dashboard_renders_one_cell_small_and_resized_frames_without_panicking() {
+        let screen = golden_dashboard_screen("normal");
+        for (width, height) in [(1, 1), (40, 16), (80, 24), (80, 35), (107, 35)] {
+            render_to_buffer(width, height, |frame| {
+                screen.render_on(frame, dashboard_fixture_today());
+            });
+        }
+    }
 
-        for parent in [Rect::new(0, 2, 40, 1), Rect::new(7, 9, 1, 1)] {
-            let inner = dashboard_block_inner(&block, parent);
-            assert!(
-                inner.x >= parent.x
-                    && inner.y >= parent.y
-                    && inner.right() <= parent.right()
-                    && inner.bottom() <= parent.bottom(),
-                "inner {inner:?} escaped parent {parent:?}"
-            );
+    #[test]
+    fn dashboard_recalculates_complete_output_after_resize() {
+        let screen = golden_dashboard_screen("normal");
+        for (width, height) in [(80, 35), (80, 24), (40, 16), (107, 35)] {
+            let output = render_dashboard(&screen, width, height);
+            assert_eq!(output.lines().count(), height as usize);
         }
     }
 
