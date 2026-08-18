@@ -102,6 +102,10 @@ impl DashboardScreen {
     }
 
     pub fn render(&self, frame: &mut Frame) {
+        self.render_on(frame, chrono::Local::now().date_naive());
+    }
+
+    fn render_on(&self, frame: &mut Frame, today: chrono::NaiveDate) {
         let area = centered_area(frame.area(), CONTENT_WIDTH);
         if area.width == 0 || area.height == 0 {
             return;
@@ -153,7 +157,7 @@ impl DashboardScreen {
             let heatmap_inner = dashboard_block_inner(&heatmap_block, chunks[2]);
             frame.render_widget(heatmap_block, chunks[2]);
             if heatmap_inner.width > 0 && heatmap_inner.height > 0 {
-                let heatmap = Heatmap::new(&self.heatmap_data, 52, self.no_color);
+                let heatmap = Heatmap::with_today(&self.heatmap_data, 52, self.no_color, today);
                 frame.render_widget(heatmap, heatmap_inner);
             }
         }
@@ -564,9 +568,10 @@ impl NavigationStatus for DashboardScreen {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{PracticeType, SetData};
-    use crate::tui::framework::test_support::render_to_string;
+    use crate::model::{Log, Milestone, PracticeType, Set, SetData};
+    use crate::tui::framework::test_support::{render_to_snapshot, render_to_string};
     use crate::tui::lifecycle::Reenter;
+    use chrono::{NaiveDate, NaiveDateTime};
     use crossterm::event::{KeyEventKind, KeyModifiers};
     use rusqlite::Connection;
 
@@ -581,6 +586,131 @@ mod tests {
 
     fn render_dashboard(screen: &DashboardScreen, width: u16, height: u16) -> String {
         render_to_string(width, height, |frame| screen.render(frame))
+    }
+
+    fn dashboard_fixture_today() -> NaiveDate {
+        NaiveDate::from_ymd_opt(2026, 8, 18).unwrap()
+    }
+
+    fn dashboard_fixture_time(day: u32) -> NaiveDateTime {
+        NaiveDate::from_ymd_opt(2026, 8, day)
+            .unwrap()
+            .and_hms_opt(6, 30, 0)
+            .unwrap()
+    }
+
+    fn golden_dashboard_screen(name: &str) -> DashboardScreen {
+        std::env::set_var("LC_ALL", "C");
+        crate::i18n::init();
+        let logged_at = dashboard_fixture_time(18);
+        let goal_time = dashboard_fixture_time(1);
+        let mut screen = DashboardScreen {
+            heatmap_data: vec![("2026-08-17".into(), 1), ("2026-08-18".into(), 3)],
+            recent_entries: vec![LogEntry {
+                log: Log {
+                    id: 701,
+                    practice_id: 301,
+                    logged_at,
+                    note: Some("Fixture note".into()),
+                    warm_up: None,
+                    cool_down: None,
+                    rpe: Some(8),
+                },
+                practice_name: "A deliberately long weighted practice name that must stay inside Recent".into(),
+                practice_type: PracticeType::Weighted,
+                sets: vec![Set {
+                    id: 801,
+                    log_id: 701,
+                    set_number: 1,
+                    data: SetData::Weighted { weight: 1234.0, reps: 5678 },
+                }],
+                rpe: Some(8),
+            }],
+            quote: "A deliberately long quote must wrap only inside Summary while the footer remains complete.".into(),
+            goals: vec![Goal {
+                id: 901,
+                title: "A deliberately long active goal title that must stay inside Goals".into(),
+                completed: false,
+                position: 0,
+                created_at: goal_time,
+                completed_at: None,
+                milestones: vec![
+                    Milestone {
+                        id: 902,
+                        goal_id: 901,
+                        title: "Done".into(),
+                        completed: true,
+                        position: 0,
+                        created_at: goal_time,
+                        completed_at: Some(goal_time),
+                    },
+                    Milestone {
+                        id: 903,
+                        goal_id: 901,
+                        title: "Pending".into(),
+                        completed: false,
+                        position: 1,
+                        created_at: goal_time,
+                        completed_at: None,
+                    },
+                ],
+            }],
+            mode: DashboardMode::Normal,
+            hrv_today: Some(64),
+            hrv_input: TextInput::new(),
+            status_msg: Some(("Dashboard fixture status".into(), false)),
+            no_color: false,
+            weekly_volume: 12_345.0,
+            training_days: 4,
+            consecutive_days: 3,
+        };
+        match name {
+            "normal" => {}
+            "hrv_input" => {
+                screen.mode = DashboardMode::HrvInput;
+                screen.hrv_input = TextInput::from("9".repeat(100));
+                screen.status_msg = Some(("HRV fixture status".into(), true));
+            }
+            "confirm_quit" => {
+                screen.mode = DashboardMode::ConfirmQuit;
+                screen.status_msg = Some(("Hidden by confirmation".into(), true));
+            }
+            other => panic!("unknown Dashboard golden state: {other}"),
+        }
+        screen
+    }
+
+    fn dashboard_golden(name: &str) -> &'static str {
+        match name {
+            "normal" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/dashboard/normal.txt"
+            )),
+            "hrv_input" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/dashboard/hrv_input.txt"
+            )),
+            "confirm_quit" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/dashboard/confirm_quit.txt"
+            )),
+            other => panic!("unknown Dashboard golden fixture: {other}"),
+        }
+    }
+
+    #[test]
+    fn dashboard_states_match_golden_buffers() {
+        for name in ["normal", "hrv_input", "confirm_quit"] {
+            let screen = golden_dashboard_screen(name);
+            let actual = render_to_snapshot(80, 35, |frame| {
+                screen.render_on(frame, dashboard_fixture_today())
+            });
+            assert_eq!(
+                actual,
+                dashboard_golden(name),
+                "Dashboard {name} buffer changed"
+            );
+        }
     }
 
     #[test]

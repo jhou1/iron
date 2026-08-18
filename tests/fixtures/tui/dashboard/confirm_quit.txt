@@ -1,0 +1,2801 @@
+area	x=0	y=0	width=80	height=35
+0,0	"─"	DarkGray	Reset	NONE	false
+1,0	"─"	DarkGray	Reset	NONE	false
+2,0	" "	DarkGray	Reset	NONE	false
+3,0	"⚡"	Yellow	Reset	NONE	false
+4,0	" "	Reset	Reset	NONE	false
+5,0	" "	Yellow	Reset	NONE	false
+6,0	"I"	Yellow	Reset	BOLD	false
+7,0	"r"	Yellow	Reset	BOLD	false
+8,0	"o"	Yellow	Reset	BOLD	false
+9,0	"n"	Yellow	Reset	BOLD	false
+10,0	" "	Yellow	Reset	BOLD	false
+11,0	"T"	Yellow	Reset	BOLD	false
+12,0	"r"	Yellow	Reset	BOLD	false
+13,0	"a"	Yellow	Reset	BOLD	false
+14,0	"i"	Yellow	Reset	BOLD	false
+15,0	"n"	Yellow	Reset	BOLD	false
+16,0	"i"	Yellow	Reset	BOLD	false
+17,0	"n"	Yellow	Reset	BOLD	false
+18,0	"g"	Yellow	Reset	BOLD	false
+19,0	" "	Yellow	Reset	BOLD	false
+20,0	"T"	Yellow	Reset	BOLD	false
+21,0	"r"	Yellow	Reset	BOLD	false
+22,0	"a"	Yellow	Reset	BOLD	false
+23,0	"c"	Yellow	Reset	BOLD	false
+24,0	"k"	Yellow	Reset	BOLD	false
+25,0	"e"	Yellow	Reset	BOLD	false
+26,0	"r"	Yellow	Reset	BOLD	false
+27,0	" "	Reset	Reset	NONE	false
+28,0	" "	Reset	Reset	NONE	false
+29,0	" "	Reset	Reset	NONE	false
+30,0	" "	Reset	Reset	NONE	false
+31,0	" "	Reset	Reset	NONE	false
+32,0	" "	Reset	Reset	NONE	false
+33,0	" "	Reset	Reset	NONE	false
+34,0	" "	Reset	Reset	NONE	false
+35,0	" "	Reset	Reset	NONE	false
+36,0	" "	Reset	Reset	NONE	false
+37,0	" "	Reset	Reset	NONE	false
+38,0	" "	Reset	Reset	NONE	false
+39,0	" "	Reset	Reset	NONE	false
+40,0	" "	Reset	Reset	NONE	false
+41,0	" "	Reset	Reset	NONE	false
+42,0	" "	Reset	Reset	NONE	false
+43,0	" "	Reset	Reset	NONE	false
+44,0	" "	Reset	Reset	NONE	false
+45,0	" "	Reset	Reset	NONE	false
+46,0	" "	Reset	Reset	NONE	false
+47,0	" "	Reset	Reset	NONE	false
+48,0	" "	Reset	Reset	NONE	false
+49,0	" "	Reset	Reset	NONE	false
+50,0	" "	Reset	Reset	NONE	false
+51,0	" "	Reset	Reset	NONE	false
+52,0	" "	Reset	Reset	NONE	false
+53,0	" "	Reset	Reset	NONE	false
+54,0	" "	Reset	Reset	NONE	false
+55,0	" "	Reset	Reset	NONE	false
+56,0	" "	Reset	Reset	NONE	false
+57,0	" "	Reset	Reset	NONE	false
+58,0	" "	Reset	Reset	NONE	false
+59,0	" "	Reset	Reset	NONE	false
+60,0	" "	Reset	Reset	NONE	false
+61,0	" "	Reset	Reset	NONE	false
+62,0	" "	Reset	Reset	NONE	false
+63,0	" "	Reset	Reset	NONE	false
+64,0	" "	Reset	Reset	NONE	false
+65,0	" "	Reset	Reset	NONE	false
+66,0	" "	Reset	Reset	NONE	false
+67,0	" "	Reset	Reset	NONE	false
+68,0	" "	Reset	Reset	NONE	false
+69,0	" "	Reset	Reset	NONE	false
+70,0	" "	Reset	Reset	NONE	false
+71,0	" "	Reset	Reset	NONE	false
+72,0	" "	Reset	Reset	NONE	false
+73,0	" "	Reset	Reset	NONE	false
+74,0	" "	Reset	Reset	NONE	false
+75,0	" "	Reset	Reset	NONE	false
+76,0	" "	Reset	Reset	NONE	false
+77,0	" "	Reset	Reset	NONE	false
+78,0	" "	Reset	Reset	NONE	false
+79,0	" "	Reset	Reset	NONE	false
+0,1	" "	Reset	Reset	NONE	false
+1,1	" "	Reset	Reset	NONE	false
+2,1	" "	Reset	Reset	NONE	false
+3,1	" "	Reset	Reset	NONE	false
+4,1	" "	Reset	Reset	NONE	false
+5,1	" "	Reset	Reset	NONE	false
+6,1	" "	Reset	Reset	NONE	false
+7,1	" "	Reset	Reset	NONE	false
+8,1	" "	Reset	Reset	NONE	false
+9,1	" "	Reset	Reset	NONE	false
+10,1	" "	Reset	Reset	NONE	false
+11,1	" "	Reset	Reset	NONE	false
+12,1	" "	Reset	Reset	NONE	false
+13,1	" "	Reset	Reset	NONE	false
+14,1	" "	Reset	Reset	NONE	false
+15,1	" "	Reset	Reset	NONE	false
+16,1	" "	Reset	Reset	NONE	false
+17,1	" "	Reset	Reset	NONE	false
+18,1	" "	Reset	Reset	NONE	false
+19,1	" "	Reset	Reset	NONE	false
+20,1	" "	Reset	Reset	NONE	false
+21,1	" "	Reset	Reset	NONE	false
+22,1	" "	Reset	Reset	NONE	false
+23,1	" "	Reset	Reset	NONE	false
+24,1	" "	Reset	Reset	NONE	false
+25,1	" "	Reset	Reset	NONE	false
+26,1	" "	Reset	Reset	NONE	false
+27,1	" "	Reset	Reset	NONE	false
+28,1	" "	Reset	Reset	NONE	false
+29,1	" "	Reset	Reset	NONE	false
+30,1	" "	Reset	Reset	NONE	false
+31,1	" "	Reset	Reset	NONE	false
+32,1	" "	Reset	Reset	NONE	false
+33,1	" "	Reset	Reset	NONE	false
+34,1	" "	Reset	Reset	NONE	false
+35,1	" "	Reset	Reset	NONE	false
+36,1	" "	Reset	Reset	NONE	false
+37,1	" "	Reset	Reset	NONE	false
+38,1	" "	Reset	Reset	NONE	false
+39,1	" "	Reset	Reset	NONE	false
+40,1	" "	Reset	Reset	NONE	false
+41,1	" "	Reset	Reset	NONE	false
+42,1	" "	Reset	Reset	NONE	false
+43,1	" "	Reset	Reset	NONE	false
+44,1	" "	Reset	Reset	NONE	false
+45,1	" "	Reset	Reset	NONE	false
+46,1	" "	Reset	Reset	NONE	false
+47,1	" "	Reset	Reset	NONE	false
+48,1	" "	Reset	Reset	NONE	false
+49,1	" "	Reset	Reset	NONE	false
+50,1	" "	Reset	Reset	NONE	false
+51,1	" "	Reset	Reset	NONE	false
+52,1	" "	Reset	Reset	NONE	false
+53,1	" "	Reset	Reset	NONE	false
+54,1	" "	Reset	Reset	NONE	false
+55,1	" "	Reset	Reset	NONE	false
+56,1	" "	Reset	Reset	NONE	false
+57,1	" "	Reset	Reset	NONE	false
+58,1	" "	Reset	Reset	NONE	false
+59,1	" "	Reset	Reset	NONE	false
+60,1	" "	Reset	Reset	NONE	false
+61,1	" "	Reset	Reset	NONE	false
+62,1	" "	Reset	Reset	NONE	false
+63,1	" "	Reset	Reset	NONE	false
+64,1	" "	Reset	Reset	NONE	false
+65,1	" "	Reset	Reset	NONE	false
+66,1	" "	Reset	Reset	NONE	false
+67,1	" "	Reset	Reset	NONE	false
+68,1	" "	Reset	Reset	NONE	false
+69,1	" "	Reset	Reset	NONE	false
+70,1	" "	Reset	Reset	NONE	false
+71,1	" "	Reset	Reset	NONE	false
+72,1	" "	Reset	Reset	NONE	false
+73,1	" "	Reset	Reset	NONE	false
+74,1	" "	Reset	Reset	NONE	false
+75,1	" "	Reset	Reset	NONE	false
+76,1	" "	Reset	Reset	NONE	false
+77,1	" "	Reset	Reset	NONE	false
+78,1	" "	Reset	Reset	NONE	false
+79,1	" "	Reset	Reset	NONE	false
+0,2	"┌"	DarkGray	Reset	NONE	false
+1,2	"─"	DarkGray	Reset	NONE	false
+2,2	"─"	DarkGray	Reset	NONE	false
+3,2	" "	DarkGray	Reset	NONE	false
+4,2	"H"	White	Reset	BOLD	false
+5,2	"e"	White	Reset	BOLD	false
+6,2	"a"	White	Reset	BOLD	false
+7,2	"t"	White	Reset	BOLD	false
+8,2	"m"	White	Reset	BOLD	false
+9,2	"a"	White	Reset	BOLD	false
+10,2	"p"	White	Reset	BOLD	false
+11,2	" "	DarkGray	Reset	NONE	false
+12,2	"─"	DarkGray	Reset	NONE	false
+13,2	"─"	DarkGray	Reset	NONE	false
+14,2	"─"	DarkGray	Reset	NONE	false
+15,2	"─"	DarkGray	Reset	NONE	false
+16,2	"─"	DarkGray	Reset	NONE	false
+17,2	"─"	DarkGray	Reset	NONE	false
+18,2	"─"	DarkGray	Reset	NONE	false
+19,2	"─"	DarkGray	Reset	NONE	false
+20,2	"─"	DarkGray	Reset	NONE	false
+21,2	"─"	DarkGray	Reset	NONE	false
+22,2	"─"	DarkGray	Reset	NONE	false
+23,2	"─"	DarkGray	Reset	NONE	false
+24,2	"─"	DarkGray	Reset	NONE	false
+25,2	"─"	DarkGray	Reset	NONE	false
+26,2	"─"	DarkGray	Reset	NONE	false
+27,2	"─"	DarkGray	Reset	NONE	false
+28,2	"─"	DarkGray	Reset	NONE	false
+29,2	"─"	DarkGray	Reset	NONE	false
+30,2	"─"	DarkGray	Reset	NONE	false
+31,2	"─"	DarkGray	Reset	NONE	false
+32,2	"─"	DarkGray	Reset	NONE	false
+33,2	"─"	DarkGray	Reset	NONE	false
+34,2	"─"	DarkGray	Reset	NONE	false
+35,2	"─"	DarkGray	Reset	NONE	false
+36,2	"─"	DarkGray	Reset	NONE	false
+37,2	"─"	DarkGray	Reset	NONE	false
+38,2	"─"	DarkGray	Reset	NONE	false
+39,2	"─"	DarkGray	Reset	NONE	false
+40,2	"─"	DarkGray	Reset	NONE	false
+41,2	"─"	DarkGray	Reset	NONE	false
+42,2	"─"	DarkGray	Reset	NONE	false
+43,2	"─"	DarkGray	Reset	NONE	false
+44,2	"─"	DarkGray	Reset	NONE	false
+45,2	"─"	DarkGray	Reset	NONE	false
+46,2	"─"	DarkGray	Reset	NONE	false
+47,2	"─"	DarkGray	Reset	NONE	false
+48,2	"─"	DarkGray	Reset	NONE	false
+49,2	"─"	DarkGray	Reset	NONE	false
+50,2	"─"	DarkGray	Reset	NONE	false
+51,2	"─"	DarkGray	Reset	NONE	false
+52,2	"─"	DarkGray	Reset	NONE	false
+53,2	"─"	DarkGray	Reset	NONE	false
+54,2	"─"	DarkGray	Reset	NONE	false
+55,2	"─"	DarkGray	Reset	NONE	false
+56,2	"─"	DarkGray	Reset	NONE	false
+57,2	"─"	DarkGray	Reset	NONE	false
+58,2	"─"	DarkGray	Reset	NONE	false
+59,2	"─"	DarkGray	Reset	NONE	false
+60,2	"─"	DarkGray	Reset	NONE	false
+61,2	"─"	DarkGray	Reset	NONE	false
+62,2	"─"	DarkGray	Reset	NONE	false
+63,2	"─"	DarkGray	Reset	NONE	false
+64,2	"─"	DarkGray	Reset	NONE	false
+65,2	"─"	DarkGray	Reset	NONE	false
+66,2	"─"	DarkGray	Reset	NONE	false
+67,2	"─"	DarkGray	Reset	NONE	false
+68,2	"─"	DarkGray	Reset	NONE	false
+69,2	"─"	DarkGray	Reset	NONE	false
+70,2	"─"	DarkGray	Reset	NONE	false
+71,2	"─"	DarkGray	Reset	NONE	false
+72,2	"─"	DarkGray	Reset	NONE	false
+73,2	"─"	DarkGray	Reset	NONE	false
+74,2	"─"	DarkGray	Reset	NONE	false
+75,2	"─"	DarkGray	Reset	NONE	false
+76,2	"─"	DarkGray	Reset	NONE	false
+77,2	"─"	DarkGray	Reset	NONE	false
+78,2	"─"	DarkGray	Reset	NONE	false
+79,2	"┐"	DarkGray	Reset	NONE	false
+0,3	"│"	DarkGray	Reset	NONE	false
+1,3	" "	Reset	Reset	NONE	false
+2,3	" "	Reset	Reset	NONE	false
+3,3	" "	Reset	Reset	NONE	false
+4,3	" "	Reset	Reset	NONE	false
+5,3	" "	Reset	Reset	NONE	false
+6,3	" "	Reset	Reset	NONE	false
+7,3	" "	Reset	Reset	NONE	false
+8,3	" "	Reset	Reset	NONE	false
+9,3	" "	Reset	Reset	NONE	false
+10,3	" "	Reset	Reset	NONE	false
+11,3	" "	Reset	Reset	NONE	false
+12,3	" "	Reset	Reset	NONE	false
+13,3	" "	Reset	Reset	NONE	false
+14,3	" "	Reset	Reset	NONE	false
+15,3	" "	Reset	Reset	NONE	false
+16,3	" "	Reset	Reset	NONE	false
+17,3	" "	Reset	Reset	NONE	false
+18,3	" "	Reset	Reset	NONE	false
+19,3	" "	Reset	Reset	NONE	false
+20,3	" "	Reset	Reset	NONE	false
+21,3	" "	Reset	Reset	NONE	false
+22,3	" "	Reset	Reset	NONE	false
+23,3	" "	Reset	Reset	NONE	false
+24,3	" "	Reset	Reset	NONE	false
+25,3	" "	Reset	Reset	NONE	false
+26,3	" "	Reset	Reset	NONE	false
+27,3	" "	Reset	Reset	NONE	false
+28,3	" "	Reset	Reset	NONE	false
+29,3	" "	Reset	Reset	NONE	false
+30,3	" "	Reset	Reset	NONE	false
+31,3	" "	Reset	Reset	NONE	false
+32,3	" "	Reset	Reset	NONE	false
+33,3	" "	Reset	Reset	NONE	false
+34,3	" "	Reset	Reset	NONE	false
+35,3	" "	Reset	Reset	NONE	false
+36,3	" "	Reset	Reset	NONE	false
+37,3	" "	Reset	Reset	NONE	false
+38,3	" "	Reset	Reset	NONE	false
+39,3	" "	Reset	Reset	NONE	false
+40,3	" "	Reset	Reset	NONE	false
+41,3	" "	Reset	Reset	NONE	false
+42,3	" "	Reset	Reset	NONE	false
+43,3	" "	Reset	Reset	NONE	false
+44,3	" "	Reset	Reset	NONE	false
+45,3	" "	Reset	Reset	NONE	false
+46,3	" "	Reset	Reset	NONE	false
+47,3	" "	Reset	Reset	NONE	false
+48,3	" "	Reset	Reset	NONE	false
+49,3	" "	Reset	Reset	NONE	false
+50,3	" "	Reset	Reset	NONE	false
+51,3	" "	Reset	Reset	NONE	false
+52,3	" "	Reset	Reset	NONE	false
+53,3	" "	Reset	Reset	NONE	false
+54,3	" "	Reset	Reset	NONE	false
+55,3	" "	Reset	Reset	NONE	false
+56,3	" "	Reset	Reset	NONE	false
+57,3	" "	Reset	Reset	NONE	false
+58,3	" "	Reset	Reset	NONE	false
+59,3	" "	Reset	Reset	NONE	false
+60,3	" "	Reset	Reset	NONE	false
+61,3	" "	Reset	Reset	NONE	false
+62,3	" "	Reset	Reset	NONE	false
+63,3	" "	Reset	Reset	NONE	false
+64,3	" "	Reset	Reset	NONE	false
+65,3	" "	Reset	Reset	NONE	false
+66,3	" "	Reset	Reset	NONE	false
+67,3	" "	Reset	Reset	NONE	false
+68,3	" "	Reset	Reset	NONE	false
+69,3	" "	Reset	Reset	NONE	false
+70,3	" "	Reset	Reset	NONE	false
+71,3	" "	Reset	Reset	NONE	false
+72,3	" "	Reset	Reset	NONE	false
+73,3	" "	Reset	Reset	NONE	false
+74,3	" "	Reset	Reset	NONE	false
+75,3	" "	Reset	Reset	NONE	false
+76,3	" "	Reset	Reset	NONE	false
+77,3	" "	Reset	Reset	NONE	false
+78,3	" "	Reset	Reset	NONE	false
+79,3	"│"	DarkGray	Reset	NONE	false
+0,4	"│"	DarkGray	Reset	NONE	false
+1,4	" "	Reset	Reset	NONE	false
+2,4	" "	Reset	Reset	NONE	false
+3,4	" "	Reset	Reset	NONE	false
+4,4	" "	Reset	Reset	NONE	false
+5,4	"A"	Gray	Reset	NONE	false
+6,4	"u"	Gray	Reset	NONE	false
+7,4	"g"	Gray	Reset	NONE	false
+8,4	" "	Reset	Reset	NONE	false
+9,4	"S"	Gray	Reset	NONE	false
+10,4	"e"	Gray	Reset	NONE	false
+11,4	"p"	Gray	Reset	NONE	false
+12,4	" "	Reset	Reset	NONE	false
+13,4	" "	Reset	Reset	NONE	false
+14,4	" "	Reset	Reset	NONE	false
+15,4	" "	Reset	Reset	NONE	false
+16,4	" "	Reset	Reset	NONE	false
+17,4	"O"	Gray	Reset	NONE	false
+18,4	"c"	Gray	Reset	NONE	false
+19,4	"t"	Gray	Reset	NONE	false
+20,4	" "	Reset	Reset	NONE	false
+21,4	" "	Reset	Reset	NONE	false
+22,4	" "	Reset	Reset	NONE	false
+23,4	" "	Reset	Reset	NONE	false
+24,4	" "	Reset	Reset	NONE	false
+25,4	"N"	Gray	Reset	NONE	false
+26,4	"o"	Gray	Reset	NONE	false
+27,4	"v"	Gray	Reset	NONE	false
+28,4	" "	Reset	Reset	NONE	false
+29,4	" "	Reset	Reset	NONE	false
+30,4	" "	Reset	Reset	NONE	false
+31,4	" "	Reset	Reset	NONE	false
+32,4	" "	Reset	Reset	NONE	false
+33,4	"D"	Gray	Reset	NONE	false
+34,4	"e"	Gray	Reset	NONE	false
+35,4	"c"	Gray	Reset	NONE	false
+36,4	" "	Reset	Reset	NONE	false
+37,4	" "	Reset	Reset	NONE	false
+38,4	" "	Reset	Reset	NONE	false
+39,4	" "	Reset	Reset	NONE	false
+40,4	" "	Reset	Reset	NONE	false
+41,4	" "	Reset	Reset	NONE	false
+42,4	" "	Reset	Reset	NONE	false
+43,4	"J"	Gray	Reset	NONE	false
+44,4	"a"	Gray	Reset	NONE	false
+45,4	"n"	Gray	Reset	NONE	false
+46,4	" "	Reset	Reset	NONE	false
+47,4	" "	Reset	Reset	NONE	false
+48,4	" "	Reset	Reset	NONE	false
+49,4	" "	Reset	Reset	NONE	false
+50,4	" "	Reset	Reset	NONE	false
+51,4	"F"	Gray	Reset	NONE	false
+52,4	"e"	Gray	Reset	NONE	false
+53,4	"b"	Gray	Reset	NONE	false
+54,4	" "	Reset	Reset	NONE	false
+55,4	" "	Reset	Reset	NONE	false
+56,4	" "	Reset	Reset	NONE	false
+57,4	" "	Reset	Reset	NONE	false
+58,4	" "	Reset	Reset	NONE	false
+59,4	"M"	Gray	Reset	NONE	false
+60,4	"a"	Gray	Reset	NONE	false
+61,4	"r"	Gray	Reset	NONE	false
+62,4	" "	Reset	Reset	NONE	false
+63,4	" "	Reset	Reset	NONE	false
+64,4	" "	Reset	Reset	NONE	false
+65,4	" "	Reset	Reset	NONE	false
+66,4	" "	Reset	Reset	NONE	false
+67,4	" "	Reset	Reset	NONE	false
+68,4	" "	Reset	Reset	NONE	false
+69,4	"A"	Gray	Reset	NONE	false
+70,4	"p"	Gray	Reset	NONE	false
+71,4	"r"	Gray	Reset	NONE	false
+72,4	" "	Reset	Reset	NONE	false
+73,4	" "	Reset	Reset	NONE	false
+74,4	" "	Reset	Reset	NONE	false
+75,4	" "	Reset	Reset	NONE	false
+76,4	" "	Reset	Reset	NONE	false
+77,4	" "	Reset	Reset	NONE	false
+78,4	" "	Reset	Reset	NONE	false
+79,4	"│"	DarkGray	Reset	NONE	false
+0,5	"│"	DarkGray	Reset	NONE	false
+1,5	" "	Reset	Reset	NONE	false
+2,5	"M"	Gray	Reset	NONE	false
+3,5	"o"	Gray	Reset	NONE	false
+4,5	" "	Reset	Reset	NONE	false
+5,5	"●"	Indexed(240)	Reset	NONE	false
+6,5	" "	Reset	Reset	NONE	false
+7,5	"●"	Indexed(240)	Reset	NONE	false
+8,5	" "	Reset	Reset	NONE	false
+9,5	"●"	Indexed(240)	Reset	NONE	false
+10,5	" "	Reset	Reset	NONE	false
+11,5	"●"	Indexed(240)	Reset	NONE	false
+12,5	" "	Reset	Reset	NONE	false
+13,5	"●"	Indexed(240)	Reset	NONE	false
+14,5	" "	Reset	Reset	NONE	false
+15,5	"●"	Indexed(240)	Reset	NONE	false
+16,5	" "	Reset	Reset	NONE	false
+17,5	"●"	Indexed(240)	Reset	NONE	false
+18,5	" "	Reset	Reset	NONE	false
+19,5	"●"	Indexed(240)	Reset	NONE	false
+20,5	" "	Reset	Reset	NONE	false
+21,5	"●"	Indexed(240)	Reset	NONE	false
+22,5	" "	Reset	Reset	NONE	false
+23,5	"●"	Indexed(240)	Reset	NONE	false
+24,5	" "	Reset	Reset	NONE	false
+25,5	"●"	Indexed(240)	Reset	NONE	false
+26,5	" "	Reset	Reset	NONE	false
+27,5	"●"	Indexed(240)	Reset	NONE	false
+28,5	" "	Reset	Reset	NONE	false
+29,5	"●"	Indexed(240)	Reset	NONE	false
+30,5	" "	Reset	Reset	NONE	false
+31,5	"●"	Indexed(240)	Reset	NONE	false
+32,5	" "	Reset	Reset	NONE	false
+33,5	"●"	Indexed(240)	Reset	NONE	false
+34,5	" "	Reset	Reset	NONE	false
+35,5	"●"	Indexed(240)	Reset	NONE	false
+36,5	" "	Reset	Reset	NONE	false
+37,5	"●"	Indexed(240)	Reset	NONE	false
+38,5	" "	Reset	Reset	NONE	false
+39,5	"●"	Indexed(240)	Reset	NONE	false
+40,5	" "	Reset	Reset	NONE	false
+41,5	"●"	Indexed(240)	Reset	NONE	false
+42,5	" "	Reset	Reset	NONE	false
+43,5	"●"	Indexed(240)	Reset	NONE	false
+44,5	" "	Reset	Reset	NONE	false
+45,5	"●"	Indexed(240)	Reset	NONE	false
+46,5	" "	Reset	Reset	NONE	false
+47,5	"●"	Indexed(240)	Reset	NONE	false
+48,5	" "	Reset	Reset	NONE	false
+49,5	"●"	Indexed(240)	Reset	NONE	false
+50,5	" "	Reset	Reset	NONE	false
+51,5	"●"	Indexed(240)	Reset	NONE	false
+52,5	" "	Reset	Reset	NONE	false
+53,5	"●"	Indexed(240)	Reset	NONE	false
+54,5	" "	Reset	Reset	NONE	false
+55,5	"●"	Indexed(240)	Reset	NONE	false
+56,5	" "	Reset	Reset	NONE	false
+57,5	"●"	Indexed(240)	Reset	NONE	false
+58,5	" "	Reset	Reset	NONE	false
+59,5	"●"	Indexed(240)	Reset	NONE	false
+60,5	" "	Reset	Reset	NONE	false
+61,5	"●"	Indexed(240)	Reset	NONE	false
+62,5	" "	Reset	Reset	NONE	false
+63,5	"●"	Indexed(240)	Reset	NONE	false
+64,5	" "	Reset	Reset	NONE	false
+65,5	"●"	Indexed(240)	Reset	NONE	false
+66,5	" "	Reset	Reset	NONE	false
+67,5	"●"	Indexed(240)	Reset	NONE	false
+68,5	" "	Reset	Reset	NONE	false
+69,5	"●"	Indexed(240)	Reset	NONE	false
+70,5	" "	Reset	Reset	NONE	false
+71,5	"●"	Indexed(240)	Reset	NONE	false
+72,5	" "	Reset	Reset	NONE	false
+73,5	"●"	Indexed(240)	Reset	NONE	false
+74,5	" "	Reset	Reset	NONE	false
+75,5	"●"	Indexed(240)	Reset	NONE	false
+76,5	" "	Reset	Reset	NONE	false
+77,5	" "	Reset	Reset	NONE	false
+78,5	" "	Reset	Reset	NONE	false
+79,5	"│"	DarkGray	Reset	NONE	false
+0,6	"│"	DarkGray	Reset	NONE	false
+1,6	" "	Reset	Reset	NONE	false
+2,6	"T"	Gray	Reset	NONE	false
+3,6	"u"	Gray	Reset	NONE	false
+4,6	" "	Reset	Reset	NONE	false
+5,6	"●"	Indexed(240)	Reset	NONE	false
+6,6	" "	Reset	Reset	NONE	false
+7,6	"●"	Indexed(240)	Reset	NONE	false
+8,6	" "	Reset	Reset	NONE	false
+9,6	"●"	Indexed(240)	Reset	NONE	false
+10,6	" "	Reset	Reset	NONE	false
+11,6	"●"	Indexed(240)	Reset	NONE	false
+12,6	" "	Reset	Reset	NONE	false
+13,6	"●"	Indexed(240)	Reset	NONE	false
+14,6	" "	Reset	Reset	NONE	false
+15,6	"●"	Indexed(240)	Reset	NONE	false
+16,6	" "	Reset	Reset	NONE	false
+17,6	"●"	Indexed(240)	Reset	NONE	false
+18,6	" "	Reset	Reset	NONE	false
+19,6	"●"	Indexed(240)	Reset	NONE	false
+20,6	" "	Reset	Reset	NONE	false
+21,6	"●"	Indexed(240)	Reset	NONE	false
+22,6	" "	Reset	Reset	NONE	false
+23,6	"●"	Indexed(240)	Reset	NONE	false
+24,6	" "	Reset	Reset	NONE	false
+25,6	"●"	Indexed(240)	Reset	NONE	false
+26,6	" "	Reset	Reset	NONE	false
+27,6	"●"	Indexed(240)	Reset	NONE	false
+28,6	" "	Reset	Reset	NONE	false
+29,6	"●"	Indexed(240)	Reset	NONE	false
+30,6	" "	Reset	Reset	NONE	false
+31,6	"●"	Indexed(240)	Reset	NONE	false
+32,6	" "	Reset	Reset	NONE	false
+33,6	"●"	Indexed(240)	Reset	NONE	false
+34,6	" "	Reset	Reset	NONE	false
+35,6	"●"	Indexed(240)	Reset	NONE	false
+36,6	" "	Reset	Reset	NONE	false
+37,6	"●"	Indexed(240)	Reset	NONE	false
+38,6	" "	Reset	Reset	NONE	false
+39,6	"●"	Indexed(240)	Reset	NONE	false
+40,6	" "	Reset	Reset	NONE	false
+41,6	"●"	Indexed(240)	Reset	NONE	false
+42,6	" "	Reset	Reset	NONE	false
+43,6	"●"	Indexed(240)	Reset	NONE	false
+44,6	" "	Reset	Reset	NONE	false
+45,6	"●"	Indexed(240)	Reset	NONE	false
+46,6	" "	Reset	Reset	NONE	false
+47,6	"●"	Indexed(240)	Reset	NONE	false
+48,6	" "	Reset	Reset	NONE	false
+49,6	"●"	Indexed(240)	Reset	NONE	false
+50,6	" "	Reset	Reset	NONE	false
+51,6	"●"	Indexed(240)	Reset	NONE	false
+52,6	" "	Reset	Reset	NONE	false
+53,6	"●"	Indexed(240)	Reset	NONE	false
+54,6	" "	Reset	Reset	NONE	false
+55,6	"●"	Indexed(240)	Reset	NONE	false
+56,6	" "	Reset	Reset	NONE	false
+57,6	"●"	Indexed(240)	Reset	NONE	false
+58,6	" "	Reset	Reset	NONE	false
+59,6	"●"	Indexed(240)	Reset	NONE	false
+60,6	" "	Reset	Reset	NONE	false
+61,6	"●"	Indexed(240)	Reset	NONE	false
+62,6	" "	Reset	Reset	NONE	false
+63,6	"●"	Indexed(240)	Reset	NONE	false
+64,6	" "	Reset	Reset	NONE	false
+65,6	"●"	Indexed(240)	Reset	NONE	false
+66,6	" "	Reset	Reset	NONE	false
+67,6	"●"	Indexed(240)	Reset	NONE	false
+68,6	" "	Reset	Reset	NONE	false
+69,6	"●"	Indexed(240)	Reset	NONE	false
+70,6	" "	Reset	Reset	NONE	false
+71,6	"●"	Indexed(240)	Reset	NONE	false
+72,6	" "	Reset	Reset	NONE	false
+73,6	"●"	Indexed(240)	Reset	NONE	false
+74,6	" "	Reset	Reset	NONE	false
+75,6	"●"	Indexed(240)	Reset	NONE	false
+76,6	" "	Reset	Reset	NONE	false
+77,6	" "	Reset	Reset	NONE	false
+78,6	" "	Reset	Reset	NONE	false
+79,6	"│"	DarkGray	Reset	NONE	false
+0,7	"│"	DarkGray	Reset	NONE	false
+1,7	" "	Reset	Reset	NONE	false
+2,7	"W"	Gray	Reset	NONE	false
+3,7	"e"	Gray	Reset	NONE	false
+4,7	" "	Reset	Reset	NONE	false
+5,7	"●"	Indexed(240)	Reset	NONE	false
+6,7	" "	Reset	Reset	NONE	false
+7,7	"●"	Indexed(240)	Reset	NONE	false
+8,7	" "	Reset	Reset	NONE	false
+9,7	"●"	Indexed(240)	Reset	NONE	false
+10,7	" "	Reset	Reset	NONE	false
+11,7	"●"	Indexed(240)	Reset	NONE	false
+12,7	" "	Reset	Reset	NONE	false
+13,7	"●"	Indexed(240)	Reset	NONE	false
+14,7	" "	Reset	Reset	NONE	false
+15,7	"●"	Indexed(240)	Reset	NONE	false
+16,7	" "	Reset	Reset	NONE	false
+17,7	"●"	Indexed(240)	Reset	NONE	false
+18,7	" "	Reset	Reset	NONE	false
+19,7	"●"	Indexed(240)	Reset	NONE	false
+20,7	" "	Reset	Reset	NONE	false
+21,7	"●"	Indexed(240)	Reset	NONE	false
+22,7	" "	Reset	Reset	NONE	false
+23,7	"●"	Indexed(240)	Reset	NONE	false
+24,7	" "	Reset	Reset	NONE	false
+25,7	"●"	Indexed(240)	Reset	NONE	false
+26,7	" "	Reset	Reset	NONE	false
+27,7	"●"	Indexed(240)	Reset	NONE	false
+28,7	" "	Reset	Reset	NONE	false
+29,7	"●"	Indexed(240)	Reset	NONE	false
+30,7	" "	Reset	Reset	NONE	false
+31,7	"●"	Indexed(240)	Reset	NONE	false
+32,7	" "	Reset	Reset	NONE	false
+33,7	"●"	Indexed(240)	Reset	NONE	false
+34,7	" "	Reset	Reset	NONE	false
+35,7	"●"	Indexed(240)	Reset	NONE	false
+36,7	" "	Reset	Reset	NONE	false
+37,7	"●"	Indexed(240)	Reset	NONE	false
+38,7	" "	Reset	Reset	NONE	false
+39,7	"●"	Indexed(240)	Reset	NONE	false
+40,7	" "	Reset	Reset	NONE	false
+41,7	"●"	Indexed(240)	Reset	NONE	false
+42,7	" "	Reset	Reset	NONE	false
+43,7	"●"	Indexed(240)	Reset	NONE	false
+44,7	" "	Reset	Reset	NONE	false
+45,7	"●"	Indexed(240)	Reset	NONE	false
+46,7	" "	Reset	Reset	NONE	false
+47,7	"●"	Indexed(240)	Reset	NONE	false
+48,7	" "	Reset	Reset	NONE	false
+49,7	"●"	Indexed(240)	Reset	NONE	false
+50,7	" "	Reset	Reset	NONE	false
+51,7	"●"	Indexed(240)	Reset	NONE	false
+52,7	" "	Reset	Reset	NONE	false
+53,7	"●"	Indexed(240)	Reset	NONE	false
+54,7	" "	Reset	Reset	NONE	false
+55,7	"●"	Indexed(240)	Reset	NONE	false
+56,7	" "	Reset	Reset	NONE	false
+57,7	"●"	Indexed(240)	Reset	NONE	false
+58,7	" "	Reset	Reset	NONE	false
+59,7	"●"	Indexed(240)	Reset	NONE	false
+60,7	" "	Reset	Reset	NONE	false
+61,7	"●"	Indexed(240)	Reset	NONE	false
+62,7	" "	Reset	Reset	NONE	false
+63,7	"●"	Indexed(240)	Reset	NONE	false
+64,7	" "	Reset	Reset	NONE	false
+65,7	"●"	Indexed(240)	Reset	NONE	false
+66,7	" "	Reset	Reset	NONE	false
+67,7	"●"	Indexed(240)	Reset	NONE	false
+68,7	" "	Reset	Reset	NONE	false
+69,7	"●"	Indexed(240)	Reset	NONE	false
+70,7	" "	Reset	Reset	NONE	false
+71,7	"●"	Indexed(240)	Reset	NONE	false
+72,7	" "	Reset	Reset	NONE	false
+73,7	"●"	Indexed(240)	Reset	NONE	false
+74,7	" "	Reset	Reset	NONE	false
+75,7	"●"	Indexed(240)	Reset	NONE	false
+76,7	" "	Reset	Reset	NONE	false
+77,7	" "	Reset	Reset	NONE	false
+78,7	" "	Reset	Reset	NONE	false
+79,7	"│"	DarkGray	Reset	NONE	false
+0,8	"│"	DarkGray	Reset	NONE	false
+1,8	" "	Reset	Reset	NONE	false
+2,8	"T"	Gray	Reset	NONE	false
+3,8	"h"	Gray	Reset	NONE	false
+4,8	" "	Reset	Reset	NONE	false
+5,8	"●"	Indexed(240)	Reset	NONE	false
+6,8	" "	Reset	Reset	NONE	false
+7,8	"●"	Indexed(240)	Reset	NONE	false
+8,8	" "	Reset	Reset	NONE	false
+9,8	"●"	Indexed(240)	Reset	NONE	false
+10,8	" "	Reset	Reset	NONE	false
+11,8	"●"	Indexed(240)	Reset	NONE	false
+12,8	" "	Reset	Reset	NONE	false
+13,8	"●"	Indexed(240)	Reset	NONE	false
+14,8	" "	Reset	Reset	NONE	false
+15,8	"●"	Indexed(240)	Reset	NONE	false
+16,8	" "	Reset	Reset	NONE	false
+17,8	"●"	Indexed(240)	Reset	NONE	false
+18,8	" "	Reset	Reset	NONE	false
+19,8	"●"	Indexed(240)	Reset	NONE	false
+20,8	" "	Reset	Reset	NONE	false
+21,8	"●"	Indexed(240)	Reset	NONE	false
+22,8	" "	Reset	Reset	NONE	false
+23,8	"●"	Indexed(240)	Reset	NONE	false
+24,8	" "	Reset	Reset	NONE	false
+25,8	"●"	Indexed(240)	Reset	NONE	false
+26,8	" "	Reset	Reset	NONE	false
+27,8	"●"	Indexed(240)	Reset	NONE	false
+28,8	" "	Reset	Reset	NONE	false
+29,8	"●"	Indexed(240)	Reset	NONE	false
+30,8	" "	Reset	Reset	NONE	false
+31,8	"●"	Indexed(240)	Reset	NONE	false
+32,8	" "	Reset	Reset	NONE	false
+33,8	"●"	Indexed(240)	Reset	NONE	false
+34,8	" "	Reset	Reset	NONE	false
+35,8	"●"	Indexed(240)	Reset	NONE	false
+36,8	" "	Reset	Reset	NONE	false
+37,8	"●"	Indexed(240)	Reset	NONE	false
+38,8	" "	Reset	Reset	NONE	false
+39,8	"●"	Indexed(240)	Reset	NONE	false
+40,8	" "	Reset	Reset	NONE	false
+41,8	"●"	Indexed(240)	Reset	NONE	false
+42,8	" "	Reset	Reset	NONE	false
+43,8	"●"	Indexed(240)	Reset	NONE	false
+44,8	" "	Reset	Reset	NONE	false
+45,8	"●"	Indexed(240)	Reset	NONE	false
+46,8	" "	Reset	Reset	NONE	false
+47,8	"●"	Indexed(240)	Reset	NONE	false
+48,8	" "	Reset	Reset	NONE	false
+49,8	"●"	Indexed(240)	Reset	NONE	false
+50,8	" "	Reset	Reset	NONE	false
+51,8	"●"	Indexed(240)	Reset	NONE	false
+52,8	" "	Reset	Reset	NONE	false
+53,8	"●"	Indexed(240)	Reset	NONE	false
+54,8	" "	Reset	Reset	NONE	false
+55,8	"●"	Indexed(240)	Reset	NONE	false
+56,8	" "	Reset	Reset	NONE	false
+57,8	"●"	Indexed(240)	Reset	NONE	false
+58,8	" "	Reset	Reset	NONE	false
+59,8	"●"	Indexed(240)	Reset	NONE	false
+60,8	" "	Reset	Reset	NONE	false
+61,8	"●"	Indexed(240)	Reset	NONE	false
+62,8	" "	Reset	Reset	NONE	false
+63,8	"●"	Indexed(240)	Reset	NONE	false
+64,8	" "	Reset	Reset	NONE	false
+65,8	"●"	Indexed(240)	Reset	NONE	false
+66,8	" "	Reset	Reset	NONE	false
+67,8	"●"	Indexed(240)	Reset	NONE	false
+68,8	" "	Reset	Reset	NONE	false
+69,8	"●"	Indexed(240)	Reset	NONE	false
+70,8	" "	Reset	Reset	NONE	false
+71,8	"●"	Indexed(240)	Reset	NONE	false
+72,8	" "	Reset	Reset	NONE	false
+73,8	"●"	Indexed(240)	Reset	NONE	false
+74,8	" "	Reset	Reset	NONE	false
+75,8	"●"	Indexed(240)	Reset	NONE	false
+76,8	" "	Reset	Reset	NONE	false
+77,8	" "	Reset	Reset	NONE	false
+78,8	" "	Reset	Reset	NONE	false
+79,8	"│"	DarkGray	Reset	NONE	false
+0,9	"│"	DarkGray	Reset	NONE	false
+1,9	" "	Reset	Reset	NONE	false
+2,9	"F"	Gray	Reset	NONE	false
+3,9	"r"	Gray	Reset	NONE	false
+4,9	" "	Reset	Reset	NONE	false
+5,9	"●"	Indexed(240)	Reset	NONE	false
+6,9	" "	Reset	Reset	NONE	false
+7,9	"●"	Indexed(240)	Reset	NONE	false
+8,9	" "	Reset	Reset	NONE	false
+9,9	"●"	Indexed(240)	Reset	NONE	false
+10,9	" "	Reset	Reset	NONE	false
+11,9	"●"	Indexed(240)	Reset	NONE	false
+12,9	" "	Reset	Reset	NONE	false
+13,9	"●"	Indexed(240)	Reset	NONE	false
+14,9	" "	Reset	Reset	NONE	false
+15,9	"●"	Indexed(240)	Reset	NONE	false
+16,9	" "	Reset	Reset	NONE	false
+17,9	"●"	Indexed(240)	Reset	NONE	false
+18,9	" "	Reset	Reset	NONE	false
+19,9	"●"	Indexed(240)	Reset	NONE	false
+20,9	" "	Reset	Reset	NONE	false
+21,9	"●"	Indexed(240)	Reset	NONE	false
+22,9	" "	Reset	Reset	NONE	false
+23,9	"●"	Indexed(240)	Reset	NONE	false
+24,9	" "	Reset	Reset	NONE	false
+25,9	"●"	Indexed(240)	Reset	NONE	false
+26,9	" "	Reset	Reset	NONE	false
+27,9	"●"	Indexed(240)	Reset	NONE	false
+28,9	" "	Reset	Reset	NONE	false
+29,9	"●"	Indexed(240)	Reset	NONE	false
+30,9	" "	Reset	Reset	NONE	false
+31,9	"●"	Indexed(240)	Reset	NONE	false
+32,9	" "	Reset	Reset	NONE	false
+33,9	"●"	Indexed(240)	Reset	NONE	false
+34,9	" "	Reset	Reset	NONE	false
+35,9	"●"	Indexed(240)	Reset	NONE	false
+36,9	" "	Reset	Reset	NONE	false
+37,9	"●"	Indexed(240)	Reset	NONE	false
+38,9	" "	Reset	Reset	NONE	false
+39,9	"●"	Indexed(240)	Reset	NONE	false
+40,9	" "	Reset	Reset	NONE	false
+41,9	"●"	Indexed(240)	Reset	NONE	false
+42,9	" "	Reset	Reset	NONE	false
+43,9	"●"	Indexed(240)	Reset	NONE	false
+44,9	" "	Reset	Reset	NONE	false
+45,9	"●"	Indexed(240)	Reset	NONE	false
+46,9	" "	Reset	Reset	NONE	false
+47,9	"●"	Indexed(240)	Reset	NONE	false
+48,9	" "	Reset	Reset	NONE	false
+49,9	"●"	Indexed(240)	Reset	NONE	false
+50,9	" "	Reset	Reset	NONE	false
+51,9	"●"	Indexed(240)	Reset	NONE	false
+52,9	" "	Reset	Reset	NONE	false
+53,9	"●"	Indexed(240)	Reset	NONE	false
+54,9	" "	Reset	Reset	NONE	false
+55,9	"●"	Indexed(240)	Reset	NONE	false
+56,9	" "	Reset	Reset	NONE	false
+57,9	"●"	Indexed(240)	Reset	NONE	false
+58,9	" "	Reset	Reset	NONE	false
+59,9	"●"	Indexed(240)	Reset	NONE	false
+60,9	" "	Reset	Reset	NONE	false
+61,9	"●"	Indexed(240)	Reset	NONE	false
+62,9	" "	Reset	Reset	NONE	false
+63,9	"●"	Indexed(240)	Reset	NONE	false
+64,9	" "	Reset	Reset	NONE	false
+65,9	"●"	Indexed(240)	Reset	NONE	false
+66,9	" "	Reset	Reset	NONE	false
+67,9	"●"	Indexed(240)	Reset	NONE	false
+68,9	" "	Reset	Reset	NONE	false
+69,9	"●"	Indexed(240)	Reset	NONE	false
+70,9	" "	Reset	Reset	NONE	false
+71,9	"●"	Indexed(240)	Reset	NONE	false
+72,9	" "	Reset	Reset	NONE	false
+73,9	"●"	Indexed(240)	Reset	NONE	false
+74,9	" "	Reset	Reset	NONE	false
+75,9	"●"	Indexed(240)	Reset	NONE	false
+76,9	" "	Reset	Reset	NONE	false
+77,9	" "	Reset	Reset	NONE	false
+78,9	" "	Reset	Reset	NONE	false
+79,9	"│"	DarkGray	Reset	NONE	false
+0,10	"│"	DarkGray	Reset	NONE	false
+1,10	" "	Reset	Reset	NONE	false
+2,10	"S"	Gray	Reset	NONE	false
+3,10	"a"	Gray	Reset	NONE	false
+4,10	" "	Reset	Reset	NONE	false
+5,10	"●"	Indexed(240)	Reset	NONE	false
+6,10	" "	Reset	Reset	NONE	false
+7,10	"●"	Indexed(240)	Reset	NONE	false
+8,10	" "	Reset	Reset	NONE	false
+9,10	"●"	Indexed(240)	Reset	NONE	false
+10,10	" "	Reset	Reset	NONE	false
+11,10	"●"	Indexed(240)	Reset	NONE	false
+12,10	" "	Reset	Reset	NONE	false
+13,10	"●"	Indexed(240)	Reset	NONE	false
+14,10	" "	Reset	Reset	NONE	false
+15,10	"●"	Indexed(240)	Reset	NONE	false
+16,10	" "	Reset	Reset	NONE	false
+17,10	"●"	Indexed(240)	Reset	NONE	false
+18,10	" "	Reset	Reset	NONE	false
+19,10	"●"	Indexed(240)	Reset	NONE	false
+20,10	" "	Reset	Reset	NONE	false
+21,10	"●"	Indexed(240)	Reset	NONE	false
+22,10	" "	Reset	Reset	NONE	false
+23,10	"●"	Indexed(240)	Reset	NONE	false
+24,10	" "	Reset	Reset	NONE	false
+25,10	"●"	Indexed(240)	Reset	NONE	false
+26,10	" "	Reset	Reset	NONE	false
+27,10	"●"	Indexed(240)	Reset	NONE	false
+28,10	" "	Reset	Reset	NONE	false
+29,10	"●"	Indexed(240)	Reset	NONE	false
+30,10	" "	Reset	Reset	NONE	false
+31,10	"●"	Indexed(240)	Reset	NONE	false
+32,10	" "	Reset	Reset	NONE	false
+33,10	"●"	Indexed(240)	Reset	NONE	false
+34,10	" "	Reset	Reset	NONE	false
+35,10	"●"	Indexed(240)	Reset	NONE	false
+36,10	" "	Reset	Reset	NONE	false
+37,10	"●"	Indexed(240)	Reset	NONE	false
+38,10	" "	Reset	Reset	NONE	false
+39,10	"●"	Indexed(240)	Reset	NONE	false
+40,10	" "	Reset	Reset	NONE	false
+41,10	"●"	Indexed(240)	Reset	NONE	false
+42,10	" "	Reset	Reset	NONE	false
+43,10	"●"	Indexed(240)	Reset	NONE	false
+44,10	" "	Reset	Reset	NONE	false
+45,10	"●"	Indexed(240)	Reset	NONE	false
+46,10	" "	Reset	Reset	NONE	false
+47,10	"●"	Indexed(240)	Reset	NONE	false
+48,10	" "	Reset	Reset	NONE	false
+49,10	"●"	Indexed(240)	Reset	NONE	false
+50,10	" "	Reset	Reset	NONE	false
+51,10	"●"	Indexed(240)	Reset	NONE	false
+52,10	" "	Reset	Reset	NONE	false
+53,10	"●"	Indexed(240)	Reset	NONE	false
+54,10	" "	Reset	Reset	NONE	false
+55,10	"●"	Indexed(240)	Reset	NONE	false
+56,10	" "	Reset	Reset	NONE	false
+57,10	"●"	Indexed(240)	Reset	NONE	false
+58,10	" "	Reset	Reset	NONE	false
+59,10	"●"	Indexed(240)	Reset	NONE	false
+60,10	" "	Reset	Reset	NONE	false
+61,10	"●"	Indexed(240)	Reset	NONE	false
+62,10	" "	Reset	Reset	NONE	false
+63,10	"●"	Indexed(240)	Reset	NONE	false
+64,10	" "	Reset	Reset	NONE	false
+65,10	"●"	Indexed(240)	Reset	NONE	false
+66,10	" "	Reset	Reset	NONE	false
+67,10	"●"	Indexed(240)	Reset	NONE	false
+68,10	" "	Reset	Reset	NONE	false
+69,10	"●"	Indexed(240)	Reset	NONE	false
+70,10	" "	Reset	Reset	NONE	false
+71,10	"●"	Indexed(240)	Reset	NONE	false
+72,10	" "	Reset	Reset	NONE	false
+73,10	"●"	Indexed(240)	Reset	NONE	false
+74,10	" "	Reset	Reset	NONE	false
+75,10	"●"	Indexed(240)	Reset	NONE	false
+76,10	" "	Reset	Reset	NONE	false
+77,10	" "	Reset	Reset	NONE	false
+78,10	" "	Reset	Reset	NONE	false
+79,10	"│"	DarkGray	Reset	NONE	false
+0,11	"│"	DarkGray	Reset	NONE	false
+1,11	" "	Reset	Reset	NONE	false
+2,11	"S"	Gray	Reset	NONE	false
+3,11	"u"	Gray	Reset	NONE	false
+4,11	" "	Reset	Reset	NONE	false
+5,11	"●"	Indexed(240)	Reset	NONE	false
+6,11	" "	Reset	Reset	NONE	false
+7,11	"●"	Indexed(240)	Reset	NONE	false
+8,11	" "	Reset	Reset	NONE	false
+9,11	"●"	Indexed(240)	Reset	NONE	false
+10,11	" "	Reset	Reset	NONE	false
+11,11	"●"	Indexed(240)	Reset	NONE	false
+12,11	" "	Reset	Reset	NONE	false
+13,11	"●"	Indexed(240)	Reset	NONE	false
+14,11	" "	Reset	Reset	NONE	false
+15,11	"●"	Indexed(240)	Reset	NONE	false
+16,11	" "	Reset	Reset	NONE	false
+17,11	"●"	Indexed(240)	Reset	NONE	false
+18,11	" "	Reset	Reset	NONE	false
+19,11	"●"	Indexed(240)	Reset	NONE	false
+20,11	" "	Reset	Reset	NONE	false
+21,11	"●"	Indexed(240)	Reset	NONE	false
+22,11	" "	Reset	Reset	NONE	false
+23,11	"●"	Indexed(240)	Reset	NONE	false
+24,11	" "	Reset	Reset	NONE	false
+25,11	"●"	Indexed(240)	Reset	NONE	false
+26,11	" "	Reset	Reset	NONE	false
+27,11	"●"	Indexed(240)	Reset	NONE	false
+28,11	" "	Reset	Reset	NONE	false
+29,11	"●"	Indexed(240)	Reset	NONE	false
+30,11	" "	Reset	Reset	NONE	false
+31,11	"●"	Indexed(240)	Reset	NONE	false
+32,11	" "	Reset	Reset	NONE	false
+33,11	"●"	Indexed(240)	Reset	NONE	false
+34,11	" "	Reset	Reset	NONE	false
+35,11	"●"	Indexed(240)	Reset	NONE	false
+36,11	" "	Reset	Reset	NONE	false
+37,11	"●"	Indexed(240)	Reset	NONE	false
+38,11	" "	Reset	Reset	NONE	false
+39,11	"●"	Indexed(240)	Reset	NONE	false
+40,11	" "	Reset	Reset	NONE	false
+41,11	"●"	Indexed(240)	Reset	NONE	false
+42,11	" "	Reset	Reset	NONE	false
+43,11	"●"	Indexed(240)	Reset	NONE	false
+44,11	" "	Reset	Reset	NONE	false
+45,11	"●"	Indexed(240)	Reset	NONE	false
+46,11	" "	Reset	Reset	NONE	false
+47,11	"●"	Indexed(240)	Reset	NONE	false
+48,11	" "	Reset	Reset	NONE	false
+49,11	"●"	Indexed(240)	Reset	NONE	false
+50,11	" "	Reset	Reset	NONE	false
+51,11	"●"	Indexed(240)	Reset	NONE	false
+52,11	" "	Reset	Reset	NONE	false
+53,11	"●"	Indexed(240)	Reset	NONE	false
+54,11	" "	Reset	Reset	NONE	false
+55,11	"●"	Indexed(240)	Reset	NONE	false
+56,11	" "	Reset	Reset	NONE	false
+57,11	"●"	Indexed(240)	Reset	NONE	false
+58,11	" "	Reset	Reset	NONE	false
+59,11	"●"	Indexed(240)	Reset	NONE	false
+60,11	" "	Reset	Reset	NONE	false
+61,11	"●"	Indexed(240)	Reset	NONE	false
+62,11	" "	Reset	Reset	NONE	false
+63,11	"●"	Indexed(240)	Reset	NONE	false
+64,11	" "	Reset	Reset	NONE	false
+65,11	"●"	Indexed(240)	Reset	NONE	false
+66,11	" "	Reset	Reset	NONE	false
+67,11	"●"	Indexed(240)	Reset	NONE	false
+68,11	" "	Reset	Reset	NONE	false
+69,11	"●"	Indexed(240)	Reset	NONE	false
+70,11	" "	Reset	Reset	NONE	false
+71,11	"●"	Indexed(240)	Reset	NONE	false
+72,11	" "	Reset	Reset	NONE	false
+73,11	"●"	Indexed(240)	Reset	NONE	false
+74,11	" "	Reset	Reset	NONE	false
+75,11	"●"	Indexed(240)	Reset	NONE	false
+76,11	" "	Reset	Reset	NONE	false
+77,11	" "	Reset	Reset	NONE	false
+78,11	" "	Reset	Reset	NONE	false
+79,11	"│"	DarkGray	Reset	NONE	false
+0,12	"│"	DarkGray	Reset	NONE	false
+1,12	" "	Reset	Reset	NONE	false
+2,12	" "	Reset	Reset	NONE	false
+3,12	" "	Reset	Reset	NONE	false
+4,12	" "	Reset	Reset	NONE	false
+5,12	"L"	Gray	Reset	NONE	false
+6,12	"e"	Gray	Reset	NONE	false
+7,12	"s"	Gray	Reset	NONE	false
+8,12	"s"	Gray	Reset	NONE	false
+9,12	" "	Gray	Reset	NONE	false
+10,12	"●"	Indexed(240)	Reset	NONE	false
+11,12	" "	Reset	Reset	NONE	false
+12,12	"●"	Indexed(22)	Reset	NONE	false
+13,12	" "	Reset	Reset	NONE	false
+14,12	"●"	Indexed(28)	Reset	NONE	false
+15,12	" "	Reset	Reset	NONE	false
+16,12	"●"	Indexed(34)	Reset	NONE	false
+17,12	" "	Reset	Reset	NONE	false
+18,12	"●"	Indexed(82)	Reset	NONE	false
+19,12	" "	Gray	Reset	NONE	false
+20,12	"M"	Gray	Reset	NONE	false
+21,12	"o"	Gray	Reset	NONE	false
+22,12	"r"	Gray	Reset	NONE	false
+23,12	"e"	Gray	Reset	NONE	false
+24,12	" "	Reset	Reset	NONE	false
+25,12	" "	Reset	Reset	NONE	false
+26,12	" "	Reset	Reset	NONE	false
+27,12	" "	Reset	Reset	NONE	false
+28,12	" "	Reset	Reset	NONE	false
+29,12	" "	Reset	Reset	NONE	false
+30,12	" "	Reset	Reset	NONE	false
+31,12	" "	Reset	Reset	NONE	false
+32,12	" "	Reset	Reset	NONE	false
+33,12	" "	Reset	Reset	NONE	false
+34,12	" "	Reset	Reset	NONE	false
+35,12	" "	Reset	Reset	NONE	false
+36,12	" "	Reset	Reset	NONE	false
+37,12	" "	Reset	Reset	NONE	false
+38,12	" "	Reset	Reset	NONE	false
+39,12	" "	Reset	Reset	NONE	false
+40,12	" "	Reset	Reset	NONE	false
+41,12	" "	Reset	Reset	NONE	false
+42,12	" "	Reset	Reset	NONE	false
+43,12	" "	Reset	Reset	NONE	false
+44,12	" "	Reset	Reset	NONE	false
+45,12	" "	Reset	Reset	NONE	false
+46,12	" "	Reset	Reset	NONE	false
+47,12	" "	Reset	Reset	NONE	false
+48,12	" "	Reset	Reset	NONE	false
+49,12	" "	Reset	Reset	NONE	false
+50,12	" "	Reset	Reset	NONE	false
+51,12	" "	Reset	Reset	NONE	false
+52,12	" "	Reset	Reset	NONE	false
+53,12	" "	Reset	Reset	NONE	false
+54,12	" "	Reset	Reset	NONE	false
+55,12	" "	Reset	Reset	NONE	false
+56,12	" "	Reset	Reset	NONE	false
+57,12	" "	Reset	Reset	NONE	false
+58,12	" "	Reset	Reset	NONE	false
+59,12	" "	Reset	Reset	NONE	false
+60,12	" "	Reset	Reset	NONE	false
+61,12	" "	Reset	Reset	NONE	false
+62,12	" "	Reset	Reset	NONE	false
+63,12	" "	Reset	Reset	NONE	false
+64,12	" "	Reset	Reset	NONE	false
+65,12	" "	Reset	Reset	NONE	false
+66,12	" "	Reset	Reset	NONE	false
+67,12	" "	Reset	Reset	NONE	false
+68,12	" "	Reset	Reset	NONE	false
+69,12	" "	Reset	Reset	NONE	false
+70,12	" "	Reset	Reset	NONE	false
+71,12	" "	Reset	Reset	NONE	false
+72,12	" "	Reset	Reset	NONE	false
+73,12	" "	Reset	Reset	NONE	false
+74,12	" "	Reset	Reset	NONE	false
+75,12	" "	Reset	Reset	NONE	false
+76,12	" "	Reset	Reset	NONE	false
+77,12	" "	Reset	Reset	NONE	false
+78,12	" "	Reset	Reset	NONE	false
+79,12	"│"	DarkGray	Reset	NONE	false
+0,13	"│"	DarkGray	Reset	NONE	false
+1,13	" "	Reset	Reset	NONE	false
+2,13	" "	Reset	Reset	NONE	false
+3,13	" "	Reset	Reset	NONE	false
+4,13	" "	Reset	Reset	NONE	false
+5,13	" "	Reset	Reset	NONE	false
+6,13	" "	Reset	Reset	NONE	false
+7,13	" "	Reset	Reset	NONE	false
+8,13	" "	Reset	Reset	NONE	false
+9,13	" "	Reset	Reset	NONE	false
+10,13	" "	Reset	Reset	NONE	false
+11,13	" "	Reset	Reset	NONE	false
+12,13	" "	Reset	Reset	NONE	false
+13,13	" "	Reset	Reset	NONE	false
+14,13	" "	Reset	Reset	NONE	false
+15,13	" "	Reset	Reset	NONE	false
+16,13	" "	Reset	Reset	NONE	false
+17,13	" "	Reset	Reset	NONE	false
+18,13	" "	Reset	Reset	NONE	false
+19,13	" "	Reset	Reset	NONE	false
+20,13	" "	Reset	Reset	NONE	false
+21,13	" "	Reset	Reset	NONE	false
+22,13	" "	Reset	Reset	NONE	false
+23,13	" "	Reset	Reset	NONE	false
+24,13	" "	Reset	Reset	NONE	false
+25,13	" "	Reset	Reset	NONE	false
+26,13	" "	Reset	Reset	NONE	false
+27,13	" "	Reset	Reset	NONE	false
+28,13	" "	Reset	Reset	NONE	false
+29,13	" "	Reset	Reset	NONE	false
+30,13	" "	Reset	Reset	NONE	false
+31,13	" "	Reset	Reset	NONE	false
+32,13	" "	Reset	Reset	NONE	false
+33,13	" "	Reset	Reset	NONE	false
+34,13	" "	Reset	Reset	NONE	false
+35,13	" "	Reset	Reset	NONE	false
+36,13	" "	Reset	Reset	NONE	false
+37,13	" "	Reset	Reset	NONE	false
+38,13	" "	Reset	Reset	NONE	false
+39,13	" "	Reset	Reset	NONE	false
+40,13	" "	Reset	Reset	NONE	false
+41,13	" "	Reset	Reset	NONE	false
+42,13	" "	Reset	Reset	NONE	false
+43,13	" "	Reset	Reset	NONE	false
+44,13	" "	Reset	Reset	NONE	false
+45,13	" "	Reset	Reset	NONE	false
+46,13	" "	Reset	Reset	NONE	false
+47,13	" "	Reset	Reset	NONE	false
+48,13	" "	Reset	Reset	NONE	false
+49,13	" "	Reset	Reset	NONE	false
+50,13	" "	Reset	Reset	NONE	false
+51,13	" "	Reset	Reset	NONE	false
+52,13	" "	Reset	Reset	NONE	false
+53,13	" "	Reset	Reset	NONE	false
+54,13	" "	Reset	Reset	NONE	false
+55,13	" "	Reset	Reset	NONE	false
+56,13	" "	Reset	Reset	NONE	false
+57,13	" "	Reset	Reset	NONE	false
+58,13	" "	Reset	Reset	NONE	false
+59,13	" "	Reset	Reset	NONE	false
+60,13	" "	Reset	Reset	NONE	false
+61,13	" "	Reset	Reset	NONE	false
+62,13	" "	Reset	Reset	NONE	false
+63,13	" "	Reset	Reset	NONE	false
+64,13	" "	Reset	Reset	NONE	false
+65,13	" "	Reset	Reset	NONE	false
+66,13	" "	Reset	Reset	NONE	false
+67,13	" "	Reset	Reset	NONE	false
+68,13	" "	Reset	Reset	NONE	false
+69,13	" "	Reset	Reset	NONE	false
+70,13	" "	Reset	Reset	NONE	false
+71,13	" "	Reset	Reset	NONE	false
+72,13	" "	Reset	Reset	NONE	false
+73,13	" "	Reset	Reset	NONE	false
+74,13	" "	Reset	Reset	NONE	false
+75,13	" "	Reset	Reset	NONE	false
+76,13	" "	Reset	Reset	NONE	false
+77,13	" "	Reset	Reset	NONE	false
+78,13	" "	Reset	Reset	NONE	false
+79,13	"│"	DarkGray	Reset	NONE	false
+0,14	"└"	DarkGray	Reset	NONE	false
+1,14	"─"	DarkGray	Reset	NONE	false
+2,14	"─"	DarkGray	Reset	NONE	false
+3,14	"─"	DarkGray	Reset	NONE	false
+4,14	"─"	DarkGray	Reset	NONE	false
+5,14	"─"	DarkGray	Reset	NONE	false
+6,14	"─"	DarkGray	Reset	NONE	false
+7,14	"─"	DarkGray	Reset	NONE	false
+8,14	"─"	DarkGray	Reset	NONE	false
+9,14	"─"	DarkGray	Reset	NONE	false
+10,14	"─"	DarkGray	Reset	NONE	false
+11,14	"─"	DarkGray	Reset	NONE	false
+12,14	"─"	DarkGray	Reset	NONE	false
+13,14	"─"	DarkGray	Reset	NONE	false
+14,14	"─"	DarkGray	Reset	NONE	false
+15,14	"─"	DarkGray	Reset	NONE	false
+16,14	"─"	DarkGray	Reset	NONE	false
+17,14	"─"	DarkGray	Reset	NONE	false
+18,14	"─"	DarkGray	Reset	NONE	false
+19,14	"─"	DarkGray	Reset	NONE	false
+20,14	"─"	DarkGray	Reset	NONE	false
+21,14	"─"	DarkGray	Reset	NONE	false
+22,14	"─"	DarkGray	Reset	NONE	false
+23,14	"─"	DarkGray	Reset	NONE	false
+24,14	"─"	DarkGray	Reset	NONE	false
+25,14	"─"	DarkGray	Reset	NONE	false
+26,14	"─"	DarkGray	Reset	NONE	false
+27,14	"─"	DarkGray	Reset	NONE	false
+28,14	"─"	DarkGray	Reset	NONE	false
+29,14	"─"	DarkGray	Reset	NONE	false
+30,14	"─"	DarkGray	Reset	NONE	false
+31,14	"─"	DarkGray	Reset	NONE	false
+32,14	"─"	DarkGray	Reset	NONE	false
+33,14	"─"	DarkGray	Reset	NONE	false
+34,14	"─"	DarkGray	Reset	NONE	false
+35,14	"─"	DarkGray	Reset	NONE	false
+36,14	"─"	DarkGray	Reset	NONE	false
+37,14	"─"	DarkGray	Reset	NONE	false
+38,14	"─"	DarkGray	Reset	NONE	false
+39,14	"─"	DarkGray	Reset	NONE	false
+40,14	"─"	DarkGray	Reset	NONE	false
+41,14	"─"	DarkGray	Reset	NONE	false
+42,14	"─"	DarkGray	Reset	NONE	false
+43,14	"─"	DarkGray	Reset	NONE	false
+44,14	"─"	DarkGray	Reset	NONE	false
+45,14	"─"	DarkGray	Reset	NONE	false
+46,14	"─"	DarkGray	Reset	NONE	false
+47,14	"─"	DarkGray	Reset	NONE	false
+48,14	"─"	DarkGray	Reset	NONE	false
+49,14	"─"	DarkGray	Reset	NONE	false
+50,14	"─"	DarkGray	Reset	NONE	false
+51,14	"─"	DarkGray	Reset	NONE	false
+52,14	"─"	DarkGray	Reset	NONE	false
+53,14	"─"	DarkGray	Reset	NONE	false
+54,14	"─"	DarkGray	Reset	NONE	false
+55,14	"─"	DarkGray	Reset	NONE	false
+56,14	"─"	DarkGray	Reset	NONE	false
+57,14	"─"	DarkGray	Reset	NONE	false
+58,14	"─"	DarkGray	Reset	NONE	false
+59,14	"─"	DarkGray	Reset	NONE	false
+60,14	"─"	DarkGray	Reset	NONE	false
+61,14	"─"	DarkGray	Reset	NONE	false
+62,14	"─"	DarkGray	Reset	NONE	false
+63,14	"─"	DarkGray	Reset	NONE	false
+64,14	"─"	DarkGray	Reset	NONE	false
+65,14	"─"	DarkGray	Reset	NONE	false
+66,14	"─"	DarkGray	Reset	NONE	false
+67,14	"─"	DarkGray	Reset	NONE	false
+68,14	"─"	DarkGray	Reset	NONE	false
+69,14	"─"	DarkGray	Reset	NONE	false
+70,14	"─"	DarkGray	Reset	NONE	false
+71,14	"─"	DarkGray	Reset	NONE	false
+72,14	"─"	DarkGray	Reset	NONE	false
+73,14	"─"	DarkGray	Reset	NONE	false
+74,14	"─"	DarkGray	Reset	NONE	false
+75,14	"─"	DarkGray	Reset	NONE	false
+76,14	"─"	DarkGray	Reset	NONE	false
+77,14	"─"	DarkGray	Reset	NONE	false
+78,14	"─"	DarkGray	Reset	NONE	false
+79,14	"┘"	DarkGray	Reset	NONE	false
+0,15	" "	Reset	Reset	NONE	false
+1,15	" "	Reset	Reset	NONE	false
+2,15	" "	Reset	Reset	NONE	false
+3,15	" "	Reset	Reset	NONE	false
+4,15	" "	Reset	Reset	NONE	false
+5,15	" "	Reset	Reset	NONE	false
+6,15	" "	Reset	Reset	NONE	false
+7,15	" "	Reset	Reset	NONE	false
+8,15	" "	Reset	Reset	NONE	false
+9,15	" "	Reset	Reset	NONE	false
+10,15	" "	Reset	Reset	NONE	false
+11,15	" "	Reset	Reset	NONE	false
+12,15	" "	Reset	Reset	NONE	false
+13,15	" "	Reset	Reset	NONE	false
+14,15	" "	Reset	Reset	NONE	false
+15,15	" "	Reset	Reset	NONE	false
+16,15	" "	Reset	Reset	NONE	false
+17,15	" "	Reset	Reset	NONE	false
+18,15	" "	Reset	Reset	NONE	false
+19,15	" "	Reset	Reset	NONE	false
+20,15	" "	Reset	Reset	NONE	false
+21,15	" "	Reset	Reset	NONE	false
+22,15	" "	Reset	Reset	NONE	false
+23,15	" "	Reset	Reset	NONE	false
+24,15	" "	Reset	Reset	NONE	false
+25,15	" "	Reset	Reset	NONE	false
+26,15	" "	Reset	Reset	NONE	false
+27,15	" "	Reset	Reset	NONE	false
+28,15	" "	Reset	Reset	NONE	false
+29,15	" "	Reset	Reset	NONE	false
+30,15	" "	Reset	Reset	NONE	false
+31,15	" "	Reset	Reset	NONE	false
+32,15	" "	Reset	Reset	NONE	false
+33,15	" "	Reset	Reset	NONE	false
+34,15	" "	Reset	Reset	NONE	false
+35,15	" "	Reset	Reset	NONE	false
+36,15	" "	Reset	Reset	NONE	false
+37,15	" "	Reset	Reset	NONE	false
+38,15	" "	Reset	Reset	NONE	false
+39,15	" "	Reset	Reset	NONE	false
+40,15	" "	Reset	Reset	NONE	false
+41,15	" "	Reset	Reset	NONE	false
+42,15	" "	Reset	Reset	NONE	false
+43,15	" "	Reset	Reset	NONE	false
+44,15	" "	Reset	Reset	NONE	false
+45,15	" "	Reset	Reset	NONE	false
+46,15	" "	Reset	Reset	NONE	false
+47,15	" "	Reset	Reset	NONE	false
+48,15	" "	Reset	Reset	NONE	false
+49,15	" "	Reset	Reset	NONE	false
+50,15	" "	Reset	Reset	NONE	false
+51,15	" "	Reset	Reset	NONE	false
+52,15	" "	Reset	Reset	NONE	false
+53,15	" "	Reset	Reset	NONE	false
+54,15	" "	Reset	Reset	NONE	false
+55,15	" "	Reset	Reset	NONE	false
+56,15	" "	Reset	Reset	NONE	false
+57,15	" "	Reset	Reset	NONE	false
+58,15	" "	Reset	Reset	NONE	false
+59,15	" "	Reset	Reset	NONE	false
+60,15	" "	Reset	Reset	NONE	false
+61,15	" "	Reset	Reset	NONE	false
+62,15	" "	Reset	Reset	NONE	false
+63,15	" "	Reset	Reset	NONE	false
+64,15	" "	Reset	Reset	NONE	false
+65,15	" "	Reset	Reset	NONE	false
+66,15	" "	Reset	Reset	NONE	false
+67,15	" "	Reset	Reset	NONE	false
+68,15	" "	Reset	Reset	NONE	false
+69,15	" "	Reset	Reset	NONE	false
+70,15	" "	Reset	Reset	NONE	false
+71,15	" "	Reset	Reset	NONE	false
+72,15	" "	Reset	Reset	NONE	false
+73,15	" "	Reset	Reset	NONE	false
+74,15	" "	Reset	Reset	NONE	false
+75,15	" "	Reset	Reset	NONE	false
+76,15	" "	Reset	Reset	NONE	false
+77,15	" "	Reset	Reset	NONE	false
+78,15	" "	Reset	Reset	NONE	false
+79,15	" "	Reset	Reset	NONE	false
+0,16	"┌"	DarkGray	Reset	NONE	false
+1,16	"─"	DarkGray	Reset	NONE	false
+2,16	"─"	DarkGray	Reset	NONE	false
+3,16	" "	DarkGray	Reset	NONE	false
+4,16	"S"	White	Reset	BOLD	false
+5,16	"u"	White	Reset	BOLD	false
+6,16	"m"	White	Reset	BOLD	false
+7,16	"m"	White	Reset	BOLD	false
+8,16	"a"	White	Reset	BOLD	false
+9,16	"r"	White	Reset	BOLD	false
+10,16	"y"	White	Reset	BOLD	false
+11,16	" "	DarkGray	Reset	NONE	false
+12,16	"─"	DarkGray	Reset	NONE	false
+13,16	"─"	DarkGray	Reset	NONE	false
+14,16	"─"	DarkGray	Reset	NONE	false
+15,16	"─"	DarkGray	Reset	NONE	false
+16,16	"─"	DarkGray	Reset	NONE	false
+17,16	"─"	DarkGray	Reset	NONE	false
+18,16	"─"	DarkGray	Reset	NONE	false
+19,16	"─"	DarkGray	Reset	NONE	false
+20,16	"─"	DarkGray	Reset	NONE	false
+21,16	"─"	DarkGray	Reset	NONE	false
+22,16	"─"	DarkGray	Reset	NONE	false
+23,16	"─"	DarkGray	Reset	NONE	false
+24,16	"─"	DarkGray	Reset	NONE	false
+25,16	"─"	DarkGray	Reset	NONE	false
+26,16	"─"	DarkGray	Reset	NONE	false
+27,16	"─"	DarkGray	Reset	NONE	false
+28,16	"─"	DarkGray	Reset	NONE	false
+29,16	"─"	DarkGray	Reset	NONE	false
+30,16	"─"	DarkGray	Reset	NONE	false
+31,16	"─"	DarkGray	Reset	NONE	false
+32,16	"─"	DarkGray	Reset	NONE	false
+33,16	"─"	DarkGray	Reset	NONE	false
+34,16	"─"	DarkGray	Reset	NONE	false
+35,16	"─"	DarkGray	Reset	NONE	false
+36,16	"─"	DarkGray	Reset	NONE	false
+37,16	"─"	DarkGray	Reset	NONE	false
+38,16	"─"	DarkGray	Reset	NONE	false
+39,16	"─"	DarkGray	Reset	NONE	false
+40,16	"─"	DarkGray	Reset	NONE	false
+41,16	"─"	DarkGray	Reset	NONE	false
+42,16	"─"	DarkGray	Reset	NONE	false
+43,16	"─"	DarkGray	Reset	NONE	false
+44,16	"─"	DarkGray	Reset	NONE	false
+45,16	"─"	DarkGray	Reset	NONE	false
+46,16	"─"	DarkGray	Reset	NONE	false
+47,16	"─"	DarkGray	Reset	NONE	false
+48,16	"─"	DarkGray	Reset	NONE	false
+49,16	"─"	DarkGray	Reset	NONE	false
+50,16	"─"	DarkGray	Reset	NONE	false
+51,16	"─"	DarkGray	Reset	NONE	false
+52,16	"─"	DarkGray	Reset	NONE	false
+53,16	"─"	DarkGray	Reset	NONE	false
+54,16	"─"	DarkGray	Reset	NONE	false
+55,16	"─"	DarkGray	Reset	NONE	false
+56,16	"─"	DarkGray	Reset	NONE	false
+57,16	"─"	DarkGray	Reset	NONE	false
+58,16	"─"	DarkGray	Reset	NONE	false
+59,16	"─"	DarkGray	Reset	NONE	false
+60,16	"─"	DarkGray	Reset	NONE	false
+61,16	"─"	DarkGray	Reset	NONE	false
+62,16	"─"	DarkGray	Reset	NONE	false
+63,16	"─"	DarkGray	Reset	NONE	false
+64,16	"─"	DarkGray	Reset	NONE	false
+65,16	"─"	DarkGray	Reset	NONE	false
+66,16	"─"	DarkGray	Reset	NONE	false
+67,16	"─"	DarkGray	Reset	NONE	false
+68,16	"─"	DarkGray	Reset	NONE	false
+69,16	"─"	DarkGray	Reset	NONE	false
+70,16	"─"	DarkGray	Reset	NONE	false
+71,16	"─"	DarkGray	Reset	NONE	false
+72,16	"─"	DarkGray	Reset	NONE	false
+73,16	"─"	DarkGray	Reset	NONE	false
+74,16	"─"	DarkGray	Reset	NONE	false
+75,16	"─"	DarkGray	Reset	NONE	false
+76,16	"─"	DarkGray	Reset	NONE	false
+77,16	"─"	DarkGray	Reset	NONE	false
+78,16	"─"	DarkGray	Reset	NONE	false
+79,16	"┐"	DarkGray	Reset	NONE	false
+0,17	"│"	DarkGray	Reset	NONE	false
+1,17	" "	Reset	Reset	NONE	false
+2,17	" "	Reset	Reset	NONE	false
+3,17	" "	Reset	Reset	NONE	false
+4,17	" "	Reset	Reset	NONE	false
+5,17	" "	Reset	Reset	NONE	false
+6,17	" "	Reset	Reset	NONE	false
+7,17	" "	Reset	Reset	NONE	false
+8,17	" "	Reset	Reset	NONE	false
+9,17	" "	Reset	Reset	NONE	false
+10,17	" "	Reset	Reset	NONE	false
+11,17	" "	Reset	Reset	NONE	false
+12,17	" "	Reset	Reset	NONE	false
+13,17	" "	Reset	Reset	NONE	false
+14,17	" "	Reset	Reset	NONE	false
+15,17	" "	Reset	Reset	NONE	false
+16,17	" "	Reset	Reset	NONE	false
+17,17	" "	Reset	Reset	NONE	false
+18,17	" "	Reset	Reset	NONE	false
+19,17	" "	Reset	Reset	NONE	false
+20,17	" "	Reset	Reset	NONE	false
+21,17	" "	Reset	Reset	NONE	false
+22,17	" "	Reset	Reset	NONE	false
+23,17	" "	Reset	Reset	NONE	false
+24,17	" "	Reset	Reset	NONE	false
+25,17	" "	Reset	Reset	NONE	false
+26,17	" "	Reset	Reset	NONE	false
+27,17	" "	Reset	Reset	NONE	false
+28,17	" "	Reset	Reset	NONE	false
+29,17	" "	Reset	Reset	NONE	false
+30,17	" "	Reset	Reset	NONE	false
+31,17	" "	Reset	Reset	NONE	false
+32,17	" "	Reset	Reset	NONE	false
+33,17	" "	Reset	Reset	NONE	false
+34,17	" "	Reset	Reset	NONE	false
+35,17	" "	Reset	Reset	NONE	false
+36,17	" "	Reset	Reset	NONE	false
+37,17	" "	Reset	Reset	NONE	false
+38,17	" "	Reset	Reset	NONE	false
+39,17	" "	Reset	Reset	NONE	false
+40,17	" "	Reset	Reset	NONE	false
+41,17	" "	Reset	Reset	NONE	false
+42,17	" "	Reset	Reset	NONE	false
+43,17	" "	Reset	Reset	NONE	false
+44,17	" "	Reset	Reset	NONE	false
+45,17	" "	Reset	Reset	NONE	false
+46,17	" "	Reset	Reset	NONE	false
+47,17	" "	Reset	Reset	NONE	false
+48,17	" "	Reset	Reset	NONE	false
+49,17	" "	Reset	Reset	NONE	false
+50,17	" "	Reset	Reset	NONE	false
+51,17	" "	Reset	Reset	NONE	false
+52,17	" "	Reset	Reset	NONE	false
+53,17	" "	Reset	Reset	NONE	false
+54,17	" "	Reset	Reset	NONE	false
+55,17	" "	Reset	Reset	NONE	false
+56,17	" "	Reset	Reset	NONE	false
+57,17	" "	Reset	Reset	NONE	false
+58,17	" "	Reset	Reset	NONE	false
+59,17	" "	Reset	Reset	NONE	false
+60,17	" "	Reset	Reset	NONE	false
+61,17	" "	Reset	Reset	NONE	false
+62,17	" "	Reset	Reset	NONE	false
+63,17	" "	Reset	Reset	NONE	false
+64,17	" "	Reset	Reset	NONE	false
+65,17	" "	Reset	Reset	NONE	false
+66,17	" "	Reset	Reset	NONE	false
+67,17	" "	Reset	Reset	NONE	false
+68,17	" "	Reset	Reset	NONE	false
+69,17	" "	Reset	Reset	NONE	false
+70,17	" "	Reset	Reset	NONE	false
+71,17	" "	Reset	Reset	NONE	false
+72,17	" "	Reset	Reset	NONE	false
+73,17	" "	Reset	Reset	NONE	false
+74,17	" "	Reset	Reset	NONE	false
+75,17	" "	Reset	Reset	NONE	false
+76,17	" "	Reset	Reset	NONE	false
+77,17	" "	Reset	Reset	NONE	false
+78,17	" "	Reset	Reset	NONE	false
+79,17	"│"	DarkGray	Reset	NONE	false
+0,18	"│"	DarkGray	Reset	NONE	false
+1,18	" "	Reset	Reset	NONE	false
+2,18	" "	Reset	Reset	NONE	false
+3,18	" "	Reset	Reset	NONE	false
+4,18	" "	Reset	Reset	NONE	false
+5,18	" "	Reset	Reset	NONE	false
+6,18	" "	Reset	Reset	NONE	false
+7,18	" "	Reset	Reset	NONE	false
+8,18	"T"	White	Reset	NONE	false
+9,18	"h"	White	Reset	NONE	false
+10,18	"i"	White	Reset	NONE	false
+11,18	"s"	White	Reset	NONE	false
+12,18	" "	White	Reset	NONE	false
+13,18	"W"	White	Reset	NONE	false
+14,18	"e"	White	Reset	NONE	false
+15,18	"e"	White	Reset	NONE	false
+16,18	"k"	White	Reset	NONE	false
+17,18	":"	White	Reset	NONE	false
+18,18	" "	White	Reset	NONE	false
+19,18	"1"	White	Reset	NONE	false
+20,18	"2"	White	Reset	NONE	false
+21,18	"."	White	Reset	NONE	false
+22,18	"3"	White	Reset	NONE	false
+23,18	" "	White	Reset	NONE	false
+24,18	"t"	White	Reset	NONE	false
+25,18	" "	Reset	Reset	NONE	false
+26,18	" "	Reset	Reset	NONE	false
+27,18	"S"	White	Reset	NONE	false
+28,18	"t"	White	Reset	NONE	false
+29,18	"r"	White	Reset	NONE	false
+30,18	"e"	White	Reset	NONE	false
+31,18	"a"	White	Reset	NONE	false
+32,18	"k"	White	Reset	NONE	false
+33,18	":"	White	Reset	NONE	false
+34,18	" "	White	Reset	NONE	false
+35,18	"3"	White	Reset	NONE	false
+36,18	" "	White	Reset	NONE	false
+37,18	"d"	White	Reset	NONE	false
+38,18	"a"	White	Reset	NONE	false
+39,18	"y"	White	Reset	NONE	false
+40,18	"s"	White	Reset	NONE	false
+41,18	" "	Reset	Reset	NONE	false
+42,18	" "	Reset	Reset	NONE	false
+43,18	"R"	White	Reset	NONE	false
+44,18	"e"	White	Reset	NONE	false
+45,18	"c"	White	Reset	NONE	false
+46,18	"o"	White	Reset	NONE	false
+47,18	"v"	White	Reset	NONE	false
+48,18	"e"	White	Reset	NONE	false
+49,18	"r"	White	Reset	NONE	false
+50,18	"y"	White	Reset	NONE	false
+51,18	":"	White	Reset	NONE	false
+52,18	" "	White	Reset	NONE	false
+53,18	"6"	White	Reset	NONE	false
+54,18	"4"	White	Reset	NONE	false
+55,18	"%"	White	Reset	NONE	false
+56,18	" "	Reset	Reset	NONE	false
+57,18	" "	Reset	Reset	NONE	false
+58,18	"F"	White	Reset	NONE	false
+59,18	"r"	White	Reset	NONE	false
+60,18	"e"	White	Reset	NONE	false
+61,18	"q"	White	Reset	NONE	false
+62,18	"u"	White	Reset	NONE	false
+63,18	"e"	White	Reset	NONE	false
+64,18	"n"	White	Reset	NONE	false
+65,18	"c"	White	Reset	NONE	false
+66,18	"y"	White	Reset	NONE	false
+67,18	":"	White	Reset	NONE	false
+68,18	" "	White	Reset	NONE	false
+69,18	"4"	White	Reset	NONE	false
+70,18	"/"	White	Reset	NONE	false
+71,18	"7"	White	Reset	NONE	false
+72,18	" "	Reset	Reset	NONE	false
+73,18	" "	Reset	Reset	NONE	false
+74,18	" "	Reset	Reset	NONE	false
+75,18	" "	Reset	Reset	NONE	false
+76,18	" "	Reset	Reset	NONE	false
+77,18	" "	Reset	Reset	NONE	false
+78,18	" "	Reset	Reset	NONE	false
+79,18	"│"	DarkGray	Reset	NONE	false
+0,19	"│"	DarkGray	Reset	NONE	false
+1,19	" "	Reset	Reset	NONE	false
+2,19	" "	Reset	Reset	NONE	false
+3,19	" "	Reset	Reset	NONE	false
+4,19	" "	Reset	Reset	NONE	false
+5,19	" "	Reset	Reset	NONE	false
+6,19	" "	Reset	Reset	NONE	false
+7,19	" "	Reset	Reset	NONE	false
+8,19	" "	Reset	Reset	NONE	false
+9,19	" "	Reset	Reset	NONE	false
+10,19	" "	Reset	Reset	NONE	false
+11,19	" "	Reset	Reset	NONE	false
+12,19	" "	Reset	Reset	NONE	false
+13,19	" "	Reset	Reset	NONE	false
+14,19	" "	Reset	Reset	NONE	false
+15,19	" "	Reset	Reset	NONE	false
+16,19	" "	Reset	Reset	NONE	false
+17,19	" "	Reset	Reset	NONE	false
+18,19	" "	Reset	Reset	NONE	false
+19,19	" "	Reset	Reset	NONE	false
+20,19	" "	Reset	Reset	NONE	false
+21,19	" "	Reset	Reset	NONE	false
+22,19	" "	Reset	Reset	NONE	false
+23,19	" "	Reset	Reset	NONE	false
+24,19	" "	Reset	Reset	NONE	false
+25,19	" "	Reset	Reset	NONE	false
+26,19	" "	Reset	Reset	NONE	false
+27,19	" "	Reset	Reset	NONE	false
+28,19	" "	Reset	Reset	NONE	false
+29,19	" "	Reset	Reset	NONE	false
+30,19	" "	Reset	Reset	NONE	false
+31,19	" "	Reset	Reset	NONE	false
+32,19	" "	Reset	Reset	NONE	false
+33,19	" "	Reset	Reset	NONE	false
+34,19	" "	Reset	Reset	NONE	false
+35,19	" "	Reset	Reset	NONE	false
+36,19	" "	Reset	Reset	NONE	false
+37,19	" "	Reset	Reset	NONE	false
+38,19	" "	Reset	Reset	NONE	false
+39,19	" "	Reset	Reset	NONE	false
+40,19	" "	Reset	Reset	NONE	false
+41,19	" "	Reset	Reset	NONE	false
+42,19	" "	Reset	Reset	NONE	false
+43,19	" "	Reset	Reset	NONE	false
+44,19	" "	Reset	Reset	NONE	false
+45,19	" "	Reset	Reset	NONE	false
+46,19	" "	Reset	Reset	NONE	false
+47,19	" "	Reset	Reset	NONE	false
+48,19	" "	Reset	Reset	NONE	false
+49,19	" "	Reset	Reset	NONE	false
+50,19	" "	Reset	Reset	NONE	false
+51,19	" "	Reset	Reset	NONE	false
+52,19	" "	Reset	Reset	NONE	false
+53,19	" "	Reset	Reset	NONE	false
+54,19	" "	Reset	Reset	NONE	false
+55,19	" "	Reset	Reset	NONE	false
+56,19	" "	Reset	Reset	NONE	false
+57,19	" "	Reset	Reset	NONE	false
+58,19	" "	Reset	Reset	NONE	false
+59,19	" "	Reset	Reset	NONE	false
+60,19	" "	Reset	Reset	NONE	false
+61,19	" "	Reset	Reset	NONE	false
+62,19	" "	Reset	Reset	NONE	false
+63,19	" "	Reset	Reset	NONE	false
+64,19	" "	Reset	Reset	NONE	false
+65,19	" "	Reset	Reset	NONE	false
+66,19	" "	Reset	Reset	NONE	false
+67,19	" "	Reset	Reset	NONE	false
+68,19	" "	Reset	Reset	NONE	false
+69,19	" "	Reset	Reset	NONE	false
+70,19	" "	Reset	Reset	NONE	false
+71,19	" "	Reset	Reset	NONE	false
+72,19	" "	Reset	Reset	NONE	false
+73,19	" "	Reset	Reset	NONE	false
+74,19	" "	Reset	Reset	NONE	false
+75,19	" "	Reset	Reset	NONE	false
+76,19	" "	Reset	Reset	NONE	false
+77,19	" "	Reset	Reset	NONE	false
+78,19	" "	Reset	Reset	NONE	false
+79,19	"│"	DarkGray	Reset	NONE	false
+0,20	"│"	DarkGray	Reset	NONE	false
+1,20	" "	Reset	Reset	NONE	false
+2,20	" "	Reset	Reset	NONE	false
+3,20	">"	Yellow	Reset	ITALIC	false
+4,20	" "	Yellow	Reset	ITALIC	false
+5,20	"A"	Yellow	Reset	ITALIC	false
+6,20	" "	Yellow	Reset	ITALIC	false
+7,20	"d"	Yellow	Reset	ITALIC	false
+8,20	"e"	Yellow	Reset	ITALIC	false
+9,20	"l"	Yellow	Reset	ITALIC	false
+10,20	"i"	Yellow	Reset	ITALIC	false
+11,20	"b"	Yellow	Reset	ITALIC	false
+12,20	"e"	Yellow	Reset	ITALIC	false
+13,20	"r"	Yellow	Reset	ITALIC	false
+14,20	"a"	Yellow	Reset	ITALIC	false
+15,20	"t"	Yellow	Reset	ITALIC	false
+16,20	"e"	Yellow	Reset	ITALIC	false
+17,20	"l"	Yellow	Reset	ITALIC	false
+18,20	"y"	Yellow	Reset	ITALIC	false
+19,20	" "	Yellow	Reset	ITALIC	false
+20,20	"l"	Yellow	Reset	ITALIC	false
+21,20	"o"	Yellow	Reset	ITALIC	false
+22,20	"n"	Yellow	Reset	ITALIC	false
+23,20	"g"	Yellow	Reset	ITALIC	false
+24,20	" "	Yellow	Reset	ITALIC	false
+25,20	"q"	Yellow	Reset	ITALIC	false
+26,20	"u"	Yellow	Reset	ITALIC	false
+27,20	"o"	Yellow	Reset	ITALIC	false
+28,20	"t"	Yellow	Reset	ITALIC	false
+29,20	"e"	Yellow	Reset	ITALIC	false
+30,20	" "	Yellow	Reset	ITALIC	false
+31,20	"m"	Yellow	Reset	ITALIC	false
+32,20	"u"	Yellow	Reset	ITALIC	false
+33,20	"s"	Yellow	Reset	ITALIC	false
+34,20	"t"	Yellow	Reset	ITALIC	false
+35,20	" "	Yellow	Reset	ITALIC	false
+36,20	"w"	Yellow	Reset	ITALIC	false
+37,20	"r"	Yellow	Reset	ITALIC	false
+38,20	"a"	Yellow	Reset	ITALIC	false
+39,20	"p"	Yellow	Reset	ITALIC	false
+40,20	" "	Yellow	Reset	ITALIC	false
+41,20	"o"	Yellow	Reset	ITALIC	false
+42,20	"n"	Yellow	Reset	ITALIC	false
+43,20	"l"	Yellow	Reset	ITALIC	false
+44,20	"y"	Yellow	Reset	ITALIC	false
+45,20	" "	Yellow	Reset	ITALIC	false
+46,20	"i"	Yellow	Reset	ITALIC	false
+47,20	"n"	Yellow	Reset	ITALIC	false
+48,20	"s"	Yellow	Reset	ITALIC	false
+49,20	"i"	Yellow	Reset	ITALIC	false
+50,20	"d"	Yellow	Reset	ITALIC	false
+51,20	"e"	Yellow	Reset	ITALIC	false
+52,20	" "	Yellow	Reset	ITALIC	false
+53,20	"S"	Yellow	Reset	ITALIC	false
+54,20	"u"	Yellow	Reset	ITALIC	false
+55,20	"m"	Yellow	Reset	ITALIC	false
+56,20	"m"	Yellow	Reset	ITALIC	false
+57,20	"a"	Yellow	Reset	ITALIC	false
+58,20	"r"	Yellow	Reset	ITALIC	false
+59,20	"y"	Yellow	Reset	ITALIC	false
+60,20	" "	Yellow	Reset	ITALIC	false
+61,20	"w"	Yellow	Reset	ITALIC	false
+62,20	"h"	Yellow	Reset	ITALIC	false
+63,20	"i"	Yellow	Reset	ITALIC	false
+64,20	"l"	Yellow	Reset	ITALIC	false
+65,20	"e"	Yellow	Reset	ITALIC	false
+66,20	" "	Yellow	Reset	ITALIC	false
+67,20	"t"	Yellow	Reset	ITALIC	false
+68,20	"h"	Yellow	Reset	ITALIC	false
+69,20	"e"	Yellow	Reset	ITALIC	false
+70,20	" "	Yellow	Reset	ITALIC	false
+71,20	"f"	Yellow	Reset	ITALIC	false
+72,20	"o"	Yellow	Reset	ITALIC	false
+73,20	"o"	Yellow	Reset	ITALIC	false
+74,20	"t"	Yellow	Reset	ITALIC	false
+75,20	"e"	Yellow	Reset	ITALIC	false
+76,20	"r"	Yellow	Reset	ITALIC	false
+77,20	" "	Reset	Reset	NONE	false
+78,20	" "	Reset	Reset	NONE	false
+79,20	"│"	DarkGray	Reset	NONE	false
+0,21	"│"	DarkGray	Reset	NONE	false
+1,21	" "	Reset	Reset	NONE	false
+2,21	" "	Reset	Reset	NONE	false
+3,21	" "	Reset	Reset	NONE	false
+4,21	" "	Reset	Reset	NONE	false
+5,21	" "	Reset	Reset	NONE	false
+6,21	" "	Reset	Reset	NONE	false
+7,21	" "	Reset	Reset	NONE	false
+8,21	" "	Reset	Reset	NONE	false
+9,21	" "	Reset	Reset	NONE	false
+10,21	" "	Reset	Reset	NONE	false
+11,21	" "	Reset	Reset	NONE	false
+12,21	" "	Reset	Reset	NONE	false
+13,21	" "	Reset	Reset	NONE	false
+14,21	" "	Reset	Reset	NONE	false
+15,21	" "	Reset	Reset	NONE	false
+16,21	" "	Reset	Reset	NONE	false
+17,21	" "	Reset	Reset	NONE	false
+18,21	" "	Reset	Reset	NONE	false
+19,21	" "	Reset	Reset	NONE	false
+20,21	" "	Reset	Reset	NONE	false
+21,21	" "	Reset	Reset	NONE	false
+22,21	" "	Reset	Reset	NONE	false
+23,21	" "	Reset	Reset	NONE	false
+24,21	" "	Reset	Reset	NONE	false
+25,21	" "	Reset	Reset	NONE	false
+26,21	" "	Reset	Reset	NONE	false
+27,21	" "	Reset	Reset	NONE	false
+28,21	" "	Reset	Reset	NONE	false
+29,21	" "	Reset	Reset	NONE	false
+30,21	" "	Reset	Reset	NONE	false
+31,21	" "	Reset	Reset	NONE	false
+32,21	" "	Reset	Reset	NONE	false
+33,21	" "	Reset	Reset	NONE	false
+34,21	" "	Reset	Reset	NONE	false
+35,21	" "	Reset	Reset	NONE	false
+36,21	" "	Reset	Reset	NONE	false
+37,21	" "	Reset	Reset	NONE	false
+38,21	" "	Reset	Reset	NONE	false
+39,21	" "	Reset	Reset	NONE	false
+40,21	" "	Reset	Reset	NONE	false
+41,21	" "	Reset	Reset	NONE	false
+42,21	" "	Reset	Reset	NONE	false
+43,21	" "	Reset	Reset	NONE	false
+44,21	" "	Reset	Reset	NONE	false
+45,21	" "	Reset	Reset	NONE	false
+46,21	" "	Reset	Reset	NONE	false
+47,21	" "	Reset	Reset	NONE	false
+48,21	" "	Reset	Reset	NONE	false
+49,21	" "	Reset	Reset	NONE	false
+50,21	" "	Reset	Reset	NONE	false
+51,21	" "	Reset	Reset	NONE	false
+52,21	" "	Reset	Reset	NONE	false
+53,21	" "	Reset	Reset	NONE	false
+54,21	" "	Reset	Reset	NONE	false
+55,21	" "	Reset	Reset	NONE	false
+56,21	" "	Reset	Reset	NONE	false
+57,21	" "	Reset	Reset	NONE	false
+58,21	" "	Reset	Reset	NONE	false
+59,21	" "	Reset	Reset	NONE	false
+60,21	" "	Reset	Reset	NONE	false
+61,21	" "	Reset	Reset	NONE	false
+62,21	" "	Reset	Reset	NONE	false
+63,21	" "	Reset	Reset	NONE	false
+64,21	" "	Reset	Reset	NONE	false
+65,21	" "	Reset	Reset	NONE	false
+66,21	" "	Reset	Reset	NONE	false
+67,21	" "	Reset	Reset	NONE	false
+68,21	" "	Reset	Reset	NONE	false
+69,21	" "	Reset	Reset	NONE	false
+70,21	" "	Reset	Reset	NONE	false
+71,21	" "	Reset	Reset	NONE	false
+72,21	" "	Reset	Reset	NONE	false
+73,21	" "	Reset	Reset	NONE	false
+74,21	" "	Reset	Reset	NONE	false
+75,21	" "	Reset	Reset	NONE	false
+76,21	" "	Reset	Reset	NONE	false
+77,21	" "	Reset	Reset	NONE	false
+78,21	" "	Reset	Reset	NONE	false
+79,21	"│"	DarkGray	Reset	NONE	false
+0,22	"└"	DarkGray	Reset	NONE	false
+1,22	"─"	DarkGray	Reset	NONE	false
+2,22	"─"	DarkGray	Reset	NONE	false
+3,22	"─"	DarkGray	Reset	NONE	false
+4,22	"─"	DarkGray	Reset	NONE	false
+5,22	"─"	DarkGray	Reset	NONE	false
+6,22	"─"	DarkGray	Reset	NONE	false
+7,22	"─"	DarkGray	Reset	NONE	false
+8,22	"─"	DarkGray	Reset	NONE	false
+9,22	"─"	DarkGray	Reset	NONE	false
+10,22	"─"	DarkGray	Reset	NONE	false
+11,22	"─"	DarkGray	Reset	NONE	false
+12,22	"─"	DarkGray	Reset	NONE	false
+13,22	"─"	DarkGray	Reset	NONE	false
+14,22	"─"	DarkGray	Reset	NONE	false
+15,22	"─"	DarkGray	Reset	NONE	false
+16,22	"─"	DarkGray	Reset	NONE	false
+17,22	"─"	DarkGray	Reset	NONE	false
+18,22	"─"	DarkGray	Reset	NONE	false
+19,22	"─"	DarkGray	Reset	NONE	false
+20,22	"─"	DarkGray	Reset	NONE	false
+21,22	"─"	DarkGray	Reset	NONE	false
+22,22	"─"	DarkGray	Reset	NONE	false
+23,22	"─"	DarkGray	Reset	NONE	false
+24,22	"─"	DarkGray	Reset	NONE	false
+25,22	"─"	DarkGray	Reset	NONE	false
+26,22	"─"	DarkGray	Reset	NONE	false
+27,22	"─"	DarkGray	Reset	NONE	false
+28,22	"─"	DarkGray	Reset	NONE	false
+29,22	"─"	DarkGray	Reset	NONE	false
+30,22	"─"	DarkGray	Reset	NONE	false
+31,22	"─"	DarkGray	Reset	NONE	false
+32,22	"─"	DarkGray	Reset	NONE	false
+33,22	"─"	DarkGray	Reset	NONE	false
+34,22	"─"	DarkGray	Reset	NONE	false
+35,22	"─"	DarkGray	Reset	NONE	false
+36,22	"─"	DarkGray	Reset	NONE	false
+37,22	"─"	DarkGray	Reset	NONE	false
+38,22	"─"	DarkGray	Reset	NONE	false
+39,22	"─"	DarkGray	Reset	NONE	false
+40,22	"─"	DarkGray	Reset	NONE	false
+41,22	"─"	DarkGray	Reset	NONE	false
+42,22	"─"	DarkGray	Reset	NONE	false
+43,22	"─"	DarkGray	Reset	NONE	false
+44,22	"─"	DarkGray	Reset	NONE	false
+45,22	"─"	DarkGray	Reset	NONE	false
+46,22	"─"	DarkGray	Reset	NONE	false
+47,22	"─"	DarkGray	Reset	NONE	false
+48,22	"─"	DarkGray	Reset	NONE	false
+49,22	"─"	DarkGray	Reset	NONE	false
+50,22	"─"	DarkGray	Reset	NONE	false
+51,22	"─"	DarkGray	Reset	NONE	false
+52,22	"─"	DarkGray	Reset	NONE	false
+53,22	"─"	DarkGray	Reset	NONE	false
+54,22	"─"	DarkGray	Reset	NONE	false
+55,22	"─"	DarkGray	Reset	NONE	false
+56,22	"─"	DarkGray	Reset	NONE	false
+57,22	"─"	DarkGray	Reset	NONE	false
+58,22	"─"	DarkGray	Reset	NONE	false
+59,22	"─"	DarkGray	Reset	NONE	false
+60,22	"─"	DarkGray	Reset	NONE	false
+61,22	"─"	DarkGray	Reset	NONE	false
+62,22	"─"	DarkGray	Reset	NONE	false
+63,22	"─"	DarkGray	Reset	NONE	false
+64,22	"─"	DarkGray	Reset	NONE	false
+65,22	"─"	DarkGray	Reset	NONE	false
+66,22	"─"	DarkGray	Reset	NONE	false
+67,22	"─"	DarkGray	Reset	NONE	false
+68,22	"─"	DarkGray	Reset	NONE	false
+69,22	"─"	DarkGray	Reset	NONE	false
+70,22	"─"	DarkGray	Reset	NONE	false
+71,22	"─"	DarkGray	Reset	NONE	false
+72,22	"─"	DarkGray	Reset	NONE	false
+73,22	"─"	DarkGray	Reset	NONE	false
+74,22	"─"	DarkGray	Reset	NONE	false
+75,22	"─"	DarkGray	Reset	NONE	false
+76,22	"─"	DarkGray	Reset	NONE	false
+77,22	"─"	DarkGray	Reset	NONE	false
+78,22	"─"	DarkGray	Reset	NONE	false
+79,22	"┘"	DarkGray	Reset	NONE	false
+0,23	" "	Reset	Reset	NONE	false
+1,23	" "	Reset	Reset	NONE	false
+2,23	" "	Reset	Reset	NONE	false
+3,23	" "	Reset	Reset	NONE	false
+4,23	" "	Reset	Reset	NONE	false
+5,23	" "	Reset	Reset	NONE	false
+6,23	" "	Reset	Reset	NONE	false
+7,23	" "	Reset	Reset	NONE	false
+8,23	" "	Reset	Reset	NONE	false
+9,23	" "	Reset	Reset	NONE	false
+10,23	" "	Reset	Reset	NONE	false
+11,23	" "	Reset	Reset	NONE	false
+12,23	" "	Reset	Reset	NONE	false
+13,23	" "	Reset	Reset	NONE	false
+14,23	" "	Reset	Reset	NONE	false
+15,23	" "	Reset	Reset	NONE	false
+16,23	" "	Reset	Reset	NONE	false
+17,23	" "	Reset	Reset	NONE	false
+18,23	" "	Reset	Reset	NONE	false
+19,23	" "	Reset	Reset	NONE	false
+20,23	" "	Reset	Reset	NONE	false
+21,23	" "	Reset	Reset	NONE	false
+22,23	" "	Reset	Reset	NONE	false
+23,23	" "	Reset	Reset	NONE	false
+24,23	" "	Reset	Reset	NONE	false
+25,23	" "	Reset	Reset	NONE	false
+26,23	" "	Reset	Reset	NONE	false
+27,23	" "	Reset	Reset	NONE	false
+28,23	" "	Reset	Reset	NONE	false
+29,23	" "	Reset	Reset	NONE	false
+30,23	" "	Reset	Reset	NONE	false
+31,23	" "	Reset	Reset	NONE	false
+32,23	" "	Reset	Reset	NONE	false
+33,23	" "	Reset	Reset	NONE	false
+34,23	" "	Reset	Reset	NONE	false
+35,23	" "	Reset	Reset	NONE	false
+36,23	" "	Reset	Reset	NONE	false
+37,23	" "	Reset	Reset	NONE	false
+38,23	" "	Reset	Reset	NONE	false
+39,23	" "	Reset	Reset	NONE	false
+40,23	" "	Reset	Reset	NONE	false
+41,23	" "	Reset	Reset	NONE	false
+42,23	" "	Reset	Reset	NONE	false
+43,23	" "	Reset	Reset	NONE	false
+44,23	" "	Reset	Reset	NONE	false
+45,23	" "	Reset	Reset	NONE	false
+46,23	" "	Reset	Reset	NONE	false
+47,23	" "	Reset	Reset	NONE	false
+48,23	" "	Reset	Reset	NONE	false
+49,23	" "	Reset	Reset	NONE	false
+50,23	" "	Reset	Reset	NONE	false
+51,23	" "	Reset	Reset	NONE	false
+52,23	" "	Reset	Reset	NONE	false
+53,23	" "	Reset	Reset	NONE	false
+54,23	" "	Reset	Reset	NONE	false
+55,23	" "	Reset	Reset	NONE	false
+56,23	" "	Reset	Reset	NONE	false
+57,23	" "	Reset	Reset	NONE	false
+58,23	" "	Reset	Reset	NONE	false
+59,23	" "	Reset	Reset	NONE	false
+60,23	" "	Reset	Reset	NONE	false
+61,23	" "	Reset	Reset	NONE	false
+62,23	" "	Reset	Reset	NONE	false
+63,23	" "	Reset	Reset	NONE	false
+64,23	" "	Reset	Reset	NONE	false
+65,23	" "	Reset	Reset	NONE	false
+66,23	" "	Reset	Reset	NONE	false
+67,23	" "	Reset	Reset	NONE	false
+68,23	" "	Reset	Reset	NONE	false
+69,23	" "	Reset	Reset	NONE	false
+70,23	" "	Reset	Reset	NONE	false
+71,23	" "	Reset	Reset	NONE	false
+72,23	" "	Reset	Reset	NONE	false
+73,23	" "	Reset	Reset	NONE	false
+74,23	" "	Reset	Reset	NONE	false
+75,23	" "	Reset	Reset	NONE	false
+76,23	" "	Reset	Reset	NONE	false
+77,23	" "	Reset	Reset	NONE	false
+78,23	" "	Reset	Reset	NONE	false
+79,23	" "	Reset	Reset	NONE	false
+0,24	"┌"	DarkGray	Reset	NONE	false
+1,24	"─"	DarkGray	Reset	NONE	false
+2,24	"─"	DarkGray	Reset	NONE	false
+3,24	" "	DarkGray	Reset	NONE	false
+4,24	"R"	White	Reset	BOLD	false
+5,24	"e"	White	Reset	BOLD	false
+6,24	"c"	White	Reset	BOLD	false
+7,24	"e"	White	Reset	BOLD	false
+8,24	"n"	White	Reset	BOLD	false
+9,24	"t"	White	Reset	BOLD	false
+10,24	" "	DarkGray	Reset	NONE	false
+11,24	"─"	DarkGray	Reset	NONE	false
+12,24	"─"	DarkGray	Reset	NONE	false
+13,24	"─"	DarkGray	Reset	NONE	false
+14,24	"─"	DarkGray	Reset	NONE	false
+15,24	"─"	DarkGray	Reset	NONE	false
+16,24	"─"	DarkGray	Reset	NONE	false
+17,24	"─"	DarkGray	Reset	NONE	false
+18,24	"─"	DarkGray	Reset	NONE	false
+19,24	"─"	DarkGray	Reset	NONE	false
+20,24	"─"	DarkGray	Reset	NONE	false
+21,24	"─"	DarkGray	Reset	NONE	false
+22,24	"─"	DarkGray	Reset	NONE	false
+23,24	"─"	DarkGray	Reset	NONE	false
+24,24	"─"	DarkGray	Reset	NONE	false
+25,24	"─"	DarkGray	Reset	NONE	false
+26,24	"─"	DarkGray	Reset	NONE	false
+27,24	"─"	DarkGray	Reset	NONE	false
+28,24	"─"	DarkGray	Reset	NONE	false
+29,24	"─"	DarkGray	Reset	NONE	false
+30,24	"─"	DarkGray	Reset	NONE	false
+31,24	"─"	DarkGray	Reset	NONE	false
+32,24	"─"	DarkGray	Reset	NONE	false
+33,24	"─"	DarkGray	Reset	NONE	false
+34,24	"─"	DarkGray	Reset	NONE	false
+35,24	"─"	DarkGray	Reset	NONE	false
+36,24	"─"	DarkGray	Reset	NONE	false
+37,24	"─"	DarkGray	Reset	NONE	false
+38,24	"─"	DarkGray	Reset	NONE	false
+39,24	"┐"	DarkGray	Reset	NONE	false
+40,24	"┌"	DarkGray	Reset	NONE	false
+41,24	"─"	DarkGray	Reset	NONE	false
+42,24	"─"	DarkGray	Reset	NONE	false
+43,24	" "	DarkGray	Reset	NONE	false
+44,24	"G"	White	Reset	BOLD	false
+45,24	"o"	White	Reset	BOLD	false
+46,24	"a"	White	Reset	BOLD	false
+47,24	"l"	White	Reset	BOLD	false
+48,24	"s"	White	Reset	BOLD	false
+49,24	" "	DarkGray	Reset	NONE	false
+50,24	"─"	DarkGray	Reset	NONE	false
+51,24	"─"	DarkGray	Reset	NONE	false
+52,24	"─"	DarkGray	Reset	NONE	false
+53,24	"─"	DarkGray	Reset	NONE	false
+54,24	"─"	DarkGray	Reset	NONE	false
+55,24	"─"	DarkGray	Reset	NONE	false
+56,24	"─"	DarkGray	Reset	NONE	false
+57,24	"─"	DarkGray	Reset	NONE	false
+58,24	"─"	DarkGray	Reset	NONE	false
+59,24	"─"	DarkGray	Reset	NONE	false
+60,24	"─"	DarkGray	Reset	NONE	false
+61,24	"─"	DarkGray	Reset	NONE	false
+62,24	"─"	DarkGray	Reset	NONE	false
+63,24	"─"	DarkGray	Reset	NONE	false
+64,24	"─"	DarkGray	Reset	NONE	false
+65,24	"─"	DarkGray	Reset	NONE	false
+66,24	"─"	DarkGray	Reset	NONE	false
+67,24	"─"	DarkGray	Reset	NONE	false
+68,24	"─"	DarkGray	Reset	NONE	false
+69,24	"─"	DarkGray	Reset	NONE	false
+70,24	"─"	DarkGray	Reset	NONE	false
+71,24	"─"	DarkGray	Reset	NONE	false
+72,24	"─"	DarkGray	Reset	NONE	false
+73,24	"─"	DarkGray	Reset	NONE	false
+74,24	"─"	DarkGray	Reset	NONE	false
+75,24	"─"	DarkGray	Reset	NONE	false
+76,24	"─"	DarkGray	Reset	NONE	false
+77,24	"─"	DarkGray	Reset	NONE	false
+78,24	"─"	DarkGray	Reset	NONE	false
+79,24	"┐"	DarkGray	Reset	NONE	false
+0,25	"│"	DarkGray	Reset	NONE	false
+1,25	" "	Reset	Reset	NONE	false
+2,25	" "	Reset	Reset	NONE	false
+3,25	" "	Reset	Reset	NONE	false
+4,25	" "	Reset	Reset	NONE	false
+5,25	" "	Reset	Reset	NONE	false
+6,25	" "	Reset	Reset	NONE	false
+7,25	" "	Reset	Reset	NONE	false
+8,25	" "	Reset	Reset	NONE	false
+9,25	" "	Reset	Reset	NONE	false
+10,25	" "	Reset	Reset	NONE	false
+11,25	" "	Reset	Reset	NONE	false
+12,25	" "	Reset	Reset	NONE	false
+13,25	" "	Reset	Reset	NONE	false
+14,25	" "	Reset	Reset	NONE	false
+15,25	" "	Reset	Reset	NONE	false
+16,25	" "	Reset	Reset	NONE	false
+17,25	" "	Reset	Reset	NONE	false
+18,25	" "	Reset	Reset	NONE	false
+19,25	" "	Reset	Reset	NONE	false
+20,25	" "	Reset	Reset	NONE	false
+21,25	" "	Reset	Reset	NONE	false
+22,25	" "	Reset	Reset	NONE	false
+23,25	" "	Reset	Reset	NONE	false
+24,25	" "	Reset	Reset	NONE	false
+25,25	" "	Reset	Reset	NONE	false
+26,25	" "	Reset	Reset	NONE	false
+27,25	" "	Reset	Reset	NONE	false
+28,25	" "	Reset	Reset	NONE	false
+29,25	" "	Reset	Reset	NONE	false
+30,25	" "	Reset	Reset	NONE	false
+31,25	" "	Reset	Reset	NONE	false
+32,25	" "	Reset	Reset	NONE	false
+33,25	" "	Reset	Reset	NONE	false
+34,25	" "	Reset	Reset	NONE	false
+35,25	" "	Reset	Reset	NONE	false
+36,25	" "	Reset	Reset	NONE	false
+37,25	" "	Reset	Reset	NONE	false
+38,25	" "	Reset	Reset	NONE	false
+39,25	"│"	DarkGray	Reset	NONE	false
+40,25	"│"	DarkGray	Reset	NONE	false
+41,25	" "	Reset	Reset	NONE	false
+42,25	" "	Reset	Reset	NONE	false
+43,25	" "	Reset	Reset	NONE	false
+44,25	" "	Reset	Reset	NONE	false
+45,25	" "	Reset	Reset	NONE	false
+46,25	" "	Reset	Reset	NONE	false
+47,25	" "	Reset	Reset	NONE	false
+48,25	" "	Reset	Reset	NONE	false
+49,25	" "	Reset	Reset	NONE	false
+50,25	" "	Reset	Reset	NONE	false
+51,25	" "	Reset	Reset	NONE	false
+52,25	" "	Reset	Reset	NONE	false
+53,25	" "	Reset	Reset	NONE	false
+54,25	" "	Reset	Reset	NONE	false
+55,25	" "	Reset	Reset	NONE	false
+56,25	" "	Reset	Reset	NONE	false
+57,25	" "	Reset	Reset	NONE	false
+58,25	" "	Reset	Reset	NONE	false
+59,25	" "	Reset	Reset	NONE	false
+60,25	" "	Reset	Reset	NONE	false
+61,25	" "	Reset	Reset	NONE	false
+62,25	" "	Reset	Reset	NONE	false
+63,25	" "	Reset	Reset	NONE	false
+64,25	" "	Reset	Reset	NONE	false
+65,25	" "	Reset	Reset	NONE	false
+66,25	" "	Reset	Reset	NONE	false
+67,25	" "	Reset	Reset	NONE	false
+68,25	" "	Reset	Reset	NONE	false
+69,25	" "	Reset	Reset	NONE	false
+70,25	" "	Reset	Reset	NONE	false
+71,25	" "	Reset	Reset	NONE	false
+72,25	" "	Reset	Reset	NONE	false
+73,25	" "	Reset	Reset	NONE	false
+74,25	" "	Reset	Reset	NONE	false
+75,25	" "	Reset	Reset	NONE	false
+76,25	" "	Reset	Reset	NONE	false
+77,25	" "	Reset	Reset	NONE	false
+78,25	" "	Reset	Reset	NONE	false
+79,25	"│"	DarkGray	Reset	NONE	false
+0,26	"│"	DarkGray	Reset	NONE	false
+1,26	" "	Reset	Reset	NONE	false
+2,26	"2"	White	Reset	BOLD	false
+3,26	"0"	White	Reset	BOLD	false
+4,26	"2"	White	Reset	BOLD	false
+5,26	"6"	White	Reset	BOLD	false
+6,26	"-"	White	Reset	BOLD	false
+7,26	"0"	White	Reset	BOLD	false
+8,26	"8"	White	Reset	BOLD	false
+9,26	"-"	White	Reset	BOLD	false
+10,26	"1"	White	Reset	BOLD	false
+11,26	"8"	White	Reset	BOLD	false
+12,26	" "	Reset	Reset	NONE	false
+13,26	" "	Reset	Reset	NONE	false
+14,26	" "	Reset	Reset	NONE	false
+15,26	" "	Reset	Reset	NONE	false
+16,26	" "	Reset	Reset	NONE	false
+17,26	" "	Reset	Reset	NONE	false
+18,26	" "	Reset	Reset	NONE	false
+19,26	" "	Reset	Reset	NONE	false
+20,26	" "	Reset	Reset	NONE	false
+21,26	" "	Reset	Reset	NONE	false
+22,26	" "	Reset	Reset	NONE	false
+23,26	" "	Reset	Reset	NONE	false
+24,26	" "	Reset	Reset	NONE	false
+25,26	" "	Reset	Reset	NONE	false
+26,26	" "	Reset	Reset	NONE	false
+27,26	" "	Reset	Reset	NONE	false
+28,26	" "	Reset	Reset	NONE	false
+29,26	" "	Reset	Reset	NONE	false
+30,26	" "	Reset	Reset	NONE	false
+31,26	" "	Reset	Reset	NONE	false
+32,26	" "	Reset	Reset	NONE	false
+33,26	" "	Reset	Reset	NONE	false
+34,26	" "	Reset	Reset	NONE	false
+35,26	" "	Reset	Reset	NONE	false
+36,26	" "	Reset	Reset	NONE	false
+37,26	" "	Reset	Reset	NONE	false
+38,26	" "	Reset	Reset	NONE	false
+39,26	"│"	DarkGray	Reset	NONE	false
+40,26	"│"	DarkGray	Reset	NONE	false
+41,26	" "	Reset	Reset	NONE	false
+42,26	"A"	White	Reset	BOLD	false
+43,26	" "	White	Reset	BOLD	false
+44,26	"d"	White	Reset	BOLD	false
+45,26	"e"	White	Reset	BOLD	false
+46,26	"l"	White	Reset	BOLD	false
+47,26	"i"	White	Reset	BOLD	false
+48,26	"b"	White	Reset	BOLD	false
+49,26	"e"	White	Reset	BOLD	false
+50,26	"r"	White	Reset	BOLD	false
+51,26	"a"	White	Reset	BOLD	false
+52,26	"t"	White	Reset	BOLD	false
+53,26	"e"	White	Reset	BOLD	false
+54,26	"l"	White	Reset	BOLD	false
+55,26	"y"	White	Reset	BOLD	false
+56,26	" "	White	Reset	BOLD	false
+57,26	"l"	White	Reset	BOLD	false
+58,26	"o"	White	Reset	BOLD	false
+59,26	"n"	White	Reset	BOLD	false
+60,26	"g"	White	Reset	BOLD	false
+61,26	" "	White	Reset	BOLD	false
+62,26	"a"	White	Reset	BOLD	false
+63,26	"c"	White	Reset	BOLD	false
+64,26	"t"	White	Reset	BOLD	false
+65,26	"i"	White	Reset	BOLD	false
+66,26	"v"	White	Reset	BOLD	false
+67,26	"e"	White	Reset	BOLD	false
+68,26	" "	White	Reset	BOLD	false
+69,26	"g"	White	Reset	BOLD	false
+70,26	"o"	White	Reset	BOLD	false
+71,26	"a"	White	Reset	BOLD	false
+72,26	"l"	White	Reset	BOLD	false
+73,26	" "	White	Reset	BOLD	false
+74,26	"t"	White	Reset	BOLD	false
+75,26	"i"	White	Reset	BOLD	false
+76,26	"t"	White	Reset	BOLD	false
+77,26	"l"	White	Reset	BOLD	false
+78,26	" "	Reset	Reset	NONE	false
+79,26	"│"	DarkGray	Reset	NONE	false
+0,27	"│"	DarkGray	Reset	NONE	false
+1,27	" "	Reset	Reset	NONE	false
+2,27	" "	Reset	Reset	NONE	false
+3,27	" "	Reset	Reset	NONE	false
+4,27	" "	Reset	Reset	NONE	false
+5,27	" "	Reset	Reset	NONE	false
+6,27	"A"	Gray	Reset	NONE	false
+7,27	" "	Gray	Reset	NONE	false
+8,27	"d"	Gray	Reset	NONE	false
+9,27	"e"	Gray	Reset	NONE	false
+10,27	"l"	Gray	Reset	NONE	false
+11,27	"i"	Gray	Reset	NONE	false
+12,27	"b"	Gray	Reset	NONE	false
+13,27	"e"	Gray	Reset	NONE	false
+14,27	"r"	Gray	Reset	NONE	false
+15,27	"a"	Gray	Reset	NONE	false
+16,27	"t"	Gray	Reset	NONE	false
+17,27	"e"	Gray	Reset	NONE	false
+18,27	"l"	Gray	Reset	NONE	false
+19,27	"y"	Gray	Reset	NONE	false
+20,27	" "	Gray	Reset	NONE	false
+21,27	"l"	Gray	Reset	NONE	false
+22,27	"o"	Gray	Reset	NONE	false
+23,27	"n"	Gray	Reset	NONE	false
+24,27	"g"	Gray	Reset	NONE	false
+25,27	" "	Gray	Reset	NONE	false
+26,27	"w"	Gray	Reset	NONE	false
+27,27	" "	Reset	Reset	NONE	false
+28,27	"7"	Gray	Reset	NONE	false
+29,27	"0"	Gray	Reset	NONE	false
+30,27	"0"	Gray	Reset	NONE	false
+31,27	"6"	Gray	Reset	NONE	false
+32,27	"6"	Gray	Reset	NONE	false
+33,27	"5"	Gray	Reset	NONE	false
+34,27	"2"	Gray	Reset	NONE	false
+35,27	" "	Gray	Reset	NONE	false
+36,27	"k"	Gray	Reset	NONE	false
+37,27	"g"	Gray	Reset	NONE	false
+38,27	" "	Reset	Reset	NONE	false
+39,27	"│"	DarkGray	Reset	NONE	false
+40,27	"│"	DarkGray	Reset	NONE	false
+41,27	" "	Reset	Reset	NONE	false
+42,27	"█"	Green	Reset	NONE	false
+43,27	"█"	Green	Reset	NONE	false
+44,27	"█"	Green	Reset	NONE	false
+45,27	"█"	Green	Reset	NONE	false
+46,27	"█"	Green	Reset	NONE	false
+47,27	"█"	Green	Reset	NONE	false
+48,27	"█"	Green	Reset	NONE	false
+49,27	"█"	Green	Reset	NONE	false
+50,27	"█"	Green	Reset	NONE	false
+51,27	"█"	Green	Reset	NONE	false
+52,27	"█"	Green	Reset	NONE	false
+53,27	"█"	Green	Reset	NONE	false
+54,27	"█"	Green	Reset	NONE	false
+55,27	"█"	Green	Reset	NONE	false
+56,27	"█"	Green	Reset	NONE	false
+57,27	"█"	Green	Reset	NONE	false
+58,27	"█"	Indexed(240)	Reset	NONE	false
+59,27	"█"	Indexed(240)	Reset	NONE	false
+60,27	"█"	Indexed(240)	Reset	NONE	false
+61,27	"█"	Indexed(240)	Reset	NONE	false
+62,27	"█"	Indexed(240)	Reset	NONE	false
+63,27	"█"	Indexed(240)	Reset	NONE	false
+64,27	"█"	Indexed(240)	Reset	NONE	false
+65,27	"█"	Indexed(240)	Reset	NONE	false
+66,27	"█"	Indexed(240)	Reset	NONE	false
+67,27	"█"	Indexed(240)	Reset	NONE	false
+68,27	"█"	Indexed(240)	Reset	NONE	false
+69,27	"█"	Indexed(240)	Reset	NONE	false
+70,27	"█"	Indexed(240)	Reset	NONE	false
+71,27	"█"	Indexed(240)	Reset	NONE	false
+72,27	"█"	Indexed(240)	Reset	NONE	false
+73,27	" "	Gray	Reset	NONE	false
+74,27	" "	Gray	Reset	NONE	false
+75,27	"5"	Gray	Reset	NONE	false
+76,27	"0"	Gray	Reset	NONE	false
+77,27	"%"	Gray	Reset	NONE	false
+78,27	" "	Reset	Reset	NONE	false
+79,27	"│"	DarkGray	Reset	NONE	false
+0,28	"│"	DarkGray	Reset	NONE	false
+1,28	" "	Reset	Reset	NONE	false
+2,28	" "	Reset	Reset	NONE	false
+3,28	" "	Reset	Reset	NONE	false
+4,28	" "	Reset	Reset	NONE	false
+5,28	" "	Reset	Reset	NONE	false
+6,28	" "	Reset	Reset	NONE	false
+7,28	" "	Reset	Reset	NONE	false
+8,28	" "	Reset	Reset	NONE	false
+9,28	" "	Reset	Reset	NONE	false
+10,28	" "	Reset	Reset	NONE	false
+11,28	" "	Reset	Reset	NONE	false
+12,28	" "	Reset	Reset	NONE	false
+13,28	" "	Reset	Reset	NONE	false
+14,28	" "	Reset	Reset	NONE	false
+15,28	" "	Reset	Reset	NONE	false
+16,28	" "	Reset	Reset	NONE	false
+17,28	" "	Reset	Reset	NONE	false
+18,28	" "	Reset	Reset	NONE	false
+19,28	" "	Reset	Reset	NONE	false
+20,28	" "	Reset	Reset	NONE	false
+21,28	" "	Reset	Reset	NONE	false
+22,28	" "	Reset	Reset	NONE	false
+23,28	" "	Reset	Reset	NONE	false
+24,28	" "	Reset	Reset	NONE	false
+25,28	" "	Reset	Reset	NONE	false
+26,28	" "	Reset	Reset	NONE	false
+27,28	" "	Reset	Reset	NONE	false
+28,28	" "	Reset	Reset	NONE	false
+29,28	" "	Reset	Reset	NONE	false
+30,28	" "	Reset	Reset	NONE	false
+31,28	" "	Reset	Reset	NONE	false
+32,28	" "	Reset	Reset	NONE	false
+33,28	" "	Reset	Reset	NONE	false
+34,28	" "	Reset	Reset	NONE	false
+35,28	" "	Reset	Reset	NONE	false
+36,28	" "	Reset	Reset	NONE	false
+37,28	" "	Reset	Reset	NONE	false
+38,28	" "	Reset	Reset	NONE	false
+39,28	"│"	DarkGray	Reset	NONE	false
+40,28	"│"	DarkGray	Reset	NONE	false
+41,28	" "	Reset	Reset	NONE	false
+42,28	" "	Reset	Reset	NONE	false
+43,28	" "	Reset	Reset	NONE	false
+44,28	" "	Reset	Reset	NONE	false
+45,28	" "	Reset	Reset	NONE	false
+46,28	" "	Reset	Reset	NONE	false
+47,28	" "	Reset	Reset	NONE	false
+48,28	" "	Reset	Reset	NONE	false
+49,28	" "	Reset	Reset	NONE	false
+50,28	" "	Reset	Reset	NONE	false
+51,28	" "	Reset	Reset	NONE	false
+52,28	" "	Reset	Reset	NONE	false
+53,28	" "	Reset	Reset	NONE	false
+54,28	" "	Reset	Reset	NONE	false
+55,28	" "	Reset	Reset	NONE	false
+56,28	" "	Reset	Reset	NONE	false
+57,28	" "	Reset	Reset	NONE	false
+58,28	" "	Reset	Reset	NONE	false
+59,28	" "	Reset	Reset	NONE	false
+60,28	" "	Reset	Reset	NONE	false
+61,28	" "	Reset	Reset	NONE	false
+62,28	" "	Reset	Reset	NONE	false
+63,28	" "	Reset	Reset	NONE	false
+64,28	" "	Reset	Reset	NONE	false
+65,28	" "	Reset	Reset	NONE	false
+66,28	" "	Reset	Reset	NONE	false
+67,28	" "	Reset	Reset	NONE	false
+68,28	" "	Reset	Reset	NONE	false
+69,28	" "	Reset	Reset	NONE	false
+70,28	" "	Reset	Reset	NONE	false
+71,28	" "	Reset	Reset	NONE	false
+72,28	" "	Reset	Reset	NONE	false
+73,28	" "	Reset	Reset	NONE	false
+74,28	" "	Reset	Reset	NONE	false
+75,28	" "	Reset	Reset	NONE	false
+76,28	" "	Reset	Reset	NONE	false
+77,28	" "	Reset	Reset	NONE	false
+78,28	" "	Reset	Reset	NONE	false
+79,28	"│"	DarkGray	Reset	NONE	false
+0,29	"│"	DarkGray	Reset	NONE	false
+1,29	" "	Reset	Reset	NONE	false
+2,29	" "	Reset	Reset	NONE	false
+3,29	" "	Reset	Reset	NONE	false
+4,29	" "	Reset	Reset	NONE	false
+5,29	" "	Reset	Reset	NONE	false
+6,29	" "	Reset	Reset	NONE	false
+7,29	" "	Reset	Reset	NONE	false
+8,29	" "	Reset	Reset	NONE	false
+9,29	" "	Reset	Reset	NONE	false
+10,29	" "	Reset	Reset	NONE	false
+11,29	" "	Reset	Reset	NONE	false
+12,29	" "	Reset	Reset	NONE	false
+13,29	" "	Reset	Reset	NONE	false
+14,29	" "	Reset	Reset	NONE	false
+15,29	" "	Reset	Reset	NONE	false
+16,29	" "	Reset	Reset	NONE	false
+17,29	" "	Reset	Reset	NONE	false
+18,29	" "	Reset	Reset	NONE	false
+19,29	" "	Reset	Reset	NONE	false
+20,29	" "	Reset	Reset	NONE	false
+21,29	" "	Reset	Reset	NONE	false
+22,29	" "	Reset	Reset	NONE	false
+23,29	" "	Reset	Reset	NONE	false
+24,29	" "	Reset	Reset	NONE	false
+25,29	" "	Reset	Reset	NONE	false
+26,29	" "	Reset	Reset	NONE	false
+27,29	" "	Reset	Reset	NONE	false
+28,29	" "	Reset	Reset	NONE	false
+29,29	" "	Reset	Reset	NONE	false
+30,29	" "	Reset	Reset	NONE	false
+31,29	" "	Reset	Reset	NONE	false
+32,29	" "	Reset	Reset	NONE	false
+33,29	" "	Reset	Reset	NONE	false
+34,29	" "	Reset	Reset	NONE	false
+35,29	" "	Reset	Reset	NONE	false
+36,29	" "	Reset	Reset	NONE	false
+37,29	" "	Reset	Reset	NONE	false
+38,29	" "	Reset	Reset	NONE	false
+39,29	"│"	DarkGray	Reset	NONE	false
+40,29	"│"	DarkGray	Reset	NONE	false
+41,29	" "	Reset	Reset	NONE	false
+42,29	" "	Reset	Reset	NONE	false
+43,29	" "	Reset	Reset	NONE	false
+44,29	" "	Reset	Reset	NONE	false
+45,29	" "	Reset	Reset	NONE	false
+46,29	" "	Reset	Reset	NONE	false
+47,29	" "	Reset	Reset	NONE	false
+48,29	" "	Reset	Reset	NONE	false
+49,29	" "	Reset	Reset	NONE	false
+50,29	" "	Reset	Reset	NONE	false
+51,29	" "	Reset	Reset	NONE	false
+52,29	" "	Reset	Reset	NONE	false
+53,29	" "	Reset	Reset	NONE	false
+54,29	" "	Reset	Reset	NONE	false
+55,29	" "	Reset	Reset	NONE	false
+56,29	" "	Reset	Reset	NONE	false
+57,29	" "	Reset	Reset	NONE	false
+58,29	" "	Reset	Reset	NONE	false
+59,29	" "	Reset	Reset	NONE	false
+60,29	" "	Reset	Reset	NONE	false
+61,29	" "	Reset	Reset	NONE	false
+62,29	" "	Reset	Reset	NONE	false
+63,29	" "	Reset	Reset	NONE	false
+64,29	" "	Reset	Reset	NONE	false
+65,29	" "	Reset	Reset	NONE	false
+66,29	" "	Reset	Reset	NONE	false
+67,29	" "	Reset	Reset	NONE	false
+68,29	" "	Reset	Reset	NONE	false
+69,29	" "	Reset	Reset	NONE	false
+70,29	" "	Reset	Reset	NONE	false
+71,29	" "	Reset	Reset	NONE	false
+72,29	" "	Reset	Reset	NONE	false
+73,29	" "	Reset	Reset	NONE	false
+74,29	" "	Reset	Reset	NONE	false
+75,29	" "	Reset	Reset	NONE	false
+76,29	" "	Reset	Reset	NONE	false
+77,29	" "	Reset	Reset	NONE	false
+78,29	" "	Reset	Reset	NONE	false
+79,29	"│"	DarkGray	Reset	NONE	false
+0,30	"│"	DarkGray	Reset	NONE	false
+1,30	" "	Reset	Reset	NONE	false
+2,30	" "	Reset	Reset	NONE	false
+3,30	" "	Reset	Reset	NONE	false
+4,30	" "	Reset	Reset	NONE	false
+5,30	" "	Reset	Reset	NONE	false
+6,30	" "	Reset	Reset	NONE	false
+7,30	" "	Reset	Reset	NONE	false
+8,30	" "	Reset	Reset	NONE	false
+9,30	" "	Reset	Reset	NONE	false
+10,30	" "	Reset	Reset	NONE	false
+11,30	" "	Reset	Reset	NONE	false
+12,30	" "	Reset	Reset	NONE	false
+13,30	" "	Reset	Reset	NONE	false
+14,30	" "	Reset	Reset	NONE	false
+15,30	" "	Reset	Reset	NONE	false
+16,30	" "	Reset	Reset	NONE	false
+17,30	" "	Reset	Reset	NONE	false
+18,30	" "	Reset	Reset	NONE	false
+19,30	" "	Reset	Reset	NONE	false
+20,30	" "	Reset	Reset	NONE	false
+21,30	" "	Reset	Reset	NONE	false
+22,30	" "	Reset	Reset	NONE	false
+23,30	" "	Reset	Reset	NONE	false
+24,30	" "	Reset	Reset	NONE	false
+25,30	" "	Reset	Reset	NONE	false
+26,30	" "	Reset	Reset	NONE	false
+27,30	" "	Reset	Reset	NONE	false
+28,30	" "	Reset	Reset	NONE	false
+29,30	" "	Reset	Reset	NONE	false
+30,30	" "	Reset	Reset	NONE	false
+31,30	" "	Reset	Reset	NONE	false
+32,30	" "	Reset	Reset	NONE	false
+33,30	" "	Reset	Reset	NONE	false
+34,30	" "	Reset	Reset	NONE	false
+35,30	" "	Reset	Reset	NONE	false
+36,30	" "	Reset	Reset	NONE	false
+37,30	" "	Reset	Reset	NONE	false
+38,30	" "	Reset	Reset	NONE	false
+39,30	"│"	DarkGray	Reset	NONE	false
+40,30	"│"	DarkGray	Reset	NONE	false
+41,30	" "	Reset	Reset	NONE	false
+42,30	" "	Reset	Reset	NONE	false
+43,30	" "	Reset	Reset	NONE	false
+44,30	" "	Reset	Reset	NONE	false
+45,30	" "	Reset	Reset	NONE	false
+46,30	" "	Reset	Reset	NONE	false
+47,30	" "	Reset	Reset	NONE	false
+48,30	" "	Reset	Reset	NONE	false
+49,30	" "	Reset	Reset	NONE	false
+50,30	" "	Reset	Reset	NONE	false
+51,30	" "	Reset	Reset	NONE	false
+52,30	" "	Reset	Reset	NONE	false
+53,30	" "	Reset	Reset	NONE	false
+54,30	" "	Reset	Reset	NONE	false
+55,30	" "	Reset	Reset	NONE	false
+56,30	" "	Reset	Reset	NONE	false
+57,30	" "	Reset	Reset	NONE	false
+58,30	" "	Reset	Reset	NONE	false
+59,30	" "	Reset	Reset	NONE	false
+60,30	" "	Reset	Reset	NONE	false
+61,30	" "	Reset	Reset	NONE	false
+62,30	" "	Reset	Reset	NONE	false
+63,30	" "	Reset	Reset	NONE	false
+64,30	" "	Reset	Reset	NONE	false
+65,30	" "	Reset	Reset	NONE	false
+66,30	" "	Reset	Reset	NONE	false
+67,30	" "	Reset	Reset	NONE	false
+68,30	" "	Reset	Reset	NONE	false
+69,30	" "	Reset	Reset	NONE	false
+70,30	" "	Reset	Reset	NONE	false
+71,30	" "	Reset	Reset	NONE	false
+72,30	" "	Reset	Reset	NONE	false
+73,30	" "	Reset	Reset	NONE	false
+74,30	" "	Reset	Reset	NONE	false
+75,30	" "	Reset	Reset	NONE	false
+76,30	" "	Reset	Reset	NONE	false
+77,30	" "	Reset	Reset	NONE	false
+78,30	" "	Reset	Reset	NONE	false
+79,30	"│"	DarkGray	Reset	NONE	false
+0,31	"│"	DarkGray	Reset	NONE	false
+1,31	" "	Reset	Reset	NONE	false
+2,31	" "	Reset	Reset	NONE	false
+3,31	" "	Reset	Reset	NONE	false
+4,31	" "	Reset	Reset	NONE	false
+5,31	" "	Reset	Reset	NONE	false
+6,31	" "	Reset	Reset	NONE	false
+7,31	" "	Reset	Reset	NONE	false
+8,31	" "	Reset	Reset	NONE	false
+9,31	" "	Reset	Reset	NONE	false
+10,31	" "	Reset	Reset	NONE	false
+11,31	" "	Reset	Reset	NONE	false
+12,31	" "	Reset	Reset	NONE	false
+13,31	" "	Reset	Reset	NONE	false
+14,31	" "	Reset	Reset	NONE	false
+15,31	" "	Reset	Reset	NONE	false
+16,31	" "	Reset	Reset	NONE	false
+17,31	" "	Reset	Reset	NONE	false
+18,31	" "	Reset	Reset	NONE	false
+19,31	" "	Reset	Reset	NONE	false
+20,31	" "	Reset	Reset	NONE	false
+21,31	" "	Reset	Reset	NONE	false
+22,31	" "	Reset	Reset	NONE	false
+23,31	" "	Reset	Reset	NONE	false
+24,31	" "	Reset	Reset	NONE	false
+25,31	" "	Reset	Reset	NONE	false
+26,31	" "	Reset	Reset	NONE	false
+27,31	" "	Reset	Reset	NONE	false
+28,31	" "	Reset	Reset	NONE	false
+29,31	" "	Reset	Reset	NONE	false
+30,31	" "	Reset	Reset	NONE	false
+31,31	" "	Reset	Reset	NONE	false
+32,31	" "	Reset	Reset	NONE	false
+33,31	" "	Reset	Reset	NONE	false
+34,31	" "	Reset	Reset	NONE	false
+35,31	" "	Reset	Reset	NONE	false
+36,31	" "	Reset	Reset	NONE	false
+37,31	" "	Reset	Reset	NONE	false
+38,31	" "	Reset	Reset	NONE	false
+39,31	"│"	DarkGray	Reset	NONE	false
+40,31	"│"	DarkGray	Reset	NONE	false
+41,31	" "	Reset	Reset	NONE	false
+42,31	" "	Reset	Reset	NONE	false
+43,31	" "	Reset	Reset	NONE	false
+44,31	" "	Reset	Reset	NONE	false
+45,31	" "	Reset	Reset	NONE	false
+46,31	" "	Reset	Reset	NONE	false
+47,31	" "	Reset	Reset	NONE	false
+48,31	" "	Reset	Reset	NONE	false
+49,31	" "	Reset	Reset	NONE	false
+50,31	" "	Reset	Reset	NONE	false
+51,31	" "	Reset	Reset	NONE	false
+52,31	" "	Reset	Reset	NONE	false
+53,31	" "	Reset	Reset	NONE	false
+54,31	" "	Reset	Reset	NONE	false
+55,31	" "	Reset	Reset	NONE	false
+56,31	" "	Reset	Reset	NONE	false
+57,31	" "	Reset	Reset	NONE	false
+58,31	" "	Reset	Reset	NONE	false
+59,31	" "	Reset	Reset	NONE	false
+60,31	" "	Reset	Reset	NONE	false
+61,31	" "	Reset	Reset	NONE	false
+62,31	" "	Reset	Reset	NONE	false
+63,31	" "	Reset	Reset	NONE	false
+64,31	" "	Reset	Reset	NONE	false
+65,31	" "	Reset	Reset	NONE	false
+66,31	" "	Reset	Reset	NONE	false
+67,31	" "	Reset	Reset	NONE	false
+68,31	" "	Reset	Reset	NONE	false
+69,31	" "	Reset	Reset	NONE	false
+70,31	" "	Reset	Reset	NONE	false
+71,31	" "	Reset	Reset	NONE	false
+72,31	" "	Reset	Reset	NONE	false
+73,31	" "	Reset	Reset	NONE	false
+74,31	" "	Reset	Reset	NONE	false
+75,31	" "	Reset	Reset	NONE	false
+76,31	" "	Reset	Reset	NONE	false
+77,31	" "	Reset	Reset	NONE	false
+78,31	" "	Reset	Reset	NONE	false
+79,31	"│"	DarkGray	Reset	NONE	false
+0,32	"└"	DarkGray	Reset	NONE	false
+1,32	"─"	DarkGray	Reset	NONE	false
+2,32	"─"	DarkGray	Reset	NONE	false
+3,32	"─"	DarkGray	Reset	NONE	false
+4,32	"─"	DarkGray	Reset	NONE	false
+5,32	"─"	DarkGray	Reset	NONE	false
+6,32	"─"	DarkGray	Reset	NONE	false
+7,32	"─"	DarkGray	Reset	NONE	false
+8,32	"─"	DarkGray	Reset	NONE	false
+9,32	"─"	DarkGray	Reset	NONE	false
+10,32	"─"	DarkGray	Reset	NONE	false
+11,32	"─"	DarkGray	Reset	NONE	false
+12,32	"─"	DarkGray	Reset	NONE	false
+13,32	"─"	DarkGray	Reset	NONE	false
+14,32	"─"	DarkGray	Reset	NONE	false
+15,32	"─"	DarkGray	Reset	NONE	false
+16,32	"─"	DarkGray	Reset	NONE	false
+17,32	"─"	DarkGray	Reset	NONE	false
+18,32	"─"	DarkGray	Reset	NONE	false
+19,32	"─"	DarkGray	Reset	NONE	false
+20,32	"─"	DarkGray	Reset	NONE	false
+21,32	"─"	DarkGray	Reset	NONE	false
+22,32	"─"	DarkGray	Reset	NONE	false
+23,32	"─"	DarkGray	Reset	NONE	false
+24,32	"─"	DarkGray	Reset	NONE	false
+25,32	"─"	DarkGray	Reset	NONE	false
+26,32	"─"	DarkGray	Reset	NONE	false
+27,32	"─"	DarkGray	Reset	NONE	false
+28,32	"─"	DarkGray	Reset	NONE	false
+29,32	"─"	DarkGray	Reset	NONE	false
+30,32	"─"	DarkGray	Reset	NONE	false
+31,32	"─"	DarkGray	Reset	NONE	false
+32,32	"─"	DarkGray	Reset	NONE	false
+33,32	"─"	DarkGray	Reset	NONE	false
+34,32	"─"	DarkGray	Reset	NONE	false
+35,32	"─"	DarkGray	Reset	NONE	false
+36,32	"─"	DarkGray	Reset	NONE	false
+37,32	"─"	DarkGray	Reset	NONE	false
+38,32	"─"	DarkGray	Reset	NONE	false
+39,32	"┘"	DarkGray	Reset	NONE	false
+40,32	"└"	DarkGray	Reset	NONE	false
+41,32	"─"	DarkGray	Reset	NONE	false
+42,32	"─"	DarkGray	Reset	NONE	false
+43,32	"─"	DarkGray	Reset	NONE	false
+44,32	"─"	DarkGray	Reset	NONE	false
+45,32	"─"	DarkGray	Reset	NONE	false
+46,32	"─"	DarkGray	Reset	NONE	false
+47,32	"─"	DarkGray	Reset	NONE	false
+48,32	"─"	DarkGray	Reset	NONE	false
+49,32	"─"	DarkGray	Reset	NONE	false
+50,32	"─"	DarkGray	Reset	NONE	false
+51,32	"─"	DarkGray	Reset	NONE	false
+52,32	"─"	DarkGray	Reset	NONE	false
+53,32	"─"	DarkGray	Reset	NONE	false
+54,32	"─"	DarkGray	Reset	NONE	false
+55,32	"─"	DarkGray	Reset	NONE	false
+56,32	"─"	DarkGray	Reset	NONE	false
+57,32	"─"	DarkGray	Reset	NONE	false
+58,32	"─"	DarkGray	Reset	NONE	false
+59,32	"─"	DarkGray	Reset	NONE	false
+60,32	"─"	DarkGray	Reset	NONE	false
+61,32	"─"	DarkGray	Reset	NONE	false
+62,32	"─"	DarkGray	Reset	NONE	false
+63,32	"─"	DarkGray	Reset	NONE	false
+64,32	"─"	DarkGray	Reset	NONE	false
+65,32	"─"	DarkGray	Reset	NONE	false
+66,32	"─"	DarkGray	Reset	NONE	false
+67,32	"─"	DarkGray	Reset	NONE	false
+68,32	"─"	DarkGray	Reset	NONE	false
+69,32	"─"	DarkGray	Reset	NONE	false
+70,32	"─"	DarkGray	Reset	NONE	false
+71,32	"─"	DarkGray	Reset	NONE	false
+72,32	"─"	DarkGray	Reset	NONE	false
+73,32	"─"	DarkGray	Reset	NONE	false
+74,32	"─"	DarkGray	Reset	NONE	false
+75,32	"─"	DarkGray	Reset	NONE	false
+76,32	"─"	DarkGray	Reset	NONE	false
+77,32	"─"	DarkGray	Reset	NONE	false
+78,32	"─"	DarkGray	Reset	NONE	false
+79,32	"┘"	DarkGray	Reset	NONE	false
+0,33	"Q"	Red	Reset	NONE	false
+1,33	"u"	Red	Reset	NONE	false
+2,33	"i"	Red	Reset	NONE	false
+3,33	"t"	Red	Reset	NONE	false
+4,33	" "	Red	Reset	NONE	false
+5,33	"i"	Red	Reset	NONE	false
+6,33	"r"	Red	Reset	NONE	false
+7,33	"o"	Red	Reset	NONE	false
+8,33	"n"	Red	Reset	NONE	false
+9,33	"?"	Red	Reset	NONE	false
+10,33	" "	Reset	Reset	NONE	false
+11,33	" "	Reset	Reset	NONE	false
+12,33	" "	Reset	Reset	NONE	false
+13,33	" "	Reset	Reset	NONE	false
+14,33	" "	Reset	Reset	NONE	false
+15,33	" "	Reset	Reset	NONE	false
+16,33	" "	Reset	Reset	NONE	false
+17,33	" "	Reset	Reset	NONE	false
+18,33	" "	Reset	Reset	NONE	false
+19,33	" "	Reset	Reset	NONE	false
+20,33	" "	Reset	Reset	NONE	false
+21,33	" "	Reset	Reset	NONE	false
+22,33	" "	Reset	Reset	NONE	false
+23,33	" "	Reset	Reset	NONE	false
+24,33	" "	Reset	Reset	NONE	false
+25,33	" "	Reset	Reset	NONE	false
+26,33	" "	Reset	Reset	NONE	false
+27,33	" "	Reset	Reset	NONE	false
+28,33	" "	Reset	Reset	NONE	false
+29,33	" "	Reset	Reset	NONE	false
+30,33	" "	Reset	Reset	NONE	false
+31,33	" "	Reset	Reset	NONE	false
+32,33	" "	Reset	Reset	NONE	false
+33,33	" "	Reset	Reset	NONE	false
+34,33	" "	Reset	Reset	NONE	false
+35,33	" "	Reset	Reset	NONE	false
+36,33	" "	Reset	Reset	NONE	false
+37,33	" "	Reset	Reset	NONE	false
+38,33	" "	Reset	Reset	NONE	false
+39,33	" "	Reset	Reset	NONE	false
+40,33	" "	Reset	Reset	NONE	false
+41,33	" "	Reset	Reset	NONE	false
+42,33	" "	Reset	Reset	NONE	false
+43,33	" "	Reset	Reset	NONE	false
+44,33	" "	Reset	Reset	NONE	false
+45,33	" "	Reset	Reset	NONE	false
+46,33	" "	Reset	Reset	NONE	false
+47,33	" "	Reset	Reset	NONE	false
+48,33	" "	Reset	Reset	NONE	false
+49,33	" "	Reset	Reset	NONE	false
+50,33	" "	Reset	Reset	NONE	false
+51,33	" "	Reset	Reset	NONE	false
+52,33	" "	Reset	Reset	NONE	false
+53,33	" "	Reset	Reset	NONE	false
+54,33	" "	Reset	Reset	NONE	false
+55,33	" "	Reset	Reset	NONE	false
+56,33	" "	Reset	Reset	NONE	false
+57,33	" "	Reset	Reset	NONE	false
+58,33	" "	Reset	Reset	NONE	false
+59,33	" "	Reset	Reset	NONE	false
+60,33	" "	Reset	Reset	NONE	false
+61,33	" "	Reset	Reset	NONE	false
+62,33	" "	Reset	Reset	NONE	false
+63,33	" "	Reset	Reset	NONE	false
+64,33	" "	Reset	Reset	NONE	false
+65,33	" "	Reset	Reset	NONE	false
+66,33	" "	Reset	Reset	NONE	false
+67,33	" "	Reset	Reset	NONE	false
+68,33	" "	Reset	Reset	NONE	false
+69,33	" "	Reset	Reset	NONE	false
+70,33	" "	Reset	Reset	NONE	false
+71,33	" "	Reset	Reset	NONE	false
+72,33	" "	Reset	Reset	NONE	false
+73,33	" "	Reset	Reset	NONE	false
+74,33	" "	Reset	Reset	NONE	false
+75,33	" "	Reset	Reset	NONE	false
+76,33	" "	Reset	Reset	NONE	false
+77,33	" "	Reset	Reset	NONE	false
+78,33	" "	Reset	Reset	NONE	false
+79,33	" "	Reset	Reset	NONE	false
+0,34	"["	Yellow	Reset	NONE	false
+1,34	"y"	Yellow	Reset	NONE	false
+2,34	"]"	Yellow	Reset	NONE	false
+3,34	" "	Reset	Reset	NONE	false
+4,34	"Y"	Reset	Reset	NONE	false
+5,34	"e"	Reset	Reset	NONE	false
+6,34	"s"	Reset	Reset	NONE	false
+7,34	" "	Reset	Reset	NONE	false
+8,34	" "	Reset	Reset	NONE	false
+9,34	"["	Yellow	Reset	NONE	false
+10,34	"a"	Yellow	Reset	NONE	false
+11,34	"n"	Yellow	Reset	NONE	false
+12,34	"y"	Yellow	Reset	NONE	false
+13,34	"]"	Yellow	Reset	NONE	false
+14,34	" "	Reset	Reset	NONE	false
+15,34	"C"	Reset	Reset	NONE	false
+16,34	"a"	Reset	Reset	NONE	false
+17,34	"n"	Reset	Reset	NONE	false
+18,34	"c"	Reset	Reset	NONE	false
+19,34	"e"	Reset	Reset	NONE	false
+20,34	"l"	Reset	Reset	NONE	false
+21,34	" "	Reset	Reset	NONE	false
+22,34	" "	Reset	Reset	NONE	false
+23,34	" "	Reset	Reset	NONE	false
+24,34	" "	Reset	Reset	NONE	false
+25,34	" "	Reset	Reset	NONE	false
+26,34	" "	Reset	Reset	NONE	false
+27,34	" "	Reset	Reset	NONE	false
+28,34	" "	Reset	Reset	NONE	false
+29,34	" "	Reset	Reset	NONE	false
+30,34	" "	Reset	Reset	NONE	false
+31,34	" "	Reset	Reset	NONE	false
+32,34	" "	Reset	Reset	NONE	false
+33,34	" "	Reset	Reset	NONE	false
+34,34	" "	Reset	Reset	NONE	false
+35,34	" "	Reset	Reset	NONE	false
+36,34	" "	Reset	Reset	NONE	false
+37,34	" "	Reset	Reset	NONE	false
+38,34	" "	Reset	Reset	NONE	false
+39,34	" "	Reset	Reset	NONE	false
+40,34	" "	Reset	Reset	NONE	false
+41,34	" "	Reset	Reset	NONE	false
+42,34	" "	Reset	Reset	NONE	false
+43,34	" "	Reset	Reset	NONE	false
+44,34	" "	Reset	Reset	NONE	false
+45,34	" "	Reset	Reset	NONE	false
+46,34	" "	Reset	Reset	NONE	false
+47,34	" "	Reset	Reset	NONE	false
+48,34	" "	Reset	Reset	NONE	false
+49,34	" "	Reset	Reset	NONE	false
+50,34	" "	Reset	Reset	NONE	false
+51,34	" "	Reset	Reset	NONE	false
+52,34	" "	Reset	Reset	NONE	false
+53,34	" "	Reset	Reset	NONE	false
+54,34	" "	Reset	Reset	NONE	false
+55,34	" "	Reset	Reset	NONE	false
+56,34	" "	Reset	Reset	NONE	false
+57,34	" "	Reset	Reset	NONE	false
+58,34	" "	Reset	Reset	NONE	false
+59,34	" "	Reset	Reset	NONE	false
+60,34	" "	Reset	Reset	NONE	false
+61,34	" "	Reset	Reset	NONE	false
+62,34	" "	Reset	Reset	NONE	false
+63,34	" "	Reset	Reset	NONE	false
+64,34	" "	Reset	Reset	NONE	false
+65,34	" "	Reset	Reset	NONE	false
+66,34	" "	Reset	Reset	NONE	false
+67,34	" "	Reset	Reset	NONE	false
+68,34	" "	Reset	Reset	NONE	false
+69,34	" "	Reset	Reset	NONE	false
+70,34	" "	Reset	Reset	NONE	false
+71,34	" "	Reset	Reset	NONE	false
+72,34	" "	Reset	Reset	NONE	false
+73,34	" "	Reset	Reset	NONE	false
+74,34	" "	Reset	Reset	NONE	false
+75,34	" "	Reset	Reset	NONE	false
+76,34	" "	Reset	Reset	NONE	false
+77,34	" "	Reset	Reset	NONE	false
+78,34	" "	Reset	Reset	NONE	false
+79,34	" "	Reset	Reset	NONE	false

@@ -14,14 +14,26 @@ pub struct Heatmap<'a> {
     data: &'a [(String, i64)],
     weeks: u16,
     no_color: bool,
+    today: chrono::NaiveDate,
 }
 
 impl<'a> Heatmap<'a> {
+    #[allow(dead_code)]
     pub fn new(data: &'a [(String, i64)], weeks: u16, no_color: bool) -> Self {
+        Self::with_today(data, weeks, no_color, Local::now().date_naive())
+    }
+
+    pub(crate) fn with_today(
+        data: &'a [(String, i64)],
+        weeks: u16,
+        no_color: bool,
+        today: chrono::NaiveDate,
+    ) -> Self {
         Self {
             data,
             weeks,
             no_color,
+            today,
         }
     }
 
@@ -54,7 +66,7 @@ impl<'a> Widget for Heatmap<'a> {
         // Build lookup map from date string -> count
         let counts: HashMap<String, i64> = self.data.iter().cloned().collect();
 
-        let today = Local::now().date_naive();
+        let today = self.today;
 
         // Calculate the start date: we want `weeks` columns of 7 days each.
         // Each column is one week (Mon..Sun). The rightmost column contains today.
