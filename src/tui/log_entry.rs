@@ -1358,8 +1358,10 @@ fn metric_label_for_type(pt: &PracticeType) -> String {
 mod tests {
     use super::*;
     use crate::db::Database;
-    use crate::tui::framework::test_support::render_to_string;
+    use crate::model::Practice;
+    use crate::tui::framework::test_support::{render_to_snapshot, render_to_string};
     use crate::tui::lifecycle::NavigationStatus;
+    use chrono::NaiveDate;
     use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
     use rusqlite::Connection;
 
@@ -1398,6 +1400,194 @@ mod tests {
 
     fn render_log_entry(screen: &mut LogEntryScreen, width: u16, height: u16) -> String {
         render_to_string(width, height, |frame| screen.render(frame))
+    }
+
+    fn log_entry_fixture_time() -> chrono::NaiveDateTime {
+        NaiveDate::from_ymd_opt(2026, 8, 19)
+            .unwrap()
+            .and_hms_opt(6, 30, 0)
+            .unwrap()
+    }
+
+    fn fixture_practice(id: i64, name: &str, practice_type: PracticeType) -> Practice {
+        Practice {
+            id,
+            name: name.to_owned(),
+            practice_type,
+            created_at: log_entry_fixture_time(),
+            active: true,
+        }
+    }
+
+    fn base_log_entry_fixture() -> LogEntryScreen {
+        std::env::set_var("LC_ALL", "C");
+        crate::i18n::init();
+        let practices = vec![
+            fixture_practice(101, "Barbell Back Squat", PracticeType::Weighted),
+            fixture_practice(102, "Strict Pull-up", PracticeType::Bodyweight),
+            fixture_practice(103, "Road Running", PracticeType::Distance),
+            fixture_practice(104, "Row Ergometer", PracticeType::Endurance),
+        ];
+        LogEntryScreen {
+            filtered_indices: (0..practices.len()).collect(),
+            practices,
+            filter: TextInput::new(),
+            filtering: false,
+            selected: 2,
+            list_viewport: ViewportState::new(0),
+            phase: Phase::SelectPractice,
+            chosen_practice: None,
+            sets: Vec::new(),
+            field1: TextInput::new(),
+            field2: TextInput::new(),
+            active_field: 0,
+            note: TextInput::new(),
+            warm_up: TextInput::new(),
+            cool_down: TextInput::new(),
+            rpe_input: TextInput::new(),
+            focus: FocusSection::Sets,
+            selected_set: None,
+            editing_set: None,
+            editing_log_id: None,
+            log_date: "2026-08-19".into(),
+            editing_date: false,
+            date_input: TextInput::new(),
+            confirming_exit: false,
+            return_to: ModuleId::Dashboard,
+            status_msg: Some(("Log Entry fixture status".into(), false)),
+        }
+    }
+
+    fn configure_weighted_form(screen: &mut LogEntryScreen) {
+        screen.phase = Phase::EnterLog;
+        screen.chosen_practice = Some(screen.practices[0].clone());
+        screen.sets = vec![
+            SetData::Weighted {
+                weight: 120.0,
+                reps: 5,
+            },
+            SetData::Weighted {
+                weight: 125.0,
+                reps: 3,
+            },
+        ];
+        screen.field1 = TextInput::from("127.5");
+        screen.field2 = TextInput::from("2");
+        screen.warm_up = TextInput::from("Empty bar, 60kg, 90kg");
+        screen.cool_down = TextInput::from("Five minutes easy cycle");
+        screen.rpe_input = TextInput::from("8");
+        screen.note = TextInput::from("Controlled fixture session");
+        screen.focus = FocusSection::Sets;
+        screen.selected_set = Some(1);
+    }
+
+    fn golden_log_entry_screen(name: &str) -> LogEntryScreen {
+        let mut screen = base_log_entry_fixture();
+        match name {
+            "select_browse" => {
+                screen.list_viewport.set_offset(1);
+            }
+            "select_filter" => {
+                screen.filtering = true;
+                screen.filter = TextInput::from("Road");
+                screen.filtered_indices = vec![2];
+                screen.selected = 0;
+                screen.status_msg = Some(("Filter fixture status".into(), false));
+            }
+            "weighted_form" => configure_weighted_form(&mut screen),
+            "set_edit" => {
+                configure_weighted_form(&mut screen);
+                screen.editing_set = Some(1);
+                screen.selected_set = Some(1);
+                screen.field1 = TextInput::from("130");
+                screen.field2 = TextInput::from("4");
+                screen.active_field = 1;
+            }
+            "date_edit" => {
+                configure_weighted_form(&mut screen);
+                screen.editing_date = true;
+                screen.date_input = TextInput::from("2026-08-20");
+            }
+            "note_focus" => {
+                configure_weighted_form(&mut screen);
+                screen.focus = FocusSection::Note;
+                screen.note = TextInput::from(
+                    "长期训练记录 mixed with a deliberately long suffix ".repeat(4),
+                );
+            }
+            "confirm_exit" => {
+                configure_weighted_form(&mut screen);
+                screen.confirming_exit = true;
+                screen.status_msg = None;
+            }
+            "existing_edit" => {
+                configure_weighted_form(&mut screen);
+                screen.editing_log_id = Some(701);
+                screen.return_to = ModuleId::History;
+                screen.focus = FocusSection::WarmUp;
+                screen.status_msg = Some(("Existing log fixture".into(), false));
+            }
+            other => panic!("unknown Log Entry golden state: {other}"),
+        }
+        screen
+    }
+
+    fn log_entry_golden(name: &str) -> &'static str {
+        match name {
+            "select_browse" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/log_entry/select_browse.txt"
+            )),
+            "select_filter" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/log_entry/select_filter.txt"
+            )),
+            "weighted_form" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/log_entry/weighted_form.txt"
+            )),
+            "set_edit" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/log_entry/set_edit.txt"
+            )),
+            "date_edit" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/log_entry/date_edit.txt"
+            )),
+            "note_focus" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/log_entry/note_focus.txt"
+            )),
+            "confirm_exit" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/log_entry/confirm_exit.txt"
+            )),
+            "existing_edit" => include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/fixtures/tui/log_entry/existing_edit.txt"
+            )),
+            other => panic!("unknown Log Entry golden fixture: {other}"),
+        }
+    }
+
+    const LOG_ENTRY_GOLDEN_STATES: [&str; 8] = [
+        "select_browse",
+        "select_filter",
+        "weighted_form",
+        "set_edit",
+        "date_edit",
+        "note_focus",
+        "confirm_exit",
+        "existing_edit",
+    ];
+
+    #[test]
+    fn log_entry_states_match_golden_buffers() {
+        for name in LOG_ENTRY_GOLDEN_STATES {
+            let mut screen = golden_log_entry_screen(name);
+            let actual = render_to_snapshot(80, 24, |frame| screen.render(frame));
+            assert_eq!(actual, log_entry_golden(name), "Log Entry {name} changed");
+        }
     }
 
     #[test]
