@@ -18,7 +18,7 @@ use ratatui::{
     Frame,
 };
 
-pub use framework::components::{render_status_line, StatusMessage};
+pub use framework::components::StatusMessage;
 pub use navigation::{Action, ModuleId, NavigationIntent, ScreenId};
 
 const HIGHLIGHT_BG: Color = Color::Rgb(204, 163, 0);

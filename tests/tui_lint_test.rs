@@ -215,6 +215,645 @@ fn log_entry_selector_ownership_violations(source: &str) -> Vec<String> {
     violations
 }
 
+const LOG_ENTRY_REQUIRED_COMPONENTS: [&str; 3] = [
+    "render_screen_frame_sections",
+    "render_scrollable_list_panel",
+    "render_bounded_panel",
+];
+
+fn is_log_entry_required_component(name: &str) -> bool {
+    LOG_ENTRY_REQUIRED_COMPONENTS.contains(&name)
+}
+
+fn is_log_entry_forbidden_function(name: &str) -> bool {
+    matches!(
+        name,
+        "render_status_line" | "render_shortcuts" | "highlight_row"
+    )
+}
+
+#[derive(Clone)]
+struct LogEntryBinding {
+    original: String,
+    canonical_framework_import: bool,
+}
+
+#[derive(Default)]
+struct LogEntryScope {
+    values: HashMap<String, LogEntryBinding>,
+    types: HashMap<String, String>,
+}
+
+fn collect_log_entry_imports(
+    tree: &syn::UseTree,
+    prefix: &mut Vec<String>,
+    scope: &mut LogEntryScope,
+    wrong_origin_required: &mut BTreeSet<String>,
+) {
+    match tree {
+        syn::UseTree::Path(path) => {
+            prefix.push(path.ident.to_string());
+            collect_log_entry_imports(&path.tree, prefix, scope, wrong_origin_required);
+            prefix.pop();
+        }
+        syn::UseTree::Group(group) => {
+            for item in &group.items {
+                collect_log_entry_imports(item, prefix, scope, wrong_origin_required);
+            }
+        }
+        syn::UseTree::Name(name) => {
+            let local_name = name.ident.to_string();
+            let mut origin = prefix.clone();
+            origin.push(local_name.clone());
+            let canonical = matches!(
+                origin.as_slice(),
+                [root, framework, component]
+                    if root == "super"
+                        && framework == "framework"
+                        && component == &local_name
+                        && is_log_entry_required_component(component)
+            );
+            if is_log_entry_required_component(&local_name)
+                || is_log_entry_forbidden_function(&local_name)
+            {
+                scope.values.insert(
+                    local_name.clone(),
+                    LogEntryBinding {
+                        original: local_name.clone(),
+                        canonical_framework_import: canonical,
+                    },
+                );
+                if is_log_entry_required_component(&local_name) && !canonical {
+                    wrong_origin_required.insert(local_name);
+                }
+            } else if local_name == "Block" {
+                scope.types.insert(local_name.clone(), local_name);
+            }
+        }
+        syn::UseTree::Rename(rename) => {
+            let original = rename.ident.to_string();
+            let local_name = rename.rename.to_string();
+            if is_log_entry_required_component(&original)
+                || is_log_entry_forbidden_function(&original)
+            {
+                scope.values.insert(
+                    local_name,
+                    LogEntryBinding {
+                        original: original.clone(),
+                        canonical_framework_import: false,
+                    },
+                );
+                if is_log_entry_required_component(&original) {
+                    wrong_origin_required.insert(original);
+                }
+            } else if original == "Block" {
+                scope.types.insert(local_name, original);
+            }
+        }
+        syn::UseTree::Glob(_) => {}
+    }
+}
+
+#[derive(Default)]
+struct LogEntryPatternBindingCollector {
+    names: BTreeSet<String>,
+}
+
+impl<'ast> Visit<'ast> for LogEntryPatternBindingCollector {
+    fn visit_pat_ident(&mut self, pattern: &'ast syn::PatIdent) {
+        self.names.insert(pattern.ident.to_string());
+        visit::visit_pat_ident(self, pattern);
+    }
+}
+
+#[derive(Default)]
+struct LogEntryRenderOwnership {
+    screen_frame_calls: usize,
+    list_panel_calls: usize,
+    bounded_panel_calls: usize,
+    borders_method_calls: usize,
+    block_constructor_calls: usize,
+    status_line_calls: usize,
+    shortcuts_calls: usize,
+    highlight_calls: usize,
+    selector_skip_calls: usize,
+    selector_take_calls: usize,
+    called_methods: BTreeSet<String>,
+    wrong_origin_required_calls: BTreeSet<String>,
+}
+
+impl LogEntryRenderOwnership {
+    fn merge(&mut self, other: Self) {
+        self.screen_frame_calls += other.screen_frame_calls;
+        self.list_panel_calls += other.list_panel_calls;
+        self.bounded_panel_calls += other.bounded_panel_calls;
+        self.borders_method_calls += other.borders_method_calls;
+        self.block_constructor_calls += other.block_constructor_calls;
+        self.status_line_calls += other.status_line_calls;
+        self.shortcuts_calls += other.shortcuts_calls;
+        self.highlight_calls += other.highlight_calls;
+        self.selector_skip_calls += other.selector_skip_calls;
+        self.selector_take_calls += other.selector_take_calls;
+        self.called_methods.extend(other.called_methods);
+        self.wrong_origin_required_calls
+            .extend(other.wrong_origin_required_calls);
+    }
+}
+
+struct LogEntryRenderVisitor<'a> {
+    scopes: Vec<LogEntryScope>,
+    ownership: LogEntryRenderOwnership,
+    _canonical_framework_imports: &'a BTreeSet<String>,
+}
+
+impl<'a> LogEntryRenderVisitor<'a> {
+    fn new(canonical_framework_imports: &'a BTreeSet<String>) -> Self {
+        let values = canonical_framework_imports
+            .iter()
+            .map(|name| {
+                (
+                    name.clone(),
+                    LogEntryBinding {
+                        original: name.clone(),
+                        canonical_framework_import: true,
+                    },
+                )
+            })
+            .collect();
+        Self {
+            scopes: vec![LogEntryScope {
+                values,
+                types: HashMap::new(),
+            }],
+            ownership: LogEntryRenderOwnership::default(),
+            _canonical_framework_imports: canonical_framework_imports,
+        }
+    }
+
+    fn push_signature_scope(&mut self, method: &syn::ImplItemFn) {
+        let mut scope = LogEntryScope::default();
+        for input in &method.sig.inputs {
+            if let syn::FnArg::Typed(input) = input {
+                let mut bindings = LogEntryPatternBindingCollector::default();
+                bindings.visit_pat(&input.pat);
+                for name in bindings.names {
+                    if is_log_entry_required_component(&name) {
+                        scope.values.insert(
+                            name.clone(),
+                            LogEntryBinding {
+                                original: name,
+                                canonical_framework_import: false,
+                            },
+                        );
+                    }
+                }
+            }
+        }
+        self.scopes.push(scope);
+    }
+
+    fn block_scope(&self, block: &syn::Block) -> LogEntryScope {
+        let mut scope = LogEntryScope::default();
+        let mut ignored_wrong_origins = BTreeSet::new();
+        for statement in &block.stmts {
+            let syn::Stmt::Item(item) = statement else {
+                continue;
+            };
+            match item {
+                syn::Item::Const(item) if !is_cfg_test(&item.attrs) => {
+                    self.insert_required_shadow(&mut scope, item.ident.to_string());
+                }
+                syn::Item::Fn(item) if !is_cfg_test(&item.attrs) => {
+                    self.insert_required_shadow(&mut scope, item.sig.ident.to_string());
+                }
+                syn::Item::Static(item) if !is_cfg_test(&item.attrs) => {
+                    self.insert_required_shadow(&mut scope, item.ident.to_string());
+                }
+                syn::Item::Use(item) if !is_cfg_test(&item.attrs) => collect_log_entry_imports(
+                    &item.tree,
+                    &mut Vec::new(),
+                    &mut scope,
+                    &mut ignored_wrong_origins,
+                ),
+                _ => {}
+            }
+        }
+        scope
+    }
+
+    fn insert_required_shadow(&self, scope: &mut LogEntryScope, name: String) {
+        if is_log_entry_required_component(&name) {
+            scope.values.insert(
+                name.clone(),
+                LogEntryBinding {
+                    original: name,
+                    canonical_framework_import: false,
+                },
+            );
+        }
+    }
+
+    fn shadow_pattern(&mut self, pattern: &syn::Pat) {
+        let mut bindings = LogEntryPatternBindingCollector::default();
+        bindings.visit_pat(pattern);
+        let scope = self.scopes.last_mut().unwrap();
+        for name in bindings.names {
+            if is_log_entry_required_component(&name) {
+                scope.values.insert(
+                    name.clone(),
+                    LogEntryBinding {
+                        original: name,
+                        canonical_framework_import: false,
+                    },
+                );
+            }
+        }
+    }
+
+    fn resolve_unqualified(&self, local_name: &str) -> Option<&LogEntryBinding> {
+        self.scopes
+            .iter()
+            .rev()
+            .find_map(|scope| scope.values.get(local_name))
+    }
+
+    fn resolved_call(&self, function: &syn::ExprPath) -> (String, bool) {
+        let called_name = function
+            .path
+            .segments
+            .last()
+            .map(|segment| segment.ident.to_string())
+            .unwrap_or_default();
+        if function.qself.is_none() && function.path.segments.len() == 1 {
+            if let Some(binding) = self.resolve_unqualified(&called_name) {
+                return (binding.original.clone(), binding.canonical_framework_import);
+            }
+        }
+        (called_name, false)
+    }
+
+    fn resolved_type_name(&self, name: &str) -> String {
+        for scope in self.scopes.iter().rev() {
+            if let Some(original) = scope.types.get(name) {
+                return original.clone();
+            }
+        }
+        name.to_owned()
+    }
+
+    fn is_block_constructor(&self, function: &syn::ExprPath) -> bool {
+        let Some(method) = function.path.segments.last() else {
+            return false;
+        };
+        if !matches!(
+            method.ident.to_string().as_str(),
+            "default" | "bordered" | "inner"
+        ) {
+            return false;
+        }
+        let receiver = if let Some(qself) = &function.qself {
+            type_path_name(&qself.ty)
+        } else if function.path.segments.len() >= 2 {
+            function
+                .path
+                .segments
+                .iter()
+                .nth(function.path.segments.len() - 2)
+                .map(|segment| segment.ident.to_string())
+        } else {
+            None
+        };
+        receiver.is_some_and(|name| self.resolved_type_name(&name) == "Block")
+    }
+
+    fn visit_condition_with_bindings(&mut self, expression: &'a syn::Expr) {
+        match expression {
+            syn::Expr::Binary(binary) if matches!(binary.op, syn::BinOp::And(_)) => {
+                self.visit_condition_with_bindings(&binary.left);
+                self.visit_condition_with_bindings(&binary.right);
+            }
+            syn::Expr::Group(group) => self.visit_condition_with_bindings(&group.expr),
+            syn::Expr::Let(expression) => {
+                self.visit_expr(&expression.expr);
+                self.shadow_pattern(&expression.pat);
+            }
+            syn::Expr::Paren(paren) => self.visit_condition_with_bindings(&paren.expr),
+            _ => self.visit_expr(expression),
+        }
+    }
+
+    fn visit_executable_closure(&mut self, closure: &'a syn::ExprClosure) {
+        self.scopes.push(LogEntryScope::default());
+        for input in &closure.inputs {
+            self.shadow_pattern(input);
+        }
+        self.visit_expr(&closure.body);
+        self.scopes.pop();
+    }
+}
+
+impl<'ast> Visit<'ast> for LogEntryRenderVisitor<'ast> {
+    fn visit_item(&mut self, _item: &'ast syn::Item) {
+        // Nested declarations are not executable calls on the production render path.
+    }
+
+    fn visit_block(&mut self, block: &'ast syn::Block) {
+        self.scopes.push(self.block_scope(block));
+        for statement in &block.stmts {
+            self.visit_stmt(statement);
+        }
+        self.scopes.pop();
+    }
+
+    fn visit_local(&mut self, local: &'ast syn::Local) {
+        if let Some(initializer) = &local.init {
+            self.visit_expr(&initializer.expr);
+            if let Some((_, diverge)) = &initializer.diverge {
+                self.visit_expr(diverge);
+            }
+        }
+        self.shadow_pattern(&local.pat);
+    }
+
+    fn visit_expr_closure(&mut self, closure: &'ast syn::ExprClosure) {
+        let _ = closure;
+    }
+
+    fn visit_arm(&mut self, arm: &'ast syn::Arm) {
+        self.scopes.push(LogEntryScope::default());
+        self.shadow_pattern(&arm.pat);
+        if let Some((_, guard)) = &arm.guard {
+            self.visit_expr(guard);
+        }
+        self.visit_expr(&arm.body);
+        self.scopes.pop();
+    }
+
+    fn visit_expr_for_loop(&mut self, expression: &'ast syn::ExprForLoop) {
+        self.visit_expr(&expression.expr);
+        self.scopes.push(LogEntryScope::default());
+        self.shadow_pattern(&expression.pat);
+        self.visit_block(&expression.body);
+        self.scopes.pop();
+    }
+
+    fn visit_expr_if(&mut self, expression: &'ast syn::ExprIf) {
+        self.scopes.push(LogEntryScope::default());
+        self.visit_condition_with_bindings(&expression.cond);
+        self.visit_block(&expression.then_branch);
+        self.scopes.pop();
+        if let Some((_, else_branch)) = &expression.else_branch {
+            self.visit_expr(else_branch);
+        }
+    }
+
+    fn visit_expr_while(&mut self, expression: &'ast syn::ExprWhile) {
+        self.scopes.push(LogEntryScope::default());
+        self.visit_condition_with_bindings(&expression.cond);
+        self.visit_block(&expression.body);
+        self.scopes.pop();
+    }
+
+    fn visit_expr_call(&mut self, call: &'ast syn::ExprCall) {
+        if let Some(closure) = direct_invoked_closure(&call.func) {
+            self.visit_executable_closure(closure);
+            for argument in &call.args {
+                self.visit_expr(argument);
+            }
+            return;
+        }
+        if let syn::Expr::Path(function) = call.func.as_ref() {
+            let (called_name, canonical_framework_import) = self.resolved_call(function);
+            let executes_callback =
+                canonical_framework_import && is_log_entry_required_component(&called_name);
+            match called_name.as_str() {
+                "render_screen_frame_sections" if canonical_framework_import => {
+                    self.ownership.screen_frame_calls += 1;
+                }
+                "render_scrollable_list_panel" if canonical_framework_import => {
+                    self.ownership.list_panel_calls += 1;
+                }
+                "render_bounded_panel" if canonical_framework_import => {
+                    self.ownership.bounded_panel_calls += 1;
+                }
+                "render_screen_frame_sections"
+                | "render_scrollable_list_panel"
+                | "render_bounded_panel" => {
+                    self.ownership
+                        .wrong_origin_required_calls
+                        .insert(called_name);
+                }
+                "render_status_line" => self.ownership.status_line_calls += 1,
+                "render_shortcuts" => self.ownership.shortcuts_calls += 1,
+                "highlight_row" => self.ownership.highlight_calls += 1,
+                _ => {}
+            }
+            if self.is_block_constructor(function) {
+                self.ownership.block_constructor_calls += 1;
+            }
+            if executes_callback {
+                for argument in &call.args {
+                    if let syn::Expr::Closure(closure) = argument {
+                        self.visit_executable_closure(closure);
+                    }
+                }
+            }
+        }
+        visit::visit_expr_call(self, call);
+    }
+
+    fn visit_expr_method_call(&mut self, call: &'ast syn::ExprMethodCall) {
+        match call.method.to_string().as_str() {
+            "borders" => self.ownership.borders_method_calls += 1,
+            "skip" => self.ownership.selector_skip_calls += 1,
+            "take" => self.ownership.selector_take_calls += 1,
+            _ => {}
+        }
+        if matches!(call.receiver.as_ref(), syn::Expr::Path(path) if path.path.is_ident("self")) {
+            self.ownership
+                .called_methods
+                .insert(call.method.to_string());
+        }
+        visit::visit_expr_method_call(self, call);
+    }
+}
+
+fn log_entry_ownership_violations(source: &str) -> Vec<String> {
+    let file = match syn::parse_file(source) {
+        Ok(file) => file,
+        Err(error) => return vec![format!("Log Entry source must parse as Rust: {error}")],
+    };
+    let production_impls = file
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            syn::Item::Impl(item_impl)
+                if item_impl.trait_.is_none()
+                    && !is_cfg_test(&item_impl.attrs)
+                    && is_screen_type(item_impl.self_ty.as_ref(), "LogEntryScreen") =>
+            {
+                Some(item_impl)
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    if production_impls.len() != 1 {
+        return vec![format!(
+            "Log Entry must define exactly one production inherent impl LogEntryScreen; found {}",
+            production_impls.len()
+        )];
+    }
+    let item_impl = production_impls[0];
+    let methods = item_impl
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            syn::ImplItem::Fn(method) if !is_cfg_test(&method.attrs) => {
+                Some((method.sig.ident.to_string(), method))
+            }
+            _ => None,
+        })
+        .collect::<HashMap<_, _>>();
+    if !methods.contains_key("render") {
+        return vec!["Log Entry must define one production LogEntryScreen::render method".into()];
+    }
+
+    let mut root_scope = LogEntryScope::default();
+    let mut import_wrong_origins = BTreeSet::new();
+    for item in &file.items {
+        if let syn::Item::Use(item) = item {
+            if !is_cfg_test(&item.attrs) {
+                collect_log_entry_imports(
+                    &item.tree,
+                    &mut Vec::new(),
+                    &mut root_scope,
+                    &mut import_wrong_origins,
+                );
+            }
+        }
+    }
+    for item in &file.items {
+        match item {
+            syn::Item::Const(item) if !is_cfg_test(&item.attrs) => {
+                let name = item.ident.to_string();
+                if is_log_entry_required_component(&name) {
+                    root_scope.values.insert(
+                        name.clone(),
+                        LogEntryBinding {
+                            original: name,
+                            canonical_framework_import: false,
+                        },
+                    );
+                }
+            }
+            syn::Item::Fn(item) if !is_cfg_test(&item.attrs) => {
+                let name = item.sig.ident.to_string();
+                if is_log_entry_required_component(&name) {
+                    root_scope.values.insert(
+                        name.clone(),
+                        LogEntryBinding {
+                            original: name,
+                            canonical_framework_import: false,
+                        },
+                    );
+                }
+            }
+            syn::Item::Static(item) if !is_cfg_test(&item.attrs) => {
+                let name = item.ident.to_string();
+                if is_log_entry_required_component(&name) {
+                    root_scope.values.insert(
+                        name.clone(),
+                        LogEntryBinding {
+                            original: name,
+                            canonical_framework_import: false,
+                        },
+                    );
+                }
+            }
+            _ => {}
+        }
+    }
+    let canonical_framework_imports = root_scope
+        .values
+        .iter()
+        .filter(|(_, binding)| binding.canonical_framework_import)
+        .map(|(name, _)| name.clone())
+        .collect::<BTreeSet<_>>();
+
+    let mut ownership = LogEntryRenderOwnership::default();
+    ownership
+        .wrong_origin_required_calls
+        .extend(import_wrong_origins);
+    let mut pending = vec!["render".to_owned()];
+    let mut visited = HashSet::new();
+    while let Some(method_name) = pending.pop() {
+        if !visited.insert(method_name.clone()) {
+            continue;
+        }
+        let Some(method) = methods.get(&method_name) else {
+            continue;
+        };
+        let mut visitor = LogEntryRenderVisitor::new(&canonical_framework_imports);
+        visitor.scopes[0].types = root_scope.types.clone();
+        for (name, binding) in &root_scope.values {
+            visitor.scopes[0]
+                .values
+                .insert(name.clone(), binding.clone());
+        }
+        visitor.push_signature_scope(method);
+        visitor.visit_block(&method.block);
+        visitor.scopes.pop();
+        pending.extend(
+            visitor
+                .ownership
+                .called_methods
+                .iter()
+                .filter(|called| {
+                    methods.contains_key(called.as_str()) && !visited.contains(called.as_str())
+                })
+                .cloned(),
+        );
+        ownership.merge(visitor.ownership);
+    }
+
+    let mut violations = Vec::new();
+    for (actual, expected, component) in [
+        (ownership.screen_frame_calls, 2, "ScreenFrameSections"),
+        (ownership.list_panel_calls, 1, "ScrollableListPanel"),
+        (ownership.bounded_panel_calls, 4, "BoundedPanel"),
+    ] {
+        if actual != expected {
+            violations.push(format!(
+                "LogEntryScreen production render path must call {component} exactly {expected} time(s); found {actual}"
+            ));
+        }
+    }
+    for name in ownership.wrong_origin_required_calls {
+        violations.push(format!(
+            "LogEntryScreen production render path has wrong-origin required component `{name}`"
+        ));
+    }
+    for (count, forbidden) in [
+        (ownership.borders_method_calls, ".borders"),
+        (
+            ownership.block_constructor_calls,
+            "local Block construction/inner",
+        ),
+        (ownership.status_line_calls, "render_status_line"),
+        (ownership.shortcuts_calls, "render_shortcuts"),
+        (ownership.highlight_calls, "highlight_row"),
+        (ownership.selector_skip_calls, "selector .skip"),
+        (ownership.selector_take_calls, "selector .take"),
+    ] {
+        if count != 0 {
+            violations.push(format!(
+                "LogEntryScreen production render path must not own {forbidden}; found {count}"
+            ));
+        }
+    }
+    violations
+}
+
 fn dashboard_heatmap_construction_violations(source: &str) -> Vec<String> {
     let production = dashboard_production_source(source);
     let mut violations = Vec::new();
@@ -1631,6 +2270,244 @@ fn log_entry_selector_ownership_ignores_comments_strings_and_tests() {
     assert!(violations
         .iter()
         .any(|item| item.contains("ScrollableListPanel")));
+}
+
+#[test]
+fn log_entry_delegates_all_presentation_to_framework() {
+    let source = std::fs::read_to_string("src/tui/log_entry.rs").unwrap();
+    let violations = log_entry_ownership_violations(&source);
+    assert!(violations.is_empty(), "{}", violations.join("\n"));
+}
+
+#[test]
+fn log_entry_ownership_rejects_wrong_origin_dead_and_test_decoys() {
+    let source = r#"
+        use wrong::framework::render_bounded_panel;
+        use super::framework::{render_screen_frame_sections, render_scrollable_list_panel};
+        struct LogEntryScreen;
+        impl LogEntryScreen {
+            fn render(&mut self) {
+                self.render_select_practice();
+                self.render_enter_log();
+            }
+            fn render_select_practice(&mut self) {
+                render_screen_frame_sections();
+                render_scrollable_list_panel();
+            }
+            fn render_enter_log(&mut self) {
+                render_screen_frame_sections();
+                render_bounded_panel();
+                Block::default().borders(Borders::ALL);
+            }
+            fn dead_helper(&self) {
+                render_bounded_panel(); render_bounded_panel(); render_bounded_panel();
+            }
+            #[cfg(test)]
+            fn test_decoy(&self) {
+                render_bounded_panel(); render_bounded_panel(); render_bounded_panel();
+            }
+        }
+    "#;
+    let violations = log_entry_ownership_violations(source);
+    assert!(violations.iter().any(|item| item.contains("wrong-origin")));
+    assert!(violations
+        .iter()
+        .any(|item| item.contains("BoundedPanel") && item.contains("found 0")));
+    assert!(violations.iter().any(|item| item.contains("local Block")));
+}
+
+#[test]
+fn log_entry_ownership_accepts_only_the_exact_reachable_component_path() {
+    let source = r#"
+        use super::framework::{
+            render_bounded_panel,
+            render_screen_frame_sections,
+            render_scrollable_list_panel,
+        };
+        struct LogEntryScreen;
+        impl LogEntryScreen {
+            fn render(&mut self) {
+                self.render_select_practice();
+                self.render_enter_log();
+            }
+            fn render_select_practice(&mut self) {
+                render_screen_frame_sections();
+                render_scrollable_list_panel();
+            }
+            fn render_enter_log(&mut self) {
+                render_screen_frame_sections();
+                render_bounded_panel(); render_bounded_panel();
+                render_bounded_panel(); render_bounded_panel();
+            }
+        }
+    "#;
+    assert!(log_entry_ownership_violations(source).is_empty());
+}
+
+#[test]
+fn log_entry_ownership_rejects_alias_glob_ufcs_and_nested_decoys() {
+    for (label, imports, call) in [
+        (
+            "alias",
+            "use super::framework::{render_bounded_panel as panel, render_screen_frame_sections, render_scrollable_list_panel};",
+            "panel(); panel(); panel(); panel();",
+        ),
+        (
+            "glob",
+            "use super::framework::*;",
+            "render_bounded_panel(); render_bounded_panel(); render_bounded_panel(); render_bounded_panel();",
+        ),
+        (
+            "UFCS",
+            "use super::framework::{render_bounded_panel, render_screen_frame_sections, render_scrollable_list_panel};",
+            "<Decoy as Components>::render_bounded_panel(); render_bounded_panel(); render_bounded_panel(); render_bounded_panel();",
+        ),
+    ] {
+        let source = format!(
+            r#"
+                {imports}
+                struct LogEntryScreen;
+                impl LogEntryScreen {{
+                    fn render(&mut self) {{
+                        self.render_select_practice();
+                        self.render_enter_log();
+                        fn nested() {{
+                            render_bounded_panel(); render_bounded_panel();
+                            Block::bordered();
+                        }}
+                        let _text = "render_bounded_panel(); Block::default()";
+                    }}
+                    fn render_select_practice(&mut self) {{
+                        render_screen_frame_sections();
+                        render_scrollable_list_panel();
+                    }}
+                    fn render_enter_log(&mut self) {{
+                        render_screen_frame_sections();
+                        {call}
+                    }}
+                    #[cfg(test)]
+                    fn test_decoy(&self) {{
+                        render_bounded_panel(); Block::default().borders(Borders::ALL);
+                    }}
+                }}
+            "#
+        );
+        let violations = log_entry_ownership_violations(&source);
+        assert!(
+            violations
+                .iter()
+                .any(|item| item.contains("wrong-origin")),
+            "{label}: {violations:?}"
+        );
+        assert!(
+            !violations.iter().any(|item| item.contains("local Block")),
+            "nested/test Block decoys must be ignored for {label}: {violations:?}"
+        );
+    }
+}
+
+#[test]
+fn log_entry_ownership_rejects_uninvoked_closure_and_root_shadow_decoys() {
+    let uninvoked_closure = r#"
+        use super::framework::{
+            render_bounded_panel,
+            render_screen_frame_sections,
+            render_scrollable_list_panel,
+        };
+        struct LogEntryScreen;
+        impl LogEntryScreen {
+            fn render(&mut self) {
+                self.render_select_practice();
+                self.render_enter_log();
+            }
+            fn render_select_practice(&mut self) {
+                render_screen_frame_sections();
+                render_scrollable_list_panel();
+            }
+            fn render_enter_log(&mut self) {
+                render_screen_frame_sections();
+                let _dead = || {
+                    render_bounded_panel(); render_bounded_panel();
+                    render_bounded_panel(); render_bounded_panel();
+                };
+            }
+        }
+    "#;
+    let violations = log_entry_ownership_violations(uninvoked_closure);
+    assert!(
+        violations
+            .iter()
+            .any(|item| item.contains("BoundedPanel") && item.contains("found 0")),
+        "{violations:?}"
+    );
+
+    let root_shadow_before_import = r#"
+        fn render_bounded_panel() {}
+        use super::framework::{
+            render_bounded_panel,
+            render_screen_frame_sections,
+            render_scrollable_list_panel,
+        };
+        struct LogEntryScreen;
+        impl LogEntryScreen {
+            fn render(&mut self) {
+                self.render_select_practice();
+                self.render_enter_log();
+            }
+            fn render_select_practice(&mut self) {
+                render_screen_frame_sections();
+                render_scrollable_list_panel();
+            }
+            fn render_enter_log(&mut self) {
+                render_screen_frame_sections();
+                render_bounded_panel(); render_bounded_panel();
+                render_bounded_panel(); render_bounded_panel();
+            }
+        }
+    "#;
+    let violations = log_entry_ownership_violations(root_shadow_before_import);
+    assert!(
+        violations.iter().any(|item| item.contains("wrong-origin")),
+        "{violations:?}"
+    );
+}
+
+#[test]
+fn log_entry_ownership_rejects_aliased_ufcs_block_ownership() {
+    let source = r#"
+        use ratatui::widgets::{Block as Panel, Borders as Edges};
+        use super::framework::{
+            render_bounded_panel,
+            render_screen_frame_sections,
+            render_scrollable_list_panel,
+        };
+        struct LogEntryScreen;
+        impl LogEntryScreen {
+            fn render(&mut self) {
+                self.render_select_practice();
+                self.render_enter_log();
+            }
+            fn render_select_practice(&mut self) {
+                render_screen_frame_sections();
+                render_scrollable_list_panel();
+            }
+            fn render_enter_log(&mut self) {
+                render_screen_frame_sections();
+                render_bounded_panel(); render_bounded_panel();
+                render_bounded_panel(); render_bounded_panel();
+                <Panel as Default>::default().borders(Edges::ALL);
+            }
+        }
+    "#;
+    let violations = log_entry_ownership_violations(source);
+    assert!(
+        violations.iter().any(|item| item.contains("local Block")),
+        "{violations:?}"
+    );
+    assert!(
+        violations.iter().any(|item| item.contains(".borders")),
+        "{violations:?}"
+    );
 }
 
 #[test]
@@ -3860,9 +4737,9 @@ fn paragraph_widgets_must_wrap_user_content() {
         "dashboard.rs:339",
         "dashboard.rs:359",
         "dashboard.rs:395",
-        "log_entry.rs:512",
-        "log_entry.rs:704",
-        "log_entry.rs:803",
+        "log_entry.rs:567",
+        "log_entry.rs:748",
+        "log_entry.rs:829",
     ]
     .into_iter()
     .collect();
@@ -3917,9 +4794,9 @@ fn paragraph_widgets_must_wrap_user_content() {
     assert!(msg.is_empty(), "\n{}", msg);
 }
 
-/// Ensures that main content screens use bordered blocks for visual consistency.
-/// Every screen that displays a primary list or content area should wrap it in
-/// a Block with Borders::ALL.
+/// Ensures that main content screens use bordered panels for visual consistency.
+/// Log Entry's executable ownership is validated precisely by the Syn-based guard
+/// above; this legacy visual-consistency check accepts its shared panel owner.
 #[test]
 fn screens_must_have_bordered_blocks() {
     let tui_dir = Path::new("src/tui");
@@ -3930,8 +4807,8 @@ fn screens_must_have_bordered_blocks() {
         let path = tui_dir.join(filename);
         let source = std::fs::read_to_string(&path)
             .unwrap_or_else(|_| panic!("failed to read {}", path.display()));
-        if !source.contains(".borders(Borders::ALL)") {
-            missing.push(format!("  {} — missing .borders(Borders::ALL)", filename));
+        if !source.contains("render_bounded_panel(") {
+            missing.push(format!("  {} — missing render_bounded_panel", filename));
         }
     }
 

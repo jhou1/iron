@@ -1,10 +1,10 @@
 use chrono::{Local, NaiveDate, NaiveTime};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
-    layout::{Constraint, Direction, Layout},
+    layout::{Constraint, Rect},
     style::{Color, Modifier, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Padding, Paragraph, Wrap},
+    widgets::{Padding, Paragraph, Wrap},
     Frame,
 };
 
@@ -12,14 +12,12 @@ use unicode_width::UnicodeWidthStr;
 
 use super::lifecycle::NavigationStatus;
 use super::{
-    centered_area,
     framework::{
-        fit_rect, move_selection, render_screen_frame_sections, render_scrollable_list_panel,
-        render_shortcuts, shortcut_height, truncate_to_width, EdgeBehavior, ListPanelContent,
-        Shortcut, TextInput, ViewportState,
+        move_selection, render_bounded_panel, render_screen_frame_sections,
+        render_scrollable_list_panel, truncate_to_width, BoundedPanelSpec, EdgeBehavior,
+        ListPanelContent, Shortcut, TextInput, ViewportState,
     },
-    render_status_line, Action, ModuleId, NavigationIntent, StatusMessage, BORDER_COLOR,
-    CONTENT_WIDTH,
+    Action, ModuleId, NavigationIntent, StatusMessage, BORDER_COLOR, CONTENT_WIDTH,
 };
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
@@ -431,50 +429,107 @@ impl LogEntryScreen {
         shortcuts
     }
 
-    fn render_enter_log(&mut self, frame: &mut Frame) {
-        let area = centered_area(frame.area(), CONTENT_WIDTH);
+    fn render_enter_log(&self, frame: &mut Frame) {
         let practice = self.chosen_practice.as_ref().unwrap();
-        let shortcuts = self.active_enter_shortcuts();
-        let shortcut_rows = shortcut_height(&shortcuts, area.width);
-
         let sets_content_lines = u16::try_from(self.sets.len())
             .unwrap_or(u16::MAX)
             .saturating_add(2)
             .max(2); // committed sets + input + total
 
-        let outer = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Min(0),
-                Constraint::Length(1),
-                Constraint::Length(shortcut_rows),
-            ])
-            .split(area);
-        let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
+        let shortcuts = self.active_enter_shortcuts();
+        let status = if self.confirming_exit && self.status_msg.is_none() {
+            Some((tr("log-cancel-confirm"), true))
+        } else {
+            self.status_msg.clone()
+        };
+        let sections = render_screen_frame_sections(
+            frame,
+            frame.area(),
+            CONTENT_WIDTH,
+            &status,
+            &shortcuts,
+            &[
                 Constraint::Length(5), // [0] date section (border + padding)
                 Constraint::Length(1), // [1] spacer
                 Constraint::Length(sets_content_lines.saturating_add(4)), // [2] sets section
                 Constraint::Length(7), // [3] warm-up/cool-down section (border + padding)
                 Constraint::Min(0),    // [4] note section (border, grows)
-            ])
-            .split(outer[0]);
+            ],
+            false,
+        );
+        let chunks = &sections.body;
 
         // ── Date section ──
-        let date_border_color = BORDER_COLOR;
         let date_title = truncate_to_width(
             &format!(" {} ({}) ", practice.name, practice.practice_type.label()),
             chunks[0].width.saturating_sub(2) as usize,
         );
-        let date_block = Block::default()
-            .title(Span::styled(date_title, Style::default().fg(ACCENT).bold()))
-            .borders(Borders::ALL)
-            .padding(Padding::uniform(1))
-            .border_style(Style::default().fg(date_border_color));
-        let date_inner = fit_rect(chunks[0], date_block.inner(chunks[0]));
-        frame.render_widget(date_block, chunks[0]);
+        render_bounded_panel(
+            frame,
+            chunks[0],
+            BoundedPanelSpec {
+                title: Some(Line::from(Span::styled(
+                    date_title,
+                    Style::default().fg(ACCENT).bold(),
+                ))),
+                border_style: Style::default().fg(BORDER_COLOR),
+                padding: Padding::uniform(1),
+            },
+            |frame, date_inner| {
+                self.render_date_content(frame, date_inner);
+            },
+        );
 
+        // ── Sets section ──
+        render_bounded_panel(
+            frame,
+            chunks[2],
+            BoundedPanelSpec {
+                title: Some(Line::from(Span::styled(
+                    " Sets ",
+                    Style::default().fg(Color::White).bold(),
+                ))),
+                border_style: Style::default().fg(BORDER_COLOR),
+                padding: Padding::uniform(1),
+            },
+            |frame, sets_inner| {
+                self.render_sets_content(frame, sets_inner, practice);
+            },
+        );
+
+        // ── Warm-up / Cool-down section ──
+        render_bounded_panel(
+            frame,
+            chunks[3],
+            BoundedPanelSpec {
+                title: None,
+                border_style: Style::default().fg(BORDER_COLOR),
+                padding: Padding::uniform(1),
+            },
+            |frame, wucd_inner| {
+                self.render_wucd_content(frame, wucd_inner);
+            },
+        );
+
+        // ── Note section ──
+        render_bounded_panel(
+            frame,
+            chunks[4],
+            BoundedPanelSpec {
+                title: Some(Line::from(Span::styled(
+                    format!(" {} ", tr("log-note-optional")),
+                    Style::default().fg(Color::Gray),
+                ))),
+                border_style: Style::default().fg(BORDER_COLOR),
+                padding: Padding::horizontal(1),
+            },
+            |frame, note_inner| {
+                self.render_note_content(frame, note_inner);
+            },
+        );
+    }
+
+    fn render_date_content(&self, frame: &mut Frame, date_inner: Rect) {
         let date_line = if self.editing_date {
             let label = truncate_to_width(
                 &format!("{} ", tr("log-date-label")),
@@ -510,20 +565,9 @@ impl LogEntryScreen {
             ])
         };
         frame.render_widget(Paragraph::new(date_line), date_inner);
+    }
 
-        // ── Sets section ──
-        let sets_border_color = BORDER_COLOR;
-        let sets_block = Block::default()
-            .title(Span::styled(
-                " Sets ",
-                Style::default().fg(Color::White).bold(),
-            ))
-            .borders(Borders::ALL)
-            .padding(Padding::uniform(1))
-            .border_style(Style::default().fg(sets_border_color));
-        let sets_inner = fit_rect(chunks[2], sets_block.inner(chunks[2]));
-        frame.render_widget(sets_block, chunks[2]);
-
+    fn render_sets_content(&self, frame: &mut Frame, sets_inner: Rect, practice: &Practice) {
         let mut sets_lines: Vec<Line> = Vec::new();
         for (i, set) in self.sets.iter().enumerate() {
             let text = truncate_to_width(
@@ -702,16 +746,9 @@ impl LogEntryScreen {
         )));
 
         frame.render_widget(Paragraph::new(sets_lines), sets_inner);
+    }
 
-        // ── Warm-up / Cool-down section ──
-        let wucd_border_color = BORDER_COLOR;
-        let wucd_block = Block::default()
-            .borders(Borders::ALL)
-            .padding(Padding::uniform(1))
-            .border_style(Style::default().fg(wucd_border_color));
-        let wucd_inner = fit_rect(chunks[3], wucd_block.inner(chunks[3]));
-        frame.render_widget(wucd_block, chunks[3]);
-
+    fn render_wucd_content(&self, frame: &mut Frame, wucd_inner: Rect) {
         let wu_active = self.focus == FocusSection::WarmUp;
         let wu_color = if wu_active { ACCENT } else { Color::White };
         let wu_label = format!("{}: ", tr("log-warmup-label"));
@@ -778,20 +815,9 @@ impl LogEntryScreen {
             Paragraph::new(wucd_lines).wrap(Wrap { trim: false }),
             wucd_inner,
         );
+    }
 
-        // ── Note section ──
-        let note_border_color = BORDER_COLOR;
-        let note_block = Block::default()
-            .title(Span::styled(
-                format!(" {} ", tr("log-note-optional")),
-                Style::default().fg(Color::Gray),
-            ))
-            .borders(Borders::ALL)
-            .padding(Padding::horizontal(1))
-            .border_style(Style::default().fg(note_border_color));
-        let note_inner = fit_rect(chunks[4], note_block.inner(chunks[4]));
-        frame.render_widget(note_block, chunks[4]);
-
+    fn render_note_content(&self, frame: &mut Frame, note_inner: Rect) {
         if self.focus == FocusSection::Note {
             let note_line = Line::from(self.note.visible_spans(note_inner.width, 0, ACCENT));
             frame.render_widget(
@@ -808,16 +834,6 @@ impl LogEntryScreen {
                 note_inner,
             );
         }
-
-        // ── Status line ──
-        if self.confirming_exit && self.status_msg.is_none() {
-            render_status_line(frame, outer[1], &Some((tr("log-cancel-confirm"), true)));
-        } else {
-            render_status_line(frame, outer[1], &self.status_msg);
-        }
-
-        // ── Footer ──
-        render_shortcuts(frame, outer[2], &shortcuts);
     }
 
     fn handle_enter_log(&mut self, key: KeyEvent, db: &Database) -> Action {
@@ -1678,6 +1694,21 @@ mod tests {
         let mut screen = LogEntryScreen::new(&db).unwrap();
         let output = render_log_entry(&mut screen, 24, 10);
         assert!(!output.is_empty());
+    }
+
+    #[test]
+    fn every_log_entry_fixture_renders_one_tiny_and_resized_frames() {
+        for name in LOG_ENTRY_GOLDEN_STATES {
+            for (width, height) in [(1, 1), (24, 10), (80, 24), (107, 35)] {
+                let mut screen = golden_log_entry_screen(name);
+                let snapshot = render_to_snapshot(width, height, |frame| screen.render(frame));
+                assert_eq!(
+                    snapshot.lines().count(),
+                    width as usize * height as usize + 1,
+                    "state={name} size={width}x{height}",
+                );
+            }
+        }
     }
 
     #[test]

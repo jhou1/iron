@@ -10,6 +10,7 @@ pub mod test_support;
 pub mod viewport;
 
 pub use action_panel::render_action_panel;
+pub use bounded_panel::{render_bounded_panel, BoundedPanelSpec};
 #[allow(unused_imports)]
 pub use components::{
     fit_rect, render_detail_panel, render_detail_panel_with_header, render_scrollable_lines,
