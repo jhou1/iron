@@ -14,11 +14,12 @@ use super::lifecycle::NavigationStatus;
 use super::{
     centered_area,
     framework::{
-        fit_rect, move_selection, render_shortcuts, shortcut_height, truncate_to_width,
-        EdgeBehavior, Shortcut, TextInput, ViewportState, VisualSpan,
+        fit_rect, move_selection, render_screen_frame_sections, render_scrollable_list_panel,
+        render_shortcuts, shortcut_height, truncate_to_width, EdgeBehavior, ListPanelContent,
+        Shortcut, TextInput, ViewportState,
     },
-    highlight_row, render_status_line, Action, ModuleId, NavigationIntent, StatusMessage,
-    BORDER_COLOR, CONTENT_WIDTH,
+    render_status_line, Action, ModuleId, NavigationIntent, StatusMessage, BORDER_COLOR,
+    CONTENT_WIDTH,
 };
 use crate::db::Database;
 use crate::i18n::{tr, tr_args};
@@ -196,22 +197,18 @@ impl LogEntryScreen {
     }
 
     fn render_select_practice(&mut self, frame: &mut Frame) {
-        let area = centered_area(frame.area(), CONTENT_WIDTH);
         let shortcuts = self.active_select_shortcuts();
-        let shortcut_rows = shortcut_height(&shortcuts, area.width);
-
-        let outer = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Min(0),
-                Constraint::Length(1),
-                Constraint::Length(shortcut_rows),
-            ])
-            .split(area);
-        let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Length(1), Constraint::Min(0)])
-            .split(outer[0]);
+        let sections = render_screen_frame_sections(
+            frame,
+            frame.area(),
+            CONTENT_WIDTH,
+            &self.status_msg,
+            &shortcuts,
+            &[Constraint::Length(1), Constraint::Min(0)],
+            false,
+        );
+        let filter_area = sections.body[0];
+        let list_area = sections.body[1];
 
         // Filter bar
         let filter_style = if self.filtering {
@@ -228,117 +225,88 @@ impl LogEntryScreen {
             )]
         };
         if self.filtering {
-            filter_spans.extend(self.filter.visible_spans(chunks[0].width, 2, ACCENT));
+            filter_spans.extend(self.filter.visible_spans(filter_area.width, 2, ACCENT));
         } else if !self.filter.value().is_empty() {
             filter_spans.push(Span::styled(
                 truncate_to_width(
                     self.filter.value(),
-                    chunks[0].width.saturating_sub(2) as usize,
+                    filter_area.width.saturating_sub(2) as usize,
                 ),
                 filter_style,
             ));
         }
         frame.render_widget(
             Paragraph::new(Line::from(filter_spans)).wrap(Wrap { trim: false }),
-            chunks[0],
+            filter_area,
         );
 
-        // Bordered list
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .padding(Padding::uniform(1))
-            .border_style(Style::default().fg(BORDER_COLOR));
-        let inner = fit_rect(chunks[1], block.inner(chunks[1]));
-        let visible_rows = inner.height.saturating_sub(1) as usize; // -1 for header
-        self.list_viewport.set_height(visible_rows);
-        if !self.filtered_indices.is_empty() {
-            self.list_viewport.reveal(VisualSpan {
-                start: self.selected,
-                height: 1,
-            });
-        }
-        self.list_viewport.clamp(self.filtered_indices.len());
-        let overflow = self
-            .list_viewport
-            .overflow(self.filtered_indices.len())
-            .suffix();
-        let block = block.title(Line::from(vec![
-            Span::styled("── ", Style::default().fg(BORDER_COLOR)),
-            Span::styled(
-                format!("{}{}", tr("log-select-practice"), overflow),
-                Style::default().fg(Color::White).bold(),
-            ),
-            Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
-        ]));
-        frame.render_widget(block, chunks[1]);
-
-        let name_header = tr("practices-col-name");
-        let type_header = tr("practices-col-type");
-        let desired_type_width = self
-            .practices
-            .iter()
-            .map(|practice| practice.practice_type.label().width())
-            .max()
-            .unwrap_or(0)
-            .max(type_header.width());
-        let type_col_width = desired_type_width.min((inner.width as usize) / 3);
-        let name_col_width = (inner.width as usize)
-            .saturating_sub(2)
-            .saturating_sub(2)
-            .saturating_sub(type_col_width);
-        let name_header = truncate_to_width(&name_header, name_col_width);
-        let type_header = truncate_to_width(&type_header, type_col_width);
-        let header_padding = name_col_width
-            .saturating_sub(name_header.width())
-            .saturating_add(2);
-
-        let mut all_lines = vec![Line::from(vec![
-            Span::styled("  ", Style::default().fg(Color::DarkGray)),
-            Span::styled(&name_header, Style::default().fg(Color::DarkGray)),
-            Span::raw(" ".repeat(header_padding)),
-            Span::styled(&type_header, Style::default().fg(Color::DarkGray)),
-        ])];
-
-        let scroll = self.list_viewport.offset();
-        let end = scroll
-            .saturating_add(visible_rows)
-            .min(self.filtered_indices.len());
-
-        for i in scroll..end {
-            let idx = self.filtered_indices[i];
-            let practice = &self.practices[idx];
-            let marker = if i == self.selected { "> " } else { "  " };
-            let name_style = if i == self.selected {
-                Style::default().fg(Color::White).bold()
-            } else {
-                Style::default().fg(Color::White)
-            };
-            let name = truncate_to_width(&practice.name, name_col_width);
-            let padding = name_col_width
-                .saturating_sub(name.width())
-                .saturating_add(2);
-            let type_label = truncate_to_width(&practice.practice_type.label(), type_col_width);
-            all_lines.push(Line::from(vec![
-                Span::styled(marker, name_style),
-                Span::styled(name, name_style),
-                Span::raw(" ".repeat(padding)),
-                Span::styled(type_label, Style::default().fg(Color::Gray)),
-            ]));
-        }
-        frame.render_widget(Paragraph::new(all_lines).wrap(Wrap { trim: false }), inner);
-
-        if !self.filtered_indices.is_empty() && self.selected >= scroll && self.selected < end {
-            highlight_row(
-                frame,
-                inner,
-                ((self.selected - scroll) as u16).saturating_add(1),
-            );
-            // +1 for header
-        }
-
-        render_status_line(frame, outer[1], &self.status_msg);
-
-        render_shortcuts(frame, outer[2], &shortcuts);
+        let practices = &self.practices;
+        let filtered_indices = &self.filtered_indices;
+        let selected = self.selected;
+        render_scrollable_list_panel(
+            frame,
+            list_area,
+            tr("log-select-practice"),
+            &mut self.list_viewport,
+            |inner| {
+                let name_header = tr("practices-col-name");
+                let type_header = tr("practices-col-type");
+                let desired_type_width = practices
+                    .iter()
+                    .map(|practice| practice.practice_type.label().width())
+                    .max()
+                    .unwrap_or(0)
+                    .max(type_header.width());
+                let type_col_width = desired_type_width.min((inner.width as usize) / 3);
+                let name_col_width = (inner.width as usize)
+                    .saturating_sub(2)
+                    .saturating_sub(2)
+                    .saturating_sub(type_col_width);
+                let name_header = truncate_to_width(&name_header, name_col_width);
+                let type_header = truncate_to_width(&type_header, type_col_width);
+                let header_padding = name_col_width
+                    .saturating_sub(name_header.width())
+                    .saturating_add(2);
+                let header = Line::from(vec![
+                    Span::styled("  ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(name_header, Style::default().fg(Color::DarkGray)),
+                    Span::raw(" ".repeat(header_padding)),
+                    Span::styled(type_header, Style::default().fg(Color::DarkGray)),
+                ]);
+                let rows = filtered_indices
+                    .iter()
+                    .enumerate()
+                    .map(|(row_index, index)| {
+                        let practice = &practices[*index];
+                        let marker = if row_index == selected { "> " } else { "  " };
+                        let name_style = if row_index == selected {
+                            Style::default().fg(Color::White).bold()
+                        } else {
+                            Style::default().fg(Color::White)
+                        };
+                        let name = truncate_to_width(&practice.name, name_col_width);
+                        let padding = name_col_width
+                            .saturating_sub(name.width())
+                            .saturating_add(2);
+                        Line::from(vec![
+                            Span::styled(marker, name_style),
+                            Span::styled(name, name_style),
+                            Span::raw(" ".repeat(padding)),
+                            Span::styled(
+                                truncate_to_width(&practice.practice_type.label(), type_col_width),
+                                Style::default().fg(Color::Gray),
+                            ),
+                        ])
+                    })
+                    .collect();
+                ListPanelContent {
+                    header: Some(header),
+                    rows,
+                    empty: None,
+                    selected: (!filtered_indices.is_empty()).then_some(selected),
+                }
+            },
+        );
     }
 
     fn handle_select_practice(&mut self, key: KeyEvent) -> Action {

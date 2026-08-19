@@ -172,6 +172,49 @@ fn dashboard_ownership_violations(source: &str) -> Vec<String> {
     violations
 }
 
+fn method_region(source: &str, start: &str, end: &str) -> String {
+    let start_index = source
+        .find(start)
+        .unwrap_or_else(|| panic!("missing {start}"));
+    let tail = &source[start_index..];
+    let end_index = tail.find(end).unwrap_or_else(|| panic!("missing {end}"));
+    source_code(&tail[..end_index])
+}
+
+fn log_entry_selector_ownership_violations(source: &str) -> Vec<String> {
+    let selector = method_region(
+        source,
+        "fn render_select_practice",
+        "fn handle_select_practice",
+    );
+    let mut violations = Vec::new();
+    for (needle, expected, label) in [
+        ("render_screen_frame_sections(", 1, "ScreenFrameSections"),
+        ("render_scrollable_list_panel(", 1, "ScrollableListPanel"),
+    ] {
+        let actual = selector.match_indices(needle).count();
+        if actual != expected {
+            violations.push(format!(
+                "Log Entry selector must call {label} exactly {expected} time(s); found {actual}"
+            ));
+        }
+    }
+    for forbidden in [
+        ".borders(Borders::ALL)",
+        ".inner(",
+        "render_status_line(",
+        "render_shortcuts(",
+        "highlight_row(",
+        ".skip(",
+        ".take(",
+    ] {
+        if selector.contains(forbidden) {
+            violations.push(format!("Log Entry selector still owns {forbidden}"));
+        }
+    }
+    violations
+}
+
 fn dashboard_heatmap_construction_violations(source: &str) -> Vec<String> {
     let production = dashboard_production_source(source);
     let mut violations = Vec::new();
@@ -1558,6 +1601,36 @@ fn dashboard_ownership_ignores_nonproduction_decoys() {
         .any(|item| item.contains("ScreenFrameSections")));
     assert!(violations.iter().any(|item| item.contains("StaticPanel")));
     assert!(!violations.iter().any(|item| item.contains("Borders::ALL")));
+}
+
+#[test]
+fn log_entry_selector_delegates_shared_presentation() {
+    let source = std::fs::read_to_string("src/tui/log_entry.rs").unwrap();
+    let violations = log_entry_selector_ownership_violations(&source);
+    assert!(violations.is_empty(), "{}", violations.join("\n"));
+}
+
+#[test]
+fn log_entry_selector_ownership_ignores_comments_strings_and_tests() {
+    let source = r###"
+        fn render_select_practice(&mut self) {
+            // render_screen_frame_sections(); render_scrollable_list_panel();
+            let _text = r#"render_scrollable_list_panel("#;
+        }
+        fn handle_select_practice(&mut self) {}
+        #[cfg(test)]
+        fn decoy() {
+            render_screen_frame_sections();
+            render_scrollable_list_panel();
+        }
+    "###;
+    let violations = log_entry_selector_ownership_violations(source);
+    assert!(violations
+        .iter()
+        .any(|item| item.contains("ScreenFrameSections")));
+    assert!(violations
+        .iter()
+        .any(|item| item.contains("ScrollableListPanel")));
 }
 
 #[test]
@@ -3787,9 +3860,9 @@ fn paragraph_widgets_must_wrap_user_content() {
         "dashboard.rs:339",
         "dashboard.rs:359",
         "dashboard.rs:395",
-        "log_entry.rs:544",
-        "log_entry.rs:736",
-        "log_entry.rs:835",
+        "log_entry.rs:512",
+        "log_entry.rs:704",
+        "log_entry.rs:803",
     ]
     .into_iter()
     .collect();
