@@ -1,4 +1,5 @@
 pub mod action_panel;
+pub mod bounded_panel;
 pub mod components;
 pub mod input;
 pub mod list_panel;

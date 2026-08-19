@@ -2,43 +2,15 @@ use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Padding},
+    widgets::Padding,
     Frame,
 };
 
-use crate::tui::{framework::fit_rect, BORDER_COLOR};
+use crate::tui::BORDER_COLOR;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct StaticPanelAreas {
-    pub area: Rect,
-    pub inner: Rect,
-}
+use super::bounded_panel::{render_bounded_panel, BoundedPanelAreas, BoundedPanelSpec};
 
-fn static_panel_geometry(frame_area: Rect, requested_area: Rect) -> StaticPanelAreas {
-    let area = fit_rect(frame_area, requested_area);
-    let geometry = Block::default()
-        .borders(Borders::ALL)
-        .padding(Padding::uniform(1));
-    let inner = fit_rect(area, geometry.inner(area));
-    StaticPanelAreas { area, inner }
-}
-
-fn static_panel_block(title: String) -> Block<'static> {
-    Block::default()
-        .title(Line::from(vec![
-            Span::styled("── ", Style::default().fg(BORDER_COLOR)),
-            Span::styled(
-                title,
-                Style::default()
-                    .fg(Color::White)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
-        ]))
-        .borders(Borders::ALL)
-        .padding(Padding::uniform(1))
-        .border_style(Style::default().fg(BORDER_COLOR))
-}
+pub type StaticPanelAreas = BoundedPanelAreas;
 
 pub fn render_static_panel(
     frame: &mut Frame,
@@ -46,10 +18,25 @@ pub fn render_static_panel(
     title: impl Into<String>,
     render_content: impl FnOnce(&mut Frame, Rect),
 ) -> StaticPanelAreas {
-    let areas = static_panel_geometry(frame.area(), area);
-    frame.render_widget(static_panel_block(title.into()), areas.area);
-    render_content(frame, areas.inner);
-    areas
+    render_bounded_panel(
+        frame,
+        area,
+        BoundedPanelSpec {
+            title: Some(Line::from(vec![
+                Span::styled("── ", Style::default().fg(BORDER_COLOR)),
+                Span::styled(
+                    title.into(),
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(" ──", Style::default().fg(BORDER_COLOR)),
+            ])),
+            border_style: Style::default().fg(BORDER_COLOR),
+            padding: Padding::uniform(1),
+        },
+        render_content,
+    )
 }
 
 #[cfg(test)]
