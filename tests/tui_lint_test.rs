@@ -334,6 +334,15 @@ impl<'ast> Visit<'ast> for LogEntryPatternBindingCollector {
     }
 }
 
+fn log_entry_single_binding_ident(pattern: &syn::Pat) -> Option<&syn::Ident> {
+    match pattern {
+        syn::Pat::Ident(pattern) => Some(&pattern.ident),
+        syn::Pat::Paren(pattern) => log_entry_single_binding_ident(&pattern.pat),
+        syn::Pat::Type(pattern) => log_entry_single_binding_ident(&pattern.pat),
+        _ => None,
+    }
+}
+
 #[derive(Default)]
 struct LogEntryRenderOwnership {
     screen_frame_calls: usize,
@@ -691,17 +700,17 @@ impl<'ast> Visit<'ast> for LogEntryRenderVisitor<'ast> {
         if let syn::Pat::Type(pattern) = &local.pat {
             self.record_pattern_type(&pattern.pat, &pattern.ty);
         }
-        if let (syn::Pat::Ident(pattern), Some(closure)) = (
-            &local.pat,
+        if let (Some(binding), Some(closure)) = (
+            log_entry_single_binding_ident(&local.pat),
             local
                 .init
                 .as_ref()
                 .and_then(|initializer| direct_invoked_closure(&initializer.expr)),
         ) {
-            self.callable_scopes.last_mut().unwrap().insert(
-                pattern.ident.to_string(),
-                LogEntryLocalCallable::Closure(closure),
-            );
+            self.callable_scopes
+                .last_mut()
+                .unwrap()
+                .insert(binding.to_string(), LogEntryLocalCallable::Closure(closure));
         }
     }
 
@@ -2855,6 +2864,46 @@ fn log_entry_ownership_checks_invoked_nested_functions_and_named_closures() {
         }
     "#;
     assert!(log_entry_ownership_violations(uninvoked).is_empty());
+}
+
+#[test]
+fn log_entry_ownership_checks_invoked_typed_named_closures() {
+    let source = r#"
+        use super::framework::{
+            render_bounded_panel,
+            render_screen_frame_sections,
+            render_scrollable_list_panel,
+        };
+        struct LogEntryScreen;
+        impl LogEntryScreen {
+            fn render(&mut self) {
+                self.render_select_practice();
+                self.render_enter_log();
+            }
+            fn render_select_practice(&mut self) {
+                render_screen_frame_sections();
+                render_scrollable_list_panel();
+            }
+            fn render_enter_log(&mut self) {
+                render_screen_frame_sections();
+                render_bounded_panel(); render_bounded_panel();
+                render_bounded_panel(); render_bounded_panel();
+                let forbidden: fn() = || {
+                    Block::default().borders(Borders::ALL);
+                };
+                forbidden();
+            }
+        }
+    "#;
+    let violations = log_entry_ownership_violations(source);
+    assert!(
+        violations.iter().any(|item| item.contains("local Block")),
+        "typed named closure: {violations:?}"
+    );
+    assert!(
+        violations.iter().any(|item| item.contains(".borders")),
+        "typed named closure: {violations:?}"
+    );
 }
 
 #[test]
