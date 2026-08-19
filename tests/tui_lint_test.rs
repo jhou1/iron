@@ -242,6 +242,14 @@ struct LogEntryBinding {
 struct LogEntryScope {
     values: HashMap<String, LogEntryBinding>,
     types: HashMap<String, String>,
+    value_types: HashMap<String, String>,
+}
+
+#[derive(Clone, Copy)]
+enum LogEntryLocalCallable<'ast> {
+    Function(&'ast syn::ItemFn),
+    Closure(&'ast syn::ExprClosure),
+    Shadowed,
 }
 
 fn collect_log_entry_imports(
@@ -362,6 +370,8 @@ impl LogEntryRenderOwnership {
 
 struct LogEntryRenderVisitor<'a> {
     scopes: Vec<LogEntryScope>,
+    callable_scopes: Vec<HashMap<String, LogEntryLocalCallable<'a>>>,
+    active_local_callables: HashSet<String>,
     ownership: LogEntryRenderOwnership,
     _canonical_framework_imports: &'a BTreeSet<String>,
 }
@@ -384,32 +394,24 @@ impl<'a> LogEntryRenderVisitor<'a> {
             scopes: vec![LogEntryScope {
                 values,
                 types: HashMap::new(),
+                value_types: HashMap::new(),
             }],
+            callable_scopes: vec![HashMap::new()],
+            active_local_callables: HashSet::new(),
             ownership: LogEntryRenderOwnership::default(),
             _canonical_framework_imports: canonical_framework_imports,
         }
     }
 
-    fn push_signature_scope(&mut self, method: &syn::ImplItemFn) {
-        let mut scope = LogEntryScope::default();
-        for input in &method.sig.inputs {
+    fn push_signature_scope(&mut self, signature: &syn::Signature) {
+        self.scopes.push(LogEntryScope::default());
+        self.callable_scopes.push(HashMap::new());
+        for input in &signature.inputs {
             if let syn::FnArg::Typed(input) = input {
-                let mut bindings = LogEntryPatternBindingCollector::default();
-                bindings.visit_pat(&input.pat);
-                for name in bindings.names {
-                    if is_log_entry_required_component(&name) {
-                        scope.values.insert(
-                            name.clone(),
-                            LogEntryBinding {
-                                original: name,
-                                canonical_framework_import: false,
-                            },
-                        );
-                    }
-                }
+                self.shadow_pattern(&input.pat);
+                self.record_pattern_type(&input.pat, &input.ty);
             }
         }
-        self.scopes.push(scope);
     }
 
     fn block_scope(&self, block: &syn::Block) -> LogEntryScope {
@@ -429,6 +431,11 @@ impl<'a> LogEntryRenderVisitor<'a> {
                 syn::Item::Static(item) if !is_cfg_test(&item.attrs) => {
                     self.insert_required_shadow(&mut scope, item.ident.to_string());
                 }
+                syn::Item::Type(item) if !is_cfg_test(&item.attrs) => {
+                    if let Some(target) = type_path_name(&item.ty) {
+                        scope.types.insert(item.ident.to_string(), target);
+                    }
+                }
                 syn::Item::Use(item) if !is_cfg_test(&item.attrs) => collect_log_entry_imports(
                     &item.tree,
                     &mut Vec::new(),
@@ -439,6 +446,25 @@ impl<'a> LogEntryRenderVisitor<'a> {
             }
         }
         scope
+    }
+
+    fn block_callable_scope(
+        &self,
+        block: &'a syn::Block,
+    ) -> HashMap<String, LogEntryLocalCallable<'a>> {
+        block
+            .stmts
+            .iter()
+            .filter_map(|statement| match statement {
+                syn::Stmt::Item(syn::Item::Fn(function)) if !is_cfg_test(&function.attrs) => {
+                    Some((
+                        function.sig.ident.to_string(),
+                        LogEntryLocalCallable::Function(function),
+                    ))
+                }
+                _ => None,
+            })
+            .collect()
     }
 
     fn insert_required_shadow(&self, scope: &mut LogEntryScope, name: String) {
@@ -453,6 +479,18 @@ impl<'a> LogEntryRenderVisitor<'a> {
         }
     }
 
+    fn record_pattern_type(&mut self, pattern: &syn::Pat, ty: &syn::Type) {
+        let Some(type_name) = type_path_name(ty) else {
+            return;
+        };
+        let mut bindings = LogEntryPatternBindingCollector::default();
+        bindings.visit_pat(pattern);
+        let scope = self.scopes.last_mut().unwrap();
+        for name in bindings.names {
+            scope.value_types.insert(name, type_name.clone());
+        }
+    }
+
     fn shadow_pattern(&mut self, pattern: &syn::Pat) {
         let mut bindings = LogEntryPatternBindingCollector::default();
         bindings.visit_pat(pattern);
@@ -462,12 +500,50 @@ impl<'a> LogEntryRenderVisitor<'a> {
                 scope.values.insert(
                     name.clone(),
                     LogEntryBinding {
-                        original: name,
+                        original: name.clone(),
                         canonical_framework_import: false,
                     },
                 );
             }
+            self.callable_scopes
+                .last_mut()
+                .unwrap()
+                .insert(name, LogEntryLocalCallable::Shadowed);
         }
+    }
+
+    fn resolve_local_callable(&self, name: &str) -> Option<LogEntryLocalCallable<'a>> {
+        for scope in self.callable_scopes.iter().rev() {
+            if let Some(callable) = scope.get(name) {
+                return match callable {
+                    LogEntryLocalCallable::Function(function) => {
+                        Some(LogEntryLocalCallable::Function(function))
+                    }
+                    LogEntryLocalCallable::Closure(closure) => {
+                        Some(LogEntryLocalCallable::Closure(closure))
+                    }
+                    LogEntryLocalCallable::Shadowed => None,
+                };
+            }
+        }
+        None
+    }
+
+    fn visit_local_callable(&mut self, name: &str, callable: LogEntryLocalCallable<'a>) {
+        if !self.active_local_callables.insert(name.to_owned()) {
+            return;
+        }
+        match callable {
+            LogEntryLocalCallable::Function(function) => {
+                self.push_signature_scope(&function.sig);
+                self.visit_block(&function.block);
+                self.callable_scopes.pop();
+                self.scopes.pop();
+            }
+            LogEntryLocalCallable::Closure(closure) => self.visit_executable_closure(closure),
+            LogEntryLocalCallable::Shadowed => {}
+        }
+        self.active_local_callables.remove(name);
     }
 
     fn resolve_unqualified(&self, local_name: &str) -> Option<&LogEntryBinding> {
@@ -493,12 +569,44 @@ impl<'a> LogEntryRenderVisitor<'a> {
     }
 
     fn resolved_type_name(&self, name: &str) -> String {
-        for scope in self.scopes.iter().rev() {
-            if let Some(original) = scope.types.get(name) {
-                return original.clone();
+        let mut resolved = name.to_owned();
+        let mut visited = HashSet::new();
+        while visited.insert(resolved.clone()) {
+            let Some(next) = self
+                .scopes
+                .iter()
+                .rev()
+                .find_map(|scope| scope.types.get(&resolved))
+            else {
+                break;
+            };
+            if next == &resolved {
+                break;
             }
+            resolved = next.clone();
         }
-        name.to_owned()
+        resolved
+    }
+
+    fn resolved_value_type(&self, name: &str) -> Option<String> {
+        let type_name = self
+            .scopes
+            .iter()
+            .rev()
+            .find_map(|scope| scope.value_types.get(name))?;
+        Some(self.resolved_type_name(type_name))
+    }
+
+    fn receiver_is_block(&self, receiver: &syn::Expr) -> bool {
+        match receiver {
+            syn::Expr::Group(group) => self.receiver_is_block(&group.expr),
+            syn::Expr::Paren(paren) => self.receiver_is_block(&paren.expr),
+            syn::Expr::Path(path) if path.qself.is_none() && path.path.segments.len() == 1 => self
+                .resolved_value_type(&path.path.segments[0].ident.to_string())
+                .is_some_and(|name| name == "Block"),
+            syn::Expr::Reference(reference) => self.receiver_is_block(&reference.expr),
+            _ => false,
+        }
     }
 
     fn is_block_constructor(&self, function: &syn::ExprPath) -> bool {
@@ -544,10 +652,12 @@ impl<'a> LogEntryRenderVisitor<'a> {
 
     fn visit_executable_closure(&mut self, closure: &'a syn::ExprClosure) {
         self.scopes.push(LogEntryScope::default());
+        self.callable_scopes.push(HashMap::new());
         for input in &closure.inputs {
             self.shadow_pattern(input);
         }
         self.visit_expr(&closure.body);
+        self.callable_scopes.pop();
         self.scopes.pop();
     }
 }
@@ -559,13 +669,18 @@ impl<'ast> Visit<'ast> for LogEntryRenderVisitor<'ast> {
 
     fn visit_block(&mut self, block: &'ast syn::Block) {
         self.scopes.push(self.block_scope(block));
+        self.callable_scopes.push(self.block_callable_scope(block));
         for statement in &block.stmts {
             self.visit_stmt(statement);
         }
+        self.callable_scopes.pop();
         self.scopes.pop();
     }
 
     fn visit_local(&mut self, local: &'ast syn::Local) {
+        if is_cfg_test(&local.attrs) {
+            return;
+        }
         if let Some(initializer) = &local.init {
             self.visit_expr(&initializer.expr);
             if let Some((_, diverge)) = &initializer.diverge {
@@ -573,6 +688,28 @@ impl<'ast> Visit<'ast> for LogEntryRenderVisitor<'ast> {
             }
         }
         self.shadow_pattern(&local.pat);
+        if let syn::Pat::Type(pattern) = &local.pat {
+            self.record_pattern_type(&pattern.pat, &pattern.ty);
+        }
+        if let (syn::Pat::Ident(pattern), Some(closure)) = (
+            &local.pat,
+            local
+                .init
+                .as_ref()
+                .and_then(|initializer| direct_invoked_closure(&initializer.expr)),
+        ) {
+            self.callable_scopes.last_mut().unwrap().insert(
+                pattern.ident.to_string(),
+                LogEntryLocalCallable::Closure(closure),
+            );
+        }
+    }
+
+    fn visit_expr(&mut self, expression: &'ast syn::Expr) {
+        if is_cfg_test(log_entry_expr_attrs(expression)) {
+            return;
+        }
+        visit::visit_expr(self, expression);
     }
 
     fn visit_expr_closure(&mut self, closure: &'ast syn::ExprClosure) {
@@ -581,26 +718,32 @@ impl<'ast> Visit<'ast> for LogEntryRenderVisitor<'ast> {
 
     fn visit_arm(&mut self, arm: &'ast syn::Arm) {
         self.scopes.push(LogEntryScope::default());
+        self.callable_scopes.push(HashMap::new());
         self.shadow_pattern(&arm.pat);
         if let Some((_, guard)) = &arm.guard {
             self.visit_expr(guard);
         }
         self.visit_expr(&arm.body);
+        self.callable_scopes.pop();
         self.scopes.pop();
     }
 
     fn visit_expr_for_loop(&mut self, expression: &'ast syn::ExprForLoop) {
         self.visit_expr(&expression.expr);
         self.scopes.push(LogEntryScope::default());
+        self.callable_scopes.push(HashMap::new());
         self.shadow_pattern(&expression.pat);
         self.visit_block(&expression.body);
+        self.callable_scopes.pop();
         self.scopes.pop();
     }
 
     fn visit_expr_if(&mut self, expression: &'ast syn::ExprIf) {
         self.scopes.push(LogEntryScope::default());
+        self.callable_scopes.push(HashMap::new());
         self.visit_condition_with_bindings(&expression.cond);
         self.visit_block(&expression.then_branch);
+        self.callable_scopes.pop();
         self.scopes.pop();
         if let Some((_, else_branch)) = &expression.else_branch {
             self.visit_expr(else_branch);
@@ -609,8 +752,10 @@ impl<'ast> Visit<'ast> for LogEntryRenderVisitor<'ast> {
 
     fn visit_expr_while(&mut self, expression: &'ast syn::ExprWhile) {
         self.scopes.push(LogEntryScope::default());
+        self.callable_scopes.push(HashMap::new());
         self.visit_condition_with_bindings(&expression.cond);
         self.visit_block(&expression.body);
+        self.callable_scopes.pop();
         self.scopes.pop();
     }
 
@@ -623,6 +768,14 @@ impl<'ast> Visit<'ast> for LogEntryRenderVisitor<'ast> {
             return;
         }
         if let syn::Expr::Path(function) = call.func.as_ref() {
+            let unqualified_name = (function.qself.is_none() && function.path.segments.len() == 1)
+                .then(|| function.path.segments[0].ident.to_string());
+            if let Some((name, callable)) = unqualified_name.as_deref().and_then(|name| {
+                self.resolve_local_callable(name)
+                    .map(|callable| (name, callable))
+            }) {
+                self.visit_local_callable(name, callable);
+            }
             let (called_name, canonical_framework_import) = self.resolved_call(function);
             let executes_callback =
                 canonical_framework_import && is_log_entry_required_component(&called_name);
@@ -665,6 +818,9 @@ impl<'ast> Visit<'ast> for LogEntryRenderVisitor<'ast> {
     fn visit_expr_method_call(&mut self, call: &'ast syn::ExprMethodCall) {
         match call.method.to_string().as_str() {
             "borders" => self.ownership.borders_method_calls += 1,
+            "inner" if self.receiver_is_block(&call.receiver) => {
+                self.ownership.block_constructor_calls += 1;
+            }
             "skip" => self.ownership.selector_skip_calls += 1,
             "take" => self.ownership.selector_take_calls += 1,
             _ => {}
@@ -770,6 +926,11 @@ fn log_entry_ownership_violations(source: &str) -> Vec<String> {
                     );
                 }
             }
+            syn::Item::Type(item) if !is_cfg_test(&item.attrs) => {
+                if let Some(target) = type_path_name(&item.ty) {
+                    root_scope.types.insert(item.ident.to_string(), target);
+                }
+            }
             _ => {}
         }
     }
@@ -800,8 +961,9 @@ fn log_entry_ownership_violations(source: &str) -> Vec<String> {
                 .values
                 .insert(name.clone(), binding.clone());
         }
-        visitor.push_signature_scope(method);
+        visitor.push_signature_scope(&method.sig);
         visitor.visit_block(&method.block);
+        visitor.callable_scopes.pop();
         visitor.scopes.pop();
         pending.extend(
             visitor
@@ -925,6 +1087,25 @@ fn is_cfg_test(attrs: &[syn::Attribute]) -> bool {
                 )
                 .is_ok_and(|items| items.iter().any(meta_is_test_only))
     })
+}
+
+fn log_entry_expr_attrs(expression: &syn::Expr) -> &[syn::Attribute] {
+    macro_rules! attrs {
+        ($($variant:ident),+ $(,)?) => {
+            match expression {
+                $(syn::Expr::$variant(expression) => &expression.attrs,)+
+                syn::Expr::Verbatim(_) => &[],
+                _ => &[],
+            }
+        };
+    }
+
+    attrs!(
+        Array, Assign, Async, Await, Binary, Block, Break, Call, Cast, Closure, Const, Continue,
+        Field, ForLoop, Group, If, Index, Infer, Let, Lit, Loop, Macro, Match, MethodCall, Paren,
+        Path, Range, RawAddr, Reference, Repeat, Return, Struct, Try, TryBlock, Tuple, Unary,
+        Unsafe, While, Yield,
+    )
 }
 
 fn collect_ownership_aliases(tree: &syn::UseTree, aliases: &mut HashMap<String, String>) {
@@ -2508,6 +2689,255 @@ fn log_entry_ownership_rejects_aliased_ufcs_block_ownership() {
         violations.iter().any(|item| item.contains(".borders")),
         "{violations:?}"
     );
+}
+
+#[test]
+fn log_entry_ownership_excludes_pure_test_statements_but_keeps_production_cfg() {
+    let test_only = r#"
+        use super::framework::{
+            render_bounded_panel,
+            render_screen_frame_sections,
+            render_scrollable_list_panel,
+        };
+        struct LogEntryScreen;
+        impl LogEntryScreen {
+            fn render(&mut self) {
+                self.render_select_practice();
+                self.render_enter_log();
+            }
+            fn render_select_practice(&mut self) {
+                #[cfg(test)]
+                render_screen_frame_sections();
+                #[cfg(test)]
+                let _list = render_scrollable_list_panel();
+            }
+            fn render_enter_log(&mut self) {
+                #[cfg(test)]
+                render_screen_frame_sections();
+                #[cfg(test)]
+                let _one = render_bounded_panel();
+                #[cfg(test)]
+                let _two = render_bounded_panel();
+                #[cfg(test)]
+                let _three = render_bounded_panel();
+                #[cfg(test)]
+                let _four = render_bounded_panel();
+            }
+        }
+    "#;
+    let violations = log_entry_ownership_violations(test_only);
+    for component in ["ScreenFrameSections", "ScrollableListPanel", "BoundedPanel"] {
+        assert!(
+            violations
+                .iter()
+                .any(|item| item.contains(component) && item.contains("found 0")),
+            "{component}: {violations:?}"
+        );
+    }
+
+    for cfg in ["not(test)", "any(test, feature = \"production\")"] {
+        let production_relevant = format!(
+            r#"
+                use super::framework::{{
+                    render_bounded_panel,
+                    render_screen_frame_sections,
+                    render_scrollable_list_panel,
+                }};
+                struct LogEntryScreen;
+                impl LogEntryScreen {{
+                    fn render(&mut self) {{
+                        self.render_select_practice();
+                        self.render_enter_log();
+                    }}
+                    fn render_select_practice(&mut self) {{
+                        #[cfg({cfg})]
+                        render_screen_frame_sections();
+                        #[cfg({cfg})]
+                        let _list = render_scrollable_list_panel();
+                    }}
+                    fn render_enter_log(&mut self) {{
+                        #[cfg({cfg})]
+                        render_screen_frame_sections();
+                        #[cfg({cfg})]
+                        let _one = render_bounded_panel();
+                        #[cfg({cfg})]
+                        let _two = render_bounded_panel();
+                        #[cfg({cfg})]
+                        let _three = render_bounded_panel();
+                        #[cfg({cfg})]
+                        let _four = render_bounded_panel();
+                    }}
+                }}
+            "#
+        );
+        assert!(
+            log_entry_ownership_violations(&production_relevant).is_empty(),
+            "cfg({cfg}) must remain production-relevant"
+        );
+    }
+}
+
+#[test]
+fn log_entry_ownership_checks_invoked_nested_functions_and_named_closures() {
+    for (label, declaration, invocation) in [
+        (
+            "nested function",
+            "fn forbidden() { Block::default().borders(Borders::ALL); }",
+            "forbidden();",
+        ),
+        (
+            "named closure",
+            "let forbidden = || { Block::default().borders(Borders::ALL); };",
+            "forbidden();",
+        ),
+    ] {
+        let source = format!(
+            r#"
+                use super::framework::{{
+                    render_bounded_panel,
+                    render_screen_frame_sections,
+                    render_scrollable_list_panel,
+                }};
+                struct LogEntryScreen;
+                impl LogEntryScreen {{
+                    fn render(&mut self) {{
+                        self.render_select_practice();
+                        self.render_enter_log();
+                    }}
+                    fn render_select_practice(&mut self) {{
+                        render_screen_frame_sections();
+                        render_scrollable_list_panel();
+                    }}
+                    fn render_enter_log(&mut self) {{
+                        render_screen_frame_sections();
+                        render_bounded_panel(); render_bounded_panel();
+                        render_bounded_panel(); render_bounded_panel();
+                        {declaration}
+                        {invocation}
+                    }}
+                }}
+            "#
+        );
+        let violations = log_entry_ownership_violations(&source);
+        assert!(
+            violations.iter().any(|item| item.contains("local Block")),
+            "{label}: {violations:?}"
+        );
+        assert!(
+            violations.iter().any(|item| item.contains(".borders")),
+            "{label}: {violations:?}"
+        );
+    }
+
+    let uninvoked = r#"
+        use super::framework::{
+            render_bounded_panel,
+            render_screen_frame_sections,
+            render_scrollable_list_panel,
+        };
+        struct LogEntryScreen;
+        impl LogEntryScreen {
+            fn render(&mut self) {
+                self.render_select_practice();
+                self.render_enter_log();
+            }
+            fn render_select_practice(&mut self) {
+                render_screen_frame_sections();
+                render_scrollable_list_panel();
+            }
+            fn render_enter_log(&mut self) {
+                render_screen_frame_sections();
+                render_bounded_panel(); render_bounded_panel();
+                render_bounded_panel(); render_bounded_panel();
+                fn dead_function() { Block::default().borders(Borders::ALL); }
+                let _dead_closure = || { Block::default().borders(Borders::ALL); };
+            }
+        }
+    "#;
+    assert!(log_entry_ownership_violations(uninvoked).is_empty());
+}
+
+#[test]
+fn log_entry_ownership_resolves_block_inner_and_type_aliases_precisely() {
+    for (label, root_declaration, local_ownership) in [
+        (
+            "method-form inner",
+            "fn obtain_block() -> Block<'static> { todo!() }",
+            "let panel: Block<'static> = obtain_block(); panel.inner(area);",
+        ),
+        (
+            "root type alias",
+            "type Panel<'a> = Block<'a>;",
+            "Panel::default();",
+        ),
+        (
+            "local type alias",
+            "",
+            "type Panel<'a> = Block<'a>; Panel::bordered();",
+        ),
+    ] {
+        let source = format!(
+            r#"
+                use super::framework::{{
+                    render_bounded_panel,
+                    render_screen_frame_sections,
+                    render_scrollable_list_panel,
+                }};
+                use ratatui::widgets::Block;
+                {root_declaration}
+                struct LogEntryScreen;
+                impl LogEntryScreen {{
+                    fn render(&mut self) {{
+                        self.render_select_practice();
+                        self.render_enter_log();
+                    }}
+                    fn render_select_practice(&mut self) {{
+                        render_screen_frame_sections();
+                        render_scrollable_list_panel();
+                    }}
+                    fn render_enter_log(&mut self) {{
+                        render_screen_frame_sections();
+                        render_bounded_panel(); render_bounded_panel();
+                        render_bounded_panel(); render_bounded_panel();
+                        {local_ownership}
+                    }}
+                }}
+            "#
+        );
+        let violations = log_entry_ownership_violations(&source);
+        assert!(
+            violations.iter().any(|item| item.contains("local Block")),
+            "{label}: {violations:?}"
+        );
+    }
+
+    let unrelated_inner = r#"
+        use super::framework::{
+            render_bounded_panel,
+            render_screen_frame_sections,
+            render_scrollable_list_panel,
+        };
+        struct Domain;
+        struct LogEntryScreen;
+        impl LogEntryScreen {
+            fn render(&mut self) {
+                self.render_select_practice();
+                self.render_enter_log();
+            }
+            fn render_select_practice(&mut self) {
+                render_screen_frame_sections();
+                render_scrollable_list_panel();
+            }
+            fn render_enter_log(&mut self) {
+                render_screen_frame_sections();
+                render_bounded_panel(); render_bounded_panel();
+                render_bounded_panel(); render_bounded_panel();
+                let domain: Domain = todo!();
+                domain.inner(area);
+            }
+        }
+    "#;
+    assert!(log_entry_ownership_violations(unrelated_inner).is_empty());
 }
 
 #[test]
