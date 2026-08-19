@@ -1,9 +1,7 @@
 # TUI Consistency Framework Design
 
 **Date:** 2026-08-10
-**Status:** Batches 1, 2, 3A, 3B-1, 3B-2, 3B-3, 3B-4, 3B-5 Goals, and 3B-6 Dashboard complete
-
-Log Entry form extraction remains unshipped.
+**Status:** Batches 1, 2, 3A, 3B-1, 3B-2, 3B-3, 3B-4, 3B-5 Goals, 3B-6 Dashboard, and 3B-7 Log Entry complete
 **Branch:** `codex/tui-consistency`
 **Base:** validated Goals milestone-management implementation (`0069c04`)
 
@@ -33,7 +31,7 @@ The project has replaced those repeated interaction mechanisms with a unified TU
 
 ## Architecture
 
-`src/tui/framework/` provides eight focused units.
+`src/tui/framework/` provides nine focused units.
 
 ### `viewport.rs`
 
@@ -75,15 +73,19 @@ Provides `ScreenFrame`, which centers a screen body and reserves its body sectio
 
 ### `list_panel.rs`
 
-Provides `ScrollableListPanel`, which owns bordered-list geometry, title and overflow markers, viewport reveal and clamp, visible-row slicing, and selected-row highlighting. Practices, Quotes, Trends, and History provide already-formatted rows and retain their domain selection policies. Its existing API remains accepted; the backward-compatible `render_scrollable_list_panel_spanned` sibling adds measured multi-line selection reveal/highlighting for Goals without changing those consumers.
+Provides `ScrollableListPanel`, which owns bordered-list geometry, title and overflow markers, viewport reveal and clamp, visible-row slicing, and selected-row highlighting. Practices, Quotes, Trends, History, and Log Entry provide already-formatted rows and retain their domain selection policies. Its existing API remains accepted; the backward-compatible `render_scrollable_list_panel_spanned` sibling adds measured multi-line selection reveal/highlighting for Goals without changing those consumers.
 
 ### `action_panel.rs`
 
 Provides `ActionPanel`, which bounds contextual action content and its selected-row highlighting. Practices and Quotes consume it for their applicable modes; Trends does not use `ActionPanel` because its filter and specialized Sparkline/statistics panel remain screen-owned.
 
+### `bounded_panel.rs`
+
+Provides `BoundedPanel`, a presentation-only primitive for clipped border, caller-provided title and padding, and safe-inner geometry. It has no screen, domain, state, input, viewport, status, shortcut, or database knowledge. Log Entry uses four instances for its existing form panels.
+
 ### `static_panel.rs`
 
-Provides `StaticPanel`, a presentation-only sibling for clipped border, decorated title, padding, and safe-inner geometry. It accepts a one-shot content closure and returns the exact clipped outer and inner rectangles. It has no screen, domain, state, status, shortcut, selection, viewport, or database knowledge.
+Provides `StaticPanel`, a presentation-only compatibility wrapper over `BoundedPanel` for clipped border, decorated title, padding, and safe-inner geometry. It accepts a one-shot content closure and returns the exact clipped outer and inner rectangles. It has no screen, domain, state, status, shortcut, selection, viewport, or database knowledge.
 
 ### `test_support.rs`
 
@@ -221,7 +223,11 @@ Goals retains its database operations, navigation topology, atomic target prepar
 
 Batch 3B-6 freezes three immutable `80x35` styled-buffer fixtures for populated Normal, HRV-input, and quit-confirmation Dashboard states. A deterministic Heatmap seam supplies the fixture date, while production Dashboard rendering continues to obtain the current local date.
 
-Dashboard uses `ScreenFrameSections` once to allocate its existing seven body constraints with status and active-mode shortcuts reserved, and uses four `StaticPanel` instances for Heatmap, Summary, Recent, and Goals. `StaticPanel` owns clipped border/title/padding/safe-inner geometry; Dashboard retains all domain formatting, data queries, HRV editor and failure retention, Recent and Goals layout, navigation, shortcuts, and lifecycle behavior. Zero, tiny, clipped-edge, and resized render targets remain geometry-safe. This presentation extraction does not change Dashboard visual output, routes, intents, preparation, re-entry, or shortcuts. Log Entry form extraction remains unshipped.
+Dashboard uses `ScreenFrameSections` once to allocate its existing seven body constraints with status and active-mode shortcuts reserved, and uses four `StaticPanel` instances for Heatmap, Summary, Recent, and Goals. `StaticPanel` owns clipped border/title/padding/safe-inner geometry; Dashboard retains all domain formatting, data queries, HRV editor and failure retention, Recent and Goals layout, navigation, shortcuts, and lifecycle behavior. Zero, tiny, clipped-edge, and resized render targets remain geometry-safe. This presentation extraction does not change Dashboard visual output, routes, intents, preparation, re-entry, or shortcuts.
+
+### Batch 3B-7: Log Entry Presentation Components — Complete
+
+Batch 3B-7 freezes eight immutable `80x24` styled-buffer fixtures for practice browse, filtered browse, weighted entry, set edit, date edit, focused long Note, exit confirmation, and existing-log edit. Log Entry uses `ScreenFrameSections` twice: once with one `ScrollableListPanel` for practice selection and once with four `BoundedPanel` instances for the Date, Sets, warm-up/cool-down/RPE, and Note panels. The components own only shared presentation mechanics. Log Entry retains its domain state, field and set formatting, dynamic height, totals, filtering, validation, persistence, stable edit identity, navigation, failure retention, and active-mode shortcuts. This presentation extraction preserves visual output, routes, intents, target preparation, request-scoped construction, lifecycle behavior, and shortcuts; small, clipped, and resized render targets remain safe.
 
 ## Testing Strategy
 

@@ -10,6 +10,12 @@ SelectPractice -> EnterLog -> save
 
 New logs return to Dashboard after a successful save. History emits `EditHistoryLog { log_id }`; target preparation resolves that exact stable database ID before constructing the edit form. Logs opened this way keep the original log identity and return to History after a successful update or confirmed cancellation.
 
+## Shared Presentation Ownership
+
+Batch 3B-7 is shipped. Log Entry uses two `ScreenFrameSections` frames, one `ScrollableListPanel` for practice selection, and four `BoundedPanel` instances for the entry form. The shared components own only frame, border, title, padding, safe-inner geometry, list viewport, selected-row highlight, status, and shortcut presentation; Log Entry retains its domain state, filtering, field formatting, validation, persistence, navigation, and lifecycle behavior.
+
+Eight immutable styled-buffer fixtures preserve exact `80x24` parity for populated and filtered practice selection, weighted entry, set edit, date edit, long focused note, exit confirmation, and pre-populated edit states. Direct rendering remains safe for small rectangles, including `24x10`, without changing any behavior contract.
+
 ## Practice Selection
 
 The selector shows active practices in Name and Type columns above a reserved status row and active-mode shortcut footer.

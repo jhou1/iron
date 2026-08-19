@@ -48,9 +48,9 @@ LANG=zh_CN.UTF-8 iron  # 中文界面
 
 现有的 Dashboard 导航路径和快捷键保持不变。打开 Dashboard、History、Trends、Practices、Goals 或 Quotes 时，应用会先重新读取数据库中的最新数据，再切换界面。在适用的界面中，会通过稳定 ID 恢复同一条目，并保留当前筛选条件、视口、已聚焦的详情以及 Trends 的时间窗口。重新进入界面时，未完成的新增、编辑、日期修改和删除确认状态、旧状态消息以及跨界面的撤销数据都会被清除。
 
-从 History 编辑记录时，导航会携带所选训练记录的稳定 ID，因此即使数据发生变化，Log Entry 也会打开准确的目标记录。目标准备是原子的：如果目标界面刷新失败，应用会停留在来源界面，保留其当前状态和缓存的目标界面，并显示错误。Batch 3A 已交付这套生命周期行为。Batch 3B-1 的 Practices、Batch 3B-2 的 Quotes、Batch 3B-3 的 Trends、Batch 3B-4 的 History、Batch 3B-5 的 Goals 和 Batch 3B-6 的 Dashboard 均已交付。Goals 是本轮唯一获批准的呈现层重设计。
+从 History 编辑记录时，导航会携带所选训练记录的稳定 ID，因此即使数据发生变化，Log Entry 也会打开准确的目标记录。目标准备是原子的：如果目标界面刷新失败，应用会停留在来源界面，保留其当前状态和缓存的目标界面，并显示错误。Batch 3A 已交付这套生命周期行为。Batch 3B-1 的 Practices、Batch 3B-2 的 Quotes、Batch 3B-3 的 Trends、Batch 3B-4 的 History、Batch 3B-5 的 Goals、Batch 3B-6 的 Dashboard 和 Batch 3B-7 的 Log Entry 均已交付。Goals 是本轮唯一获批准的呈现层重设计。
 
-Batch 3B-6 已将 Dashboard 的外框和静态面板呈现所有权迁移到共享组件，视觉和快捷键均未改变。Log Entry 表单抽取仍未交付。
+Batch 3B-6 已将 Dashboard 的外框和静态面板呈现所有权迁移到共享组件，视觉和快捷键均未改变。Batch 3B-7 已将 Log Entry 的呈现所有权迁移到共享框架、一个共享列表面板和四个有界面板，视觉、快捷键、路由和生命周期均未改变。
 
 ### 仪表盘 (Dashboard)
 
