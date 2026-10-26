@@ -324,75 +324,75 @@ area	x=0	y=0	width=80	height=35
 2,4	" "	Reset	Reset	NONE	false
 3,4	" "	Reset	Reset	NONE	false
 4,4	" "	Reset	Reset	NONE	false
-5,4	"A"	Gray	Reset	NONE	false
-6,4	"u"	Gray	Reset	NONE	false
-7,4	"g"	Gray	Reset	NONE	false
+5,4	"D"	Gray	Reset	NONE	false
+6,4	"e"	Gray	Reset	NONE	false
+7,4	"c"	Gray	Reset	NONE	false
 8,4	" "	Reset	Reset	NONE	false
-9,4	"S"	Gray	Reset	NONE	false
-10,4	"e"	Gray	Reset	NONE	false
-11,4	"p"	Gray	Reset	NONE	false
-12,4	" "	Reset	Reset	NONE	false
-13,4	" "	Reset	Reset	NONE	false
+9,4	" "	Reset	Reset	NONE	false
+10,4	" "	Reset	Reset	NONE	false
+11,4	"J"	Gray	Reset	NONE	false
+12,4	"a"	Gray	Reset	NONE	false
+13,4	"n"	Gray	Reset	NONE	false
 14,4	" "	Reset	Reset	NONE	false
 15,4	" "	Reset	Reset	NONE	false
 16,4	" "	Reset	Reset	NONE	false
-17,4	"O"	Gray	Reset	NONE	false
-18,4	"c"	Gray	Reset	NONE	false
-19,4	"t"	Gray	Reset	NONE	false
-20,4	" "	Reset	Reset	NONE	false
-21,4	" "	Reset	Reset	NONE	false
+17,4	" "	Reset	Reset	NONE	false
+18,4	" "	Reset	Reset	NONE	false
+19,4	"F"	Gray	Reset	NONE	false
+20,4	"e"	Gray	Reset	NONE	false
+21,4	"b"	Gray	Reset	NONE	false
 22,4	" "	Reset	Reset	NONE	false
 23,4	" "	Reset	Reset	NONE	false
 24,4	" "	Reset	Reset	NONE	false
-25,4	"N"	Gray	Reset	NONE	false
-26,4	"o"	Gray	Reset	NONE	false
-27,4	"v"	Gray	Reset	NONE	false
-28,4	" "	Reset	Reset	NONE	false
-29,4	" "	Reset	Reset	NONE	false
+25,4	" "	Reset	Reset	NONE	false
+26,4	" "	Reset	Reset	NONE	false
+27,4	"M"	Gray	Reset	NONE	false
+28,4	"a"	Gray	Reset	NONE	false
+29,4	"r"	Gray	Reset	NONE	false
 30,4	" "	Reset	Reset	NONE	false
 31,4	" "	Reset	Reset	NONE	false
 32,4	" "	Reset	Reset	NONE	false
-33,4	"D"	Gray	Reset	NONE	false
-34,4	"e"	Gray	Reset	NONE	false
-35,4	"c"	Gray	Reset	NONE	false
+33,4	" "	Reset	Reset	NONE	false
+34,4	" "	Reset	Reset	NONE	false
+35,4	" "	Reset	Reset	NONE	false
 36,4	" "	Reset	Reset	NONE	false
-37,4	" "	Reset	Reset	NONE	false
-38,4	" "	Reset	Reset	NONE	false
-39,4	" "	Reset	Reset	NONE	false
+37,4	"A"	Gray	Reset	NONE	false
+38,4	"p"	Gray	Reset	NONE	false
+39,4	"r"	Gray	Reset	NONE	false
 40,4	" "	Reset	Reset	NONE	false
 41,4	" "	Reset	Reset	NONE	false
 42,4	" "	Reset	Reset	NONE	false
-43,4	"J"	Gray	Reset	NONE	false
-44,4	"a"	Gray	Reset	NONE	false
-45,4	"n"	Gray	Reset	NONE	false
-46,4	" "	Reset	Reset	NONE	false
-47,4	" "	Reset	Reset	NONE	false
+43,4	" "	Reset	Reset	NONE	false
+44,4	" "	Reset	Reset	NONE	false
+45,4	"M"	Gray	Reset	NONE	false
+46,4	"a"	Gray	Reset	NONE	false
+47,4	"y"	Gray	Reset	NONE	false
 48,4	" "	Reset	Reset	NONE	false
 49,4	" "	Reset	Reset	NONE	false
 50,4	" "	Reset	Reset	NONE	false
-51,4	"F"	Gray	Reset	NONE	false
-52,4	"e"	Gray	Reset	NONE	false
-53,4	"b"	Gray	Reset	NONE	false
-54,4	" "	Reset	Reset	NONE	false
-55,4	" "	Reset	Reset	NONE	false
+51,4	" "	Reset	Reset	NONE	false
+52,4	" "	Reset	Reset	NONE	false
+53,4	"J"	Gray	Reset	NONE	false
+54,4	"u"	Gray	Reset	NONE	false
+55,4	"n"	Gray	Reset	NONE	false
 56,4	" "	Reset	Reset	NONE	false
 57,4	" "	Reset	Reset	NONE	false
 58,4	" "	Reset	Reset	NONE	false
-59,4	"M"	Gray	Reset	NONE	false
-60,4	"a"	Gray	Reset	NONE	false
-61,4	"r"	Gray	Reset	NONE	false
+59,4	" "	Reset	Reset	NONE	false
+60,4	" "	Reset	Reset	NONE	false
+61,4	" "	Reset	Reset	NONE	false
 62,4	" "	Reset	Reset	NONE	false
-63,4	" "	Reset	Reset	NONE	false
-64,4	" "	Reset	Reset	NONE	false
-65,4	" "	Reset	Reset	NONE	false
+63,4	"J"	Gray	Reset	NONE	false
+64,4	"u"	Gray	Reset	NONE	false
+65,4	"l"	Gray	Reset	NONE	false
 66,4	" "	Reset	Reset	NONE	false
 67,4	" "	Reset	Reset	NONE	false
 68,4	" "	Reset	Reset	NONE	false
-69,4	"A"	Gray	Reset	NONE	false
-70,4	"p"	Gray	Reset	NONE	false
-71,4	"r"	Gray	Reset	NONE	false
-72,4	" "	Reset	Reset	NONE	false
-73,4	" "	Reset	Reset	NONE	false
+69,4	" "	Reset	Reset	NONE	false
+70,4	" "	Reset	Reset	NONE	false
+71,4	"A"	Gray	Reset	NONE	false
+72,4	"u"	Gray	Reset	NONE	false
+73,4	"g"	Gray	Reset	NONE	false
 74,4	" "	Reset	Reset	NONE	false
 75,4	" "	Reset	Reset	NONE	false
 76,4	" "	Reset	Reset	NONE	false
@@ -404,77 +404,77 @@ area	x=0	y=0	width=80	height=35
 2,5	"M"	Gray	Reset	NONE	false
 3,5	"o"	Gray	Reset	NONE	false
 4,5	" "	Reset	Reset	NONE	false
-5,5	"●"	Indexed(240)	Reset	NONE	false
+5,5	"·"	Indexed(240)	Reset	NONE	false
 6,5	" "	Reset	Reset	NONE	false
-7,5	"●"	Indexed(240)	Reset	NONE	false
+7,5	"·"	Indexed(240)	Reset	NONE	false
 8,5	" "	Reset	Reset	NONE	false
-9,5	"●"	Indexed(240)	Reset	NONE	false
+9,5	"·"	Indexed(240)	Reset	NONE	false
 10,5	" "	Reset	Reset	NONE	false
-11,5	"●"	Indexed(240)	Reset	NONE	false
+11,5	"·"	Indexed(240)	Reset	NONE	false
 12,5	" "	Reset	Reset	NONE	false
-13,5	"●"	Indexed(240)	Reset	NONE	false
+13,5	"·"	Indexed(240)	Reset	NONE	false
 14,5	" "	Reset	Reset	NONE	false
-15,5	"●"	Indexed(240)	Reset	NONE	false
+15,5	"·"	Indexed(240)	Reset	NONE	false
 16,5	" "	Reset	Reset	NONE	false
-17,5	"●"	Indexed(240)	Reset	NONE	false
+17,5	"·"	Indexed(240)	Reset	NONE	false
 18,5	" "	Reset	Reset	NONE	false
-19,5	"●"	Indexed(240)	Reset	NONE	false
+19,5	"·"	Indexed(240)	Reset	NONE	false
 20,5	" "	Reset	Reset	NONE	false
-21,5	"●"	Indexed(240)	Reset	NONE	false
+21,5	"·"	Indexed(240)	Reset	NONE	false
 22,5	" "	Reset	Reset	NONE	false
-23,5	"●"	Indexed(240)	Reset	NONE	false
+23,5	"·"	Indexed(240)	Reset	NONE	false
 24,5	" "	Reset	Reset	NONE	false
-25,5	"●"	Indexed(240)	Reset	NONE	false
+25,5	"·"	Indexed(240)	Reset	NONE	false
 26,5	" "	Reset	Reset	NONE	false
-27,5	"●"	Indexed(240)	Reset	NONE	false
+27,5	"·"	Indexed(240)	Reset	NONE	false
 28,5	" "	Reset	Reset	NONE	false
-29,5	"●"	Indexed(240)	Reset	NONE	false
+29,5	"·"	Indexed(240)	Reset	NONE	false
 30,5	" "	Reset	Reset	NONE	false
-31,5	"●"	Indexed(240)	Reset	NONE	false
+31,5	"·"	Indexed(240)	Reset	NONE	false
 32,5	" "	Reset	Reset	NONE	false
-33,5	"●"	Indexed(240)	Reset	NONE	false
+33,5	"·"	Indexed(240)	Reset	NONE	false
 34,5	" "	Reset	Reset	NONE	false
-35,5	"●"	Indexed(240)	Reset	NONE	false
+35,5	"·"	Indexed(240)	Reset	NONE	false
 36,5	" "	Reset	Reset	NONE	false
-37,5	"●"	Indexed(240)	Reset	NONE	false
+37,5	"·"	Indexed(240)	Reset	NONE	false
 38,5	" "	Reset	Reset	NONE	false
-39,5	"●"	Indexed(240)	Reset	NONE	false
+39,5	"·"	Indexed(240)	Reset	NONE	false
 40,5	" "	Reset	Reset	NONE	false
-41,5	"●"	Indexed(240)	Reset	NONE	false
+41,5	"·"	Indexed(240)	Reset	NONE	false
 42,5	" "	Reset	Reset	NONE	false
-43,5	"●"	Indexed(240)	Reset	NONE	false
+43,5	"·"	Indexed(240)	Reset	NONE	false
 44,5	" "	Reset	Reset	NONE	false
-45,5	"●"	Indexed(240)	Reset	NONE	false
+45,5	"·"	Indexed(240)	Reset	NONE	false
 46,5	" "	Reset	Reset	NONE	false
-47,5	"●"	Indexed(240)	Reset	NONE	false
+47,5	"·"	Indexed(240)	Reset	NONE	false
 48,5	" "	Reset	Reset	NONE	false
-49,5	"●"	Indexed(240)	Reset	NONE	false
+49,5	"·"	Indexed(240)	Reset	NONE	false
 50,5	" "	Reset	Reset	NONE	false
-51,5	"●"	Indexed(240)	Reset	NONE	false
+51,5	"·"	Indexed(240)	Reset	NONE	false
 52,5	" "	Reset	Reset	NONE	false
-53,5	"●"	Indexed(240)	Reset	NONE	false
+53,5	"·"	Indexed(240)	Reset	NONE	false
 54,5	" "	Reset	Reset	NONE	false
-55,5	"●"	Indexed(240)	Reset	NONE	false
+55,5	"·"	Indexed(240)	Reset	NONE	false
 56,5	" "	Reset	Reset	NONE	false
-57,5	"●"	Indexed(240)	Reset	NONE	false
+57,5	"·"	Indexed(240)	Reset	NONE	false
 58,5	" "	Reset	Reset	NONE	false
-59,5	"●"	Indexed(240)	Reset	NONE	false
+59,5	"·"	Indexed(240)	Reset	NONE	false
 60,5	" "	Reset	Reset	NONE	false
-61,5	"●"	Indexed(240)	Reset	NONE	false
+61,5	"·"	Indexed(240)	Reset	NONE	false
 62,5	" "	Reset	Reset	NONE	false
-63,5	"●"	Indexed(240)	Reset	NONE	false
+63,5	"·"	Indexed(240)	Reset	NONE	false
 64,5	" "	Reset	Reset	NONE	false
-65,5	"●"	Indexed(240)	Reset	NONE	false
+65,5	"·"	Indexed(240)	Reset	NONE	false
 66,5	" "	Reset	Reset	NONE	false
-67,5	"●"	Indexed(240)	Reset	NONE	false
+67,5	"·"	Indexed(240)	Reset	NONE	false
 68,5	" "	Reset	Reset	NONE	false
-69,5	"●"	Indexed(240)	Reset	NONE	false
+69,5	"·"	Indexed(240)	Reset	NONE	false
 70,5	" "	Reset	Reset	NONE	false
-71,5	"●"	Indexed(240)	Reset	NONE	false
+71,5	"·"	Indexed(240)	Reset	NONE	false
 72,5	" "	Reset	Reset	NONE	false
-73,5	"●"	Indexed(240)	Reset	NONE	false
+73,5	"·"	Indexed(240)	Reset	NONE	false
 74,5	" "	Reset	Reset	NONE	false
-75,5	"●"	Indexed(240)	Reset	NONE	false
+75,5	"✔"	Green	Reset	NONE	false
 76,5	" "	Reset	Reset	NONE	false
 77,5	" "	Reset	Reset	NONE	false
 78,5	" "	Reset	Reset	NONE	false
@@ -484,77 +484,77 @@ area	x=0	y=0	width=80	height=35
 2,6	"T"	Gray	Reset	NONE	false
 3,6	"u"	Gray	Reset	NONE	false
 4,6	" "	Reset	Reset	NONE	false
-5,6	"●"	Indexed(240)	Reset	NONE	false
+5,6	"·"	Indexed(240)	Reset	NONE	false
 6,6	" "	Reset	Reset	NONE	false
-7,6	"●"	Indexed(240)	Reset	NONE	false
+7,6	"·"	Indexed(240)	Reset	NONE	false
 8,6	" "	Reset	Reset	NONE	false
-9,6	"●"	Indexed(240)	Reset	NONE	false
+9,6	"·"	Indexed(240)	Reset	NONE	false
 10,6	" "	Reset	Reset	NONE	false
-11,6	"●"	Indexed(240)	Reset	NONE	false
+11,6	"·"	Indexed(240)	Reset	NONE	false
 12,6	" "	Reset	Reset	NONE	false
-13,6	"●"	Indexed(240)	Reset	NONE	false
+13,6	"·"	Indexed(240)	Reset	NONE	false
 14,6	" "	Reset	Reset	NONE	false
-15,6	"●"	Indexed(240)	Reset	NONE	false
+15,6	"·"	Indexed(240)	Reset	NONE	false
 16,6	" "	Reset	Reset	NONE	false
-17,6	"●"	Indexed(240)	Reset	NONE	false
+17,6	"·"	Indexed(240)	Reset	NONE	false
 18,6	" "	Reset	Reset	NONE	false
-19,6	"●"	Indexed(240)	Reset	NONE	false
+19,6	"·"	Indexed(240)	Reset	NONE	false
 20,6	" "	Reset	Reset	NONE	false
-21,6	"●"	Indexed(240)	Reset	NONE	false
+21,6	"·"	Indexed(240)	Reset	NONE	false
 22,6	" "	Reset	Reset	NONE	false
-23,6	"●"	Indexed(240)	Reset	NONE	false
+23,6	"·"	Indexed(240)	Reset	NONE	false
 24,6	" "	Reset	Reset	NONE	false
-25,6	"●"	Indexed(240)	Reset	NONE	false
+25,6	"·"	Indexed(240)	Reset	NONE	false
 26,6	" "	Reset	Reset	NONE	false
-27,6	"●"	Indexed(240)	Reset	NONE	false
+27,6	"·"	Indexed(240)	Reset	NONE	false
 28,6	" "	Reset	Reset	NONE	false
-29,6	"●"	Indexed(240)	Reset	NONE	false
+29,6	"·"	Indexed(240)	Reset	NONE	false
 30,6	" "	Reset	Reset	NONE	false
-31,6	"●"	Indexed(240)	Reset	NONE	false
+31,6	"·"	Indexed(240)	Reset	NONE	false
 32,6	" "	Reset	Reset	NONE	false
-33,6	"●"	Indexed(240)	Reset	NONE	false
+33,6	"·"	Indexed(240)	Reset	NONE	false
 34,6	" "	Reset	Reset	NONE	false
-35,6	"●"	Indexed(240)	Reset	NONE	false
+35,6	"·"	Indexed(240)	Reset	NONE	false
 36,6	" "	Reset	Reset	NONE	false
-37,6	"●"	Indexed(240)	Reset	NONE	false
+37,6	"·"	Indexed(240)	Reset	NONE	false
 38,6	" "	Reset	Reset	NONE	false
-39,6	"●"	Indexed(240)	Reset	NONE	false
+39,6	"·"	Indexed(240)	Reset	NONE	false
 40,6	" "	Reset	Reset	NONE	false
-41,6	"●"	Indexed(240)	Reset	NONE	false
+41,6	"·"	Indexed(240)	Reset	NONE	false
 42,6	" "	Reset	Reset	NONE	false
-43,6	"●"	Indexed(240)	Reset	NONE	false
+43,6	"·"	Indexed(240)	Reset	NONE	false
 44,6	" "	Reset	Reset	NONE	false
-45,6	"●"	Indexed(240)	Reset	NONE	false
+45,6	"·"	Indexed(240)	Reset	NONE	false
 46,6	" "	Reset	Reset	NONE	false
-47,6	"●"	Indexed(240)	Reset	NONE	false
+47,6	"·"	Indexed(240)	Reset	NONE	false
 48,6	" "	Reset	Reset	NONE	false
-49,6	"●"	Indexed(240)	Reset	NONE	false
+49,6	"·"	Indexed(240)	Reset	NONE	false
 50,6	" "	Reset	Reset	NONE	false
-51,6	"●"	Indexed(240)	Reset	NONE	false
+51,6	"·"	Indexed(240)	Reset	NONE	false
 52,6	" "	Reset	Reset	NONE	false
-53,6	"●"	Indexed(240)	Reset	NONE	false
+53,6	"·"	Indexed(240)	Reset	NONE	false
 54,6	" "	Reset	Reset	NONE	false
-55,6	"●"	Indexed(240)	Reset	NONE	false
+55,6	"·"	Indexed(240)	Reset	NONE	false
 56,6	" "	Reset	Reset	NONE	false
-57,6	"●"	Indexed(240)	Reset	NONE	false
+57,6	"·"	Indexed(240)	Reset	NONE	false
 58,6	" "	Reset	Reset	NONE	false
-59,6	"●"	Indexed(240)	Reset	NONE	false
+59,6	"·"	Indexed(240)	Reset	NONE	false
 60,6	" "	Reset	Reset	NONE	false
-61,6	"●"	Indexed(240)	Reset	NONE	false
+61,6	"·"	Indexed(240)	Reset	NONE	false
 62,6	" "	Reset	Reset	NONE	false
-63,6	"●"	Indexed(240)	Reset	NONE	false
+63,6	"·"	Indexed(240)	Reset	NONE	false
 64,6	" "	Reset	Reset	NONE	false
-65,6	"●"	Indexed(240)	Reset	NONE	false
+65,6	"·"	Indexed(240)	Reset	NONE	false
 66,6	" "	Reset	Reset	NONE	false
-67,6	"●"	Indexed(240)	Reset	NONE	false
+67,6	"·"	Indexed(240)	Reset	NONE	false
 68,6	" "	Reset	Reset	NONE	false
-69,6	"●"	Indexed(240)	Reset	NONE	false
+69,6	"·"	Indexed(240)	Reset	NONE	false
 70,6	" "	Reset	Reset	NONE	false
-71,6	"●"	Indexed(240)	Reset	NONE	false
+71,6	"·"	Indexed(240)	Reset	NONE	false
 72,6	" "	Reset	Reset	NONE	false
-73,6	"●"	Indexed(240)	Reset	NONE	false
+73,6	"·"	Indexed(240)	Reset	NONE	false
 74,6	" "	Reset	Reset	NONE	false
-75,6	"●"	Indexed(240)	Reset	NONE	false
+75,6	"✔"	Green	Reset	NONE	false
 76,6	" "	Reset	Reset	NONE	false
 77,6	" "	Reset	Reset	NONE	false
 78,6	" "	Reset	Reset	NONE	false
@@ -564,77 +564,77 @@ area	x=0	y=0	width=80	height=35
 2,7	"W"	Gray	Reset	NONE	false
 3,7	"e"	Gray	Reset	NONE	false
 4,7	" "	Reset	Reset	NONE	false
-5,7	"●"	Indexed(240)	Reset	NONE	false
+5,7	"·"	Indexed(240)	Reset	NONE	false
 6,7	" "	Reset	Reset	NONE	false
-7,7	"●"	Indexed(240)	Reset	NONE	false
+7,7	"·"	Indexed(240)	Reset	NONE	false
 8,7	" "	Reset	Reset	NONE	false
-9,7	"●"	Indexed(240)	Reset	NONE	false
+9,7	"·"	Indexed(240)	Reset	NONE	false
 10,7	" "	Reset	Reset	NONE	false
-11,7	"●"	Indexed(240)	Reset	NONE	false
+11,7	"·"	Indexed(240)	Reset	NONE	false
 12,7	" "	Reset	Reset	NONE	false
-13,7	"●"	Indexed(240)	Reset	NONE	false
+13,7	"·"	Indexed(240)	Reset	NONE	false
 14,7	" "	Reset	Reset	NONE	false
-15,7	"●"	Indexed(240)	Reset	NONE	false
+15,7	"·"	Indexed(240)	Reset	NONE	false
 16,7	" "	Reset	Reset	NONE	false
-17,7	"●"	Indexed(240)	Reset	NONE	false
+17,7	"·"	Indexed(240)	Reset	NONE	false
 18,7	" "	Reset	Reset	NONE	false
-19,7	"●"	Indexed(240)	Reset	NONE	false
+19,7	"·"	Indexed(240)	Reset	NONE	false
 20,7	" "	Reset	Reset	NONE	false
-21,7	"●"	Indexed(240)	Reset	NONE	false
+21,7	"·"	Indexed(240)	Reset	NONE	false
 22,7	" "	Reset	Reset	NONE	false
-23,7	"●"	Indexed(240)	Reset	NONE	false
+23,7	"·"	Indexed(240)	Reset	NONE	false
 24,7	" "	Reset	Reset	NONE	false
-25,7	"●"	Indexed(240)	Reset	NONE	false
+25,7	"·"	Indexed(240)	Reset	NONE	false
 26,7	" "	Reset	Reset	NONE	false
-27,7	"●"	Indexed(240)	Reset	NONE	false
+27,7	"·"	Indexed(240)	Reset	NONE	false
 28,7	" "	Reset	Reset	NONE	false
-29,7	"●"	Indexed(240)	Reset	NONE	false
+29,7	"·"	Indexed(240)	Reset	NONE	false
 30,7	" "	Reset	Reset	NONE	false
-31,7	"●"	Indexed(240)	Reset	NONE	false
+31,7	"·"	Indexed(240)	Reset	NONE	false
 32,7	" "	Reset	Reset	NONE	false
-33,7	"●"	Indexed(240)	Reset	NONE	false
+33,7	"·"	Indexed(240)	Reset	NONE	false
 34,7	" "	Reset	Reset	NONE	false
-35,7	"●"	Indexed(240)	Reset	NONE	false
+35,7	"·"	Indexed(240)	Reset	NONE	false
 36,7	" "	Reset	Reset	NONE	false
-37,7	"●"	Indexed(240)	Reset	NONE	false
+37,7	"·"	Indexed(240)	Reset	NONE	false
 38,7	" "	Reset	Reset	NONE	false
-39,7	"●"	Indexed(240)	Reset	NONE	false
+39,7	"·"	Indexed(240)	Reset	NONE	false
 40,7	" "	Reset	Reset	NONE	false
-41,7	"●"	Indexed(240)	Reset	NONE	false
+41,7	"·"	Indexed(240)	Reset	NONE	false
 42,7	" "	Reset	Reset	NONE	false
-43,7	"●"	Indexed(240)	Reset	NONE	false
+43,7	"·"	Indexed(240)	Reset	NONE	false
 44,7	" "	Reset	Reset	NONE	false
-45,7	"●"	Indexed(240)	Reset	NONE	false
+45,7	"·"	Indexed(240)	Reset	NONE	false
 46,7	" "	Reset	Reset	NONE	false
-47,7	"●"	Indexed(240)	Reset	NONE	false
+47,7	"·"	Indexed(240)	Reset	NONE	false
 48,7	" "	Reset	Reset	NONE	false
-49,7	"●"	Indexed(240)	Reset	NONE	false
+49,7	"·"	Indexed(240)	Reset	NONE	false
 50,7	" "	Reset	Reset	NONE	false
-51,7	"●"	Indexed(240)	Reset	NONE	false
+51,7	"·"	Indexed(240)	Reset	NONE	false
 52,7	" "	Reset	Reset	NONE	false
-53,7	"●"	Indexed(240)	Reset	NONE	false
+53,7	"·"	Indexed(240)	Reset	NONE	false
 54,7	" "	Reset	Reset	NONE	false
-55,7	"●"	Indexed(240)	Reset	NONE	false
+55,7	"·"	Indexed(240)	Reset	NONE	false
 56,7	" "	Reset	Reset	NONE	false
-57,7	"●"	Indexed(240)	Reset	NONE	false
+57,7	"·"	Indexed(240)	Reset	NONE	false
 58,7	" "	Reset	Reset	NONE	false
-59,7	"●"	Indexed(240)	Reset	NONE	false
+59,7	"·"	Indexed(240)	Reset	NONE	false
 60,7	" "	Reset	Reset	NONE	false
-61,7	"●"	Indexed(240)	Reset	NONE	false
+61,7	"·"	Indexed(240)	Reset	NONE	false
 62,7	" "	Reset	Reset	NONE	false
-63,7	"●"	Indexed(240)	Reset	NONE	false
+63,7	"·"	Indexed(240)	Reset	NONE	false
 64,7	" "	Reset	Reset	NONE	false
-65,7	"●"	Indexed(240)	Reset	NONE	false
+65,7	"·"	Indexed(240)	Reset	NONE	false
 66,7	" "	Reset	Reset	NONE	false
-67,7	"●"	Indexed(240)	Reset	NONE	false
+67,7	"·"	Indexed(240)	Reset	NONE	false
 68,7	" "	Reset	Reset	NONE	false
-69,7	"●"	Indexed(240)	Reset	NONE	false
+69,7	"·"	Indexed(240)	Reset	NONE	false
 70,7	" "	Reset	Reset	NONE	false
-71,7	"●"	Indexed(240)	Reset	NONE	false
+71,7	"·"	Indexed(240)	Reset	NONE	false
 72,7	" "	Reset	Reset	NONE	false
-73,7	"●"	Indexed(240)	Reset	NONE	false
+73,7	"·"	Indexed(240)	Reset	NONE	false
 74,7	" "	Reset	Reset	NONE	false
-75,7	"●"	Indexed(240)	Reset	NONE	false
+75,7	" "	Reset	Reset	NONE	false
 76,7	" "	Reset	Reset	NONE	false
 77,7	" "	Reset	Reset	NONE	false
 78,7	" "	Reset	Reset	NONE	false
@@ -644,77 +644,77 @@ area	x=0	y=0	width=80	height=35
 2,8	"T"	Gray	Reset	NONE	false
 3,8	"h"	Gray	Reset	NONE	false
 4,8	" "	Reset	Reset	NONE	false
-5,8	"●"	Indexed(240)	Reset	NONE	false
+5,8	"·"	Indexed(240)	Reset	NONE	false
 6,8	" "	Reset	Reset	NONE	false
-7,8	"●"	Indexed(240)	Reset	NONE	false
+7,8	"·"	Indexed(240)	Reset	NONE	false
 8,8	" "	Reset	Reset	NONE	false
-9,8	"●"	Indexed(240)	Reset	NONE	false
+9,8	"·"	Indexed(240)	Reset	NONE	false
 10,8	" "	Reset	Reset	NONE	false
-11,8	"●"	Indexed(240)	Reset	NONE	false
+11,8	"·"	Indexed(240)	Reset	NONE	false
 12,8	" "	Reset	Reset	NONE	false
-13,8	"●"	Indexed(240)	Reset	NONE	false
+13,8	"·"	Indexed(240)	Reset	NONE	false
 14,8	" "	Reset	Reset	NONE	false
-15,8	"●"	Indexed(240)	Reset	NONE	false
+15,8	"·"	Indexed(240)	Reset	NONE	false
 16,8	" "	Reset	Reset	NONE	false
-17,8	"●"	Indexed(240)	Reset	NONE	false
+17,8	"·"	Indexed(240)	Reset	NONE	false
 18,8	" "	Reset	Reset	NONE	false
-19,8	"●"	Indexed(240)	Reset	NONE	false
+19,8	"·"	Indexed(240)	Reset	NONE	false
 20,8	" "	Reset	Reset	NONE	false
-21,8	"●"	Indexed(240)	Reset	NONE	false
+21,8	"·"	Indexed(240)	Reset	NONE	false
 22,8	" "	Reset	Reset	NONE	false
-23,8	"●"	Indexed(240)	Reset	NONE	false
+23,8	"·"	Indexed(240)	Reset	NONE	false
 24,8	" "	Reset	Reset	NONE	false
-25,8	"●"	Indexed(240)	Reset	NONE	false
+25,8	"·"	Indexed(240)	Reset	NONE	false
 26,8	" "	Reset	Reset	NONE	false
-27,8	"●"	Indexed(240)	Reset	NONE	false
+27,8	"·"	Indexed(240)	Reset	NONE	false
 28,8	" "	Reset	Reset	NONE	false
-29,8	"●"	Indexed(240)	Reset	NONE	false
+29,8	"·"	Indexed(240)	Reset	NONE	false
 30,8	" "	Reset	Reset	NONE	false
-31,8	"●"	Indexed(240)	Reset	NONE	false
+31,8	"·"	Indexed(240)	Reset	NONE	false
 32,8	" "	Reset	Reset	NONE	false
-33,8	"●"	Indexed(240)	Reset	NONE	false
+33,8	"·"	Indexed(240)	Reset	NONE	false
 34,8	" "	Reset	Reset	NONE	false
-35,8	"●"	Indexed(240)	Reset	NONE	false
+35,8	"·"	Indexed(240)	Reset	NONE	false
 36,8	" "	Reset	Reset	NONE	false
-37,8	"●"	Indexed(240)	Reset	NONE	false
+37,8	"·"	Indexed(240)	Reset	NONE	false
 38,8	" "	Reset	Reset	NONE	false
-39,8	"●"	Indexed(240)	Reset	NONE	false
+39,8	"·"	Indexed(240)	Reset	NONE	false
 40,8	" "	Reset	Reset	NONE	false
-41,8	"●"	Indexed(240)	Reset	NONE	false
+41,8	"·"	Indexed(240)	Reset	NONE	false
 42,8	" "	Reset	Reset	NONE	false
-43,8	"●"	Indexed(240)	Reset	NONE	false
+43,8	"·"	Indexed(240)	Reset	NONE	false
 44,8	" "	Reset	Reset	NONE	false
-45,8	"●"	Indexed(240)	Reset	NONE	false
+45,8	"·"	Indexed(240)	Reset	NONE	false
 46,8	" "	Reset	Reset	NONE	false
-47,8	"●"	Indexed(240)	Reset	NONE	false
+47,8	"·"	Indexed(240)	Reset	NONE	false
 48,8	" "	Reset	Reset	NONE	false
-49,8	"●"	Indexed(240)	Reset	NONE	false
+49,8	"·"	Indexed(240)	Reset	NONE	false
 50,8	" "	Reset	Reset	NONE	false
-51,8	"●"	Indexed(240)	Reset	NONE	false
+51,8	"·"	Indexed(240)	Reset	NONE	false
 52,8	" "	Reset	Reset	NONE	false
-53,8	"●"	Indexed(240)	Reset	NONE	false
+53,8	"·"	Indexed(240)	Reset	NONE	false
 54,8	" "	Reset	Reset	NONE	false
-55,8	"●"	Indexed(240)	Reset	NONE	false
+55,8	"·"	Indexed(240)	Reset	NONE	false
 56,8	" "	Reset	Reset	NONE	false
-57,8	"●"	Indexed(240)	Reset	NONE	false
+57,8	"·"	Indexed(240)	Reset	NONE	false
 58,8	" "	Reset	Reset	NONE	false
-59,8	"●"	Indexed(240)	Reset	NONE	false
+59,8	"·"	Indexed(240)	Reset	NONE	false
 60,8	" "	Reset	Reset	NONE	false
-61,8	"●"	Indexed(240)	Reset	NONE	false
+61,8	"·"	Indexed(240)	Reset	NONE	false
 62,8	" "	Reset	Reset	NONE	false
-63,8	"●"	Indexed(240)	Reset	NONE	false
+63,8	"·"	Indexed(240)	Reset	NONE	false
 64,8	" "	Reset	Reset	NONE	false
-65,8	"●"	Indexed(240)	Reset	NONE	false
+65,8	"·"	Indexed(240)	Reset	NONE	false
 66,8	" "	Reset	Reset	NONE	false
-67,8	"●"	Indexed(240)	Reset	NONE	false
+67,8	"·"	Indexed(240)	Reset	NONE	false
 68,8	" "	Reset	Reset	NONE	false
-69,8	"●"	Indexed(240)	Reset	NONE	false
+69,8	"·"	Indexed(240)	Reset	NONE	false
 70,8	" "	Reset	Reset	NONE	false
-71,8	"●"	Indexed(240)	Reset	NONE	false
+71,8	"·"	Indexed(240)	Reset	NONE	false
 72,8	" "	Reset	Reset	NONE	false
-73,8	"●"	Indexed(240)	Reset	NONE	false
+73,8	"·"	Indexed(240)	Reset	NONE	false
 74,8	" "	Reset	Reset	NONE	false
-75,8	"●"	Indexed(240)	Reset	NONE	false
+75,8	" "	Reset	Reset	NONE	false
 76,8	" "	Reset	Reset	NONE	false
 77,8	" "	Reset	Reset	NONE	false
 78,8	" "	Reset	Reset	NONE	false
@@ -724,77 +724,77 @@ area	x=0	y=0	width=80	height=35
 2,9	"F"	Gray	Reset	NONE	false
 3,9	"r"	Gray	Reset	NONE	false
 4,9	" "	Reset	Reset	NONE	false
-5,9	"●"	Indexed(240)	Reset	NONE	false
+5,9	"·"	Indexed(240)	Reset	NONE	false
 6,9	" "	Reset	Reset	NONE	false
-7,9	"●"	Indexed(240)	Reset	NONE	false
+7,9	"·"	Indexed(240)	Reset	NONE	false
 8,9	" "	Reset	Reset	NONE	false
-9,9	"●"	Indexed(240)	Reset	NONE	false
+9,9	"·"	Indexed(240)	Reset	NONE	false
 10,9	" "	Reset	Reset	NONE	false
-11,9	"●"	Indexed(240)	Reset	NONE	false
+11,9	"·"	Indexed(240)	Reset	NONE	false
 12,9	" "	Reset	Reset	NONE	false
-13,9	"●"	Indexed(240)	Reset	NONE	false
+13,9	"·"	Indexed(240)	Reset	NONE	false
 14,9	" "	Reset	Reset	NONE	false
-15,9	"●"	Indexed(240)	Reset	NONE	false
+15,9	"·"	Indexed(240)	Reset	NONE	false
 16,9	" "	Reset	Reset	NONE	false
-17,9	"●"	Indexed(240)	Reset	NONE	false
+17,9	"·"	Indexed(240)	Reset	NONE	false
 18,9	" "	Reset	Reset	NONE	false
-19,9	"●"	Indexed(240)	Reset	NONE	false
+19,9	"·"	Indexed(240)	Reset	NONE	false
 20,9	" "	Reset	Reset	NONE	false
-21,9	"●"	Indexed(240)	Reset	NONE	false
+21,9	"·"	Indexed(240)	Reset	NONE	false
 22,9	" "	Reset	Reset	NONE	false
-23,9	"●"	Indexed(240)	Reset	NONE	false
+23,9	"·"	Indexed(240)	Reset	NONE	false
 24,9	" "	Reset	Reset	NONE	false
-25,9	"●"	Indexed(240)	Reset	NONE	false
+25,9	"·"	Indexed(240)	Reset	NONE	false
 26,9	" "	Reset	Reset	NONE	false
-27,9	"●"	Indexed(240)	Reset	NONE	false
+27,9	"·"	Indexed(240)	Reset	NONE	false
 28,9	" "	Reset	Reset	NONE	false
-29,9	"●"	Indexed(240)	Reset	NONE	false
+29,9	"·"	Indexed(240)	Reset	NONE	false
 30,9	" "	Reset	Reset	NONE	false
-31,9	"●"	Indexed(240)	Reset	NONE	false
+31,9	"·"	Indexed(240)	Reset	NONE	false
 32,9	" "	Reset	Reset	NONE	false
-33,9	"●"	Indexed(240)	Reset	NONE	false
+33,9	"·"	Indexed(240)	Reset	NONE	false
 34,9	" "	Reset	Reset	NONE	false
-35,9	"●"	Indexed(240)	Reset	NONE	false
+35,9	"·"	Indexed(240)	Reset	NONE	false
 36,9	" "	Reset	Reset	NONE	false
-37,9	"●"	Indexed(240)	Reset	NONE	false
+37,9	"·"	Indexed(240)	Reset	NONE	false
 38,9	" "	Reset	Reset	NONE	false
-39,9	"●"	Indexed(240)	Reset	NONE	false
+39,9	"·"	Indexed(240)	Reset	NONE	false
 40,9	" "	Reset	Reset	NONE	false
-41,9	"●"	Indexed(240)	Reset	NONE	false
+41,9	"·"	Indexed(240)	Reset	NONE	false
 42,9	" "	Reset	Reset	NONE	false
-43,9	"●"	Indexed(240)	Reset	NONE	false
+43,9	"·"	Indexed(240)	Reset	NONE	false
 44,9	" "	Reset	Reset	NONE	false
-45,9	"●"	Indexed(240)	Reset	NONE	false
+45,9	"·"	Indexed(240)	Reset	NONE	false
 46,9	" "	Reset	Reset	NONE	false
-47,9	"●"	Indexed(240)	Reset	NONE	false
+47,9	"·"	Indexed(240)	Reset	NONE	false
 48,9	" "	Reset	Reset	NONE	false
-49,9	"●"	Indexed(240)	Reset	NONE	false
+49,9	"·"	Indexed(240)	Reset	NONE	false
 50,9	" "	Reset	Reset	NONE	false
-51,9	"●"	Indexed(240)	Reset	NONE	false
+51,9	"·"	Indexed(240)	Reset	NONE	false
 52,9	" "	Reset	Reset	NONE	false
-53,9	"●"	Indexed(240)	Reset	NONE	false
+53,9	"·"	Indexed(240)	Reset	NONE	false
 54,9	" "	Reset	Reset	NONE	false
-55,9	"●"	Indexed(240)	Reset	NONE	false
+55,9	"·"	Indexed(240)	Reset	NONE	false
 56,9	" "	Reset	Reset	NONE	false
-57,9	"●"	Indexed(240)	Reset	NONE	false
+57,9	"·"	Indexed(240)	Reset	NONE	false
 58,9	" "	Reset	Reset	NONE	false
-59,9	"●"	Indexed(240)	Reset	NONE	false
+59,9	"·"	Indexed(240)	Reset	NONE	false
 60,9	" "	Reset	Reset	NONE	false
-61,9	"●"	Indexed(240)	Reset	NONE	false
+61,9	"·"	Indexed(240)	Reset	NONE	false
 62,9	" "	Reset	Reset	NONE	false
-63,9	"●"	Indexed(240)	Reset	NONE	false
+63,9	"·"	Indexed(240)	Reset	NONE	false
 64,9	" "	Reset	Reset	NONE	false
-65,9	"●"	Indexed(240)	Reset	NONE	false
+65,9	"·"	Indexed(240)	Reset	NONE	false
 66,9	" "	Reset	Reset	NONE	false
-67,9	"●"	Indexed(240)	Reset	NONE	false
+67,9	"·"	Indexed(240)	Reset	NONE	false
 68,9	" "	Reset	Reset	NONE	false
-69,9	"●"	Indexed(240)	Reset	NONE	false
+69,9	"·"	Indexed(240)	Reset	NONE	false
 70,9	" "	Reset	Reset	NONE	false
-71,9	"●"	Indexed(240)	Reset	NONE	false
+71,9	"·"	Indexed(240)	Reset	NONE	false
 72,9	" "	Reset	Reset	NONE	false
-73,9	"●"	Indexed(240)	Reset	NONE	false
+73,9	"·"	Indexed(240)	Reset	NONE	false
 74,9	" "	Reset	Reset	NONE	false
-75,9	"●"	Indexed(240)	Reset	NONE	false
+75,9	" "	Reset	Reset	NONE	false
 76,9	" "	Reset	Reset	NONE	false
 77,9	" "	Reset	Reset	NONE	false
 78,9	" "	Reset	Reset	NONE	false
@@ -804,77 +804,77 @@ area	x=0	y=0	width=80	height=35
 2,10	"S"	Gray	Reset	NONE	false
 3,10	"a"	Gray	Reset	NONE	false
 4,10	" "	Reset	Reset	NONE	false
-5,10	"●"	Indexed(240)	Reset	NONE	false
+5,10	"·"	Indexed(240)	Reset	NONE	false
 6,10	" "	Reset	Reset	NONE	false
-7,10	"●"	Indexed(240)	Reset	NONE	false
+7,10	"·"	Indexed(240)	Reset	NONE	false
 8,10	" "	Reset	Reset	NONE	false
-9,10	"●"	Indexed(240)	Reset	NONE	false
+9,10	"·"	Indexed(240)	Reset	NONE	false
 10,10	" "	Reset	Reset	NONE	false
-11,10	"●"	Indexed(240)	Reset	NONE	false
+11,10	"·"	Indexed(240)	Reset	NONE	false
 12,10	" "	Reset	Reset	NONE	false
-13,10	"●"	Indexed(240)	Reset	NONE	false
+13,10	"·"	Indexed(240)	Reset	NONE	false
 14,10	" "	Reset	Reset	NONE	false
-15,10	"●"	Indexed(240)	Reset	NONE	false
+15,10	"·"	Indexed(240)	Reset	NONE	false
 16,10	" "	Reset	Reset	NONE	false
-17,10	"●"	Indexed(240)	Reset	NONE	false
+17,10	"·"	Indexed(240)	Reset	NONE	false
 18,10	" "	Reset	Reset	NONE	false
-19,10	"●"	Indexed(240)	Reset	NONE	false
+19,10	"·"	Indexed(240)	Reset	NONE	false
 20,10	" "	Reset	Reset	NONE	false
-21,10	"●"	Indexed(240)	Reset	NONE	false
+21,10	"·"	Indexed(240)	Reset	NONE	false
 22,10	" "	Reset	Reset	NONE	false
-23,10	"●"	Indexed(240)	Reset	NONE	false
+23,10	"·"	Indexed(240)	Reset	NONE	false
 24,10	" "	Reset	Reset	NONE	false
-25,10	"●"	Indexed(240)	Reset	NONE	false
+25,10	"·"	Indexed(240)	Reset	NONE	false
 26,10	" "	Reset	Reset	NONE	false
-27,10	"●"	Indexed(240)	Reset	NONE	false
+27,10	"·"	Indexed(240)	Reset	NONE	false
 28,10	" "	Reset	Reset	NONE	false
-29,10	"●"	Indexed(240)	Reset	NONE	false
+29,10	"·"	Indexed(240)	Reset	NONE	false
 30,10	" "	Reset	Reset	NONE	false
-31,10	"●"	Indexed(240)	Reset	NONE	false
+31,10	"·"	Indexed(240)	Reset	NONE	false
 32,10	" "	Reset	Reset	NONE	false
-33,10	"●"	Indexed(240)	Reset	NONE	false
+33,10	"·"	Indexed(240)	Reset	NONE	false
 34,10	" "	Reset	Reset	NONE	false
-35,10	"●"	Indexed(240)	Reset	NONE	false
+35,10	"·"	Indexed(240)	Reset	NONE	false
 36,10	" "	Reset	Reset	NONE	false
-37,10	"●"	Indexed(240)	Reset	NONE	false
+37,10	"·"	Indexed(240)	Reset	NONE	false
 38,10	" "	Reset	Reset	NONE	false
-39,10	"●"	Indexed(240)	Reset	NONE	false
+39,10	"·"	Indexed(240)	Reset	NONE	false
 40,10	" "	Reset	Reset	NONE	false
-41,10	"●"	Indexed(240)	Reset	NONE	false
+41,10	"·"	Indexed(240)	Reset	NONE	false
 42,10	" "	Reset	Reset	NONE	false
-43,10	"●"	Indexed(240)	Reset	NONE	false
+43,10	"·"	Indexed(240)	Reset	NONE	false
 44,10	" "	Reset	Reset	NONE	false
-45,10	"●"	Indexed(240)	Reset	NONE	false
+45,10	"·"	Indexed(240)	Reset	NONE	false
 46,10	" "	Reset	Reset	NONE	false
-47,10	"●"	Indexed(240)	Reset	NONE	false
+47,10	"·"	Indexed(240)	Reset	NONE	false
 48,10	" "	Reset	Reset	NONE	false
-49,10	"●"	Indexed(240)	Reset	NONE	false
+49,10	"·"	Indexed(240)	Reset	NONE	false
 50,10	" "	Reset	Reset	NONE	false
-51,10	"●"	Indexed(240)	Reset	NONE	false
+51,10	"·"	Indexed(240)	Reset	NONE	false
 52,10	" "	Reset	Reset	NONE	false
-53,10	"●"	Indexed(240)	Reset	NONE	false
+53,10	"·"	Indexed(240)	Reset	NONE	false
 54,10	" "	Reset	Reset	NONE	false
-55,10	"●"	Indexed(240)	Reset	NONE	false
+55,10	"·"	Indexed(240)	Reset	NONE	false
 56,10	" "	Reset	Reset	NONE	false
-57,10	"●"	Indexed(240)	Reset	NONE	false
+57,10	"·"	Indexed(240)	Reset	NONE	false
 58,10	" "	Reset	Reset	NONE	false
-59,10	"●"	Indexed(240)	Reset	NONE	false
+59,10	"·"	Indexed(240)	Reset	NONE	false
 60,10	" "	Reset	Reset	NONE	false
-61,10	"●"	Indexed(240)	Reset	NONE	false
+61,10	"·"	Indexed(240)	Reset	NONE	false
 62,10	" "	Reset	Reset	NONE	false
-63,10	"●"	Indexed(240)	Reset	NONE	false
+63,10	"·"	Indexed(240)	Reset	NONE	false
 64,10	" "	Reset	Reset	NONE	false
-65,10	"●"	Indexed(240)	Reset	NONE	false
+65,10	"·"	Indexed(240)	Reset	NONE	false
 66,10	" "	Reset	Reset	NONE	false
-67,10	"●"	Indexed(240)	Reset	NONE	false
+67,10	"·"	Indexed(240)	Reset	NONE	false
 68,10	" "	Reset	Reset	NONE	false
-69,10	"●"	Indexed(240)	Reset	NONE	false
+69,10	"·"	Indexed(240)	Reset	NONE	false
 70,10	" "	Reset	Reset	NONE	false
-71,10	"●"	Indexed(240)	Reset	NONE	false
+71,10	"·"	Indexed(240)	Reset	NONE	false
 72,10	" "	Reset	Reset	NONE	false
-73,10	"●"	Indexed(240)	Reset	NONE	false
+73,10	"·"	Indexed(240)	Reset	NONE	false
 74,10	" "	Reset	Reset	NONE	false
-75,10	"●"	Indexed(240)	Reset	NONE	false
+75,10	" "	Reset	Reset	NONE	false
 76,10	" "	Reset	Reset	NONE	false
 77,10	" "	Reset	Reset	NONE	false
 78,10	" "	Reset	Reset	NONE	false
@@ -884,77 +884,77 @@ area	x=0	y=0	width=80	height=35
 2,11	"S"	Gray	Reset	NONE	false
 3,11	"u"	Gray	Reset	NONE	false
 4,11	" "	Reset	Reset	NONE	false
-5,11	"●"	Indexed(240)	Reset	NONE	false
+5,11	"·"	Indexed(240)	Reset	NONE	false
 6,11	" "	Reset	Reset	NONE	false
-7,11	"●"	Indexed(240)	Reset	NONE	false
+7,11	"·"	Indexed(240)	Reset	NONE	false
 8,11	" "	Reset	Reset	NONE	false
-9,11	"●"	Indexed(240)	Reset	NONE	false
+9,11	"·"	Indexed(240)	Reset	NONE	false
 10,11	" "	Reset	Reset	NONE	false
-11,11	"●"	Indexed(240)	Reset	NONE	false
+11,11	"·"	Indexed(240)	Reset	NONE	false
 12,11	" "	Reset	Reset	NONE	false
-13,11	"●"	Indexed(240)	Reset	NONE	false
+13,11	"·"	Indexed(240)	Reset	NONE	false
 14,11	" "	Reset	Reset	NONE	false
-15,11	"●"	Indexed(240)	Reset	NONE	false
+15,11	"·"	Indexed(240)	Reset	NONE	false
 16,11	" "	Reset	Reset	NONE	false
-17,11	"●"	Indexed(240)	Reset	NONE	false
+17,11	"·"	Indexed(240)	Reset	NONE	false
 18,11	" "	Reset	Reset	NONE	false
-19,11	"●"	Indexed(240)	Reset	NONE	false
+19,11	"·"	Indexed(240)	Reset	NONE	false
 20,11	" "	Reset	Reset	NONE	false
-21,11	"●"	Indexed(240)	Reset	NONE	false
+21,11	"·"	Indexed(240)	Reset	NONE	false
 22,11	" "	Reset	Reset	NONE	false
-23,11	"●"	Indexed(240)	Reset	NONE	false
+23,11	"·"	Indexed(240)	Reset	NONE	false
 24,11	" "	Reset	Reset	NONE	false
-25,11	"●"	Indexed(240)	Reset	NONE	false
+25,11	"·"	Indexed(240)	Reset	NONE	false
 26,11	" "	Reset	Reset	NONE	false
-27,11	"●"	Indexed(240)	Reset	NONE	false
+27,11	"·"	Indexed(240)	Reset	NONE	false
 28,11	" "	Reset	Reset	NONE	false
-29,11	"●"	Indexed(240)	Reset	NONE	false
+29,11	"·"	Indexed(240)	Reset	NONE	false
 30,11	" "	Reset	Reset	NONE	false
-31,11	"●"	Indexed(240)	Reset	NONE	false
+31,11	"·"	Indexed(240)	Reset	NONE	false
 32,11	" "	Reset	Reset	NONE	false
-33,11	"●"	Indexed(240)	Reset	NONE	false
+33,11	"·"	Indexed(240)	Reset	NONE	false
 34,11	" "	Reset	Reset	NONE	false
-35,11	"●"	Indexed(240)	Reset	NONE	false
+35,11	"·"	Indexed(240)	Reset	NONE	false
 36,11	" "	Reset	Reset	NONE	false
-37,11	"●"	Indexed(240)	Reset	NONE	false
+37,11	"·"	Indexed(240)	Reset	NONE	false
 38,11	" "	Reset	Reset	NONE	false
-39,11	"●"	Indexed(240)	Reset	NONE	false
+39,11	"·"	Indexed(240)	Reset	NONE	false
 40,11	" "	Reset	Reset	NONE	false
-41,11	"●"	Indexed(240)	Reset	NONE	false
+41,11	"·"	Indexed(240)	Reset	NONE	false
 42,11	" "	Reset	Reset	NONE	false
-43,11	"●"	Indexed(240)	Reset	NONE	false
+43,11	"·"	Indexed(240)	Reset	NONE	false
 44,11	" "	Reset	Reset	NONE	false
-45,11	"●"	Indexed(240)	Reset	NONE	false
+45,11	"·"	Indexed(240)	Reset	NONE	false
 46,11	" "	Reset	Reset	NONE	false
-47,11	"●"	Indexed(240)	Reset	NONE	false
+47,11	"·"	Indexed(240)	Reset	NONE	false
 48,11	" "	Reset	Reset	NONE	false
-49,11	"●"	Indexed(240)	Reset	NONE	false
+49,11	"·"	Indexed(240)	Reset	NONE	false
 50,11	" "	Reset	Reset	NONE	false
-51,11	"●"	Indexed(240)	Reset	NONE	false
+51,11	"·"	Indexed(240)	Reset	NONE	false
 52,11	" "	Reset	Reset	NONE	false
-53,11	"●"	Indexed(240)	Reset	NONE	false
+53,11	"·"	Indexed(240)	Reset	NONE	false
 54,11	" "	Reset	Reset	NONE	false
-55,11	"●"	Indexed(240)	Reset	NONE	false
+55,11	"·"	Indexed(240)	Reset	NONE	false
 56,11	" "	Reset	Reset	NONE	false
-57,11	"●"	Indexed(240)	Reset	NONE	false
+57,11	"·"	Indexed(240)	Reset	NONE	false
 58,11	" "	Reset	Reset	NONE	false
-59,11	"●"	Indexed(240)	Reset	NONE	false
+59,11	"·"	Indexed(240)	Reset	NONE	false
 60,11	" "	Reset	Reset	NONE	false
-61,11	"●"	Indexed(240)	Reset	NONE	false
+61,11	"·"	Indexed(240)	Reset	NONE	false
 62,11	" "	Reset	Reset	NONE	false
-63,11	"●"	Indexed(240)	Reset	NONE	false
+63,11	"·"	Indexed(240)	Reset	NONE	false
 64,11	" "	Reset	Reset	NONE	false
-65,11	"●"	Indexed(240)	Reset	NONE	false
+65,11	"·"	Indexed(240)	Reset	NONE	false
 66,11	" "	Reset	Reset	NONE	false
-67,11	"●"	Indexed(240)	Reset	NONE	false
+67,11	"·"	Indexed(240)	Reset	NONE	false
 68,11	" "	Reset	Reset	NONE	false
-69,11	"●"	Indexed(240)	Reset	NONE	false
+69,11	"·"	Indexed(240)	Reset	NONE	false
 70,11	" "	Reset	Reset	NONE	false
-71,11	"●"	Indexed(240)	Reset	NONE	false
+71,11	"·"	Indexed(240)	Reset	NONE	false
 72,11	" "	Reset	Reset	NONE	false
-73,11	"●"	Indexed(240)	Reset	NONE	false
+73,11	"·"	Indexed(240)	Reset	NONE	false
 74,11	" "	Reset	Reset	NONE	false
-75,11	"●"	Indexed(240)	Reset	NONE	false
+75,11	" "	Reset	Reset	NONE	false
 76,11	" "	Reset	Reset	NONE	false
 77,11	" "	Reset	Reset	NONE	false
 78,11	" "	Reset	Reset	NONE	false
@@ -964,25 +964,25 @@ area	x=0	y=0	width=80	height=35
 2,12	" "	Reset	Reset	NONE	false
 3,12	" "	Reset	Reset	NONE	false
 4,12	" "	Reset	Reset	NONE	false
-5,12	"L"	Gray	Reset	NONE	false
-6,12	"e"	Gray	Reset	NONE	false
-7,12	"s"	Gray	Reset	NONE	false
-8,12	"s"	Gray	Reset	NONE	false
-9,12	" "	Gray	Reset	NONE	false
-10,12	"●"	Indexed(240)	Reset	NONE	false
+5,12	" "	Reset	Reset	NONE	false
+6,12	" "	Reset	Reset	NONE	false
+7,12	" "	Reset	Reset	NONE	false
+8,12	" "	Reset	Reset	NONE	false
+9,12	" "	Reset	Reset	NONE	false
+10,12	" "	Reset	Reset	NONE	false
 11,12	" "	Reset	Reset	NONE	false
-12,12	"●"	Indexed(22)	Reset	NONE	false
+12,12	" "	Reset	Reset	NONE	false
 13,12	" "	Reset	Reset	NONE	false
-14,12	"●"	Indexed(28)	Reset	NONE	false
+14,12	" "	Reset	Reset	NONE	false
 15,12	" "	Reset	Reset	NONE	false
-16,12	"●"	Indexed(34)	Reset	NONE	false
+16,12	" "	Reset	Reset	NONE	false
 17,12	" "	Reset	Reset	NONE	false
-18,12	"●"	Indexed(82)	Reset	NONE	false
-19,12	" "	Gray	Reset	NONE	false
-20,12	"M"	Gray	Reset	NONE	false
-21,12	"o"	Gray	Reset	NONE	false
-22,12	"r"	Gray	Reset	NONE	false
-23,12	"e"	Gray	Reset	NONE	false
+18,12	" "	Reset	Reset	NONE	false
+19,12	" "	Reset	Reset	NONE	false
+20,12	" "	Reset	Reset	NONE	false
+21,12	" "	Reset	Reset	NONE	false
+22,12	" "	Reset	Reset	NONE	false
+23,12	" "	Reset	Reset	NONE	false
 24,12	" "	Reset	Reset	NONE	false
 25,12	" "	Reset	Reset	NONE	false
 26,12	" "	Reset	Reset	NONE	false

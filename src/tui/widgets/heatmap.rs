@@ -3,7 +3,6 @@ use ratatui::{
     buffer::Buffer,
     layout::Rect,
     style::{Color, Style},
-    text::{Line, Span},
     widgets::Widget,
 };
 use std::collections::HashMap;
@@ -42,22 +41,25 @@ impl<'a> Heatmap<'a> {
         }
     }
 
+    fn cell_symbol(count: i64) -> &'static str {
+        if count > 0 {
+            "✔"
+        } else {
+            "·"
+        }
+    }
+
     fn cell_color(&self, count: i64) -> Color {
         if self.no_color {
-            match count {
-                0 => Color::DarkGray,
-                1 => Color::DarkGray,
-                2 => Color::Gray,
-                _ => Color::White,
+            if count > 0 {
+                Color::White
+            } else {
+                Color::DarkGray
             }
+        } else if count > 0 {
+            Color::Green
         } else {
-            match count {
-                0 => Color::Indexed(240), // visible gray on dark terminals
-                1 => Color::Indexed(22),  // dark green
-                2 => Color::Indexed(28),  // medium green
-                3 => Color::Indexed(34),  // bright green
-                _ => Color::Indexed(82),  // vivid green
-            }
+            Color::Indexed(240) // visible gray on dark terminals
         }
     }
 }
@@ -73,12 +75,9 @@ impl<'a> Widget for Heatmap<'a> {
 
         let today = self.today;
 
-        // Calculate the start date: we want `weeks` columns of 7 days each.
-        // Each column is one week (Mon..Sun). The rightmost column contains today.
-        // Find the Monday of the current week.
+        // Find the Monday of the current week. Each column is one week (Mon..Sun).
         let today_weekday = today.weekday().num_days_from_monday(); // Mon=0..Sun=6
         let current_week_monday = today - Duration::days(today_weekday as i64);
-        let start_monday = current_week_monday - Duration::weeks((self.weeks as i64) - 1);
 
         // Day labels on the left, shifted down 1 row for month labels
         let day_labels = [
@@ -104,7 +103,7 @@ impl<'a> Widget for Heatmap<'a> {
         }
 
         // Render the heatmap cells
-        let cell_width: u16 = 2; // 1 circle char + 1 space
+        let cell_width: u16 = 2; // 1 day marker + 1 space
 
         let month_names = [
             crate::i18n::tr("heatmap-jan"),
@@ -125,6 +124,11 @@ impl<'a> Widget for Heatmap<'a> {
         let mut last_label_end_x: u16 = 0;
         let cols_available = area.width.saturating_sub(label_width);
         let num_weeks = (cols_available / cell_width).min(self.weeks);
+        let start_monday = if num_weeks == 0 {
+            current_week_monday
+        } else {
+            current_week_monday - Duration::weeks((num_weeks as i64) - 1)
+        };
 
         for week in 0..num_weeks {
             let week_monday = start_monday + Duration::weeks(week as i64);
@@ -161,58 +165,9 @@ impl<'a> Widget for Heatmap<'a> {
                 let color = self.cell_color(count);
                 let y = grid_y + day;
                 if y < area.y + area.height && x < area.x + area.width {
-                    buf.set_string(x, y, "\u{25CF}", Style::default().fg(color));
+                    buf.set_string(x, y, Self::cell_symbol(count), Style::default().fg(color));
                 }
             }
-        }
-
-        // Render legend row below the 7 day rows
-        let legend_y = grid_y + 7;
-        if legend_y < area.y + area.height {
-            let legend = if self.no_color {
-                Line::from(vec![
-                    Span::styled(
-                        format!("{} ", crate::i18n::tr("heatmap-less")),
-                        Style::default(),
-                    ),
-                    Span::raw(" "),
-                    Span::raw("\u{2591}"),
-                    Span::raw(" "),
-                    Span::raw("\u{2592}"),
-                    Span::raw(" "),
-                    Span::raw("\u{2588}"),
-                    Span::styled(
-                        format!(" {}", crate::i18n::tr("heatmap-more")),
-                        Style::default(),
-                    ),
-                ])
-            } else {
-                Line::from(vec![
-                    Span::styled(
-                        format!("{} ", crate::i18n::tr("heatmap-less")),
-                        Style::default().fg(Color::Gray),
-                    ),
-                    Span::styled("\u{25CF}", Style::default().fg(Color::Indexed(240))),
-                    Span::raw(" "),
-                    Span::styled("\u{25CF}", Style::default().fg(Color::Indexed(22))),
-                    Span::raw(" "),
-                    Span::styled("\u{25CF}", Style::default().fg(Color::Indexed(28))),
-                    Span::raw(" "),
-                    Span::styled("\u{25CF}", Style::default().fg(Color::Indexed(34))),
-                    Span::raw(" "),
-                    Span::styled("\u{25CF}", Style::default().fg(Color::Indexed(82))),
-                    Span::styled(
-                        format!(" {}", crate::i18n::tr("heatmap-more")),
-                        Style::default().fg(Color::Gray),
-                    ),
-                ])
-            };
-            buf.set_line(
-                area.x + label_width,
-                legend_y,
-                &legend,
-                area.width.saturating_sub(label_width),
-            );
         }
     }
 }
@@ -222,17 +177,23 @@ mod tests {
     use super::*;
     use ratatui::buffer::Buffer;
 
+    const IDLE_MARKER: &str = "·";
+    const TRAINED_MARKER: &str = "✔";
+
     #[test]
     fn heatmap_renders_when_area_height_is_9() {
         let data = vec![("2026-05-16".to_string(), 5i64)];
-        let heatmap = Heatmap::new(&data, 52, false);
+        let heatmap = Heatmap::with_today(&data, 52, false, "2026-05-16".parse().unwrap());
         let mut buf = Buffer::empty(Rect::new(0, 0, 30, 9));
         heatmap.render(Rect::new(0, 0, 30, 9), &mut buf);
-        // At least one cell should have the circle character
-        let has_content = buf.content.iter().any(|cell| cell.symbol() == "\u{25CF}");
+        // At least one cell should use the active-day Unicode marker.
+        let has_content = buf
+            .content
+            .iter()
+            .any(|cell| cell.symbol() == TRAINED_MARKER);
         assert!(
             has_content,
-            "heatmap should render circles when area.height >= 9"
+            "heatmap should render active-day Unicode markers when area.height >= 9"
         );
     }
 
@@ -242,7 +203,10 @@ mod tests {
         let heatmap = Heatmap::new(&data, 52, false);
         let mut buf = Buffer::empty(Rect::new(0, 0, 30, 8));
         heatmap.render(Rect::new(0, 0, 30, 8), &mut buf);
-        let has_content = buf.content.iter().any(|cell| cell.symbol() == "\u{25CF}");
+        let has_content = buf
+            .content
+            .iter()
+            .any(|cell| cell.symbol() == TRAINED_MARKER);
         assert!(
             !has_content,
             "heatmap should render nothing when area.height < 9"
@@ -250,10 +214,86 @@ mod tests {
     }
 
     #[test]
+    fn heatmap_marks_training_and_non_training_days_in_unicode() {
+        let data = vec![("2026-05-16".to_string(), 5i64)];
+        let heatmap = Heatmap::with_today(&data, 52, false, "2026-05-16".parse().unwrap());
+        let mut buf = Buffer::empty(Rect::new(0, 0, 110, 9));
+        heatmap.render(Rect::new(0, 0, 110, 9), &mut buf);
+
+        let mut marker_columns = Vec::new();
+        for y in 1..=7_u16 {
+            for x in 0..buf.area.width {
+                if let Some(symbol) = symbol_at(&buf, x, y) {
+                    if symbol == TRAINED_MARKER || symbol == IDLE_MARKER {
+                        marker_columns.push(x);
+                    }
+                }
+            }
+        }
+        let rightmost_x = marker_columns
+            .into_iter()
+            .max()
+            .expect("heatmap should render day markers");
+
+        assert_eq!(
+            symbol_at(&buf, rightmost_x, 6),
+            Some(TRAINED_MARKER),
+            "the active Saturday should use ✔"
+        );
+        assert_eq!(
+            symbol_at(&buf, rightmost_x, 5),
+            Some(IDLE_MARKER),
+            "the inactive Friday should use ·"
+        );
+        assert!(
+            row_symbols(&buf, 8).trim().is_empty(),
+            "heatmap should not render an explanatory legend row"
+        );
+        assert!(
+            !buf.content.iter().any(|cell| cell.symbol() == "\u{25CF}"),
+            "heatmap should not retain the old circle marker"
+        );
+    }
+
+    #[test]
+    fn heatmap_keeps_recent_training_days_visible_in_narrow_terminals() {
+        let data = vec![("2026-08-17".to_string(), 1), ("2026-08-18".to_string(), 3)];
+        let heatmap = Heatmap::with_today(&data, 52, false, "2026-08-18".parse().unwrap());
+        let mut buf = Buffer::empty(Rect::new(0, 0, 80, 9));
+        heatmap.render(Rect::new(0, 0, 80, 9), &mut buf);
+
+        let mut marker_columns = Vec::new();
+        for y in 1..=7_u16 {
+            for x in 0..buf.area.width {
+                if let Some(symbol) = symbol_at(&buf, x, y) {
+                    if symbol == TRAINED_MARKER || symbol == IDLE_MARKER {
+                        marker_columns.push(x);
+                    }
+                }
+            }
+        }
+        let current_week_x = marker_columns
+            .into_iter()
+            .max()
+            .expect("heatmap should render day markers");
+
+        assert_eq!(
+            symbol_at(&buf, current_week_x, 1),
+            Some(TRAINED_MARKER),
+            "Monday's training should remain visible in an 80-column terminal"
+        );
+        assert_eq!(
+            symbol_at(&buf, current_week_x, 2),
+            Some(TRAINED_MARKER),
+            "Tuesday's training should remain visible in an 80-column terminal"
+        );
+    }
+
+    #[test]
     fn heatmap_renders_with_padded_block_inner_area() {
         use ratatui::widgets::{Block, Borders, Padding};
         let data = vec![("2026-05-16".to_string(), 5i64)];
-        let heatmap = Heatmap::new(&data, 52, false);
+        let heatmap = Heatmap::with_today(&data, 52, false, "2026-05-16".parse().unwrap());
         // A Block with Borders::ALL + Padding::uniform(1) on a 13-row area produces inner height 9
         let block = Block::default()
             .borders(Borders::ALL)
@@ -264,10 +304,27 @@ mod tests {
         let mut buf = Buffer::empty(area);
         block.render(area, &mut buf);
         heatmap.render(inner, &mut buf);
-        let has_content = buf.content.iter().any(|cell| cell.symbol() == "\u{25CF}");
+        let has_content = buf
+            .content
+            .iter()
+            .any(|cell| cell.symbol() == TRAINED_MARKER);
         assert!(
             has_content,
             "heatmap should render inside a padded 13-row block"
         );
+    }
+
+    fn symbol_at(buf: &Buffer, x: u16, y: u16) -> Option<&str> {
+        buf.content
+            .get(y as usize * buf.area.width as usize + x as usize)
+            .map(|cell| cell.symbol())
+    }
+
+    fn row_symbols(buf: &Buffer, y: u16) -> String {
+        buf.content[y as usize * buf.area.width as usize..]
+            .iter()
+            .take(buf.area.width as usize)
+            .map(|cell| cell.symbol().to_string())
+            .collect()
     }
 }
